@@ -92,9 +92,67 @@ class BudgetController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Budget $budget): Response
+    public function show(Budget $budget, Request $request): Response
     {
         $budget->load(['categories.expenses', 'accounts']);
+        
+        // Get query parameters for filtering
+        $search = $request->input('search');
+        $category = $request->input('category');
+        $timeframe = $request->input('timeframe');
+        $page = $request->input('page', 1);
+        
+        // Build transaction query
+        $transactionQuery = $budget->transactions()->with('account');
+        
+        // Apply search filter if provided
+        if ($search) {
+            $transactionQuery->where(function($query) use ($search) {
+                $query->where('description', 'like', "%{$search}%")
+                    ->orWhere('category', 'like', "%{$search}%");
+            });
+        }
+        
+        // Apply category filter if provided
+        if ($category) {
+            $transactionQuery->where('category', $category);
+        }
+        
+        // Apply time filter if provided
+        if ($timeframe) {
+            $now = Carbon::now();
+            switch ($timeframe) {
+                case 'this_month':
+                    $transactionQuery->whereMonth('date', $now->month)
+                        ->whereYear('date', $now->year);
+                    break;
+                case 'last_month':
+                    $lastMonth = $now->copy()->subMonth();
+                    $transactionQuery->whereMonth('date', $lastMonth->month)
+                        ->whereYear('date', $lastMonth->year);
+                    break;
+                case 'last_3_months':
+                    $threeMonthsAgo = $now->copy()->subMonths(3);
+                    $transactionQuery->where('date', '>=', $threeMonthsAgo->startOfDay());
+                    break;
+                case 'this_year':
+                    $transactionQuery->whereYear('date', $now->year);
+                    break;
+            }
+        }
+        
+        // Order by date descending
+        $transactionQuery->orderByDesc('date');
+        
+        // Paginate results
+        $transactions = $transactionQuery->paginate(10)->withQueryString();
+        
+        // Get unique categories for filter dropdown
+        $categories = $budget->transactions()
+            ->select('category')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
         
         // Get the total balance across all accounts
         $totalBalance = $budget->accounts->sum('current_balance_cents') / 100;
@@ -103,6 +161,13 @@ class BudgetController extends Controller
             'budget' => $budget,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
+            'transactions' => $transactions,
+            'categories' => $categories,
+            'filters' => [
+                'search' => $search,
+                'category' => $category,
+                'timeframe' => $timeframe,
+            ],
         ]);
     }
 

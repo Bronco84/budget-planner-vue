@@ -16,110 +16,262 @@
 
     <div class="py-12">
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <!-- Budget Overview Card -->
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
-          <div class="p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Budget Overview</h3>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="bg-gray-50 p-4 rounded-lg">
-                <div class="text-sm font-medium text-gray-500">Total Balance</div>
-                <div class="text-2xl font-semibold mt-1">${{ totalBalance.toFixed(2) }}</div>
-              </div>
-              
-              <div class="bg-gray-50 p-4 rounded-lg">
-                <div class="text-sm font-medium text-gray-500">Description</div>
-                <div class="text-md mt-1">{{ budget.description || 'No description provided' }}</div>
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <!-- Left sidebar with Budget Overview and Accounts -->
+          <div class="lg:col-span-1">
+            <!-- Budget Overview Card -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+              <div class="p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-3">Budget Overview</h3>
+                
+                <div class="space-y-3">
+                  <div class="bg-gray-50 p-3 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500">Total Balance</div>
+                    <div class="text-xl font-semibold mt-1">${{ totalBalance.toFixed(2) }}</div>
+                  </div>
+                  
+                  <div class="bg-gray-50 p-3 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500">Description</div>
+                    <div class="text-sm mt-1">{{ budget.description || 'No description provided' }}</div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-        
-        <!-- Accounts Card -->
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
-          <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-lg font-medium text-gray-900">Accounts</h3>
-              <Link 
-                :href="route('budgets.accounts.create', budget.id)" 
-                class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-              >
-                Add Account
-              </Link>
-            </div>
             
-            <div class="border rounded-lg overflow-hidden" v-if="accounts.length > 0">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th scope="col" class="relative px-6 py-3">
-                      <span class="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="account in accounts" :key="account.id">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="font-medium text-gray-900">{{ account.name }}</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm text-gray-900 capitalize">{{ account.type }}</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+            <!-- Accounts Card -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+              <div class="p-4">
+                <div class="flex justify-between items-center mb-3">
+                  <h3 class="text-lg font-medium text-gray-900">Accounts</h3>
+                  <Link 
+                    :href="route('budgets.accounts.create', budget.id)" 
+                    class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
+                  >
+                    Add
+                  </Link>
+                </div>
+                
+                <div class="space-y-3" v-if="accounts.length > 0">
+                  <div 
+                    v-for="account in accounts" 
+                    :key="account.id" 
+                    class="bg-gray-50 p-3 rounded-lg border-l-4"
+                    :class="account.current_balance_cents >= 0 ? 'border-green-500' : 'border-red-500'"
+                  >
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <div class="font-medium text-gray-900">{{ account.name }}</div>
+                        <div class="text-xs text-gray-500 capitalize mt-1">{{ account.type }}</div>
+                      </div>
                       <div class="text-sm font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
                         ${{ (account.current_balance_cents / 100).toFixed(2) }}
                       </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm text-gray-500">{{ formatDateTime(account.balance_updated_at) }}</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    </div>
+                    <div class="flex items-center justify-between mt-2">
                       <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" 
                         :class="account.status_classes">
                         {{ account.status_label }}
                       </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link :href="route('budgets.accounts.edit', [budget.id, account.id])" class="text-indigo-600 hover:text-indigo-900">Edit</Link>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            
-            <div v-else class="bg-gray-50 p-6 text-center rounded-lg">
-              <p class="text-gray-500">No accounts found. Add an account to get started.</p>
+                      <Link :href="route('budgets.accounts.edit', [budget.id, account.id])" class="text-xs text-indigo-600 hover:text-indigo-900">Edit</Link>
+                    </div>
+                  </div>
+                </div>
+                
+                <div v-else class="bg-gray-50 p-3 text-center rounded-lg">
+                  <p class="text-sm text-gray-500">No accounts found.</p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Recent Transactions Card -->
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-          <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-lg font-medium text-gray-900">Recent Transactions</h3>
-              <Link 
-                :href="route('budget.transaction.index', budget.id)" 
-                class="text-sm text-indigo-600 hover:text-indigo-900"
-              >
-                View All Transactions
-              </Link>
-            </div>
-            
-            <!-- Transactions would go here if available -->
-            <div class="bg-gray-50 p-6 text-center rounded-lg">
-              <p class="text-gray-500">No recent transactions.</p>
-              <Link
-                :href="route('budget.transaction.create', budget.id)"
-                class="mt-3 inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-              >
-                Add Transaction
-              </Link>
+          
+          <!-- Main Content Area - Transactions -->
+          <div class="lg:col-span-3">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+              <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                  <h3 class="text-lg font-medium text-gray-900">Transactions</h3>
+                  <div class="flex space-x-2">
+                    <Link 
+                      :href="route('budget.transaction.create', budget.id)" 
+                      class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
+                    >
+                      Add Transaction
+                    </Link>
+                  </div>
+                </div>
+                
+                <!-- Search and Filter Controls -->
+                <form @submit.prevent="filter">
+                  <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div class="relative rounded-md shadow-sm flex-grow">
+                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <span class="text-gray-500 sm:text-sm">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
+                      </div>
+                      <input 
+                        type="text" 
+                        v-model="form.search"
+                        class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                        placeholder="Search transactions..."
+                      >
+                    </div>
+                    <select v-model="form.category" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                      <option value="">All Categories</option>
+                      <option v-for="category in categories" :key="category" :value="category">
+                        {{ category }}
+                      </option>
+                    </select>
+                    <select v-model="form.timeframe" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                      <option value="">All Time</option>
+                      <option value="this_month">This Month</option>
+                      <option value="last_month">Last Month</option>
+                      <option value="last_3_months">Last 3 Months</option>
+                      <option value="this_year">This Year</option>
+                    </select>
+                    <button type="submit" class="hidden">Filter</button>
+                  </div>
+                </form>
+                
+                <!-- Transactions Table -->
+                <div class="border rounded-lg overflow-hidden">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th scope="col" class="relative px-6 py-3">
+                          <span class="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <tr v-for="transaction in transactions.data" :key="transaction.id">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm text-gray-900">{{ formatDate(transaction.date) }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm font-medium text-gray-900">{{ transaction.description }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm text-gray-900">{{ transaction.category }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm text-gray-900">{{ transaction.account?.name || 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
+                            ${{ (transaction.amount_in_cents / 100).toFixed(2) }}
+                          </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                          <Link 
+                            :href="route('budget.transaction.edit', [budget.id, transaction.id])" 
+                            class="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Edit
+                          </Link>
+                        </td>
+                      </tr>
+                      <!-- Empty state -->
+                      <tr v-if="transactions.data.length === 0">
+                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                          <p>No transactions found.</p>
+                          <p class="mt-1">Add a transaction to get started tracking your finances.</p>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <!-- Pagination -->
+                <div v-if="transactions.data.length > 0" class="mt-4 flex items-center justify-between">
+                  <div class="flex-1 flex justify-between sm:hidden">
+                    <Link
+                      v-if="transactions.prev_page_url"
+                      :href="transactions.prev_page_url"
+                      preserve-scroll
+                      class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      Previous
+                    </Link>
+                    <span v-else class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-white cursor-not-allowed">
+                      Previous
+                    </span>
+                    
+                    <Link
+                      v-if="transactions.next_page_url"
+                      :href="transactions.next_page_url"
+                      preserve-scroll
+                      class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      Next
+                    </Link>
+                    <span v-else class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-white cursor-not-allowed">
+                      Next
+                    </span>
+                  </div>
+                  <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                      <p class="text-sm text-gray-700">
+                        Showing
+                        <span class="font-medium">{{ transactions.from }}</span>
+                        to
+                        <span class="font-medium">{{ transactions.to }}</span>
+                        of
+                        <span class="font-medium">{{ transactions.total }}</span>
+                        results
+                      </p>
+                    </div>
+                    <div>
+                      <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <Link
+                          v-if="transactions.prev_page_url"
+                          :href="transactions.prev_page_url"
+                          preserve-scroll
+                          class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                        >
+                          <span class="sr-only">Previous</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </Link>
+                        <span v-else class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                          <span class="sr-only">Previous</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
+                        
+                        <!-- Page numbers would go here if needed -->
+                        
+                        <Link
+                          v-if="transactions.next_page_url"
+                          :href="transactions.next_page_url"
+                          preserve-scroll
+                          class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                        >
+                          <span class="sr-only">Next</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </Link>
+                        <span v-else class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                          <span class="sr-only">Next</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
+                      </nav>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -129,15 +281,56 @@
 </template>
 
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { reactive, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 // Define props
 const props = defineProps({
   budget: Object,
   accounts: Array,
-  totalBalance: Number
+  totalBalance: Number,
+  transactions: Object,
+  categories: Array,
+  filters: Object
 });
+
+// Form state for filters
+const form = reactive({
+  search: props.filters.search || '',
+  category: props.filters.category || '',
+  timeframe: props.filters.timeframe || ''
+});
+
+// Apply debounced filtering when form values change
+watch(form, debounce(() => filter(), 300));
+
+// Filter function
+function filter() {
+  router.get(
+    route('budgets.show', props.budget.id), 
+    { 
+      search: form.search, 
+      category: form.category,
+      timeframe: form.timeframe
+    }, 
+    { 
+      preserveState: true,
+      preserveScroll: true,
+      replace: true 
+    }
+  );
+}
+
+// Debounce helper
+function debounce(fn, delay = 300) {
+  let timeout;
+  
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+}
 
 // Helper functions for formatting dates
 const formatDate = (dateString) => {

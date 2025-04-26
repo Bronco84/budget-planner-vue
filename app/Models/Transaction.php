@@ -20,7 +20,7 @@ class Transaction extends Model
         'account_id',
         'description',
         'category',
-        'amount',
+        'amount_in_cents',
         'date',
         'plaid_transaction_id',
         'is_plaid_imported',
@@ -35,7 +35,7 @@ class Transaction extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount_in_cents' => 'integer',
         'date' => 'date',
         'is_plaid_imported' => 'boolean',
         'is_reconciled' => 'boolean',

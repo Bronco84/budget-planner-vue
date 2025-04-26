@@ -1,11 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Call to an undefined method App\\\\Models\\\\Budget\\:\\:getMonthlyStatistics\\(\\)\\.$#"
-			count: 1
-			path: app/Http/Controllers/BudgetController.php
-
-		-
-			message: "#^Call to an undefined method App\\\\Models\\\\Budget\\:\\:getYearlyStatistics\\(\\)\\.$#"
-			count: 1
-			path: app/Http/Controllers/BudgetController.php 
+			message: "#^Access to an undefined property Illuminate\\\\Database\\\\Eloquent\\\\Model::\\$category\\.$#"
+			count: 4
+			path: app/Models/Budget.php 

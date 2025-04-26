@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ExpenseController;
@@ -34,6 +35,8 @@ Route::middleware('auth')->group(function () {
     Route::get('budget/{budget}/statistics/monthly/{month?}/{year?}', [BudgetController::class, 'monthlyStatistics'])
         ->name('budget.statistics.monthly');
         
+    Route::resource('budgets.accounts', AccountController::class);
+    
     Route::resource('budgets.categories', CategoryController::class);
     
     Route::resource('budgets.categories.expenses', ExpenseController::class);

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use Carbon\Carbon;
 
 class BudgetController extends Controller
 {
@@ -47,13 +48,43 @@ class BudgetController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'total_amount' => 'required|numeric|min:0',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'description' => 'nullable|string',
+            'account_name' => 'required|string|max:255',
+            'account_type' => 'required|string|in:checking,savings,credit,investment,other',
+            'starting_balance' => 'required|numeric',
         ]);
 
-        $budget = Auth::user()->budgets()->create($validated);
+        // Create the budget
+        $budget = Auth::user()->budgets()->create([
+            'name' => $validated['name'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'description' => $validated['description'],
+        ]);
+
+        // Create the initial account
+        $account = $budget->accounts()->create([
+            'name' => $validated['account_name'],
+            'type' => $validated['account_type'],
+            'current_balance_cents' => $validated['starting_balance'] * 100,
+            'balance_updated_at' => now(),
+            'include_in_budget' => true,
+        ]);
+
+        // Create an initial transaction for this balance
+        $account->transactions()->create([
+            'budget_id' => $budget->id,
+            'description' => 'Initial Balance',
+            'amount_in_cents' => $validated['starting_balance'] * 100,
+            'date' => now(),
+            'category' => 'Starting Balance',
+            'is_reconciled' => true,
+        ]);
+
+        // Set this account as the starting balance account for the budget
+        $budget->update(['starting_balance_account_id' => $account->id]);
 
         return redirect()->route('budgets.show', $budget)
             ->with('message', 'Budget created successfully');
@@ -64,18 +95,15 @@ class BudgetController extends Controller
      */
     public function show(Budget $budget): Response
     {
-        $budget->load(['categories.expenses', 'accounts.plaidAccount']);
+        $budget->load(['categories.expenses', 'accounts']);
         
-        $transactions = Transaction::where('budget_id', $budget->id)
-            ->with(['plaidTransaction'])
-            ->orderBy('date', 'desc')
-            ->paginate(15);
-            
+        // Get the total balance across all accounts
+        $totalBalance = $budget->accounts->sum('current_balance_cents') / 100;
+        
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
-            'transactions' => $transactions,
-            'remainingAmount' => $budget->remaining_amount,
-            'percentUsed' => $budget->percent_used,
+            'totalBalance' => $totalBalance,
+            'accounts' => $budget->accounts,
         ]);
     }
 
@@ -96,7 +124,6 @@ class BudgetController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'total_amount' => 'required|numeric|min:0',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'description' => 'nullable|string',
@@ -130,7 +157,7 @@ class BudgetController extends Controller
 
         $statistics = $budget->getMonthlyStatistics($month, $year);
 
-        return Inertia::render('Budgets/Statistics/Monthly', [
+        return Inertia::render('Budgets/MonthlyStatistics', [
             'budget' => $budget,
             'statistics' => $statistics,
             'year' => $year,
@@ -146,7 +173,7 @@ class BudgetController extends Controller
         $year = $request->input('year', now()->year);
         $statistics = $budget->getYearlyStatistics($year);
 
-        return Inertia::render('Budgets/Statistics/Yearly', [
+        return Inertia::render('Budgets/YearlyStatistics', [
             'budget' => $budget,
             'statistics' => $statistics,
             'year' => $year,

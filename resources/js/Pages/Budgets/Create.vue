@@ -35,23 +35,59 @@
                 <InputError class="mt-2" :message="form.errors.description" />
               </div>
               
-              <div class="mb-4">
-                <InputLabel for="total_amount" value="Total Budget Amount" />
-                <div class="relative mt-1 rounded-md shadow-sm">
-                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <span class="text-gray-500 sm:text-sm">$</span>
+              <div class="mb-8">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Initial Account</h3>
+                <p class="mb-4 text-sm text-gray-600">Your budget needs at least one account to track your finances. You can add more accounts later.</p>
+                
+                <div class="bg-gray-50 p-4 rounded-lg">
+                  <div class="mb-4">
+                    <InputLabel for="account_name" value="Account Name" />
+                    <TextInput
+                      id="account_name"
+                      type="text"
+                      class="mt-1 block w-full"
+                      v-model="form.account_name"
+                      required
+                      placeholder="e.g., Checking, Credit Card, etc."
+                    />
+                    <InputError class="mt-2" :message="form.errors.account_name" />
                   </div>
-                  <TextInput
-                    id="total_amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    class="mt-1 block w-full pl-7"
-                    v-model="form.total_amount"
-                    required
-                  />
+                  
+                  <div class="mb-4">
+                    <InputLabel for="account_type" value="Account Type" />
+                    <SelectInput
+                      id="account_type"
+                      class="mt-1 block w-full"
+                      v-model="form.account_type"
+                      required
+                    >
+                      <option value="checking">Checking</option>
+                      <option value="savings">Savings</option>
+                      <option value="credit">Credit Card</option>
+                      <option value="investment">Investment</option>
+                      <option value="other">Other</option>
+                    </SelectInput>
+                    <InputError class="mt-2" :message="form.errors.account_type" />
+                  </div>
+                  
+                  <div class="mb-0">
+                    <InputLabel for="starting_balance" value="Starting Balance" />
+                    <div class="relative mt-1 rounded-md shadow-sm">
+                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <span class="text-gray-500 sm:text-sm">$</span>
+                      </div>
+                      <TextInput
+                        id="starting_balance"
+                        type="number"
+                        step="0.01"
+                        class="mt-1 block w-full pl-7"
+                        v-model="form.starting_balance"
+                        required
+                      />
+                    </div>
+                    <InputError class="mt-2" :message="form.errors.starting_balance" />
+                  </div>
                 </div>
-                <InputError class="mt-2" :message="form.errors.total_amount" />
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -107,14 +143,17 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextArea from '@/Components/TextArea.vue';
 import TextInput from '@/Components/TextInput.vue';
+import SelectInput from '@/Components/SelectInput.vue';
 
 // Initialize form with default values
 const form = useForm({
   name: '',
   description: '',
-  total_amount: '',
   start_date: new Date().toISOString().split('T')[0], // Today
   end_date: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0], // One month from today
+  account_name: '',
+  account_type: 'checking',
+  starting_balance: 0
 });
 
 // Submit form handler

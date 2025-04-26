@@ -8,14 +8,4 @@ parameters:
 		-
 			message: "#^Call to an undefined method App\\\\Models\\\\Budget\\:\\:getYearlyStatistics\\(\\)\\.$#"
 			count: 1
-			path: app/Http/Controllers/BudgetController.php
-
-		-
-			message: "#^PHPDoc type array<int, string> of property .+\\:\\:\\$fillable is not covariant with PHPDoc type list<string> of overridden property Illuminate\\\\Database\\\\Eloquent\\\\Model\\:\\:\\$fillable\\.$#"
-			count: 7
-			path: app/Models
-
-		-
-			message: "#^Return type \\(array<string, mixed>\\) of method Database\\\\Factories\\\\UserFactory\\:\\:definition\\(\\) should be compatible with return type \\(array<model property of App\\\\Models\\\\User, mixed>\\) of method Illuminate\\\\Database\\\\Eloquent\\\\Factories\\\\Factory<App\\\\Models\\\\User>\\:\\:definition\\(\\)$#"
-			count: 1
-			path: database/factories/UserFactory.php 
+			path: app/Http/Controllers/BudgetController.php 

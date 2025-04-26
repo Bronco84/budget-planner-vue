@@ -12,3 +12,5 @@ parameters:
         - resources
         - tests
         - bootstrap
+    excludePaths:
+        - tests/Unit/ExampleTest.php

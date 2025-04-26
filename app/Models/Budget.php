@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\Collection;
 
 class Budget extends Model
 {
@@ -65,6 +66,8 @@ class Budget extends Model
 
     /**
      * Get the transactions for the budget.
+     * 
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Transaction, \App\Models\Budget>
      */
     public function transactions(): HasMany
     {
@@ -76,7 +79,7 @@ class Budget extends Model
      */
     public function getRemainingAmountAttribute()
     {
-        $spent = $this->transactions()->sum('amount');
+        $spent = $this->transactions()->sum('amount_in_cents');
         return $this->total_amount - $spent;
     }
 
@@ -86,7 +89,7 @@ class Budget extends Model
     public function getPercentUsedAttribute()
     {
         if ($this->total_amount > 0) {
-            $spent = $this->transactions()->sum('amount');
+            $spent = $this->transactions()->sum('amount_in_cents');
             return ($spent / $this->total_amount) * 100;
         }
         return 0;
@@ -108,6 +111,7 @@ class Budget extends Model
         $end = Carbon::create($year, $month, 1)->endOfMonth();
 
         // Get all transactions for the current month
+        /** @var Collection<int, Transaction> $matchingTransactions */
         $matchingTransactions = $this->transactions()
             ->whereDate('date', '>=', $start)
             ->whereDate('date', '<=', $end)
@@ -119,10 +123,13 @@ class Budget extends Model
 
         // Group by category
         $byCategory = $matchingTransactions
-            ->groupBy(fn ($transaction) => $transaction->category)
-            ->map(function($transactions) {
+            ->groupBy(function (Transaction $transaction) {
+                return $transaction->category;
+            })
+            ->map(function ($transactions) {
+                $first = $transactions->first();
                 return (object)[
-                    'category' => $transactions->first()->category,
+                    'category' => $first instanceof Transaction ? $first->category : null,
                     'total' => $transactions->sum('amount_in_cents')
                 ];
             })
@@ -130,6 +137,7 @@ class Budget extends Model
 
         // Calculate previous month's statistics
         $prevMonth = $start->copy()->subMonth();
+        /** @var Collection<int, Transaction> $prevMonthTransactions */
         $prevMonthTransactions = $this->transactions()
             ->whereDate('date', '>=', $prevMonth->startOfMonth())
             ->whereDate('date', '<=', $prevMonth->endOfMonth())
@@ -140,10 +148,13 @@ class Budget extends Model
 
         // Group previous month by category
         $prevMonthByCategory = $prevMonthTransactions
-            ->groupBy(fn ($transaction) => $transaction->category)
-            ->map(function($transactions) {
+            ->groupBy(function (Transaction $transaction) {
+                return $transaction->category;
+            })
+            ->map(function ($transactions) {
+                $first = $transactions->first();
                 return (object)[
-                    'category' => $transactions->first()->category,
+                    'category' => $first instanceof Transaction ? $first->category : null,
                     'total' => $transactions->sum('amount_in_cents')
                 ];
             })

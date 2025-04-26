@@ -21,15 +21,10 @@
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Budget Overview</h3>
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="bg-gray-50 p-4 rounded-lg">
                 <div class="text-sm font-medium text-gray-500">Total Balance</div>
                 <div class="text-2xl font-semibold mt-1">${{ totalBalance.toFixed(2) }}</div>
-              </div>
-              
-              <div class="bg-gray-50 p-4 rounded-lg">
-                <div class="text-sm font-medium text-gray-500">Date Range</div>
-                <div class="text-md font-medium mt-1">{{ formatDate(budget.start_date) }} - {{ formatDate(budget.end_date) }}</div>
               </div>
               
               <div class="bg-gray-50 p-4 rounded-lg">
@@ -85,8 +80,8 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" 
-                        :class="account.include_in_budget ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'">
-                        {{ account.include_in_budget ? 'Included' : 'Excluded' }}
+                        :class="account.status_classes">
+                        {{ account.status_label }}
                       </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

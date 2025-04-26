@@ -49,14 +49,37 @@
               </div>
               
               <div class="mb-6">
-                <div class="flex items-start">
-                  <div class="flex h-5 items-center">
-                    <Checkbox id="include_in_budget" v-model:checked="form.include_in_budget" />
+                <InputLabel for="status" value="Account Status" />
+                <div class="mt-2">
+                  <div class="flex items-center">
+                    <input
+                      id="status-active"
+                      type="radio"
+                      name="status"
+                      value="active"
+                      v-model="accountStatus"
+                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label for="status-active" class="ml-2 block text-sm text-gray-700">
+                      Active (include in budget calculations)
+                    </label>
                   </div>
-                  <div class="ml-3 text-sm">
-                    <label for="include_in_budget" class="font-medium text-gray-700">Include in Budget Calculations</label>
-                    <p class="text-gray-500">Whether this account's balance should be included in your total budget calculations.</p>
+                  <div class="flex items-center mt-2">
+                    <input
+                      id="status-excluded"
+                      type="radio"
+                      name="status"
+                      value="excluded"
+                      v-model="accountStatus"
+                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label for="status-excluded" class="ml-2 block text-sm text-gray-700">
+                      Excluded (don't include in budget calculations)
+                    </label>
                   </div>
+                  <p class="text-sm text-gray-500 mt-1">
+                    This determines whether this account's balance will be included in your total budget calculations.
+                  </p>
                 </div>
               </div>
               
@@ -117,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
@@ -127,7 +150,6 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
-import Checkbox from '@/Components/Checkbox.vue';
 import Modal from '@/Components/Modal.vue';
 
 // Define props to receive the budget and account
@@ -136,11 +158,19 @@ const props = defineProps({
   account: Object
 });
 
+// Set up account status based on include_in_budget
+const accountStatus = ref(props.account.include_in_budget ? 'active' : 'excluded');
+
 // Initialize form with account values
 const form = useForm({
   name: props.account.name,
   type: props.account.type,
   include_in_budget: props.account.include_in_budget,
+});
+
+// Watch for changes to account status and update include_in_budget
+watch(accountStatus, (newValue) => {
+  form.include_in_budget = newValue === 'active';
 });
 
 // Submit form handler

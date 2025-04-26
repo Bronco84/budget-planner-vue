@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\AccountStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Account extends Model
 {
@@ -23,6 +25,7 @@ class Account extends Model
         'type',
         'current_balance_cents',
         'balance_updated_at',
+        'include_in_budget',
     ];
 
     /**
@@ -33,6 +36,17 @@ class Account extends Model
     protected $casts = [
         'current_balance_cents' => 'integer',
         'balance_updated_at' => 'datetime',
+        'include_in_budget' => 'boolean',
+    ];
+    
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var list<string>
+     */
+    protected $appends = [
+        'status_label',
+        'status_classes',
     ];
 
     /**
@@ -57,5 +71,33 @@ class Account extends Model
     public function plaidAccount(): HasOne
     {
         return $this->hasOne(PlaidAccount::class);
+    }
+    
+    /**
+     * Get the account status based on include_in_budget.
+     */
+    protected function getStatusAttribute(): AccountStatus
+    {
+        return AccountStatus::fromIncludeInBudget($this->include_in_budget);
+    }
+    
+    /**
+     * Get the status label.
+     */
+    protected function statusLabel(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->getStatusAttribute()->label(),
+        );
+    }
+    
+    /**
+     * Get the status CSS classes.
+     */
+    protected function statusClasses(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->getStatusAttribute()->classes(),
+        );
     }
 } 

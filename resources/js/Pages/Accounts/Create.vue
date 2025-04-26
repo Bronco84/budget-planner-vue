@@ -61,10 +61,35 @@
               </div>
               
               <div class="mb-4">
-                <label class="flex items-center">
-                  <Checkbox name="include_in_budget" v-model:checked="form.include_in_budget" />
-                  <span class="ml-2 text-sm text-gray-600">Include in Budget Calculations</span>
-                </label>
+                <InputLabel for="status" value="Account Status" />
+                <div class="mt-2">
+                  <div class="flex items-center">
+                    <input
+                      id="status-active"
+                      type="radio"
+                      name="status"
+                      value="active"
+                      v-model="accountStatus"
+                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label for="status-active" class="ml-2 block text-sm text-gray-700">
+                      Active (include in budget calculations)
+                    </label>
+                  </div>
+                  <div class="flex items-center mt-2">
+                    <input
+                      id="status-excluded"
+                      type="radio"
+                      name="status"
+                      value="excluded"
+                      v-model="accountStatus"
+                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label for="status-excluded" class="ml-2 block text-sm text-gray-700">
+                      Excluded (don't include in budget calculations)
+                    </label>
+                  </div>
+                </div>
               </div>
               
               <div class="flex items-center justify-end mt-6">
@@ -93,12 +118,16 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import Checkbox from '@/Components/Checkbox.vue';
+import SelectInput from '@/Components/SelectInput.vue';
+import { ref, watch } from 'vue';
 
 // Define props to receive the budget
 const props = defineProps({
   budget: Object
 });
+
+// Set up account status
+const accountStatus = ref('active');
 
 // Initialize form with default values
 const form = useForm({
@@ -108,11 +137,17 @@ const form = useForm({
   include_in_budget: true
 });
 
+// Watch for changes to account status and update include_in_budget
+watch(accountStatus, (newValue) => {
+  form.include_in_budget = newValue === 'active';
+});
+
 // Submit form handler
 const submit = () => {
   form.post(route('budgets.accounts.store', props.budget.id), {
     onSuccess: () => {
       form.reset();
+      accountStatus.value = 'active';
     },
   });
 };

@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Http\RedirectResponse;
 
 class AccountController extends Controller
 {
@@ -22,7 +24,7 @@ class AccountController extends Controller
     /**
      * Store a newly created account in storage.
      */
-    public function store(Request $request, Budget $budget)
+    public function store(Request $request, Budget $budget): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -31,6 +33,7 @@ class AccountController extends Controller
             'include_in_budget' => 'boolean',
         ]);
 
+        /** @var Account $account */
         $account = $budget->accounts()->create([
             'name' => $validated['name'],
             'type' => $validated['type'],
@@ -67,7 +70,7 @@ class AccountController extends Controller
     /**
      * Update the specified account in storage.
      */
-    public function update(Request $request, Budget $budget, Account $account)
+    public function update(Request $request, Budget $budget, Account $account): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -84,7 +87,7 @@ class AccountController extends Controller
     /**
      * Remove the specified account from storage.
      */
-    public function destroy(Budget $budget, Account $account)
+    public function destroy(Budget $budget, Account $account): RedirectResponse
     {
         // Don't allow deletion if there are transactions
         if ($account->transactions()->count() > 1) { // More than the initial balance transaction

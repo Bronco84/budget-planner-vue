@@ -1,2 +1,7 @@
 parameters:
-	ignoreErrors: [] 
+	ignoreErrors:
+		-
+			message: '#^Method App\\Models\\Budget\:\:transactions\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany\<App\\Models\\Transaction, App\\Models\\Budget\> but returns Illuminate\\Database\\Eloquent\\Relations\\HasMany\<App\\Models\\Transaction, \$this\(App\\Models\\Budget\)\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Budget.php

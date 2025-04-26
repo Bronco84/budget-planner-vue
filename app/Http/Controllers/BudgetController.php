@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Budget;
+use App\Models\Account;
 use App\Models\Transaction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,23 +49,21 @@ class BudgetController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
             'description' => 'nullable|string',
             'account_name' => 'required|string|max:255',
             'account_type' => 'required|string|in:checking,savings,credit,investment,other',
             'starting_balance' => 'required|numeric',
         ]);
 
-        // Create the budget
+        // Create the budget with proper type
+        /** @var Budget $budget */
         $budget = Auth::user()->budgets()->create([
             'name' => $validated['name'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
             'description' => $validated['description'],
         ]);
 
-        // Create the initial account
+        // Create the initial account with proper type
+        /** @var Account $account */
         $account = $budget->accounts()->create([
             'name' => $validated['account_name'],
             'type' => $validated['account_type'],
@@ -124,8 +123,6 @@ class BudgetController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
             'description' => 'nullable|string',
         ]);
 

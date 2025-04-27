@@ -13,7 +13,19 @@ return new class extends Migration
     {
         Schema::create('plaid_accounts', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('budget_id')->constrained()->onDelete('cascade');
+            $table->foreignId('account_id')->constrained()->onDelete('cascade');
+            $table->string('plaid_account_id');
+            $table->string('plaid_item_id');
+            $table->string('institution_name')->nullable();
+            $table->bigInteger('current_balance_cents')->default(0);
+            $table->bigInteger('available_balance_cents')->nullable();
+            $table->timestamp('balance_updated_at')->nullable();
+            $table->json('metadata')->nullable();
+            $table->string('access_token')->nullable();
             $table->timestamps();
+            
+            $table->unique(['plaid_account_id', 'plaid_item_id']);
         });
     }
 

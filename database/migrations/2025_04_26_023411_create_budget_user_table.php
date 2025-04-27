@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('budget_user', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('budget_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('access_level')->default('viewer'); // viewer, editor, admin
             $table->timestamps();
+            
+            $table->unique(['budget_id', 'user_id']);
         });
     }
 

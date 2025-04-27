@@ -34,6 +34,16 @@ class Category extends Model
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var list<string>
+     */
+    protected $appends = [
+        'percent_used',
+        'remaining_amount',
+    ];
+
+    /**
      * Get the budget that owns the category.
      */
     public function budget(): BelongsTo
@@ -51,8 +61,10 @@ class Category extends Model
 
     /**
      * Get the percentage used of the category budget.
+     *
+     * @return float
      */
-    public function getPercentUsedAttribute()
+    public function getPercentUsedAttribute(): float
     {
         if ($this->amount > 0) {
             $spent = $this->expenses()->sum('amount');
@@ -63,8 +75,10 @@ class Category extends Model
 
     /**
      * Get the remaining amount for the category.
+     *
+     * @return float
      */
-    public function getRemainingAmountAttribute()
+    public function getRemainingAmountAttribute(): float
     {
         $spent = $this->expenses()->sum('amount');
         return $this->amount - $spent;

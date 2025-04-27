@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Budget;
 use App\Models\Account;
 use App\Models\Transaction;
+use App\Services\ProjectionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,9 @@ class BudgetController extends Controller
      */
     public function index(): Response
     {
-        $budgets = Auth::user()->budgets()->with('categories.expenses')->get();
+        $budgets = Auth::user()->budgets()
+            ->with(['categories', 'categories.expenses', 'accounts'])
+            ->get();
         
         return Inertia::render('Budgets/Index', [
             'budgets' => $budgets
@@ -94,13 +97,33 @@ class BudgetController extends Controller
      */
     public function show(Budget $budget, Request $request): Response
     {
-        $budget->load(['categories.expenses', 'accounts']);
+        // Load relationships including plaidAccount with account
+        $budget->load([
+            'categories.expenses', 
+            'accounts.plaidAccount'
+        ]);
+        
+        // Make sure accounts are loaded with their plaidAccount relationship
+        $accounts = $budget->accounts->each(function ($account) {
+            // Force loading of plaidAccount to ensure it's available
+            $account->load('plaidAccount');
+        });
         
         // Get query parameters for filtering
         $search = $request->input('search');
         $category = $request->input('category');
         $timeframe = $request->input('timeframe');
         $page = $request->input('page', 1);
+        
+        // Get projection parameters
+        $includeProjections = $request->boolean('include_projections', false);
+        $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : Carbon::today();
+        $months = (int) $request->input('projection_months', 1);
+        
+        // Treat months=0 as disabling projections
+        if ($months === 0) {
+            $includeProjections = false;
+        }
         
         // Build transaction query
         $transactionQuery = $budget->transactions()->with('account');
@@ -144,8 +167,28 @@ class BudgetController extends Controller
         // Order by date descending
         $transactionQuery->orderByDesc('date');
         
-        // Paginate results
-        $transactions = $transactionQuery->paginate(10)->withQueryString();
+        // Get projected transactions if requested
+        $projectedTransactions = collect();
+        if ($includeProjections) {
+            $projectionService = new ProjectionService();
+            $projections = $projectionService->projectBudgetTransactions($budget, $startDate, $months);
+            
+            // Flatten the nested transaction structure from projections
+            foreach ($projections['transactions'] as $monthData) {
+                foreach ($monthData as $dayData) {
+                    foreach ($dayData as $transaction) {
+                        if ($transaction->is_projected) {
+                            $projectedTransactions->push($transaction);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Get base transactions
+        $actualTransactions = $transactionQuery->paginate(10)->withQueryString();
+        
+        // If projections are included, we need to merge them with actual transactions on the client side
         
         // Get unique categories for filter dropdown
         $categories = $budget->transactions()
@@ -161,7 +204,13 @@ class BudgetController extends Controller
             'budget' => $budget,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
-            'transactions' => $transactions,
+            'transactions' => $actualTransactions,
+            'projectedTransactions' => $includeProjections ? $projectedTransactions : null,
+            'projectionParams' => [
+                'includeProjections' => $includeProjections,
+                'startDate' => $startDate->format('Y-m-d'),
+                'months' => $months,
+            ],
             'categories' => $categories,
             'filters' => [
                 'search' => $search,
@@ -239,6 +288,34 @@ class BudgetController extends Controller
             'budget' => $budget,
             'statistics' => $statistics,
             'year' => $year,
+        ]);
+    }
+
+    /**
+     * Get projected transactions for the budget
+     */
+    public function projections(Budget $budget, Request $request): Response
+    {
+        $this->authorize('view', $budget);
+        
+        $validated = $request->validate([
+            'start_date' => 'required|date',
+            'months' => 'integer|min:1|max:24',
+        ]);
+        
+        $startDate = Carbon::parse($validated['start_date']);
+        $months = $validated['months'] ?? 6;
+        
+        $projectionService = new ProjectionService();
+        $projections = $projectionService->projectBudgetTransactions($budget, $startDate, $months);
+        
+        return Inertia::render('Budgets/Projections', [
+            'budget' => $budget,
+            'projections' => $projections,
+            'params' => [
+                'start_date' => $startDate->format('Y-m-d'),
+                'months' => $months,
+            ],
         ]);
     }
 }

@@ -21,9 +21,11 @@ class PlaidAccount extends Model
         'plaid_account_id',
         'plaid_item_id',
         'institution_name',
+        'access_token',
         'current_balance_cents',
         'available_balance_cents',
         'balance_updated_at',
+        'last_sync_at',
     ];
 
     /**
@@ -35,6 +37,7 @@ class PlaidAccount extends Model
         'current_balance_cents' => 'integer',
         'available_balance_cents' => 'integer',
         'balance_updated_at' => 'datetime',
+        'last_sync_at' => 'datetime',
     ];
 
     /**

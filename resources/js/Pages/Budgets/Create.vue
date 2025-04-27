@@ -90,32 +90,6 @@
                 </div>
               </div>
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <InputLabel for="start_date" value="Start Date" />
-                  <TextInput
-                    id="start_date"
-                    type="date"
-                    class="mt-1 block w-full"
-                    v-model="form.start_date"
-                    required
-                  />
-                  <InputError class="mt-2" :message="form.errors.start_date" />
-                </div>
-                
-                <div>
-                  <InputLabel for="end_date" value="End Date" />
-                  <TextInput
-                    id="end_date"
-                    type="date"
-                    class="mt-1 block w-full"
-                    v-model="form.end_date"
-                    required
-                  />
-                  <InputError class="mt-2" :message="form.errors.end_date" />
-                </div>
-              </div>
-              
               <div class="flex items-center justify-end mt-6">
                 <Link
                   :href="route('budgets.index')"
@@ -149,8 +123,6 @@ import SelectInput from '@/Components/SelectInput.vue';
 const form = useForm({
   name: '',
   description: '',
-  start_date: new Date().toISOString().split('T')[0], // Today
-  end_date: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0], // One month from today
   account_name: '',
   account_type: 'checking',
   starting_balance: 0

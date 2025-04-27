@@ -61,6 +61,9 @@ class AccountController extends Controller
      */
     public function edit(Budget $budget, Account $account)
     {
+        // Load the Plaid account relationship
+        $account->load('plaidAccount');
+        
         return Inertia::render('Accounts/Edit', [
             'budget' => $budget,
             'account' => $account

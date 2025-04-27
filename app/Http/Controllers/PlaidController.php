@@ -1,0 +1,247 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Account;
+use App\Models\Budget;
+use App\Models\PlaidAccount;
+use App\Services\PlaidService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
+use Inertia\Response;
+use Illuminate\Support\Facades\Log;
+
+class PlaidController extends Controller
+{
+    protected PlaidService $plaidService;
+    
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct(PlaidService $plaidService)
+    {
+        $this->plaidService = $plaidService;
+    }
+    
+    /**
+     * Show the form for linking a Plaid account.
+     */
+    public function showLinkForm(Budget $budget, Account $account): Response
+    {
+        // Check if the account is already linked to Plaid
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        
+        $linkToken = null;
+        try {
+            $linkToken = $this->plaidService->createLinkToken((string) Auth::id());
+        } catch (\Exception $e) {
+            Log::error('Failed to create link token', [
+                'error' => $e->getMessage()
+            ]);
+        }
+        
+        return Inertia::render('Plaid/Link', [
+            'budget' => $budget,
+            'account' => $account,
+            'linkToken' => $linkToken,
+            'isLinked' => $plaidAccount !== null,
+            'plaidAccount' => $plaidAccount,
+        ]);
+    }
+    
+    /**
+     * Store a new Plaid link.
+     */
+    public function store(Request $request, Budget $budget, Account $account): RedirectResponse
+    {
+        $validated = $request->validate([
+            'public_token' => 'required|string',
+            'metadata' => 'required|array',
+            'metadata.institution' => 'required|array',
+            'metadata.institution.name' => 'required|string',
+            'metadata.account' => 'required|array',
+            'metadata.account.id' => 'required|string',
+        ]);
+        
+        try {
+            // Exchange the public token for an access token
+            $accessToken = $this->plaidService->exchangePublicToken($validated['public_token']);
+            
+            if (!$accessToken) {
+                return redirect()->back()->with('error', 'Failed to connect to Plaid.');
+            }
+            
+            // Extract itemId - use a default if not present in the expected location
+            $itemId = $validated['metadata']['item']['id'] ?? 
+                    $validated['metadata']['item_id'] ?? 
+                    null;
+                    
+            // Link the account
+            $plaidAccount = $this->plaidService->linkAccount(
+                $budget,
+                $account,
+                $accessToken,
+                $validated['metadata']['account']['id'],
+                $itemId,
+                $validated['metadata']['institution']['name']
+            );
+            
+            // Sync transactions
+            $this->plaidService->syncTransactions($plaidAccount);
+            
+            return redirect()->route('budgets.show', $budget)
+                ->with('message', 'Account linked to Plaid successfully.');
+        } catch (\Exception $e) {
+            Log::error('Plaid linking failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return redirect()->back()->with('error', 'Failed to link account: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Sync transactions for a specific Plaid-linked account.
+     */
+    public function syncTransactions(Budget $budget, Account $account): RedirectResponse
+    {
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        
+        if (!$plaidAccount) {
+            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+        }
+        
+        $result = $this->plaidService->syncTransactions($plaidAccount);
+        
+        return redirect()->back()->with('message', 
+            'Synced ' . $result['imported'] . ' new and updated ' . $result['updated'] . ' transactions.');
+    }
+    
+    /**
+     * Update the account balance from Plaid.
+     */
+    public function updateBalance(Budget $budget, Account $account): RedirectResponse
+    {
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        
+        if (!$plaidAccount) {
+            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+        }
+        
+        $updated = $this->plaidService->updateAccountBalance($plaidAccount);
+        
+        if ($updated) {
+            return redirect()->back()->with('message', 'Account balance updated successfully.');
+        }
+        
+        return redirect()->back()->with('error', 'Failed to update account balance.');
+    }
+    
+    /**
+     * Unlink a Plaid account.
+     */
+    public function destroy(Budget $budget, Account $account): RedirectResponse
+    {
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        
+        if (!$plaidAccount) {
+            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+        }
+        
+        $plaidAccount->delete();
+        
+        return redirect()->back()->with('message', 'Account unlinked from Plaid.');
+    }
+    
+    /**
+     * Sync transactions for all Plaid-connected accounts in a budget.
+     */
+    public function syncAllTransactions(Budget $budget): RedirectResponse
+    {
+        // Log that the method has been called
+        Log::info('syncAllTransactions method called', [
+            'budget_id' => $budget->id,
+            'budget_name' => $budget->name
+        ]);
+    
+        // Find all accounts in this budget that have Plaid connections
+        $plaidAccounts = PlaidAccount::whereHas('account', function ($query) use ($budget) {
+            $query->where('budget_id', $budget->id);
+        })->get();
+        
+        Log::info('Found Plaid accounts', [
+            'count' => $plaidAccounts->count(),
+            'accounts' => $plaidAccounts->map(function ($pa) {
+                return [
+                    'id' => $pa->id,
+                    'plaid_account_id' => $pa->plaid_account_id,
+                    'access_token' => $pa->access_token ? '[exists]' : '[null]',
+                    'account_id' => $pa->account_id,
+                    'institution_name' => $pa->institution_name,
+                ];
+            })
+        ]);
+        
+        if ($plaidAccounts->isEmpty()) {
+            Log::warning('No Plaid-connected accounts found for budget', ['budget_id' => $budget->id]);
+            return redirect()->back()->with('error', 'No Plaid-connected accounts found.');
+        }
+        
+        $totalImported = 0;
+        $totalUpdated = 0;
+        $errors = [];
+        
+        foreach ($plaidAccounts as $plaidAccount) {
+            try {
+                Log::info('Starting sync for account', [
+                    'plaid_account_id' => $plaidAccount->id,
+                    'account_id' => $plaidAccount->account_id,
+                    'institution' => $plaidAccount->institution_name
+                ]);
+                
+                $result = $this->plaidService->syncTransactions($plaidAccount);
+                $totalImported += $result['imported'];
+                $totalUpdated += $result['updated'];
+                
+                Log::info('Sync successful', [
+                    'plaid_account_id' => $plaidAccount->id,
+                    'imported' => $result['imported'],
+                    'updated' => $result['updated']
+                ]);
+            } catch (\Exception $e) {
+                // Make sure to access the name safely
+                $accountName = $plaidAccount->account ? $plaidAccount->account->name : 'Unknown';
+                $errorMessage = "Error syncing account {$accountName}: {$e->getMessage()}";
+                $errors[] = $errorMessage;
+                
+                Log::error('Sync error', [
+                    'plaid_account_id' => $plaidAccount->id,
+                    'account_id' => $plaidAccount->account_id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        }
+        
+        Log::info('Sync complete', [
+            'total_imported' => $totalImported,
+            'total_updated' => $totalUpdated,
+            'error_count' => count($errors)
+        ]);
+        
+        if (!empty($errors)) {
+            // Log errors but don't show them to the user unless there were no successful syncs
+            Log::error('Plaid sync errors', $errors);
+            
+            if ($totalImported === 0 && $totalUpdated === 0) {
+                return redirect()->back()->with('error', 'Failed to sync transactions. Please try again.');
+            }
+        }
+        
+        return redirect()->back()->with('message', 
+            "Synced {$totalImported} new and updated {$totalUpdated} transactions.");
+    }
+} 

@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Collection;
+use App\Models\Expense;
 
 class Budget extends Model
 {
@@ -23,10 +25,8 @@ class Budget extends Model
     protected $fillable = [
         'user_id',
         'name',
-        'total_amount',
-        'start_date',
-        'end_date',
         'description',
+        'starting_balance_account_id',
     ];
 
     /**
@@ -34,10 +34,19 @@ class Budget extends Model
      *
      * @var array<string, string>
      */
-    protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
-        'total_amount' => 'decimal:2',
+    protected $casts = [];
+
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var list<string>
+     */
+    protected $appends = [
+        'total_amount',
+        'remaining_amount',
+        'percent_used',
+        'start_date',
+        'end_date',
     ];
 
     /**
@@ -75,26 +84,29 @@ class Budget extends Model
     }
 
     /**
-     * Get the remaining amount for the budget.
+     * Get the accounts for this budget.
      */
-    public function getRemainingAmountAttribute()
+    public function accounts(): HasMany
     {
-        $spent = $this->transactions()->sum('amount_in_cents');
-        return $this->total_amount - $spent;
+        return $this->hasMany(Account::class);
     }
 
     /**
-     * Get the percentage used of the budget.
+     * Get the starting balance account for this budget.
      */
-    public function getPercentUsedAttribute()
+    public function startingBalanceAccount(): BelongsTo
     {
-        if ($this->total_amount > 0) {
-            $spent = $this->transactions()->sum('amount_in_cents');
-            return ($spent / $this->total_amount) * 100;
-        }
-        return 0;
+        return $this->belongsTo(Account::class, 'starting_balance_account_id');
     }
-    
+
+    /**
+     * Get the recurring transaction templates for the budget.
+     */
+    public function recurringTransactionTemplates(): HasMany
+    {
+        return $this->hasMany(RecurringTransactionTemplate::class);
+    }
+
     /**
      * Get monthly statistics for the budget.
      * 
@@ -255,5 +267,87 @@ class Budget extends Model
             'monthly' => $monthlyStats,
             'yearly_totals' => $yearlyTotals
         ];
+    }
+
+    /**
+     * Get the total budget amount based on category allocations.
+     *
+     * @return float
+     */
+    public function getTotalAmountAttribute(): float
+    {
+        // Use the actual column name 'amount' instead of the accessor 'allocated_amount'
+        return $this->categories()->sum('amount');
+    }
+
+    /**
+     * Get the remaining budget amount.
+     *
+     * @return float
+     */
+    public function getRemainingAmountAttribute(): float
+    {
+        // Calculate based on actual columns
+        $totalAllocated = $this->categories()->sum('amount');
+        
+        // For expenses, we need to calculate the sum manually from the relationships
+        $totalSpent = 0;
+        foreach ($this->categories as $category) {
+            $totalSpent += $category->expenses()->sum('amount');
+        }
+        
+        return $totalAllocated - $totalSpent;
+    }
+
+    /**
+     * Get the percentage of budget used.
+     *
+     * @return float
+     */
+    public function getPercentUsedAttribute(): float
+    {
+        $totalAllocated = $this->categories()->sum('amount');
+        
+        if ($totalAllocated <= 0) {
+            return 0;
+        }
+        
+        // For expenses, we need to calculate the sum manually from the relationships
+        $totalSpent = 0;
+        foreach ($this->categories as $category) {
+            $totalSpent += $category->expenses()->sum('amount');
+        }
+        
+        $percentUsed = ($totalSpent / $totalAllocated) * 100;
+        
+        return min($percentUsed, 100);
+    }
+
+    /**
+     * Get the budget start date (current month start).
+     *
+     * @return string
+     */
+    public function getStartDateAttribute(): string
+    {
+        return now()->startOfMonth()->format('Y-m-d');
+    }
+
+    /**
+     * Get the budget end date (current month end).
+     *
+     * @return string
+     */
+    public function getEndDateAttribute(): string
+    {
+        return now()->endOfMonth()->format('Y-m-d');
+    }
+
+    /**
+     * Get the expenses for this budget through categories.
+     */
+    public function expenses()
+    {
+        return $this->hasManyThrough(Expense::class, Category::class);
     }
 }

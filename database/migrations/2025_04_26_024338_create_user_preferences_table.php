@@ -13,6 +13,11 @@ return new class extends Migration
     {
         Schema::create('user_preferences', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('theme')->default('light'); // light, dark, system
+            $table->boolean('notifications_enabled')->default(true);
+            $table->boolean('show_balance_projection')->default(false);
+            $table->json('other_preferences')->nullable();
             $table->timestamps();
         });
     }

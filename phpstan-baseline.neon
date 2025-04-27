@@ -1,7 +1,31 @@
 parameters:
 	ignoreErrors:
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/PlaidController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:rules\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:expenses\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Models/Budget.php
+
+		-
 			message: '#^Method App\\Models\\Budget\:\:transactions\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany\<App\\Models\\Transaction, App\\Models\\Budget\> but returns Illuminate\\Database\\Eloquent\\Relations\\HasMany\<App\\Models\\Transaction, \$this\(App\\Models\\Budget\)\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Models/Budget.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$is_projected\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/ProjectionService.php

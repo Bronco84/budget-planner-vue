@@ -87,10 +87,22 @@ class TransactionController extends Controller
     {
         $accounts = $budget->accounts()->get();
         
+        // Check if this is a recurring transaction
+        $recurringTemplate = null;
+        $rules = [];
+        if ($transaction->recurring_transaction_template_id) {
+            $recurringTemplate = $transaction->recurringTemplate;
+            if ($recurringTemplate) {
+                $rules = $recurringTemplate->rules()->get();
+            }
+        }
+        
         return Inertia::render('Transactions/Edit', [
             'budget' => $budget,
             'transaction' => $transaction,
             'accounts' => $accounts,
+            'recurringTemplate' => $recurringTemplate,
+            'rules' => $rules,
         ]);
     }
 

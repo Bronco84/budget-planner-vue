@@ -12,13 +12,6 @@
           <div class="p-6 text-gray-900">
             <div class="flex justify-between items-center mb-6">
               <h3 class="text-lg font-medium text-gray-900">Your Budgets</h3>
-              <Link
-                :href="route('budgets.create')"
-                class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
-              >
-                <PlusIcon class="w-4 h-4 mr-2" />
-                Create Budget
-              </Link>
             </div>
 
             <div v-if="budgets.length === 0" class="text-center py-16 text-gray-500">
@@ -79,12 +72,12 @@
                       <div
                         class="h-2.5 rounded-full"
                         :class="getBudgetProgressColor(budget.percent_used)"
-                        :style="{ width: `${Math.min(budget.percent_used, 100)}%` }"
+                        :style="{ width: `${isNaN(budget.percent_used) ? 0 : Math.min(budget.percent_used, 100)}%` }"
                       ></div>
                     </div>
                     <div class="flex justify-between mt-1 text-xs text-gray-500">
-                      <span>{{ Math.round(budget.percent_used) }}% used</span>
-                      <span>{{ Math.min(100 - Math.round(budget.percent_used), 100) }}% remaining</span>
+                      <span>{{ isNaN(budget.percent_used) ? '0' : Math.round(budget.percent_used) }}% used</span>
+                      <span>{{ isNaN(budget.percent_used) ? '100' : Math.min(100 - Math.round(budget.percent_used), 100) }}% remaining</span>
                     </div>
                   </div>
 
@@ -124,22 +117,37 @@ const props = defineProps({
 
 // Format a date as MM/DD/YYYY
 const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const year = date.getFullYear();
-  return `${month}/${day}/${year}`;
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'N/A';
+    
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  } catch (error) {
+    return 'N/A';
+  }
 };
 
 // Format an amount with 2 decimal places
 const formatAmount = (amount) => {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '0.00';
+  }
+  
   return parseFloat(amount).toFixed(2);
 };
 
 // Get appropriate color class based on percentage used
 const getBudgetProgressColor = (percentUsed) => {
-  if (percentUsed >= 90) return 'bg-red-500';
-  if (percentUsed >= 75) return 'bg-yellow-500';
+  const percent = parseFloat(percentUsed);
+  
+  if (isNaN(percent)) return 'bg-gray-300';
+  if (percent >= 90) return 'bg-red-500';
+  if (percent >= 75) return 'bg-yellow-500';
   return 'bg-green-500';
 };
 </script> 

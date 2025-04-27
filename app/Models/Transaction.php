@@ -27,6 +27,7 @@ class Transaction extends Model
         'is_reconciled',
         'recurring_transaction_template_id',
         'notes',
+        'is_projected',
     ];
 
     /**
@@ -39,6 +40,7 @@ class Transaction extends Model
         'date' => 'date',
         'is_plaid_imported' => 'boolean',
         'is_reconciled' => 'boolean',
+        'is_projected' => 'boolean',
     ];
 
     /**
@@ -62,6 +64,22 @@ class Transaction extends Model
      */
     public function plaidTransaction(): BelongsTo
     {
-        return $this->belongsTo(PlaidTransaction::class);
+        return $this->belongsTo(PlaidTransaction::class, 'plaid_transaction_id', 'plaid_transaction_id');
+    }
+    
+    /**
+     * Get the recurring transaction template that generated this transaction.
+     */
+    public function recurringTemplate(): BelongsTo
+    {
+        return $this->belongsTo(RecurringTransactionTemplate::class, 'recurring_transaction_template_id');
+    }
+    
+    /**
+     * Format amount for display.
+     */
+    public function getFormattedAmountAttribute(): string
+    {
+        return '$' . number_format($this->amount_in_cents / 100, 2);
     }
 } 

@@ -34,5 +34,12 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
+    'plaid' => [
+        'client_id' => env('PLAID_CLIENT_ID'),
+        'secret' => env('PLAID_SECRET'),
+        'environment' => env('PLAID_ENVIRONMENT', 'sandbox'),
+        'disable_ssl_verification' => env('PLAID_DISABLE_SSL_VERIFICATION', false),
+        'proxy' => env('PLAID_PROXY', null),
+        'base_url' => env('PLAID_BASE_URL', 'https://sandbox.plaid.com'),
+    ],
 ];

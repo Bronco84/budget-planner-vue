@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+        Schema::table('plaid_accounts', function (Blueprint $table) {
+            $table->timestamp('last_sync_at')->nullable()->after('balance_updated_at');
         });
     }
 
@@ -22,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('password_reset_tokens');
+        Schema::table('plaid_accounts', function (Blueprint $table) {
+            $table->dropColumn('last_sync_at');
+        });
     }
 };

@@ -104,6 +104,42 @@
                 </PrimaryButton>
               </div>
             </form>
+            
+            <!-- Plaid Connection Section -->
+            <div class="mt-10 pt-6 border-t border-gray-200">
+              <h3 class="text-lg font-medium text-gray-900 mb-4">Bank Connection</h3>
+              <p class="text-sm text-gray-600 mb-4">
+                Connect this account to your bank to automatically import transactions and update balances.
+              </p>
+              
+              <div v-if="account.plaid_account" class="bg-blue-50 p-4 rounded-md border border-blue-200 mb-4">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <p class="font-medium text-blue-800">{{ account.plaid_account.institution_name }}</p>
+                    <p class="text-sm text-blue-600 mt-1">
+                      Last synced: {{ formatDateTime(account.plaid_account.last_sync_at) || 'Never' }}
+                    </p>
+                  </div>
+                  <div>
+                    <Link 
+                      :href="route('plaid.link', [budget.id, account.id])"
+                      class="inline-flex items-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500"
+                    >
+                      Manage Connection
+                    </Link>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-else>
+                <Link 
+                  :href="route('plaid.link', [budget.id, account.id])"
+                  class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
+                >
+                  Connect to Bank
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -201,5 +237,17 @@ const deleteAccount = () => {
       closeModal();
     },
   });
+};
+
+// In the script section, add formatDateTime helper
+const formatDateTime = (dateTimeString) => {
+  if (!dateTimeString) return null;
+  
+  try {
+    const date = new Date(dateTimeString);
+    return date.toLocaleString();
+  } catch (e) {
+    return dateTimeString;
+  }
 };
 </script> 

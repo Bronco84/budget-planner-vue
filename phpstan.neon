@@ -14,3 +14,4 @@ parameters:
         - bootstrap
     excludePaths:
         - tests/Unit/ExampleTest.php
+    treatPhpDocTypesAsCertain: false

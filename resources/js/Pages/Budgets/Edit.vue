@@ -54,32 +54,6 @@
                 <InputError class="mt-2" :message="form.errors.total_amount" />
               </div>
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <InputLabel for="start_date" value="Start Date" />
-                  <TextInput
-                    id="start_date"
-                    type="date"
-                    class="mt-1 block w-full"
-                    v-model="form.start_date"
-                    required
-                  />
-                  <InputError class="mt-2" :message="form.errors.start_date" />
-                </div>
-                
-                <div>
-                  <InputLabel for="end_date" value="End Date" />
-                  <TextInput
-                    id="end_date"
-                    type="date"
-                    class="mt-1 block w-full"
-                    v-model="form.end_date"
-                    required
-                  />
-                  <InputError class="mt-2" :message="form.errors.end_date" />
-                </div>
-              </div>
-              
               <div class="flex items-center justify-between mt-6">
                 <DeleteButton @click="confirmBudgetDeletion" class="mr-auto">
                   Delete Budget
@@ -152,19 +126,11 @@ const props = defineProps({
   budget: Object,
 });
 
-// Format dates for form input (YYYY-MM-DD)
-const formatDateForInput = (dateString) => {
-  const date = new Date(dateString);
-  return date.toISOString().split('T')[0];
-};
-
 // Initialize form with budget data
 const form = useForm({
   name: props.budget.name,
   description: props.budget.description || '',
   total_amount: props.budget.total_amount,
-  start_date: formatDateForInput(props.budget.start_date),
-  end_date: formatDateForInput(props.budget.end_date),
 });
 
 // Submit form handler

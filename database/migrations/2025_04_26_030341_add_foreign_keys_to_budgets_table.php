@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sessions', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+        Schema::table('budgets', function (Blueprint $table) {
+            $table->foreign('starting_balance_account_id')
+                ->references('id')
+                ->on('accounts')
+                ->nullOnDelete();
         });
     }
 
@@ -22,6 +24,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sessions');
+        Schema::table('budgets', function (Blueprint $table) {
+            $table->dropForeign(['starting_balance_account_id']);
+        });
     }
 };

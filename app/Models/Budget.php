@@ -50,6 +50,13 @@ class Budget extends Model
     ];
 
     /**
+     * The relationships that should be eager loaded.
+     *
+     * @var list<string>
+     */
+    protected $with = ['accounts'];
+
+    /**
      * Get the user that owns the budget.
      */
     public function user(): BelongsTo

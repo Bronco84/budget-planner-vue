@@ -74,21 +74,44 @@
           
           <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6">
-              <h3 class="text-lg font-medium text-gray-900 mb-2">Projected Income</h3>
-              <p class="text-3xl font-bold text-green-600">
-                ${{ formatCurrency(totalProjectedIncome) }}
-              </p>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">Projected Cash Flow</h3>
+              <div class="flex items-end">
+                <p class="text-3xl font-bold" :class="netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'">
+                  ${{ formatCurrency(netCashFlow) }}
+                </p>
+                <p class="text-sm ml-2 mb-1" :class="netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'">
+                  {{ netCashFlow >= 0 ? 'Surplus' : 'Deficit' }}
+                </p>
+              </div>
+              <div class="flex justify-between text-sm text-gray-500 mt-2">
+                <p>Income: <span class="text-green-600">${{ formatCurrency(totalProjectedIncome) }}</span></p>
+                <p>Expenses: <span class="text-red-600">${{ formatCurrency(totalProjectedExpenses) }}</span></p>
+              </div>
               <p class="text-sm text-gray-500 mt-1">Over {{ form.months }} months</p>
             </div>
           </div>
           
           <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6">
-              <h3 class="text-lg font-medium text-gray-900 mb-2">Projected Expenses</h3>
-              <p class="text-3xl font-bold text-red-600">
-                ${{ formatCurrency(totalProjectedExpenses) }}
+              <h3 class="text-lg font-medium text-gray-900 mb-2">Ending Balance</h3>
+              <p class="text-3xl font-bold" :class="expectedEndingBalance >= 0 ? 'text-green-600' : 'text-red-600'">
+                ${{ formatCurrency(expectedEndingBalance) }}
               </p>
-              <p class="text-sm text-gray-500 mt-1">Over {{ form.months }} months</p>
+              <div class="flex items-center mt-2">
+                <div class="bg-gray-200 h-2 flex-grow rounded-full overflow-hidden">
+                  <div 
+                    class="h-full rounded-full"
+                    :class="balanceChangePercent >= 0 ? 'bg-green-500' : 'bg-red-500'"
+                    :style="`width: ${Math.min(Math.abs(balanceChangePercent), 100)}%`"
+                  ></div>
+                </div>
+                <span class="text-xs ml-2" :class="balanceChangePercent >= 0 ? 'text-green-600' : 'text-red-600'">
+                  {{ balanceChangePercent >= 0 ? '+' : '' }}{{ balanceChangePercent.toFixed(1) }}%
+                </span>
+              </div>
+              <p class="text-sm text-gray-500 mt-1">
+                Projected on {{ getEndDate() }}
+              </p>
             </div>
           </div>
         </div>
@@ -107,10 +130,11 @@
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expenses</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ending Balance</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="(stats, month) in projections.monthly_totals" :key="month">
+                  <tr v-for="(stats, month, index) in projections.monthly_totals" :key="month">
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-medium text-gray-900">{{ month }}</div>
                     </td>
@@ -134,6 +158,29 @@
                         ${{ formatCurrency(stats.ending_balance) }}
                       </div>
                     </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center">
+                        <!-- Previous month comparison, only show if not first month -->
+                        <template v-if="index > 0">
+                          <div class="w-16 text-xs font-medium" 
+                               :class="stats.net >= getPreviousMonthNet(month) ? 'text-green-600' : 'text-red-600'">
+                            {{ getNetChangeText(stats.net, getPreviousMonthNet(month)) }}
+                          </div>
+                          <div class="ml-2">
+                            <svg v-if="stats.net > getPreviousMonthNet(month)" class="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M12 7a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 112 0v.586l3.293-3.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L11.586 7H12z" clip-rule="evenodd" />
+                            </svg>
+                            <svg v-else-if="stats.net < getPreviousMonthNet(month)" class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M12 13a1 1 0 01-1-1V5a1 1 0 011-1h2a1 1 0 010 2h-.586l3.293 3.293a1 1 0 01-1.414 1.414L12 7.414V12a1 1 0 01-1 1z" clip-rule="evenodd" />
+                            </svg>
+                            <svg v-else class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M18 10a1 1 0 01-1 1H3a1 1 0 110-2h14a1 1 0 011 1z" clip-rule="evenodd" />
+                            </svg>
+                          </div>
+                        </template>
+                        <div v-else class="text-xs text-gray-500">First month</div>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -152,31 +199,50 @@
             
             <div v-else>
               <div v-for="(days, month) in projections.transactions" :key="month" class="mb-8">
-                <h4 class="text-xl font-medium text-gray-800 mb-4 border-b pb-2">{{ month }}</h4>
+                <div class="flex justify-between items-center">
+                  <h4 class="text-xl font-medium text-gray-800 mb-4 border-b pb-2">{{ month }}</h4>
+                  <div class="text-sm">
+                    <span class="font-medium">Month End Balance: </span>
+                    <span :class="projections.monthly_totals[month].ending_balance >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'">
+                      ${{ formatCurrency(projections.monthly_totals[month].ending_balance) }}
+                    </span>
+                  </div>
+                </div>
                 
                 <div v-for="(transactions, day) in days" :key="`${month}-${day}`" class="mb-4">
-                  <div class="flex items-center mb-2">
-                    <div class="w-12 text-sm font-medium text-gray-700">{{ day }}</div>
-                    <div class="flex-1">
+                  <div class="flex">
+                    <div class="w-12 text-sm font-medium text-gray-700 pt-2">{{ day }}</div>
+                    <div class="flex-1 border-l border-gray-200 pl-4">
                       <div v-for="transaction in transactions" :key="transaction.id || transaction.date" 
                            class="flex justify-between items-start py-2 border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                           :class="{'opacity-70': transaction.is_projected}">
-                        <div class="flex flex-col">
+                           :class="[
+                             {'opacity-70': transaction.is_projected},
+                             transaction.amount_in_cents >= 0 ? 'border-l-2 border-l-green-200' : 'border-l-2 border-l-red-200'
+                           ]">
+                        <div class="flex flex-col pl-2">
                           <div class="flex items-center">
                             <div class="font-medium text-gray-900">{{ transaction.description }}</div>
                             <div v-if="transaction.is_projected" class="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">
                               Projected
                             </div>
+                            <div v-else class="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-green-100 text-green-800">
+                              Confirmed
+                            </div>
                           </div>
-                          <div v-if="transaction.category" class="text-xs text-gray-500">
-                            {{ transaction.category }}
+                          <div class="flex items-center mt-1">
+                            <div v-if="transaction.category" class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                              {{ transaction.category }}
+                            </div>
+                            <div v-if="transaction.account" class="text-xs text-gray-500 ml-2">
+                              {{ transaction.account.name }}
+                            </div>
                           </div>
                         </div>
-                        <div class="flex items-center">
-                          <div class="text-sm font-medium mr-4" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
+                        <div class="flex flex-col items-end">
+                          <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
                             ${{ formatCurrency(transaction.amount_in_cents) }}
                           </div>
-                          <div class="text-xs text-gray-500">
+                          <div class="text-xs mt-1" :class="transaction.running_balance >= 0 ? 'text-green-600' : 'text-red-600'">
                             Balance: ${{ formatCurrency(transaction.running_balance) }}
                           </div>
                         </div>
@@ -228,6 +294,30 @@ const totalProjectedExpenses = computed(() => {
   }, 0);
 });
 
+const netCashFlow = computed(() => {
+  return totalProjectedIncome.value - totalProjectedExpenses.value;
+});
+
+const expectedEndingBalance = computed(() => {
+  const months = Object.keys(props.projections.monthly_totals);
+  const lastMonth = months[months.length - 1];
+  return props.projections.monthly_totals[lastMonth].ending_balance;
+});
+
+const balanceChangePercent = computed(() => {
+  const startingBalance = props.projections.starting_balance;
+  if (startingBalance === 0) return 0;
+  
+  const months = Object.keys(props.projections.monthly_totals);
+  const lastMonth = months[months.length - 1];
+  const lastEndingBalance = props.projections.monthly_totals[lastMonth].ending_balance;
+  
+  const change = lastEndingBalance - startingBalance;
+  const percentChange = (change / Math.abs(startingBalance)) * 100;
+  
+  return percentChange;
+});
+
 // Format helpers
 const formatCurrency = (cents) => {
   const dollars = Math.abs(cents) / 100;
@@ -246,6 +336,44 @@ const formatDate = (dateString) => {
     });
   } catch (e) {
     return dateString;
+  }
+};
+
+const getEndDate = () => {
+  const months = Object.keys(props.projections.monthly_totals);
+  const lastMonth = months[months.length - 1];
+  const date = new Date(props.params.start_date);
+  date.setMonth(date.getMonth() + parseInt(props.params.months));
+  return date.toLocaleDateString(undefined, { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+};
+
+// Get the previous month's net amount for comparison
+const getPreviousMonthNet = (currentMonth) => {
+  const months = Object.keys(props.projections.monthly_totals);
+  const currentIndex = months.indexOf(currentMonth);
+  if (currentIndex <= 0) return 0;
+  
+  const previousMonth = months[currentIndex - 1];
+  return props.projections.monthly_totals[previousMonth].net;
+};
+
+// Generate text for net change percentage
+const getNetChangeText = (currentNet, previousNet) => {
+  if (previousNet === 0) return 'N/A';
+  
+  const change = currentNet - previousNet;
+  const percentChange = ((change / Math.abs(previousNet)) * 100).toFixed(1);
+  
+  if (change > 0) {
+    return `+${percentChange}%`;
+  } else if (change < 0) {
+    return `${percentChange}%`;
+  } else {
+    return 'No change';
   }
 };
 

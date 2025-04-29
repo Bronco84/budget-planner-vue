@@ -52,7 +52,7 @@ class Budget extends Model
     /**
      * The relationships that should be eager loaded.
      *
-     * @var list<string>
+     * @var array
      */
     protected $with = ['accounts'];
 

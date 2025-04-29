@@ -213,6 +213,7 @@ import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import { formatCurrency } from '@/utils/format.js';
 
 // Define props
 const props = defineProps({
@@ -279,11 +280,6 @@ const endDate = computed(() => {
 });
 
 // Format helpers
-const formatCurrency = (cents) => {
-  const dollars = Math.abs(cents) / 100;
-  return dollars.toFixed(2);
-};
-
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   

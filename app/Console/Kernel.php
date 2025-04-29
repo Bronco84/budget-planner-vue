@@ -6,7 +6,6 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use App\Console\Commands\IdentifyRecurringTransactions;
 use App\Console\Commands\IdentifyAllRecurringTransactions;
-use App\Console\Commands\GenerateRecurringTransactions;
 
 class Kernel extends ConsoleKernel
 {
@@ -18,7 +17,6 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         IdentifyRecurringTransactions::class,
         IdentifyAllRecurringTransactions::class,
-        GenerateRecurringTransactions::class,
     ];
 
     /**
@@ -34,12 +32,6 @@ class Kernel extends ConsoleKernel
             ->sundays()
             ->at('02:00')
             ->appendOutputTo(storage_path('logs/recurring-transactions-identify.log'));
-            
-        // Generate upcoming recurring transactions daily
-        $schedule->command('transactions:generate-recurring --days=60')
-            ->daily()
-            ->at('03:00')
-            ->appendOutputTo(storage_path('logs/recurring-transactions-generate.log'));
     }
 
     /**

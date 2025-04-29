@@ -76,6 +76,14 @@ class Transaction extends Model
     }
     
     /**
+     * Get the recurring transaction template that this transaction is linked to.
+     */
+    public function recurringTransactionTemplate()
+    {
+        return $this->belongsTo(RecurringTransactionTemplate::class);
+    }
+    
+    /**
      * Format amount for display.
      */
     public function getFormattedAmountAttribute(): string

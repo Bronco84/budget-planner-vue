@@ -5,35 +5,26 @@
     <template #header>
       <div class="flex justify-between items-center">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }} - Recurring Transactions</h2>
-        <Link
-          :href="route('recurring-transactions.create', budget.id)"
-          class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-        >
-          Add Recurring Transaction
-        </Link>
+        <div class="flex items-center space-x-3">
+          <Link
+            :href="route('budgets.show', budget.id)"
+            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition duration-150 ease-in-out hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
+          >
+            Back to Budget
+          </Link>
+          <PrimaryButton as="a" :href="route('recurring-transactions.create', budget.id)">
+            Add Recurring Transaction
+          </PrimaryButton>
+        </div>
       </div>
     </template>
 
-    <div class="py-12">
-      <div class="max-w-8xl mx-auto sm:px-6 lg:px-8">
+    <div class="py-4">
+      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6">
             <!-- Account filter selector -->
             <div class="mb-6">
-              <!-- Debug information -->
-              <div class="p-4 bg-gray-100 rounded-md mb-4">
-                <h3 class="text-lg font-medium mb-2">Debug Information</h3>
-                <p>Direct accounts prop: {{ accounts ? accounts.length : 'none' }}</p>
-                <p>Budget accounts: {{ budget.accounts ? budget.accounts.length : 'none' }}</p>
-                <div v-if="accountsToUse && accountsToUse.length > 0">
-                  <p>Account names (from {{ accountSource }}):</p>
-                  <ul class="list-disc ml-6">
-                    <li v-for="account in accountsToUse" :key="account.id">
-                      {{ account.name }} (ID: {{ account.id }})
-                    </li>
-                  </ul>
-                </div>
-              </div>
               
               <label for="account-filter" class="block text-sm font-medium text-gray-700">Filter by Account</label>
               <select
@@ -46,12 +37,7 @@
                   {{ account.name }}
                 </option>
               </select>
-              <div v-if="!accounts || accounts.length === 0" class="mt-1 text-xs text-red-500">
-                No accounts data available.
-              </div>
-              <div v-else class="mt-1 text-xs text-green-500">
-                {{ accounts.length }} accounts available
-              </div>
+
             </div>
 
             <div v-if="filteredTransactions.length > 0">
@@ -89,7 +75,7 @@
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm" :class="template.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                          ${{ (template.amount_in_cents / 100).toFixed(2) }}
+                          {{ formatCurrency(template.amount_in_cents / 100) }}
                         </div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
@@ -108,6 +94,9 @@
                         <div class="flex space-x-2 justify-end">
                           <Link :href="route('recurring-transactions.edit', [budget.id, template.id])" class="text-indigo-600 hover:text-indigo-900">
                             Edit
+                          </Link>
+                          <Link :href="route('recurring-transactions.rules.index', [budget.id, template.id])" class="text-purple-600 hover:text-purple-900">
+                            Rules
                           </Link>
                           <button @click="duplicate(template)" class="text-blue-600 hover:text-blue-900">
                             Duplicate
@@ -145,6 +134,9 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, computed, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+import { formatCurrency } from '@/utils/format.js';
 
 const props = defineProps({
   budget: Object,

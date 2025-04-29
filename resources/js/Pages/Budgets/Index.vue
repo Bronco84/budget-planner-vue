@@ -55,11 +55,11 @@
                   <div class="mt-3">
                     <div class="flex justify-between text-sm mb-1">
                       <span class="text-gray-600">Budget Amount</span>
-                      <span class="font-medium">${{ formatAmount(budget.total_amount) }}</span>
+                      <span class="font-medium">{{ formatCurrency(parseFloat(budget.total_amount)) }}</span>
                     </div>
                     <div class="flex justify-between text-sm mb-1">
                       <span class="text-gray-600">Remaining</span>
-                      <span class="font-medium">${{ formatAmount(budget.remaining_amount) }}</span>
+                      <span class="font-medium">{{ formatCurrency(parseFloat(budget.remaining_amount)) }}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-600">Period</span>
@@ -109,6 +109,7 @@
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { PlusIcon, DocumentTextIcon, PencilIcon } from '@heroicons/vue/24/outline';
+import { formatCurrency } from '@/utils/format.js';
 
 // Define props
 const props = defineProps({
@@ -130,15 +131,6 @@ const formatDate = (dateString) => {
   } catch (error) {
     return 'N/A';
   }
-};
-
-// Format an amount with 2 decimal places
-const formatAmount = (amount) => {
-  if (amount === undefined || amount === null || isNaN(amount)) {
-    return '0.00';
-  }
-  
-  return parseFloat(amount).toFixed(2);
 };
 
 // Get appropriate color class based on percentage used

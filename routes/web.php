@@ -7,7 +7,9 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\RecurringTransactionController;
+use App\Http\Controllers\RecurringTransactionRuleController;
 use App\Http\Controllers\PlaidController;
+use App\Http\Controllers\ProjectionsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -32,12 +34,17 @@ Route::middleware('auth')->group(function () {
     
     Route::resource('budgets', BudgetController::class);
     
+    Route::post('budgets/{budget}/filter', [BudgetController::class, 'filter'])
+        ->name('budgets.filter');
+    
     Route::get('budget/{budget}/statistics/yearly', [BudgetController::class, 'yearlyStatistics'])
         ->name('budget.statistics.yearly');
     Route::get('budget/{budget}/statistics/monthly/{month?}/{year?}', [BudgetController::class, 'monthlyStatistics'])
         ->name('budget.statistics.monthly');
     Route::get('budget/{budget}/projections', [BudgetController::class, 'projections'])
         ->name('budget.projections');
+    Route::get('budget/{budget}/account/{account}/projections', [ProjectionsController::class, 'showAccountProjections'])
+        ->name('budget.account.projections');
         
     Route::resource('budgets.accounts', AccountController::class);
     
@@ -71,6 +78,22 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.update');
     Route::delete('budget/{budget}/recurring-transactions/{recurring_transaction}', [RecurringTransactionController::class, 'destroy'])
         ->name('recurring-transactions.destroy');
+    Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/duplicate', [RecurringTransactionController::class, 'duplicate'])
+        ->name('recurring-transactions.duplicate');
+    
+    // Routes for recurring transaction rules
+    Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/rules', [RecurringTransactionRuleController::class, 'index'])
+        ->name('recurring-transactions.rules.index');
+    Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/rules', [RecurringTransactionRuleController::class, 'store'])
+        ->name('recurring-transactions.rules.store');
+    Route::patch('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/{rule}', [RecurringTransactionRuleController::class, 'update'])
+        ->name('recurring-transactions.rules.update');
+    Route::delete('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/{rule}', [RecurringTransactionRuleController::class, 'destroy'])
+        ->name('recurring-transactions.rules.destroy');
+    Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/test', [RecurringTransactionRuleController::class, 'test'])
+        ->name('recurring-transactions.rules.test');
+    Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/apply', [RecurringTransactionRuleController::class, 'apply'])
+        ->name('recurring-transactions.rules.apply');
         
     // Plaid integration routes
     Route::get('budget/{budget}/account/{account}/plaid/link', [PlaidController::class, 'showLinkForm'])

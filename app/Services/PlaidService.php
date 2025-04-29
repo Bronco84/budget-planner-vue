@@ -344,7 +344,7 @@ class PlaidService
         if ($itemId === null || empty($itemId)) {
             $itemId = 'plaid-item-' . uniqid();
         }
-        
+
         return PlaidAccount::updateOrCreate(
             [
                 'plaid_account_id' => $plaidAccountId,
@@ -366,46 +366,46 @@ class PlaidService
      * @param int $days Number of days in the past to sync
      * @return array
      */
-    public function syncTransactions(PlaidAccount $plaidAccount, int $days = 30): array
+    public function syncTransactions(PlaidAccount $plaidAccount, int $days = 120): array
     {
         $endDate = Carbon::today();
         $startDate = Carbon::today()->subDays($days);
-        
+
         if (!$plaidAccount->access_token) {
             Log::error('Sync transactions failed: Access token is null', [
                 'plaid_account_id' => $plaidAccount->id,
                 'plaid_item_id' => $plaidAccount->plaid_item_id
             ]);
-            
+
             return [
                 'imported' => 0,
                 'updated' => 0,
             ];
         }
-        
+
         try {
             $transactions = $this->getTransactions(
-                $plaidAccount->access_token, 
-                $startDate, 
+                $plaidAccount->access_token,
+                $startDate,
                 $endDate
             );
-            
+
             if (empty($transactions)) {
                 return [
                     'imported' => 0,
                     'updated' => 0,
                 ];
             }
-            
+
             $imported = 0;
             $updated = 0;
-            
+
             foreach ($transactions as $transaction) {
                 // Only process transactions for the linked account
                 if ($transaction['account_id'] !== $plaidAccount->plaid_account_id) {
                     continue;
                 }
-                
+
                 // Store or update the Plaid transaction
                 $plaidTransaction = PlaidTransaction::updateOrCreate(
                     [
@@ -424,10 +424,10 @@ class PlaidService
                         'original_data' => json_encode($transaction),
                     ]
                 );
-                
+
                 // Check if we already have a transaction for this Plaid transaction
                 $existingTransaction = Transaction::where('plaid_transaction_id', $transaction['transaction_id'])->first();
-                
+
                 if ($existingTransaction) {
                     // Update existing transaction
                     $existingTransaction->update([
@@ -436,7 +436,7 @@ class PlaidService
                         'amount_in_cents' => -1 * $transaction['amount'] * 100, // Negate amount as Plaid uses positive for expenses
                         'date' => $transaction['date'],
                     ]);
-                    
+
                     $updated++;
                 } else {
                     // Create new transaction
@@ -450,19 +450,19 @@ class PlaidService
                         'plaid_transaction_id' => $transaction['transaction_id'],
                         'is_plaid_imported' => true,
                     ]);
-                    
+
                     $imported++;
                 }
             }
-            
+
             // Update last sync timestamp
             $plaidAccount->update([
                 'last_sync_at' => now()
             ]);
-            
+
             // Update account balance
             $this->updateAccountBalance($plaidAccount);
-            
+
             return [
                 'imported' => $imported,
                 'updated' => $updated,
@@ -473,7 +473,7 @@ class PlaidService
                 'plaid_account_id' => $plaidAccount->id,
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return [
                 'imported' => 0,
                 'updated' => 0,
@@ -495,17 +495,17 @@ class PlaidService
                 'plaid_account_id' => $plaidAccount->id,
                 'plaid_item_id' => $plaidAccount->plaid_item_id
             ]);
-            
+
             return false;
         }
-        
+
         try {
             $accounts = $this->getAccounts($plaidAccount->access_token);
-            
+
             if (empty($accounts)) {
                 return false;
             }
-            
+
             foreach ($accounts as $account) {
                 if ($account['account_id'] === $plaidAccount->plaid_account_id) {
                     $plaidAccount->update([
@@ -513,7 +513,7 @@ class PlaidService
                         'available_balance_cents' => ($account['balances']['available'] ?? $account['balances']['current']) * 100,
                         'balance_updated_at' => now(),
                     ]);
-                    
+
                     // Also update the associated account
                     $linkedAccount = $plaidAccount->account;
                     if ($linkedAccount) {
@@ -522,11 +522,11 @@ class PlaidService
                             'balance_updated_at' => now(),
                         ]);
                     }
-                    
+
                     return true;
                 }
             }
-            
+
             return false;
         } catch (\Exception $e) {
             Log::error('Error updating account balance', [
@@ -534,7 +534,7 @@ class PlaidService
                 'plaid_account_id' => $plaidAccount->id,
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return false;
         }
     }

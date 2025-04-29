@@ -30,7 +30,7 @@
                     <p class="text-sm text-gray-500 capitalize">{{ account.type }}</p>
                   </div>
                   <div class="text-lg font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                    ${{ (account.current_balance_cents / 100).toFixed(2) }}
+                    {{ formatCurrency(account.current_balance_cents / 100) }}
                   </div>
                 </div>
               </div>
@@ -117,6 +117,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { formatCurrency } from '@/utils/format.js';
 
 // Props
 const props = defineProps({

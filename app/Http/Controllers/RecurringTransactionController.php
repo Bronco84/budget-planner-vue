@@ -138,6 +138,12 @@ class RecurringTransactionController extends Controller
 
         // Load the rules associated with this recurring transaction
         $rules = $recurring_transaction->rules()->orderBy('priority')->get();
+        
+        \Log::debug('Loading rules for recurring transaction edit:', [
+            'recurring_transaction_id' => $recurring_transaction->id,
+            'rules_count' => $rules->count(),
+            'rules' => $rules,
+        ]);
 
         return Inertia::render('RecurringTransactions/Edit', [
             'budget' => $budget,
@@ -153,6 +159,12 @@ class RecurringTransactionController extends Controller
     public function update(Request $request, Budget $budget, RecurringTransactionTemplate $recurring_transaction): RedirectResponse
     {
         $this->authorize('update', $budget);
+
+        // Log raw request data for debugging
+        \Log::debug('Updating recurring transaction - raw request data:', [
+            'request_all' => $request->all(),
+            'rules_data' => $request->input('rules', []),
+        ]);
 
         $validated = $request->validate([
             'description' => 'required|string|max:255',
@@ -175,6 +187,12 @@ class RecurringTransactionController extends Controller
             'rules.*.operator' => 'required|string|in:contains,equals,starts_with,ends_with,regex,greater_than,less_than',
             'rules.*.value' => 'required|string|max:255',
             'rules.*.is_case_sensitive' => 'boolean',
+        ]);
+
+        // Log validated data for debugging
+        \Log::debug('Validated recurring transaction data:', [
+            'is_dynamic_amount' => $validated['is_dynamic_amount'],
+            'rules' => $validated['rules'] ?? [],
         ]);
 
         // Convert amount to cents
@@ -206,6 +224,11 @@ class RecurringTransactionController extends Controller
             $existingRuleIds = $recurring_transaction->rules()->pluck('id')->toArray();
             $updatedRuleIds = [];
             
+            \Log::debug('Processing dynamic amount transaction rules:', [
+                'existing_rule_ids' => $existingRuleIds,
+                'rules_count' => count($rules),
+            ]);
+            
             // Update or create rules
             foreach ($rules as $ruleData) {
                 $ruleId = $ruleData['id'] ?? null;
@@ -215,17 +238,24 @@ class RecurringTransactionController extends Controller
                     unset($ruleData['id']);
                 }
                 
+                \Log::debug('Processing rule:', [
+                    'rule_id' => $ruleId,
+                    'rule_data' => $ruleData,
+                ]);
+                
                 if ($ruleId) {
                     // Update existing rule if it belongs to this template
                     $rule = $recurring_transaction->rules()->find($ruleId);
                     if ($rule) {
                         $rule->update($ruleData);
                         $updatedRuleIds[] = $ruleId;
+                        \Log::debug('Updated existing rule:', ['rule_id' => $ruleId]);
                     }
                 } else {
                     // Create new rule
                     $rule = $recurring_transaction->rules()->create($ruleData);
                     $updatedRuleIds[] = $rule->id;
+                    \Log::debug('Created new rule:', ['rule_id' => $rule->id]);
                 }
             }
             
@@ -233,10 +263,19 @@ class RecurringTransactionController extends Controller
             $toDelete = array_diff($existingRuleIds, $updatedRuleIds);
             if (!empty($toDelete)) {
                 $recurring_transaction->rules()->whereIn('id', $toDelete)->delete();
+                \Log::debug('Deleted rules:', ['deleted_rule_ids' => $toDelete]);
             }
+            
+            // Verify rules were created
+            $finalRules = $recurring_transaction->rules()->get();
+            \Log::debug('Final rules after update:', [
+                'count' => $finalRules->count(),
+                'rules' => $finalRules,
+            ]);
         } else {
             // If not dynamic amount, delete all rules
             $recurring_transaction->rules()->delete();
+            \Log::debug('Deleted all rules (not a dynamic amount transaction)');
         }
 
         return redirect()->route('recurring-transactions.index', $budget)

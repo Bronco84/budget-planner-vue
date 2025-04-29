@@ -38,7 +38,7 @@ class Account extends Model
         'balance_updated_at' => 'datetime',
         'include_in_budget' => 'boolean',
     ];
-    
+
     /**
      * The accessors to append to the model's array form.
      *
@@ -72,7 +72,12 @@ class Account extends Model
     {
         return $this->hasOne(PlaidAccount::class);
     }
-    
+
+    public function scopeActive($query)
+    {
+        return $query->where('include_in_budget', true)->where('is_active', true);
+    }
+
     /**
      * Get the account status based on include_in_budget.
      */
@@ -80,7 +85,7 @@ class Account extends Model
     {
         return AccountStatus::fromIncludeInBudget($this->include_in_budget);
     }
-    
+
     /**
      * Get the status label.
      */
@@ -90,7 +95,7 @@ class Account extends Model
             get: fn () => $this->getStatusAttribute()->label(),
         );
     }
-    
+
     /**
      * Get the status CSS classes.
      */
@@ -100,4 +105,4 @@ class Account extends Model
             get: fn () => $this->getStatusAttribute()->classes(),
         );
     }
-} 
+}

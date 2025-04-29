@@ -101,7 +101,7 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                        ${{ (transaction.amount_in_cents / 100).toFixed(2) }}
+                        {{ formatCurrency(transaction.amount_in_cents / 100) }}
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -217,6 +217,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { formatCurrency } from '@/utils/format.js';
 
 // Define props
 const props = defineProps({

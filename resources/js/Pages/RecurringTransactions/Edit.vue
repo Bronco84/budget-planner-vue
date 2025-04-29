@@ -541,6 +541,19 @@ const submit = () => {
   // Update values before submitting
   form.is_dynamic_amount = amountType.value === 'dynamic';
   
-  form.patch(route('recurring-transactions.update', [props.budget.id, props.recurringTransaction.id]));
+  // Debug form data before submission
+  console.log('Submitting form data with rules:', {
+    is_dynamic_amount: form.is_dynamic_amount,
+    rules: form.rules,
+  });
+  
+  form.patch(route('recurring-transactions.update', [props.budget.id, props.recurringTransaction.id]), {
+    onSuccess: () => {
+      console.log('Form submitted successfully');
+    },
+    onError: (errors) => {
+      console.error('Form submission errors:', errors);
+    }
+  });
 };
 </script>

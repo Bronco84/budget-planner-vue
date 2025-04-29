@@ -42,16 +42,6 @@ class AccountController extends Controller
             'include_in_budget' => $validated['include_in_budget'] ?? true,
         ]);
 
-        // Create an initial transaction for this balance
-        $account->transactions()->create([
-            'budget_id' => $budget->id,
-            'description' => 'Initial Balance',
-            'amount_in_cents' => $validated['current_balance'] * 100,
-            'date' => now(),
-            'category' => 'Starting Balance',
-            'is_reconciled' => true,
-        ]);
-
         return redirect()->route('budgets.show', $budget)
             ->with('message', 'Account created successfully');
     }
@@ -93,12 +83,9 @@ class AccountController extends Controller
     public function destroy(Budget $budget, Account $account): RedirectResponse
     {
         // Don't allow deletion if there are transactions
-        if ($account->transactions()->count() > 1) { // More than the initial balance transaction
+        if ($account->transactions()->count() > 0) {
             return back()->with('error', 'Cannot delete account with existing transactions.');
         }
-
-        // Delete the initial transaction
-        $account->transactions()->delete();
         
         // Delete the account
         $account->delete();

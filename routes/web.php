@@ -13,6 +13,7 @@ use App\Http\Controllers\ProjectionsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -113,3 +114,13 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+// Add the debug route at the end of the file
+Route::get('/debug/rules', function () {
+    return [
+        'rules_count' => DB::table('recurring_transaction_rules')->count(),
+        'rules' => DB::table('recurring_transaction_rules')->get(),
+        'templates_count' => DB::table('recurring_transaction_templates')->count(),
+        'templates' => DB::table('recurring_transaction_templates')->get(),
+    ];
+});

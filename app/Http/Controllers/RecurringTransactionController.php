@@ -139,17 +139,18 @@ class RecurringTransactionController extends Controller
         // Load the rules associated with this recurring transaction
         $rules = $recurring_transaction->rules()->orderBy('priority')->get();
 
-        \Log::debug('Loading rules for recurring transaction edit:', [
-            'recurring_transaction_id' => $recurring_transaction->id,
-            'rules_count' => $rules->count(),
-            'rules' => $rules,
-        ]);
+        // Load linked transactions
+        $linkedTransactions = $recurring_transaction->transactions()
+            ->with('account')
+            ->orderBy('date', 'desc')
+            ->get();
 
         return Inertia::render('RecurringTransactions/Edit', [
             'budget' => $budget,
             'accounts' => $budget->accounts,
             'recurringTransaction' => $recurring_transaction,
             'rules' => $rules,
+            'linkedTransactions' => $linkedTransactions,
         ]);
     }
 

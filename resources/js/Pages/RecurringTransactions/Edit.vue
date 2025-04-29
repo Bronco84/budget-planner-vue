@@ -403,6 +403,96 @@
             </form>
           </div>
         </div>
+
+        <!-- Linked Transactions -->
+        <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+          <div class="p-6 bg-white border-b border-gray-200">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-medium text-gray-900">Linked Transactions</h3>
+            </div>
+
+            <p class="text-sm text-gray-600 mb-4">
+              These transactions are linked to this recurring template. You can edit them individually.
+            </p>
+
+            <div v-if="linkedTransactions.length === 0" class="bg-yellow-50 p-4 rounded-md">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-yellow-800">No linked transactions</h3>
+                  <div class="mt-2 text-sm text-yellow-700">
+                    <p>
+                      There are no transactions linked to this recurring template yet.
+                      Create a new transaction and select this template to link it.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="transaction in linkedTransactions" :key="transaction.id">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {{ formatDate(transaction.date) }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                      {{ transaction.description }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                      {{ transaction.account.name }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                      {{ transaction.category }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right"
+                        :class="{ 'text-green-600': transaction.amount_in_cents > 0, 'text-red-600': transaction.amount_in_cents < 0 }">
+                      {{ formatAmount(transaction.amount_in_cents) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Link :href="route('budget.transaction.edit', [budget.id, transaction.id])" class="text-indigo-600 hover:text-indigo-900">
+                        Edit
+                      </Link>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mt-4 flex justify-end">
+              <Link :href="route('budget.transaction.create', budget.id)" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 active:bg-indigo-800 focus:outline-none focus:border-indigo-900 focus:ring focus:ring-indigo-300 disabled:opacity-25 transition">
+                Create New Transaction
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -457,6 +547,7 @@ const props = defineProps({
   accounts: Array,
   recurringTransaction: Object,
   rules: Array, // Rules for the recurring template if any
+  linkedTransactions: Array,
 });
 
 // UI state
@@ -464,12 +555,22 @@ const deleteModalOpen = ref(false);
 const deleting = ref(false);
 const amountType = ref('static');
 
-// On mount, initialize form based on existing data
-onMounted(() => {
-  if (props.recurringTransaction.is_dynamic_amount) {
-    amountType.value = 'dynamic';
-  }
-});
+// Formatting functions
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString();
+};
+
+const formatDateForInput = (dateString) => {
+  if (!dateString) return '';
+  return new Date(dateString).toISOString().substr(0, 10);
+};
+
+const formatAmount = (amountInCents) => {
+  const amount = Math.abs(amountInCents / 100);
+  return '$' + amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+};
 
 const confirmDeletion = () => {
   deleteModalOpen.value = true;
@@ -489,11 +590,12 @@ const deleteTransaction = () => {
   });
 };
 
-// Format date for input field YYYY-MM-DD
-const formatDateForInput = (dateString) => {
-  if (!dateString) return '';
-  return new Date(dateString).toISOString().substr(0, 10);
-};
+// On mount, initialize form based on existing data
+onMounted(() => {
+  if (props.recurringTransaction.is_dynamic_amount) {
+    amountType.value = 'dynamic';
+  }
+});
 
 // Setup form with initial values from props
 const form = useForm({
@@ -512,7 +614,7 @@ const form = useForm({
   max_amount: props.recurringTransaction.max_amount ?
     (props.recurringTransaction.max_amount / 100).toFixed(2) : '',
   average_amount: props.recurringTransaction.average_amount ?
-    (props.recurringTransaction.average_amount / 100).toFixed(2) : '',
+    props.recurringTransaction.average_amount.toFixed(2) : '',
   notes: props.recurringTransaction.notes || '',
 
   // Rules for dynamic amount

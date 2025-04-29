@@ -24,13 +24,12 @@ return new class extends Migration
             $table->integer('day_of_month')->nullable();
             $table->integer('day_of_week')->nullable(); // 0 = Sunday, 6 = Saturday
             $table->integer('week_of_month')->nullable(); // 1-5, 5 = last week
-            $table->integer('first_day_of_month')->nullable(); // For bi-monthly transactions
             $table->json('custom_schedule')->nullable();
             $table->boolean('auto_generate')->default(true);
             $table->boolean('is_dynamic_amount')->default(false);
-            $table->decimal('min_amount', 10, 2)->nullable();
-            $table->decimal('max_amount', 10, 2)->nullable();
-            $table->decimal('average_amount', 10, 2)->nullable();
+            $table->integer('min_amount')->nullable();
+            $table->integer('max_amount')->nullable();
+            $table->integer('average_amount')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
         });

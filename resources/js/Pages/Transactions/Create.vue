@@ -95,6 +95,25 @@
                     <InputError class="mt-2" :message="form.errors.date" />
                   </div>
 
+                  <!-- Link to Recurring Transaction -->
+                  <div>
+                    <InputLabel for="recurring_transaction_template_id" value="Link to Recurring Transaction (Optional)" />
+                    <SelectInput
+                      id="recurring_transaction_template_id"
+                      v-model="form.recurring_transaction_template_id"
+                      class="mt-1 block w-full"
+                    >
+                      <option value="">None (Regular Transaction)</option>
+                      <option v-for="template in recurringTemplates" :key="template.id" :value="template.id">
+                        {{ template.description }} ({{ template.formatted_amount }})
+                      </option>
+                    </SelectInput>
+                    <p class="mt-1 text-xs text-gray-500">
+                      Link this transaction to a recurring template to mark it as an occurrence
+                    </p>
+                    <InputError class="mt-2" :message="form.errors.recurring_transaction_template_id" />
+                  </div>
+
                   <!-- Notes -->
                   <div>
                     <InputLabel for="notes" value="Notes (Optional)" />
@@ -111,13 +130,13 @@
               <!-- Note about recurring transactions -->
               <div class="border-t border-gray-200 pt-4 mt-6 text-sm text-gray-600">
                 <p>
-                  Need to create a recurring transaction? 
-                  <Link 
+                  Need to create a recurring transaction?
+                  <Link
                     :href="route('recurring-transactions.create', budget.id)"
                     class="text-indigo-600 hover:text-indigo-800"
                   >
                     Click here
-                  </Link> 
+                  </Link>
                   to set up a recurring transaction template instead.
                 </p>
               </div>
@@ -129,7 +148,7 @@
                 >
                   Cancel
                 </Link>
-                
+
                 <PrimaryButton class="ml-3" :disabled="form.processing">
                   Create Transaction
                 </PrimaryButton>
@@ -156,6 +175,7 @@ import { formatCurrency } from '@/utils/format.js';
 const props = defineProps({
   budget: Object,
   accounts: Array,
+  recurringTemplates: Array,
 });
 
 // Format today's date for input field YYYY-MM-DD
@@ -168,9 +188,10 @@ const form = useForm({
   category: '',
   date: today,
   notes: '',
+  recurring_transaction_template_id: '',
 });
 
 const submit = () => {
   form.post(route('budget.transaction.store', props.budget.id));
 };
-</script> 
+</script>

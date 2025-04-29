@@ -21,7 +21,7 @@ class TransactionController extends Controller
             ->with('account')
             ->orderByDesc('date')
             ->paginate(20);
-            
+
         return Inertia::render('Transactions/Index', [
             'budget' => $budget,
             'transactions' => $transactions,
@@ -34,10 +34,14 @@ class TransactionController extends Controller
     public function create(Budget $budget): Response
     {
         $accounts = $budget->accounts()->get();
-        
+        $recurringTemplates = $budget->recurringTransactionTemplates()
+            ->with('account')
+            ->get();
+
         return Inertia::render('Transactions/Create', [
             'budget' => $budget,
             'accounts' => $accounts,
+            'recurringTemplates' => $recurringTemplates,
         ]);
     }
 
@@ -53,11 +57,12 @@ class TransactionController extends Controller
             'date' => 'required|date',
             'category' => 'required|string|max:255',
             'notes' => 'nullable|string',
+            'recurring_transaction_template_id' => 'nullable|exists:recurring_transaction_templates,id',
         ]);
 
         // Convert amount to cents and handle negative values for expenses
         $amountInCents = $validated['amount'] * 100;
-        
+
         /** @var Transaction $transaction */
         $transaction = $budget->transactions()->create([
             'account_id' => $validated['account_id'],
@@ -66,6 +71,7 @@ class TransactionController extends Controller
             'date' => $validated['date'],
             'category' => $validated['category'],
             'notes' => $validated['notes'] ?? null,
+            'recurring_transaction_template_id' => $validated['recurring_transaction_template_id'] ?? null,
         ]);
 
         // Update account balance
@@ -86,7 +92,10 @@ class TransactionController extends Controller
     public function edit(Budget $budget, Transaction $transaction): Response
     {
         $accounts = $budget->accounts()->get();
-        
+        $recurringTemplates = $budget->recurringTransactionTemplates()
+            ->with('account')
+            ->get();
+
         // Check if this is a recurring transaction
         $recurringTemplate = null;
         $rules = [];
@@ -96,11 +105,12 @@ class TransactionController extends Controller
                 $rules = $recurringTemplate->rules()->get();
             }
         }
-        
+
         return Inertia::render('Transactions/Edit', [
             'budget' => $budget,
             'transaction' => $transaction,
             'accounts' => $accounts,
+            'recurringTemplates' => $recurringTemplates,
             'recurringTemplate' => $recurringTemplate,
             'rules' => $rules,
         ]);
@@ -118,12 +128,13 @@ class TransactionController extends Controller
             'date' => 'required|date',
             'category' => 'required|string|max:255',
             'notes' => 'nullable|string',
+            'recurring_transaction_template_id' => 'nullable|exists:recurring_transaction_templates,id',
         ]);
 
         // Calculate the difference in amount to update account balance
         $newAmountInCents = $validated['amount'] * 100;
         $amountDifference = $newAmountInCents - $transaction->amount_in_cents;
-        
+
         // Update transaction
         $transaction->update([
             'account_id' => $validated['account_id'],
@@ -132,6 +143,7 @@ class TransactionController extends Controller
             'date' => $validated['date'],
             'category' => $validated['category'],
             'notes' => $validated['notes'] ?? null,
+            'recurring_transaction_template_id' => $validated['recurring_transaction_template_id'] ?? null,
         ]);
 
         // If account has changed or amount has changed, update account balances
@@ -145,7 +157,7 @@ class TransactionController extends Controller
                     'current_balance_cents' => $oldAccount->current_balance_cents - $transaction->getOriginal('amount_in_cents'),
                     'balance_updated_at' => now(),
                 ]);
-                
+
                 // Update new account (increase balance)
                 /** @var Account $newAccount */
                 $newAccount = Account::find($validated['account_id']);
@@ -180,11 +192,11 @@ class TransactionController extends Controller
             'current_balance_cents' => $account->current_balance_cents - $transaction->amount_in_cents,
             'balance_updated_at' => now(),
         ]);
-        
+
         // Delete the transaction
         $transaction->delete();
 
         return redirect()->route('budget.transaction.index', $budget)
             ->with('message', 'Transaction deleted successfully');
     }
-} 
+}

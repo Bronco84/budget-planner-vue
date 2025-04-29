@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Query\Builder;
 
 class Transaction extends Model
 {
@@ -37,7 +39,7 @@ class Transaction extends Model
      */
     protected $casts = [
         'amount_in_cents' => 'integer',
-        'date' => 'date',
+        'date' => 'date:Y-m-d',
         'is_plaid_imported' => 'boolean',
         'is_reconciled' => 'boolean',
         'is_projected' => 'boolean',
@@ -66,7 +68,7 @@ class Transaction extends Model
     {
         return $this->belongsTo(PlaidTransaction::class, 'plaid_transaction_id', 'plaid_transaction_id');
     }
-    
+
     /**
      * Get the recurring transaction template that generated this transaction.
      */
@@ -74,7 +76,7 @@ class Transaction extends Model
     {
         return $this->belongsTo(RecurringTransactionTemplate::class, 'recurring_transaction_template_id');
     }
-    
+
     /**
      * Get the recurring transaction template that this transaction is linked to.
      */
@@ -82,7 +84,7 @@ class Transaction extends Model
     {
         return $this->belongsTo(RecurringTransactionTemplate::class);
     }
-    
+
     /**
      * Format amount for display.
      */
@@ -90,4 +92,13 @@ class Transaction extends Model
     {
         return '$' . number_format($this->amount_in_cents / 100, 2);
     }
-} 
+
+    public function scopeFromFuture(\Illuminate\Database\Eloquent\Builder $query, string $date = null): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->when(
+            isset($date),
+            fn($query) => $query->where('date', '>=', $date),
+            fn($query) => $query->where('date', '>=', now()->toDate()->format('Y-m-d'))
+        );
+    }
+}

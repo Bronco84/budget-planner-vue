@@ -42,18 +42,23 @@ class RecurringTransactionService
             // Generate all occurrences
             while ($date <= $templateEndDate) {
                 if ($template->shouldGenerateForDate($date)) {
-                    // Determine the amount - either static or dynamic based on rules
-                    $amount = $template->amount_in_cents;
+                    // Determine the amount for this transaction
+                    if ($template->transactions()->where('date', $date->copy()->format('Y-m-d'))->exists()) {
+                        // If there are future transactions, check if it's the date of the next occurrence
+                        $amount = $template->transactions()->where('date', $date)->first()->amount_in_cents;
+                    } else {
+                        // If this is a dynamic amount template, calculate it based on rules
+                        if ($template->is_dynamic_amount) {
+                            $calculatedAmount = $this->calculateDynamicAmount($template);
 
-                    // If this is a dynamic amount template, calculate it based on rules
-                    if ($template->is_dynamic_amount) {
-                        $calculatedAmount = $this->calculateDynamicAmount($template);
-
-                        // If we have a valid calculated amount, use it
-                        if ($calculatedAmount !== null) {
-                            $amount = $calculatedAmount;
+                            // If we have a valid calculated amount, use it
+                            if ($calculatedAmount !== null) {
+                                $amount = $calculatedAmount;
+                            }
                         }
+                        $amount = $template->amount_in_cents;
                     }
+
 
                     $projectedTransactions->push([
                         'account' => $account,

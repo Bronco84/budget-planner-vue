@@ -97,6 +97,25 @@
                     <InputError class="mt-2" :message="form.errors.date" />
                   </div>
 
+                  <!-- Link to Recurring Transaction -->
+                  <div>
+                    <InputLabel for="recurring_transaction_template_id" value="Link to Recurring Transaction (Optional)" />
+                    <SelectInput
+                      id="recurring_transaction_template_id"
+                      v-model="form.recurring_transaction_template_id"
+                      class="mt-1 block w-full"
+                    >
+                      <option value="">None (Regular Transaction)</option>
+                      <option v-for="template in recurringTemplates" :key="template.id" :value="template.id">
+                        {{ template.description }} ({{ template.formatted_amount }})
+                      </option>
+                    </SelectInput>
+                    <p class="mt-1 text-xs text-gray-500">
+                      Link this transaction to a recurring template to mark it as an occurrence
+                    </p>
+                    <InputError class="mt-2" :message="form.errors.recurring_transaction_template_id" />
+                  </div>
+
                   <!-- Notes -->
                   <div>
                     <InputLabel for="notes" value="Notes (Optional)" />
@@ -113,13 +132,13 @@
               <!-- Note about recurring transactions -->
               <div class="border-t border-gray-200 pt-4 mt-6 text-sm text-gray-600">
                 <p>
-                  Need to create a recurring transaction? 
-                  <Link 
+                  Need to create a recurring transaction?
+                  <Link
                     :href="route('recurring-transactions.create', budget.id)"
                     class="text-indigo-600 hover:text-indigo-800"
                   >
                     Click here
-                  </Link> 
+                  </Link>
                   to set up a recurring transaction template instead.
                 </p>
               </div>
@@ -135,7 +154,7 @@
                     Delete Transaction
                   </button>
                 </div>
-                
+
                 <div class="flex justify-end space-x-3">
                   <Link
                     :href="route('budget.transaction.index', budget.id)"
@@ -143,7 +162,7 @@
                   >
                     Cancel
                   </Link>
-                  
+
                   <PrimaryButton type="submit" :disabled="form.processing">
                     Update Transaction
                   </PrimaryButton>
@@ -174,6 +193,7 @@ const props = defineProps({
   budget: Object,
   transaction: Object,
   accounts: Array,
+  recurringTemplates: Array,
   edit: Boolean,
   patterns: Object,
 });
@@ -186,6 +206,7 @@ const form = useForm({
   category: props.transaction.category,
   date: props.transaction.date,
   notes: props.transaction.notes || '',
+  recurring_transaction_template_id: props.transaction.recurring_transaction_template_id || '',
 });
 
 // Form submission
@@ -199,4 +220,4 @@ const confirmDelete = () => {
     router.delete(route('budget.transaction.destroy', [props.budget.id, props.transaction.id]));
   }
 };
-</script> 
+</script>

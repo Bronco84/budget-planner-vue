@@ -7,6 +7,7 @@ use App\Models\Transaction;
 use App\Models\Account;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Collection;
 
 class RecurringTransactionService
 {
@@ -41,8 +42,18 @@ class RecurringTransactionService
             // Generate all occurrences
             while ($date <= $templateEndDate) {
                 if ($template->shouldGenerateForDate($date)) {
+                    // Determine the amount - either static or dynamic based on rules
+                    $amount = $template->amount_in_cents;
 
-                    $amount = $template->is_dynamic_amount ? $template->calculateDynamicAmount($date) : $template->amount_in_cents;
+                    // If this is a dynamic amount template, calculate it based on rules
+                    if ($template->is_dynamic_amount) {
+                        $calculatedAmount = $this->calculateDynamicAmount($template);
+
+                        // If we have a valid calculated amount, use it
+                        if ($calculatedAmount !== null) {
+                            $amount = $calculatedAmount;
+                        }
+                    }
 
                     $projectedTransactions->push([
                         'account' => $account,
@@ -53,7 +64,7 @@ class RecurringTransactionService
                         'account_id' => $template->account_id,
                         'date' => $date->copy(),
                         'recurring_transaction_template_id' => $template->id,
-                        'created_by' => $template->created_by,
+                        'created_by' => $template->created_by ?? null,
                         'is_projected' => true
                     ]);
                 }
@@ -63,6 +74,114 @@ class RecurringTransactionService
         }
 
         return $projectedTransactions->sortBy('date')->values();
+    }
+
+    /**
+     * Calculate the dynamic amount for a recurring transaction template based on rules.
+     *
+     * @param RecurringTransactionTemplate $template
+     * @return int|null The calculated amount in cents or null if not calculable
+     */
+    protected function calculateDynamicAmount(RecurringTransactionTemplate $template): ?int
+    {
+        $rules = $template->rules()->where('is_active', true)->get();
+
+        if ($rules->isEmpty()) {
+            if ($template->average_amount !== null) {
+                $amount = (int)($template->average_amount * 100);
+                Log::debug('Using template average amount (no rules)', ['amount' => $amount]);
+                return $amount;
+            }
+
+            Log::debug('Using template static amount (no rules or average)', ['amount' => $template->amount_in_cents]);
+            return $template->amount_in_cents;
+        }
+
+        $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
+
+        if ($matchingTransactions->isEmpty()) {
+            if ($template->average_amount !== null) {
+                $amount = (int)($template->average_amount * 100);
+                return $amount;
+            }
+
+            return $template->amount_in_cents;
+        }
+
+        // NEW: Filter transactions based on min/max logic BEFORE averaging
+        $filteredTransactions = $matchingTransactions->filter(function ($transaction) use ($template) {
+            $amount = $transaction->amount_in_cents;
+
+            if ($amount < 0) {
+                if ($template->max_amount !== null && $template->max_amount < 0 && $amount < $template->max_amount) {
+                    return false; // Exclude if lower than allowed max
+                }
+                if ($template->min_amount !== null && $template->min_amount < 0 && $amount > $template->min_amount) {
+                    return false; // Exclude if higher than allowed min
+                }
+            } else {
+                if ($template->min_amount !== null && $template->min_amount > 0 && $amount < $template->min_amount) {
+                    return false; // Exclude if lower than allowed min
+                }
+                if ($template->max_amount !== null && $template->max_amount > 0 && $amount > $template->max_amount) {
+                    return false; // Exclude if higher than allowed max
+                }
+            }
+
+            return true; // Include if passes min/max checks
+        });
+
+        if ($filteredTransactions->isEmpty()) {
+            // If no transactions left after filtering, fallback
+            if ($template->average_amount !== null) {
+                $amount = (int)($template->average_amount * 100);
+                return $amount;
+            }
+
+            return $template->amount_in_cents;
+        }
+
+        // Calculate average of only the valid transactions
+        $totalAmount = $filteredTransactions->sum('amount_in_cents');
+        $averageAmount = (int)($totalAmount / $filteredTransactions->count());
+
+        return $averageAmount;
+    }
+
+
+
+    /**
+     * Find transactions that match all the provided rules for a template.
+     *
+     * @param RecurringTransactionTemplate $template
+     * @param \Illuminate\Support\Collection $rules
+     * @return \Illuminate\Support\Collection
+     */
+    protected function findTransactionsMatchingAllRules(RecurringTransactionTemplate $template, Collection $rules): Collection
+    {
+        // Get the budget ID from the template
+        $budgetId = $template->budget_id;
+
+        // Get transactions for this budget
+        $transactions = Transaction::where('budget_id', $budgetId)->get();
+
+        // Filter transactions that match all rules
+        $matchingTransactions = $transactions->filter(function (Transaction $transaction) use ($rules) {
+            // Transaction must match ALL rules (AND logic)
+            foreach ($rules as $rule) {
+                $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
+                $ruleValue = $rule->value;
+                $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue);
+
+                if (!$matches) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        return $matchingTransactions;
     }
 
     /**
@@ -96,96 +215,74 @@ class RecurringTransactionService
         return $matchingTransactions->count();
     }
 
-    public function getNextDate(RecurringTransactionTemplate $template, Carbon $fromDate): ?Carbon
+    /**
+     * Get the value of a transaction field for comparison with a rule
+     *
+     * @param Transaction $transaction
+     * @param string $field
+     * @return mixed
+     */
+    protected function getTransactionFieldValue(Transaction $transaction, string $field)
     {
-        // If the from date is before the template start date, use the start date instead
-        if ($fromDate->lt($template->start_date)) {
-            $fromDate = Carbon::parse($template->start_date);
-        }
-
-        // If we've reached the end date already, return null
-        if ($template->end_date && $fromDate->gte($template->end_date)) {
-            return null;
-        }
-
-        $nextDate = null;
-
-        switch ($template->frequency) {
-            case RecurringTransactionTemplate::FREQUENCY_DAILY:
-                $nextDate = $fromDate->copy()->addDay();
-                break;
-            case RecurringTransactionTemplate::FREQUENCY_WEEKLY:
-                $dayOfWeek = $template->day_of_week ?? $fromDate->dayOfWeek;
-                $nextDate = $fromDate->copy()->next($dayOfWeek);
-                break;
-            case RecurringTransactionTemplate::FREQUENCY_BIWEEKLY:
-                $dayOfWeek = $template->day_of_week ?? $fromDate->dayOfWeek;
-                $nextDate = $fromDate->copy()->next($dayOfWeek)->addWeek();
-                break;
-            case RecurringTransactionTemplate::FREQUENCY_MONTHLY:
-                $dayOfMonth = $template->day_of_month ?? $fromDate->day;
-                $nextDate = $fromDate->copy()->addMonth()->day($dayOfMonth);
-
-                // Handle cases where the day doesn't exist in the next month
-                while ($nextDate->lt($fromDate)) {
-                    $nextDate->addMonth();
-                }
-                break;
-            case RecurringTransactionTemplate::FREQUENCY_BIMONTHLY:
-                $firstDay = $template->first_day_of_month ?? 1;
-                $secondDay = $template->day_of_month ?? 15;
-
-                // Ensure firstDay is before secondDay
-                if ($firstDay > $secondDay) {
-                    $temp = $firstDay;
-                    $firstDay = $secondDay;
-                    $secondDay = $temp;
-                }
-
-                $currentDay = $fromDate->day;
-                $nextDate = $fromDate->copy();
-
-                if ($currentDay < $firstDay) {
-                    // Next date is the first day of this month
-                    $nextDate->day($firstDay);
-                } else if ($currentDay < $secondDay) {
-                    // Next date is the second day of this month
-                    $nextDate->day($secondDay);
-                } else {
-                    // Next date is the first day of next month
-                    $nextDate->addMonth()->day($firstDay);
-                }
-
-                // Handle cases where the day doesn't exist in the month
-                while ($nextDate->lt($fromDate)) {
-                    if ($currentDay < $secondDay) {
-                        $nextDate = $fromDate->copy()->day($secondDay);
-                    } else {
-                        $nextDate = $fromDate->copy()->addMonth()->day($firstDay);
-                    }
-                }
-                break;
-            case RecurringTransactionTemplate::FREQUENCY_QUARTERLY:
-                $dayOfMonth = $template->day_of_month ?? $fromDate->day;
-                $nextDate = $fromDate->copy()->addMonths(3)->day($dayOfMonth);
-
-                // Handle cases where the day doesn't exist in the next quarter
-                while ($nextDate->lt($fromDate)) {
-                    $nextDate->addMonth();
-                }
-                break;
-            case RecurringTransactionTemplate::FREQUENCY_YEARLY:
-                $nextDate = $fromDate->copy()->addYear();
-                break;
+        switch ($field) {
+            case 'description':
+                return $transaction->description;
+            case 'amount':
+                return $transaction->amount_in_cents;
+            case 'category':
+                return $transaction->category;
+            case 'date':
+                return $transaction->date ? $transaction->date->format('Y-m-d') : null;
+            case 'account_id':
+                return $transaction->account_id;
             default:
                 return null;
         }
+    }
 
-        // Check if we've gone past the end date
-        if ($template->end_date && $nextDate->gt($template->end_date)) {
-            return null;
+    /**
+     * Evaluate if a transaction field value matches a rule condition
+     *
+     * @param mixed $fieldValue
+     * @param string $operator
+     * @param mixed $ruleValue
+     * @return bool
+     */
+    protected function evaluateRuleCondition($fieldValue, string $operator, $ruleValue): bool
+    {
+        Log::debug('Evaluating condition', [
+            'field_value' => $fieldValue,
+            'operator' => $operator,
+            'rule_value' => $ruleValue
+        ]);
+
+        switch ($operator) {
+            case '=':
+                return $fieldValue == $ruleValue;
+            case '!=':
+                return $fieldValue != $ruleValue;
+            case '>':
+                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue > $ruleValue;
+            case '<':
+                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue < $ruleValue;
+            case '>=':
+                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue >= $ruleValue;
+            case '<=':
+                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue <= $ruleValue;
+            case 'contains':
+                return is_string($fieldValue) && is_string($ruleValue) &&
+                    stripos($fieldValue, $ruleValue) !== false;
+            case 'not_contains':
+                return is_string($fieldValue) && is_string($ruleValue) &&
+                    stripos($fieldValue, $ruleValue) === false;
+            case 'starts_with':
+                return is_string($fieldValue) && is_string($ruleValue) &&
+                    stripos($fieldValue, $ruleValue) === 0;
+            case 'ends_with':
+                return is_string($fieldValue) && is_string($ruleValue) &&
+                    stripos($fieldValue, $ruleValue, max(0, strlen($fieldValue) - strlen($ruleValue))) !== false;
+            default:
+                return false;
         }
-
-        return $nextDate;
     }
 }

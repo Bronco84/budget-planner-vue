@@ -55,8 +55,9 @@ class RecurringTransactionService
                             if ($calculatedAmount !== null) {
                                 $amount = $calculatedAmount;
                             }
+                        } else {
+                            $amount = $template->amount_in_cents;
                         }
-                        $amount = $template->amount_in_cents;
                     }
 
 
@@ -93,12 +94,8 @@ class RecurringTransactionService
 
         if ($rules->isEmpty()) {
             if ($template->average_amount !== null) {
-                $amount = (int)($template->average_amount * 100);
-                Log::debug('Using template average amount (no rules)', ['amount' => $amount]);
-                return $amount;
+                return (int)($template->average_amount * 100);
             }
-
-            Log::debug('Using template static amount (no rules or average)', ['amount' => $template->amount_in_cents]);
             return $template->amount_in_cents;
         }
 

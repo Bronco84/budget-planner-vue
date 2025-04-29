@@ -41,12 +41,20 @@ class ProjectionsController extends Controller
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
         
-        // Get projected transactions for all accounts in this budget
-        $projectedTransactions = $this->recurringTransactionService->projectFutureTransactions(
-            $budget, 
-            $startDate, 
-            $endDate
-        );
+        // Get all accounts for this budget
+        $accounts = $budget->accounts;
+        $projectedTransactions = collect();
+        
+        // Project transactions for each account
+        foreach ($accounts as $account) {
+            $accountProjections = $this->recurringTransactionService->projectTransactions(
+                $account, 
+                $startDate, 
+                $endDate
+            );
+            
+            $projectedTransactions = $projectedTransactions->merge($accountProjections);
+        }
         
         // Group by month
         $projectionsByMonth = collect();
@@ -98,16 +106,17 @@ class ProjectionsController extends Controller
     {
         $monthsAhead = $request->input('months', 3);
         $startDate = Carbon::today();
+        $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
         
         // Get projected transactions for this account
-        $projectedTransactions = $this->recurringTransactionService->projectAccountTransactions(
+        $projectedTransactions = $this->recurringTransactionService->projectTransactions(
             $account,
             $startDate,
-            $monthsAhead
+            $endDate
         );
         
         // Project daily balance for the account
-        $initialBalance = $account->current_balance_in_cents;
+        $initialBalance = $account->current_balance_cents;
         $balanceProjection = $this->projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead);
         
         return Inertia::render('Accounts/Projections', [

@@ -6,12 +6,15 @@ use App\Models\Budget;
 use App\Models\Account;
 use App\Models\Transaction;
 use App\Services\ProjectionService;
+use App\Services\RecurringTransactionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 use Carbon\Carbon;
+use App\Http\Controllers\Controller;
 
 class BudgetController extends Controller
 {
@@ -31,7 +34,7 @@ class BudgetController extends Controller
         $budgets = Auth::user()->budgets()
             ->with(['categories', 'categories.expenses', 'accounts'])
             ->get();
-        
+
         return Inertia::render('Budgets/Index', [
             'budgets' => $budgets
         ]);
@@ -75,16 +78,6 @@ class BudgetController extends Controller
             'include_in_budget' => true,
         ]);
 
-        // Create an initial transaction for this balance
-        $account->transactions()->create([
-            'budget_id' => $budget->id,
-            'description' => 'Initial Balance',
-            'amount_in_cents' => $validated['starting_balance'] * 100,
-            'date' => now(),
-            'category' => 'Starting Balance',
-            'is_reconciled' => true,
-        ]);
-
         // Set this account as the starting balance account for the budget
         $budget->update(['starting_balance_account_id' => $account->id]);
 
@@ -97,37 +90,31 @@ class BudgetController extends Controller
      */
     public function show(Budget $budget, Request $request): Response
     {
+        // TODO: Add authorization check for budget access
         // Load relationships including plaidAccount with account
         $budget->load([
-            'categories.expenses', 
+            'categories.expenses',
             'accounts.plaidAccount'
         ]);
-        
-        // Make sure accounts are loaded with their plaidAccount relationship
-        $accounts = $budget->accounts->each(function ($account) {
-            // Force loading of plaidAccount to ensure it's available
-            $account->load('plaidAccount');
-        });
-        
+
+        // Get the selected account (or first account if none selected)
+        $account = $budget->accounts()
+            ->when(
+                $request->filled('account_id'),
+                fn($query) => $query->where('id', $request->input('account_id')),
+            )->first();
+
         // Get query parameters for filtering
         $search = $request->input('search');
         $category = $request->input('category');
         $timeframe = $request->input('timeframe');
-        $page = $request->input('page', 1);
-        
+
         // Get projection parameters
-        $includeProjections = $request->boolean('include_projections', false);
-        $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : Carbon::today();
-        $months = (int) $request->input('projection_months', 1);
-        
-        // Treat months=0 as disabling projections
-        if ($months === 0) {
-            $includeProjections = false;
-        }
-        
+        $monthsToProject = (int) $request->input('projection_months', 1);
+
         // Build transaction query
         $transactionQuery = $budget->transactions()->with('account');
-        
+
         // Apply search filter if provided
         if ($search) {
             $transactionQuery->where(function($query) use ($search) {
@@ -135,12 +122,12 @@ class BudgetController extends Controller
                     ->orWhere('category', 'like', "%{$search}%");
             });
         }
-        
+
         // Apply category filter if provided
         if ($category) {
             $transactionQuery->where('category', $category);
         }
-        
+
         // Apply time filter if provided
         if ($timeframe) {
             $now = Carbon::now();
@@ -163,59 +150,158 @@ class BudgetController extends Controller
                     break;
             }
         }
-        
-        // Order by date descending
-        $transactionQuery->orderByDesc('date');
-        
-        // Get projected transactions if requested
-        $projectedTransactions = collect();
-        if ($includeProjections) {
-            $projectionService = new ProjectionService();
-            $projections = $projectionService->projectBudgetTransactions($budget, $startDate, $months);
-            
-            // Flatten the nested transaction structure from projections
-            foreach ($projections['transactions'] as $monthData) {
-                foreach ($monthData as $dayData) {
-                    foreach ($dayData as $transaction) {
-                        if ($transaction->is_projected) {
-                            $projectedTransactions->push($transaction);
-                        }
-                    }
-                }
-            }
+
+        // Get the date range from the filter
+        $dateRange = $request->input('date_range', '90');
+        $startDate = match($dateRange) {
+            '7' => now()->subDays(7),
+            '30' => now()->subDays(30),
+            '90' => now()->subDays(90),
+            'custom' => $request->input('start_date') ? Carbon::parse($request->input('start_date')) : now()->subDays(90),
+            default => now()->startOfYear(),
+        };
+
+        $endDate = now();
+
+        // Get actual transactions including pending ones
+        $query = $account->transactions()
+            ->select('transactions.*', 'plaid_transactions.pending as pending')
+            ->with(['account', 'plaidTransaction'])
+            ->leftJoin('plaid_transactions', 'transactions.plaid_transaction_id', '=', 'plaid_transactions.plaid_transaction_id')
+            ->where(function($query) use ($startDate, $endDate) {
+                $query->where('transactions.date', '>=', $startDate)
+                    ->where('transactions.date', '<=', $endDate)
+                    ->orWhereHas('plaidTransaction', function($q) {
+                        // pending transactions should always be included
+                        // since they are technically "future" transactions without a date
+                        $q->where('pending', true);
+                    });
+            })
+            ->when($request->filled('type'), function($query, $type) {
+                match ($type) {
+                    'income' => $query->where('amount_in_cents', '>', 0),
+                    'expense' => $query->where('amount_in_cents', '<', 0),
+                    'recurring' => $query->whereNotNull('recurring_transaction_template_id'),
+                };
+            })
+            ->when($request->filled('category'), fn($query, $category) => $query->where('category', $category))
+            ->when($request->filled('search'), function($q) use ($request) {
+                $q->where('description', 'like', "%{$request->input('search')}%")
+                    ->orWhere('category', 'like', "%{$request->input('search')}%")
+                    ->orWhere('notes', 'like', "%{$request->input('search')}%");
+            });
+
+        // Get actual transactions
+        $actualTransactions = $query->orderBy('date')->get();
+
+        // Get projected transactions
+        $recurringService = app(RecurringTransactionService::class);
+        $projectedTransactions = collect($recurringService->projectTransactions(
+            $account,
+            now()->addDay(),
+            now()->addMonths($monthsToProject)->endOfMonth()
+        ))
+            ->map(function ($transaction) use ($budget) {
+                $model = new Transaction($transaction);
+                $model->account = $transaction['account'] ?? null;
+                $model->budget_id = $budget->id;
+                $model->is_projected = true;
+                $model->date = Carbon::parse($transaction['date']);
+                $model->account_id = $transaction['account_id'] ?? null;
+                $model->recurring_transaction_template_id = $transaction['recurring_transaction_template_id'] ?? null;
+                $model->amount_in_cents = $transaction['amount_in_cents'] ?? 0;
+                return $model;
+            });
+
+        // Merge and sort all transactions
+        $allTransactions = $actualTransactions->concat($projectedTransactions)
+            ->values();
+
+        // Split transactions into actual, pending, and projected for this account
+        $accountTransactions = $allTransactions->where('account_id', $account->id);
+
+        // Get actual (non-pending) transactions
+        $actualTransactions = $allTransactions
+            ->where('is_projected', false)
+            ->filter(function($transaction) {
+                return !$transaction->pending;
+            });
+
+        // Get pending transactions
+        $pendingTransactions = $accountTransactions
+            ->where('is_projected', false)
+            ->filter(function($transaction) {
+                return $transaction->pending;
+            });
+
+        // Get projected transactions
+        $projectedTransactions = $accountTransactions
+            ->where('is_projected', true);
+
+        $runningBalance = $account->current_balance_cents;
+
+        // Process actual transactions in reverse chronological order
+        foreach ($actualTransactions->reverse() as $transaction) {
+            $transaction->running_balance = $runningBalance;
+            $runningBalance = $runningBalance - $transaction->amount_in_cents;
         }
-        
-        // Get base transactions
-        $actualTransactions = $transactionQuery->paginate(10)->withQueryString();
-        
-        // If projections are included, we need to merge them with actual transactions on the client side
-        
+
+        // Reset balance to current for pending and projected transactions
+        $runningBalance = $account->current_balance_cents;
+
+        // Process pending transactions in chronological order
+        foreach ($pendingTransactions as $transaction) {
+            $runningBalance += $transaction->amount_in_cents;
+            $transaction->running_balance = $runningBalance;
+        }
+
+        // Process projected transactions in chronological order
+        foreach ($projectedTransactions as $transaction) {
+            $runningBalance += $transaction->amount_in_cents;
+            $transaction->running_balance = $runningBalance;
+        }
+
+        // Sort all transactions by date descending for display
+        $allTransactions = $allTransactions->reverse()->values();
+
+        // Paginate the merged collection
+        $perPage = 50;
+        $page = $request->input('page', 1);
+        $offset = ($page - 1) * $perPage;
+
+        $accountTransactions = new LengthAwarePaginator(
+            $allTransactions->slice($offset, $perPage),
+            $allTransactions->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         // Get unique categories for filter dropdown
         $categories = $budget->transactions()
             ->select('category')
             ->distinct()
             ->orderBy('category')
             ->pluck('category');
-        
+
         // Get the total balance across all accounts
         $totalBalance = $budget->accounts->sum('current_balance_cents') / 100;
-        
+
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
-            'transactions' => $actualTransactions,
-            'projectedTransactions' => $includeProjections ? $projectedTransactions : null,
+            'transactions' => $accountTransactions,
+            'projectedTransactions' => $projectedTransactions,
             'projectionParams' => [
-                'includeProjections' => $includeProjections,
-                'startDate' => $startDate->format('Y-m-d'),
-                'months' => $months,
+                'months' => $monthsToProject,
             ],
             'categories' => $categories,
             'filters' => [
                 'search' => $search,
                 'category' => $category,
                 'timeframe' => $timeframe,
+                'account_id' => $request->input('account_id'),
             ],
         ]);
     }
@@ -297,25 +383,71 @@ class BudgetController extends Controller
     public function projections(Budget $budget, Request $request): Response
     {
         $this->authorize('view', $budget);
-        
+
         $validated = $request->validate([
-            'start_date' => 'required|date',
             'months' => 'integer|min:1|max:24',
         ]);
-        
-        $startDate = Carbon::parse($validated['start_date']);
+
+        $startDate = Carbon::today();
         $months = $validated['months'] ?? 6;
+        $endDate = $startDate->copy()->addMonths($months);
         
-        $projectionService = new ProjectionService();
-        $projections = $projectionService->projectBudgetTransactions($budget, $startDate, $months);
+        // Get all accounts for this budget
+        $accounts = $budget->accounts;
+        $projections = collect();
         
+        // Get the RecurringTransactionService
+        $recurringTransactionService = app(RecurringTransactionService::class);
+        
+        // Project transactions for each account
+        foreach ($accounts as $account) {
+            $accountProjections = $recurringTransactionService->projectTransactions(
+                $account,
+                $startDate,
+                $endDate
+            );
+            
+            $projections = $projections->merge($accountProjections);
+        }
+
         return Inertia::render('Budgets/Projections', [
             'budget' => $budget,
             'projections' => $projections,
             'params' => [
-                'start_date' => $startDate->format('Y-m-d'),
                 'months' => $months,
             ],
         ]);
+    }
+
+    /**
+     * Handle filtering of transactions (to work around GET param issues)
+     */
+    public function filter(Request $request, Budget $budget): RedirectResponse
+    {
+        // Log received parameters
+        \Log::info('Filtering budget transactions', [
+            'budget_id' => $budget->id,
+            'params' => $request->all()
+        ]);
+
+        // Extract filter parameters
+        $params = [
+            'account_id' => $request->input('account_id'),
+            'search' => $request->input('search'),
+            'category' => $request->input('category'),
+            'timeframe' => $request->input('timeframe'),
+            'projection_months' => $request->input('projection_months', 1),
+        ];
+
+        // Remove empty parameters
+        $params = array_filter($params, function ($value) {
+            return $value !== null && $value !== '';
+        });
+
+        // Redirect to show with query parameters
+        return redirect()->route('budgets.show', array_merge(
+            ['budget' => $budget->id],
+            $params
+        ));
     }
 }

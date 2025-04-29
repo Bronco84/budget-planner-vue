@@ -1,0 +1,175 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Command "transactions\:identify\-recurring" does not have argument "account_id"\.$#'
+			identifier: larastan.console.undefinedArgument
+			count: 1
+			path: app/Console/Commands/IdentifyRecurringTransactions.php
+
+		-
+			message: '#^Command "transactions\:identify\-recurring" does not have option "days"\.$#'
+			identifier: larastan.console.undefinedOption
+			count: 1
+			path: app/Console/Commands/IdentifyRecurringTransactions.php
+
+		-
+			message: '#^Match arm comparison between ''biweekly'' and ''biweekly'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: app/Console/Commands/IdentifyRecurringTransactions.php
+
+		-
+			message: '#^Method App\\Console\\Commands\\IdentifyRecurringTransactions\:\:handle\(\) should return int but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: app/Console/Commands/IdentifyRecurringTransactions.php
+
+		-
+			message: '#^Offset float does not exist on Illuminate\\Support\\Collection\<int, mixed\>\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Console/Commands/IdentifyRecurringTransactions.php
+
+		-
+			message: '#^Parameter \#1 \$value of method Carbon\\Carbon\:\:subDays\(\) expects float\|int, array\|bool\|string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/IdentifyRecurringTransactions.php
+
+		-
+			message: '#^Match arm comparison between ''biweekly'' and ''biweekly'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: app/Console/Commands/LegacyGenerateRecurringCommand.php
+
+		-
+			message: '#^Offset float does not exist on Illuminate\\Support\\Collection\<int, mixed\>\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Console/Commands/LegacyGenerateRecurringCommand.php
+
+		-
+			message: '#^Parameter \#1 \$value of method Carbon\\Carbon\:\:subDays\(\) expects float\|int, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/LegacyGenerateRecurringCommand.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$is_projected\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BudgetController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$current_balance_cents\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/BudgetController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BudgetController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:transactions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/BudgetController.php
+
+		-
+			message: '#^Class App\\Services\\ProjectionService not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Http/Controllers/BudgetController.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: mixed$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Http/Controllers/BudgetController.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\RecurringTransactionService\:\:projectTransactions\(\) expects App\\Models\\Account, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/BudgetController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/PlaidController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Account\:\:\$current_balance_in_cents\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ProjectionsController.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\RecurringTransactionService\:\:projectAccountTransactions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/ProjectionsController.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\RecurringTransactionService\:\:projectFutureTransactions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/ProjectionsController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:rules\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/TransactionController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:expenses\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Models/Budget.php
+
+		-
+			message: '#^Method App\\Models\\Budget\:\:transactions\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany\<App\\Models\\Transaction, App\\Models\\Budget\> but returns Illuminate\\Database\\Eloquent\\Relations\\HasMany\<App\\Models\\Transaction, \$this\(App\\Models\\Budget\)\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Budget.php
+
+		-
+			message: '#^PHPDoc type array of property App\\Models\\Budget\:\:\$with is not covariant with PHPDoc type list\<string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$with\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: app/Models/Budget.php
+
+		-
+			message: '#^Method App\\Models\\RecurringTransactionTemplate\:\:getNextDate\(\) should return Carbon\\Carbon but returns null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/RecurringTransactionTemplate.php
+
+		-
+			message: '#^Class App\\Services\\ProjectionService not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Instantiated class App\\Services\\ProjectionService not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RecurringTransactionTemplate\:\:\$created_by\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/RecurringTransactionService.php
+
+		-
+			message: '#^Call to an undefined method App\\Models\\RecurringTransactionTemplate\:\:calculateDynamicAmount\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/RecurringTransactionService.php

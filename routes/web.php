@@ -9,6 +9,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\RecurringTransactionRuleController;
 use App\Http\Controllers\PlaidController;
+use App\Http\Controllers\PlaidTransactionController;
 use App\Http\Controllers\ProjectionsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -95,7 +96,7 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.rules.test');
     Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/apply', [RecurringTransactionRuleController::class, 'apply'])
         ->name('recurring-transactions.rules.apply');
-        
+    
     // Plaid integration routes
     Route::get('budget/{budget}/account/{account}/plaid/link', [PlaidController::class, 'showLinkForm'])
         ->name('plaid.link');
@@ -111,6 +112,14 @@ Route::middleware('auth')->group(function () {
     // New route for syncing all Plaid accounts in a budget
     Route::post('budget/{budget}/plaid/sync-all', [PlaidController::class, 'syncAllTransactions'])
         ->name('plaid.sync-all');
+    
+    // Plaid transactions routes
+    Route::get('budget/{budget}/account/{account}/plaid-transactions', [PlaidTransactionController::class, 'index'])
+        ->name('plaid-transactions.index');
+    Route::get('budget/{budget}/account/{account}/plaid-transactions/api', [PlaidTransactionController::class, 'getTransactions'])
+        ->name('plaid-transactions.api');
+    Route::get('budget/{budget}/account/{account}/plaid-transactions/{plaidTransactionId}', [PlaidTransactionController::class, 'show'])
+        ->name('plaid-transactions.show');
 });
 
 require __DIR__.'/auth.php';

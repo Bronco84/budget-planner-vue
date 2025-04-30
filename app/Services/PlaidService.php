@@ -412,15 +412,34 @@ class PlaidService
                         'plaid_transaction_id' => $transaction['transaction_id'],
                     ],
                     [
+                        'account_id' => $plaidAccount->account_id,
                         'plaid_account_id' => $transaction['account_id'],
                         'pending' => $transaction['pending'] ?? false,
                         'amount' => $transaction['amount'],
                         'date' => $transaction['date'],
+                        'datetime' => $transaction['datetime'] ?? null,
+                        'authorized_date' => $transaction['authorized_date'] ?? null,
+                        'authorized_datetime' => $transaction['authorized_datetime'] ?? null,
                         'name' => $transaction['name'],
                         'merchant_name' => $transaction['merchant_name'] ?? null,
+                        'merchant_entity_id' => $transaction['merchant_entity_id'] ?? null,
                         'payment_channel' => $transaction['payment_channel'] ?? null,
-                        'primary_category' => $transaction['category'][0] ?? null,
-                        'detailed_category' => end($transaction['category']) ?? null,
+                        'transaction_code' => $transaction['transaction_code'] ?? null,
+                        'transaction_type' => $transaction['transaction_type'] ?? null,
+                        'pending_transaction_id' => $transaction['pending_transaction_id'] ?? null,
+                        'iso_currency_code' => $transaction['iso_currency_code'] ?? null,
+                        'unofficial_currency_code' => $transaction['unofficial_currency_code'] ?? null,
+                        'check_number' => $transaction['check_number'] ?? null,
+                        'category' => $transaction['category'][0] ?? null,
+                        'category_id' => end($transaction['category']) ?? null,
+                        'counterparties' => isset($transaction['counterparties']) ? json_encode($transaction['counterparties']) : null,
+                        'location' => isset($transaction['location']) ? json_encode($transaction['location']) : null,
+                        'payment_meta' => isset($transaction['payment_meta']) ? json_encode($transaction['payment_meta']) : null,
+                        'personal_finance_category' => isset($transaction['personal_finance_category']) ? json_encode($transaction['personal_finance_category']) : null,
+                        'personal_finance_category_icon_url' => $transaction['personal_finance_category_icon_url'] ?? null,
+                        'logo_url' => $transaction['logo_url'] ?? null,
+                        'website' => $transaction['website'] ?? null,
+                        'metadata' => isset($transaction['metadata']) ? json_encode($transaction['metadata']) : null,
                         'original_data' => json_encode($transaction),
                     ]
                 );
@@ -452,6 +471,25 @@ class PlaidService
                     ]);
 
                     $imported++;
+                }
+                
+                // Check if this transaction was previously pending and handle accordingly
+                if (isset($transaction['pending_transaction_id']) && !empty($transaction['pending_transaction_id'])) {
+                    // This is a settled transaction that was previously pending
+                    // Find the transaction linked to the pending plaid transaction
+                    $pendingTransaction = Transaction::where('plaid_transaction_id', $transaction['pending_transaction_id'])
+                        ->first();
+                    
+                    if ($pendingTransaction) {
+                        // Delete the pending transaction since it's now settled
+                        $pendingTransaction->delete();
+                        
+                        // Log the deletion for debugging
+                        Log::info('Deleted pending transaction after settlement', [
+                            'pending_transaction_id' => $transaction['pending_transaction_id'],
+                            'settled_transaction_id' => $transaction['transaction_id']
+                        ]);
+                    }
                 }
             }
 

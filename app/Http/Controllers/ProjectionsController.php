@@ -8,6 +8,7 @@ use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Collection;
 
 class ProjectionsController extends Controller
 {
@@ -115,9 +116,19 @@ class ProjectionsController extends Controller
             $endDate
         );
         
+        // Ensure projectedTransactions is always a collection
+        if (!$projectedTransactions instanceof Collection) {
+            $projectedTransactions = collect($projectedTransactions);
+        }
+        
         // Project daily balance for the account
         $initialBalance = $account->current_balance_cents;
         $balanceProjection = $this->projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead);
+        
+        // Ensure balanceProjection has the expected structure
+        if (!isset($balanceProjection['days'])) {
+            $balanceProjection = ['days' => []];
+        }
         
         return Inertia::render('Accounts/Projections', [
             'budget' => $budget,
@@ -170,6 +181,59 @@ class ProjectionsController extends Controller
             $currentDate->addDay();
         }
         
-        return $dailyProjection;
+        // Wrap the daily projection data in an object with a 'days' property to match frontend expectations
+        return ['days' => $dailyProjection];
+    }
+
+    /**
+     * Show the detailed balance projection page for an account.
+     *
+     * @param Budget $budget
+     * @param Account $account
+     * @param Request $request
+     * @return \Inertia\Response
+     */
+    public function showBalanceProjection(Budget $budget, Account $account, Request $request)
+    {
+        // Ensure account belongs to budget
+        if ($account->budget_id !== $budget->id) {
+            abort(404, 'Account not found in this budget');
+        }
+        
+        $monthsAhead = intval($request->input('months', 12));
+        $scenario = $request->input('scenario', 'default');
+        $groupBy = $request->input('groupBy', 'day');
+        
+        $startDate = Carbon::today();
+        $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
+        
+        // Get projected transactions for this account
+        $projectedTransactions = $this->recurringTransactionService->projectTransactions(
+            $account,
+            $startDate,
+            $endDate
+        );
+        
+        // Ensure projectedTransactions is always a collection
+        if (!$projectedTransactions instanceof Collection) {
+            $projectedTransactions = collect($projectedTransactions);
+        }
+        
+        // Project daily balance for the account
+        $initialBalance = $account->current_balance_cents;
+        $balanceProjection = $this->projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead);
+        
+        // Ensure balanceProjection has the expected structure
+        if (!isset($balanceProjection['days'])) {
+            $balanceProjection = ['days' => []];
+        }
+        
+        return Inertia::render('Accounts/BalanceProjection', [
+            'budget' => $budget,
+            'account' => $account,
+            'projectedTransactions' => $projectedTransactions,
+            'balanceProjection' => $balanceProjection,
+            'monthsAhead' => $monthsAhead,
+        ]);
     }
 }

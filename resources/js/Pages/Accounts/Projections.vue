@@ -7,6 +7,12 @@
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ account.name }} - Account Projections</h2>
         <div class="flex space-x-2">
           <Link 
+            :href="route('budget.account.balance-projection', { budget: budget.id, account: account.id })" 
+            class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700"
+          >
+            View Detailed Balance Projection
+          </Link>
+          <Link 
             :href="route('budgets.show', budget.id)" 
             class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300"
           >
@@ -107,8 +113,17 @@
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Daily Balance Projection</h3>
             
+            <!-- Balance Chart -->
+            <div class="mb-6" style="height: 400px;">
+              <BalanceChart 
+                :balance-data="balanceProjectionData" 
+                :height="350"
+                :show-positive-negative="true"
+              />
+            </div>
+            
             <!-- Balance table -->
-            <div class="overflow-x-auto">
+            <div v-if="props.balanceProjection && props.balanceProjection.days" class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
@@ -119,7 +134,7 @@
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="day in balanceProjection.days" :key="day.date">
+                  <tr v-for="day in props.balanceProjection.days" :key="day.date">
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-medium text-gray-900">{{ formatDateShort(day.date) }}</div>
                     </td>
@@ -152,7 +167,7 @@
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Projected Transactions</h3>
             
-            <div v-if="projectedTransactions.length === 0" class="text-center py-10 text-gray-500">
+            <div v-if="!props.projectedTransactions || props.projectedTransactions.length === 0" class="text-center py-10 text-gray-500">
               <p>No projected transactions found for this account.</p>
             </div>
             
@@ -213,6 +228,7 @@ import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import BalanceChart from '@/Components/BalanceChart.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 // Define props
@@ -232,18 +248,21 @@ const processing = ref(false);
 
 // Computed values
 const sortedTransactions = computed(() => {
+  if (!props.projectedTransactions) return [];
   return [...props.projectedTransactions].sort((a, b) => {
     return new Date(a.date) - new Date(b.date);
   });
 });
 
 const totalIncome = computed(() => {
+  if (!props.projectedTransactions) return 0;
   return props.projectedTransactions
     .filter(t => t.amount_in_cents > 0)
     .reduce((sum, t) => sum + t.amount_in_cents, 0);
 });
 
 const totalExpenses = computed(() => {
+  if (!props.projectedTransactions) return 0;
   return Math.abs(props.projectedTransactions
     .filter(t => t.amount_in_cents < 0)
     .reduce((sum, t) => sum + t.amount_in_cents, 0));
@@ -308,6 +327,18 @@ const formatDateShort = (dateString) => {
     return dateString;
   }
 };
+
+// Prepare data for the balance chart
+const balanceProjectionData = computed(() => {
+  if (!props.balanceProjection || !props.balanceProjection.days) {
+    return [];
+  }
+  
+  return props.balanceProjection.days.map(day => ({
+    date: day.date,
+    balance: parseInt(day.balance)
+  }));
+});
 
 // Update projections
 const updateProjections = () => {

@@ -122,6 +122,12 @@
                           Projections
                         </Link>
                         <Link
+                          :href="route('budget.account.balance-projection', [budget.id, account.id])"
+                          class="text-xs text-purple-600 hover:text-purple-900"
+                        >
+                          Balance Chart
+                        </Link>
+                        <Link
                           :href="route('budgets.accounts.edit', [budget.id, account.id])"
                           class="text-xs text-indigo-600 hover:text-indigo-900"
                         >

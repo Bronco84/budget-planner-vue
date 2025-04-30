@@ -65,9 +65,10 @@
           <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6">
               <h3 class="text-lg font-medium text-gray-900 mb-2">Starting Balance</h3>
-              <p class="text-3xl font-bold" :class="projections.starting_balance >= 0 ? 'text-green-600' : 'text-red-600'">
-                ${{ formatCurrency(projections.starting_balance) }}
+              <p v-if="props.projections && props.projections.starting_balance !== undefined" class="text-3xl font-bold" :class="props.projections.starting_balance >= 0 ? 'text-green-600' : 'text-red-600'">
+                ${{ formatCurrency(props.projections.starting_balance) }}
               </p>
+              <p v-else class="text-3xl font-bold text-gray-400">$0.00</p>
               <p class="text-sm text-gray-500 mt-1">As of {{ formatDate(form.start_date) }}</p>
             </div>
           </div>
@@ -134,7 +135,7 @@
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="(stats, month, index) in projections.monthly_totals" :key="month">
+                  <tr v-for="(stats, month, index) in props.projections && props.projections.monthly_totals ? props.projections.monthly_totals : {}" :key="month">
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-medium text-gray-900">{{ month }}</div>
                     </td>
@@ -193,18 +194,18 @@
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Projected Transactions</h3>
             
-            <div v-if="Object.keys(projections.transactions).length === 0" class="text-center py-10 text-gray-500">
+            <div v-if="!props.projections || !props.projections.transactions || Object.keys(props.projections.transactions).length === 0" class="text-center py-10 text-gray-500">
               <p>No projected transactions found.</p>
             </div>
             
             <div v-else>
-              <div v-for="(days, month) in projections.transactions" :key="month" class="mb-8">
+              <div v-for="(days, month) in props.projections.transactions" :key="month" class="mb-8">
                 <div class="flex justify-between items-center">
                   <h4 class="text-xl font-medium text-gray-800 mb-4 border-b pb-2">{{ month }}</h4>
-                  <div class="text-sm">
+                  <div v-if="props.projections.monthly_totals && props.projections.monthly_totals[month]" class="text-sm">
                     <span class="font-medium">Month End Balance: </span>
-                    <span :class="projections.monthly_totals[month].ending_balance >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'">
-                      ${{ formatCurrency(projections.monthly_totals[month].ending_balance) }}
+                    <span :class="props.projections.monthly_totals[month].ending_balance >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'">
+                      ${{ formatCurrency(props.projections.monthly_totals[month].ending_balance) }}
                     </span>
                   </div>
                 </div>
@@ -283,13 +284,19 @@ const processing = ref(false);
 
 // Computed values
 const totalProjectedIncome = computed(() => {
-  return Object.values(props.projections.monthly_totals).reduce((sum, month) => {
+  if (!props.projections || !props.props.projections && props.projections.monthly_totals) {
+    return 0;
+  }
+  return Object.values(props.props.projections && props.projections.monthly_totals).reduce((sum, month) => {
     return sum + month.income;
   }, 0);
 });
 
 const totalProjectedExpenses = computed(() => {
-  return Object.values(props.projections.monthly_totals).reduce((sum, month) => {
+  if (!props.projections || !props.props.projections && props.projections.monthly_totals) {
+    return 0;
+  }
+  return Object.values(props.props.projections && props.projections.monthly_totals).reduce((sum, month) => {
     return sum + Math.abs(month.expense);
   }, 0);
 });
@@ -299,18 +306,29 @@ const netCashFlow = computed(() => {
 });
 
 const expectedEndingBalance = computed(() => {
-  const months = Object.keys(props.projections.monthly_totals);
+  if (!props.projections || !props.props.projections && props.projections.monthly_totals) {
+    return 0;
+  }
+  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
+  if (months.length === 0) return 0;
+  
   const lastMonth = months[months.length - 1];
-  return props.projections.monthly_totals[lastMonth].ending_balance;
+  return props.props.projections && props.projections.monthly_totals[lastMonth].ending_balance;
 });
 
 const balanceChangePercent = computed(() => {
-  const startingBalance = props.projections.starting_balance;
+  if (!props.projections || !props.props.projections && props.projections.monthly_totals || !props.props.projections && props.projections.starting_balance) {
+    return 0;
+  }
+  
+  const startingBalance = props.props.projections && props.projections.starting_balance;
   if (startingBalance === 0) return 0;
   
-  const months = Object.keys(props.projections.monthly_totals);
+  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
+  if (months.length === 0) return 0;
+  
   const lastMonth = months[months.length - 1];
-  const lastEndingBalance = props.projections.monthly_totals[lastMonth].ending_balance;
+  const lastEndingBalance = props.props.projections && props.projections.monthly_totals[lastMonth].ending_balance;
   
   const change = lastEndingBalance - startingBalance;
   const percentChange = (change / Math.abs(startingBalance)) * 100;
@@ -319,10 +337,6 @@ const balanceChangePercent = computed(() => {
 });
 
 // Format helpers
-const formatCurrency = (cents) => {
-  const dollars = Math.abs(cents) / 100;
-  return dollars.toFixed(2);
-};
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
@@ -340,25 +354,40 @@ const formatDate = (dateString) => {
 };
 
 const getEndDate = () => {
-  const months = Object.keys(props.projections.monthly_totals);
-  const lastMonth = months[months.length - 1];
-  const date = new Date(props.params.start_date);
-  date.setMonth(date.getMonth() + parseInt(props.params.months));
-  return date.toLocaleDateString(undefined, { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
+  if (!props.projections || !props.props.projections && props.projections.monthly_totals || !props.params || !props.params.start_date) {
+    return 'N/A';
+  }
+  
+  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
+  if (months.length === 0) return 'N/A';
+  
+  try {
+    const date = new Date(props.params.start_date);
+    date.setMonth(date.getMonth() + parseInt(props.params.months || 0));
+    return date.toLocaleDateString(undefined, { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  } catch (e) {
+    return 'N/A';
+  }
 };
 
 // Get the previous month's net amount for comparison
 const getPreviousMonthNet = (currentMonth) => {
-  const months = Object.keys(props.projections.monthly_totals);
+  if (!props.projections || !props.props.projections && props.projections.monthly_totals || !currentMonth) {
+    return 0;
+  }
+  
+  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
   const currentIndex = months.indexOf(currentMonth);
   if (currentIndex <= 0) return 0;
   
   const previousMonth = months[currentIndex - 1];
-  return props.projections.monthly_totals[previousMonth].net;
+  if (!props.props.projections && props.projections.monthly_totals[previousMonth]) return 0;
+  
+  return props.props.projections && props.projections.monthly_totals[previousMonth].net;
 };
 
 // Generate text for net change percentage

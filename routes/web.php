@@ -47,6 +47,8 @@ Route::middleware('auth')->group(function () {
         ->name('budget.projections');
     Route::get('budget/{budget}/account/{account}/projections', [ProjectionsController::class, 'showAccountProjections'])
         ->name('budget.account.projections');
+    Route::get('budget/{budget}/account/{account}/balance-projection', [ProjectionsController::class, 'showBalanceProjection'])
+        ->name('budget.account.balance-projection');
         
     Route::resource('budgets.accounts', AccountController::class);
     

@@ -163,11 +163,21 @@ class ProjectionsController extends Controller
         $currentDate = $startDate->copy();
         while ($currentDate->lte($endDate)) {
             $dateKey = $currentDate->format('Y-m-d');
+            $dayIncome = 0;
+            $dayExpense = 0;
             
             // Apply any transactions for this date
             if ($transactionsByDate->has($dateKey)) {
                 foreach ($transactionsByDate->get($dateKey) as $transaction) {
-                    $runningBalance += $transaction['amount_in_cents'];
+                    $amount = $transaction['amount_in_cents'];
+                    $runningBalance += $amount;
+                    
+                    // Track income and expenses separately
+                    if ($amount > 0) {
+                        $dayIncome += $amount;
+                    } else {
+                        $dayExpense += abs($amount);
+                    }
                 }
             }
             
@@ -175,7 +185,8 @@ class ProjectionsController extends Controller
             $dailyProjection[] = [
                 'date' => $dateKey,
                 'balance' => $runningBalance,
-                'formatted_balance' => '$' . number_format($runningBalance / 100, 2),
+                'income' => $dayIncome,
+                'expense' => $dayExpense
             ];
             
             $currentDate->addDay();

@@ -116,17 +116,18 @@ class BudgetController extends Controller
         $transactionQuery = $budget->transactions()->with('account');
 
         // Apply search filter if provided
-        if ($search) {
-            $transactionQuery->where(function($query) use ($search) {
+        $transactionQuery->when(
+            isset($search),
+            fn ($query) => $query->where(function($query) use ($search) {
                 $query->where('description', 'like', "%{$search}%")
                     ->orWhere('category', 'like', "%{$search}%");
-            });
-        }
+            })
+        );
 
-        // Apply category filter if provided
-        if ($category) {
-            $transactionQuery->where('category', $category);
-        }
+        $transactionQuery->when(
+            isset($category),
+            fn ($query) => $query->where('category', $category)
+        );
 
         // Apply time filter if provided
         if ($timeframe) {
@@ -161,11 +162,16 @@ class BudgetController extends Controller
             default => now()->startOfYear(),
         };
 
-        $endDate = now();
+        $endDate = now()->addMonths($monthsToProject);
 
         // Get actual transactions including pending ones
         $query = $account->transactions()
-            ->select('transactions.*', 'plaid_transactions.pending as pending')
+            ->select(
+                'transactions.*',
+                'plaid_transactions.pending as pending',
+            )
+            ->selectRaw('transactions.date > CURDATE() as is_projected')
+            ->selectRaw('false as is_recurring')
             ->with(['account', 'plaidTransaction'])
             ->leftJoin('plaid_transactions', 'transactions.plaid_transaction_id', '=', 'plaid_transactions.plaid_transaction_id')
             ->where(function($query) use ($startDate, $endDate) {
@@ -192,7 +198,7 @@ class BudgetController extends Controller
             });
 
         // Get actual transactions
-        $actualTransactions = $query->orderBy('date')->get();
+        $actualTransactions = $query->get();
 
         // Get projected transactions
         $recurringService = app(RecurringTransactionService::class);
@@ -206,15 +212,17 @@ class BudgetController extends Controller
                 $model->account = $transaction['account'] ?? null;
                 $model->budget_id = $budget->id;
                 $model->is_projected = true;
+                $model->is_recurring = true;
                 $model->date = Carbon::parse($transaction['date']);
                 $model->account_id = $transaction['account_id'] ?? null;
                 $model->recurring_transaction_template_id = $transaction['recurring_transaction_template_id'] ?? null;
+                $model->is_dynamic_amount = $transaction['is_dynamic_amount'] ?? false;
                 $model->amount_in_cents = $transaction['amount_in_cents'] ?? 0;
                 return $model;
             });
 
         // Merge and sort all transactions
-        $allTransactions = $actualTransactions->concat($projectedTransactions)
+        $allTransactions = $actualTransactions->concat($projectedTransactions)->sortBy('date')
             ->values();
 
         // Split transactions into actual, pending, and projected for this account
@@ -285,7 +293,7 @@ class BudgetController extends Controller
             ->pluck('category');
 
         // Get the total balance across all accounts
-        $totalBalance = $budget->accounts->sum('current_balance_cents') / 100;
+        $totalBalance = $budget->accounts->sum('current_balance_cents');
 
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
@@ -391,14 +399,14 @@ class BudgetController extends Controller
         $startDate = Carbon::today();
         $months = $validated['months'] ?? 6;
         $endDate = $startDate->copy()->addMonths($months);
-        
+
         // Get all accounts for this budget
         $accounts = $budget->accounts;
         $projections = collect();
-        
+
         // Get the RecurringTransactionService
         $recurringTransactionService = app(RecurringTransactionService::class);
-        
+
         // Project transactions for each account
         foreach ($accounts as $account) {
             $accountProjections = $recurringTransactionService->projectTransactions(
@@ -406,7 +414,7 @@ class BudgetController extends Controller
                 $startDate,
                 $endDate
             );
-            
+
             $projections = $projections->merge($accountProjections);
         }
 

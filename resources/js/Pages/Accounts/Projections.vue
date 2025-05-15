@@ -64,35 +64,35 @@
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Current Balance</h4>
                 <p class="text-2xl font-bold" :class="account.current_balance_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                  ${{ formatCurrency(account.current_balance_in_cents) }}
+                  {{ formatCurrency(account.current_balance_in_cents) }}
                 </p>
               </div>
               
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Projected Income</h4>
                 <p class="text-2xl font-bold text-green-600">
-                  ${{ formatCurrency(totalIncome) }}
+                  {{ formatCurrency(totalIncome) }}
                 </p>
               </div>
               
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Projected Expenses</h4>
                 <p class="text-2xl font-bold text-red-600">
-                  ${{ formatCurrency(totalExpenses) }}
+                  {{ formatCurrency(totalExpenses) }}
                 </p>
               </div>
               
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Net Change</h4>
                 <p class="text-2xl font-bold" :class="netChange >= 0 ? 'text-green-600' : 'text-red-600'">
-                  ${{ formatCurrency(netChange) }}
+                  {{ formatCurrency(netChange) }}
                 </p>
               </div>
               
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Ending Balance</h4>
                 <p class="text-2xl font-bold" :class="projectedEndingBalance >= 0 ? 'text-green-600' : 'text-red-600'">
-                  ${{ formatCurrency(projectedEndingBalance) }}
+                  {{ formatCurrency(projectedEndingBalance) }}
                 </p>
                 <p class="text-xs text-gray-500">as of {{ endDate }}</p>
               </div>
@@ -140,19 +140,19 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div v-if="day.income > 0" class="text-sm text-green-600">
-                        ${{ formatCurrency(day.income) }}
+                        {{ formatCurrency(day.income) }}
                       </div>
                       <div v-else class="text-sm text-gray-400">-</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div v-if="day.expense > 0" class="text-sm text-red-600">
-                        ${{ formatCurrency(day.expense) }}
+                        {{ formatCurrency(day.expense) }}
                       </div>
                       <div v-else class="text-sm text-gray-400">-</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-medium" :class="day.balance >= 0 ? 'text-green-600' : 'text-red-600'">
-                        ${{ formatCurrency(day.balance) }}
+                        {{ formatCurrency(day.balance) }}
                       </div>
                     </td>
                   </tr>
@@ -199,7 +199,7 @@
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                          ${{ formatCurrency(transaction.amount_in_cents) }}
+                          {{ formatCurrency(transaction.amount_in_cents) }}
                         </div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">

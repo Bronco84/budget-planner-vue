@@ -21,6 +21,7 @@ import {
   PointElement,
   CategoryScale,
 } from 'chart.js';
+import { formatCurrency } from '@/utils/format.js';
 
 // Register required Chart.js components
 ChartJS.register(
@@ -61,16 +62,6 @@ const formatDateForLabel = (dateString) => {
   } catch (e) {
     return dateString;
   }
-};
-
-// Format currency amounts
-const formatCurrency = (amount) => {
-  const dollars = Math.abs(amount) / 100;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(dollars);
 };
 
 // Define chart data

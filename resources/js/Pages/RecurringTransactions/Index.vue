@@ -20,12 +20,12 @@
     </template>
 
     <div class="py-4">
-      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4 overflow-x-auto">
+        <div class="bg-white shadow-sm sm:rounded-lg">
           <div class="p-6">
             <!-- Account filter selector -->
             <div class="mb-6">
-              
+
               <label for="account-filter" class="block text-sm font-medium text-gray-700">Filter by Account</label>
               <select
                 id="account-filter"
@@ -41,11 +41,14 @@
             </div>
 
             <div v-if="filteredTransactions.length > 0">
-              <div class="overflow-x-auto">
+              <div class="overflow-x-auto border rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-gray-50">
+                  <thead class="bg-gray-50 sticky top-0">
                     <tr>
                       <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Created
+                      </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Description
                       </th>
                       <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -71,11 +74,14 @@
                   <tbody class="bg-white divide-y divide-gray-200">
                     <tr v-for="template in filteredTransactions" :key="template.id">
                       <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ formatDate(template.created_at) }}</div>
+                      </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">{{ template.description }}</div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm" :class="template.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                          {{ formatCurrency(template.amount_in_cents / 100) }}
+                          {{ formatCurrency(template.amount_in_cents) }}
                         </div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
@@ -177,15 +183,15 @@ const selectedAccountId = ref('all');
 // Filtered transactions based on selected account
 const filteredTransactions = computed(() => {
   console.log('Filtering transactions with selectedAccountId:', selectedAccountId.value, typeof selectedAccountId.value);
-  
+
   if (selectedAccountId.value === 'all') {
     return props.recurringTransactions;
   }
-  
+
   // Convert selectedAccountId to number for comparison
   const accountId = parseInt(selectedAccountId.value);
   console.log('Using accountId for filtering:', accountId, typeof accountId);
-  
+
   return props.recurringTransactions.filter(transaction => {
     console.log('Transaction account_id:', transaction.account_id, typeof transaction.account_id);
     return transaction.account_id === accountId;

@@ -55,11 +55,11 @@
                   <div class="mt-3">
                     <div class="flex justify-between text-sm mb-1">
                       <span class="text-gray-600">Budget Amount</span>
-                      <span class="font-medium">{{ formatCurrency(parseFloat(budget.total_amount)) }}</span>
+                      <span class="font-medium">{{ formatCurrency(budget.total_amount * 100) }}</span>
                     </div>
                     <div class="flex justify-between text-sm mb-1">
                       <span class="text-gray-600">Remaining</span>
-                      <span class="font-medium">{{ formatCurrency(parseFloat(budget.remaining_amount)) }}</span>
+                      <span class="font-medium">{{ formatCurrency(budget.remaining_amount * 100) }}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-600">Period</span>

@@ -73,6 +73,7 @@
                         <span class="ml-2">Dynamic Amount</span>
                       </label>
                     </div>
+                    <InputError class="mt-2" :message="form.errors.is_dynamic_amount" />
                   </div>
 
                   <!-- Amount (Static) -->
@@ -162,7 +163,7 @@
               <!-- Recurring Transaction Options -->
               <div class="border-t border-gray-200 pt-6 mb-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-2">Recurring Options</h3>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <!-- Frequency -->
                   <div>
@@ -266,36 +267,36 @@
               <div v-if="amountType === 'dynamic'" class="border-t border-gray-200 pt-6 mb-6">
                 <div class="flex justify-between items-center mb-2">
                   <h3 class="text-lg font-medium text-gray-900">Pattern Matching Rules</h3>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     @click="addRule"
                     class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
                   >
                     Add Rule
                   </button>
                 </div>
-                
+
                 <p class="text-sm text-gray-600 mb-4">
                   Rules determine which transactions to include when calculating the dynamic amount.
                   All rules must match for a transaction to be included.
                 </p>
-                
+
                 <div v-if="form.rules.length === 0" class="bg-gray-50 p-4 rounded text-center text-gray-500">
                   No rules added. Click "Add Rule" to add matching criteria.
                 </div>
-                
+
                 <div v-for="(rule, index) in form.rules" :key="index" class="mb-4 p-4 border border-gray-200 rounded-md">
                   <div class="flex justify-between mb-2">
                     <h4 class="font-medium">Rule #{{ index + 1 }}</h4>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       @click="removeRule(index)"
                       class="text-red-600 hover:text-red-800 text-sm"
                     >
                       Remove
                     </button>
                   </div>
-                  
+
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Field -->
                     <div>
@@ -311,7 +312,7 @@
                         <option value="category">Category</option>
                       </SelectInput>
                     </div>
-                    
+
                     <!-- Operator -->
                     <div>
                       <InputLabel :for="`rule_${index}_operator`" value="Operator" />
@@ -330,7 +331,7 @@
                         <option value="less_than" v-if="rule.field === 'amount'">Less Than</option>
                       </SelectInput>
                     </div>
-                    
+
                     <!-- Value -->
                     <div>
                       <InputLabel :for="`rule_${index}_value`" value="Value" />
@@ -342,7 +343,7 @@
                         required
                       />
                     </div>
-                    
+
                     <!-- Case Sensitive (only for text fields) -->
                     <div v-if="rule.field !== 'amount'" class="md:col-span-3">
                       <div class="flex items-center">
@@ -436,7 +437,10 @@ const removeRule = (index) => {
 const submit = () => {
   // Update values before submitting
   form.is_dynamic_amount = amountType.value === 'dynamic';
-  
-  form.post(route('recurring-transactions.store', props.budget.id));
+
+  form.transform((form) => ({
+      ...form,
+      is_dynamic_amount: amountType.value === 'dynamic'
+  })).post(route('recurring-transactions.store', props.budget.id));
 };
-</script> 
+</script>

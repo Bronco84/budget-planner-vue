@@ -30,7 +30,7 @@
                     <p class="text-sm text-gray-500 capitalize">{{ account.type }}</p>
                   </div>
                   <div class="text-lg font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                    {{ formatCurrency(account.current_balance_cents / 100) }}
+                    {{ formatCurrency(account.current_balance_cents) }}
                   </div>
                 </div>
               </div>

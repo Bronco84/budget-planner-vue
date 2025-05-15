@@ -101,7 +101,7 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                        {{ formatCurrency(transaction.amount_in_cents / 100) }}
+                        {{ formatCurrency(transaction.amount_in_cents) }}
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm">

@@ -92,7 +92,7 @@
                         </div>
                       </div>
                       <div class="text-sm font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                        {{ formatCurrency(account.current_balance_cents / 100) }}
+                        {{ formatCurrency(account.current_balance_cents) }}
                       </div>
                     </div>
                     <div class="flex items-center justify-between mt-2">
@@ -311,30 +311,33 @@
                         <!-- Transaction row -->
                         <tr :class="{'bg-blue-50': transaction.is_projected}">
                           <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ formatDate(transaction.date) }}</div>
+                            <div class="text-sm text-gray-900">{{ transaction.date }}</div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                              <template v-if="transaction.plaid_transaction?.logo_url">
-                                <img :src="transaction.plaid_transaction.logo_url"
-                                     alt="Merchant Logo"
-                                     class="mr-2 rounded-full"
-                                     style="width: 24px; height: 24px; object-fit: cover;">
-                              </template>
-                              <template v-else-if="transaction.plaid_transaction?.personal_finance_category_icon_url">
-                                <img :src="transaction.plaid_transaction.personal_finance_category_icon_url"
-                                     alt="Category Icon"
-                                     class="mr-2"
-                                     style="width: 24px; height: 24px; object-fit: cover;">
-                              </template>
-                              <span class="text-sm font-medium text-gray-900">{{ transaction.description }}</span>
-                              <div v-if="transaction.plaid_transaction?.pending" class="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded-full inline-block ml-4">Pending</div>
-                              <template v-if="transaction.recurring_transaction_template_id">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                              </template>
-                            </div>
+                              <div class="flex items-center">
+                                  <template v-if="transaction.plaid_transaction?.logo_url">
+                                      <img :src="transaction.plaid_transaction.logo_url"
+                                           alt="Merchant Logo"
+                                           class="mr-2 rounded-full"
+                                           style="width: 24px; height: 24px; object-fit: cover;">
+                                  </template>
+                                  <template v-else-if="transaction.plaid_transaction?.personal_finance_category_icon_url">
+                                      <img :src="transaction.plaid_transaction.personal_finance_category_icon_url"
+                                           alt="Category Icon"
+                                           class="mr-2"
+                                           style="width: 24px; height: 24px; object-fit: cover;">
+                                  </template>
+                                  <span class="text-sm font-medium text-gray-900">{{ transaction.description }}</span>
+                                  <div v-if="transaction.plaid_transaction?.pending" class="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded-full inline-block ml-4">Pending</div>
+                                  <template v-if="transaction.recurring_transaction_template_id">
+                                      <template v-if="transaction.is_dynamic_amount">
+                                          <div class="text-xs text-orange-800 bg-orange-100 px-2 py-1 rounded-full inline-block ml-2">Variable</div>
+                                      </template>
+                                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                      </svg>
+                                  </template>
+                              </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">
                             <div v-if="transaction.category" class="text-sm text-gray-900">
@@ -348,17 +351,17 @@
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                              {{ formatCurrency(Math.abs(transaction.amount_in_cents) / 100) }}
+                              {{ formatCurrency(transaction.amount_in_cents) }}
                             </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-medium" :class="transaction.running_balance >= 0 ? 'text-green-600' : 'text-red-600'">
-                              {{ formatCurrency(Math.abs(transaction.running_balance) / 100) }}
+                              {{ formatCurrency(transaction.running_balance) }}
                             </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
                             <Link
-                              v-if="!transaction.is_projected"
+                              v-if="!transaction.is_recurring"
                               :href="route('budget.transaction.edit', [budget.id, transaction.id])"
                               class="text-indigo-600 hover:text-indigo-900"
                             >
@@ -616,7 +619,8 @@ function debounce(fn, delay = 300) {
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  return date.toLocaleDateString();
+  console.log(date);
+  return date.toString();
 };
 
 const formatDateTime = (dateTimeString) => {

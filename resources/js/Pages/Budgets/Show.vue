@@ -253,25 +253,13 @@
                   <div class="overflow-x-auto overflow-y-hidden">
                     <nav class="flex -mb-px min-w-full whitespace-nowrap">
                       <a
-                        href="#"
-                        @click.prevent="selectAccount(null)"
-                        class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm"
-                        :class="[
-                          !activeAccountId ?
-                            'border-indigo-500 text-indigo-600' :
-                            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        ]"
-                      >
-                        All Accounts
-                      </a>
-                      <a
                         v-for="account in accounts"
                         :key="account.id"
                         href="#"
                         @click.prevent="selectAccount(account.id)"
                         class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm"
                         :class="[
-                          activeAccountId === account.id ?
+                          activeAccountId === parseInt(account.id, 10) ?
                             'border-indigo-500 text-indigo-600' :
                             'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         ]"
@@ -504,16 +492,16 @@ const form = reactive({
   search: props.filters.search || '',
   category: props.filters.category || '',
   timeframe: props.filters.timeframe || '',
-  account_id: props.filters.account_id || null
+  account_id: props.filters.account_id || (props.accounts.length > 0 ? props.accounts[0].id : null)
 });
 
 // Computed property to determine the active account tab
 const activeAccountId = computed(() => {
-  if (!form.account_id) return null;
-
+  if (!form.account_id && props.accounts.length > 0) {
+    form.account_id = props.accounts[0].id;
+  }
   // Convert to number for consistent comparison
-  const accountId = parseInt(form.account_id, 10);
-  return isNaN(accountId) ? null : accountId;
+  return form.account_id ? parseInt(form.account_id, 10) : null;
 });
 
 // Form state for projections

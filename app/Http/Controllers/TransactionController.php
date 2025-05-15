@@ -74,14 +74,6 @@ class TransactionController extends Controller
             'recurring_transaction_template_id' => $validated['recurring_transaction_template_id'] ?? null,
         ]);
 
-        // Update account balance
-        /** @var Account $account */
-        $account = Account::find($validated['account_id']);
-        $account->update([
-            'current_balance_cents' => $account->current_balance_cents + $amountInCents,
-            'balance_updated_at' => now(),
-        ]);
-
         return redirect()->route('budget.transaction.index', $budget)
             ->with('message', 'Transaction created successfully');
     }
@@ -151,15 +143,6 @@ class TransactionController extends Controller
      */
     public function destroy(Budget $budget, Transaction $transaction): RedirectResponse
     {
-        // Update account balance
-        /** @var Account $account */
-        $account = Account::find($transaction->account_id);
-        $account->update([
-            'current_balance_cents' => $account->current_balance_cents - $transaction->amount_in_cents,
-            'balance_updated_at' => now(),
-        ]);
-
-        // Delete the transaction
         $transaction->delete();
 
         return redirect()->route('budget.transaction.index', $budget)

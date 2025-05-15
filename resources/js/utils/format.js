@@ -13,6 +13,11 @@ export const formatCurrency = (cents) => {
     return '0.00';
   }
   
-  const dollars = Math.abs(amountInCents) / 100;
-  return dollars.toFixed(2);
+  const dollars = amountInCents / 100;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(dollars);
 }; 

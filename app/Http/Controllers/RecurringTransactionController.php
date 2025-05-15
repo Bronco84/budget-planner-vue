@@ -6,6 +6,7 @@ use App\Models\Budget;
 use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
 use App\Services\RecurringTransactionService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -67,9 +68,11 @@ class RecurringTransactionController extends Controller
 
     /**
      * Store a newly created recurring transaction in storage.
+     * @throws AuthorizationException
      */
     public function store(Request $request, Budget $budget): RedirectResponse
     {
+
         $this->authorize('update', $budget);
 
         $validated = $request->validate([
@@ -82,7 +85,7 @@ class RecurringTransactionController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'day_of_week' => 'nullable|integer|min:0|max:6|required_if:frequency,weekly,biweekly',
             'day_of_month' => 'nullable|integer|min:1|max:31|required_if:frequency,monthly,quarterly,bimonthly',
-            'is_dynamic_amount' => 'required|in:true,false',
+            'is_dynamic_amount' => 'required|boolean',
             'min_amount' => 'nullable|numeric',
             'max_amount' => 'nullable|numeric',
             'average_amount' => 'nullable|numeric',
@@ -94,17 +97,7 @@ class RecurringTransactionController extends Controller
         ]);
 
         // Convert amount to cents
-        $validated['amount_in_cents'] = (int)($validated['amount'] * 100);
-        unset($validated['amount']);
-
-        // Convert dynamic amount values to cents if provided
-        if (isset($validated['min_amount']) && $validated['min_amount'] !== null) {
-            $validated['min_amount'] = (int)($validated['min_amount'] * 100);
-        }
-
-        if (isset($validated['max_amount']) && $validated['max_amount'] !== null) {
-            $validated['max_amount'] = (int)($validated['max_amount'] * 100);
-        }
+        $validated = $this->getArr($validated);
 
         // Convert is_dynamic_amount from string to boolean
         $validated['is_dynamic_amount'] = $validated['is_dynamic_amount'] === 'true';
@@ -162,7 +155,7 @@ class RecurringTransactionController extends Controller
         $this->authorize('update', $budget);
 
         // Log raw request data for debugging
-        \Log::debug('Updating recurring transaction - raw request data:', [
+        Log::debug('Updating recurring transaction - raw request data:', [
             'request_all' => $request->all(),
             'rules_data' => $request->input('rules', []),
         ]);
@@ -196,17 +189,7 @@ class RecurringTransactionController extends Controller
         ]);
 
         // Convert amount to cents
-        $validated['amount_in_cents'] = (int)($validated['amount'] * 100);
-        unset($validated['amount']);
-
-        // Convert dynamic amount values to cents if provided
-        if (isset($validated['min_amount']) && $validated['min_amount'] !== null) {
-            $validated['min_amount'] = (int)($validated['min_amount'] * 100);
-        }
-
-        if (isset($validated['max_amount']) && $validated['max_amount'] !== null) {
-            $validated['max_amount'] = (int)($validated['max_amount'] * 100);
-        }
+        $validated = $this->getArr($validated);
 
         // Extract rules from validated data
         $rules = $validated['rules'] ?? [];
@@ -221,7 +204,7 @@ class RecurringTransactionController extends Controller
             $existingRuleIds = $recurring_transaction->rules()->pluck('id')->toArray();
             $updatedRuleIds = [];
 
-            \Log::debug('Processing dynamic amount transaction rules:', [
+            Log::debug('Processing dynamic amount transaction rules:', [
                 'existing_rule_ids' => $existingRuleIds,
                 'rules_count' => count($rules),
             ]);
@@ -235,7 +218,7 @@ class RecurringTransactionController extends Controller
                     unset($ruleData['id']);
                 }
 
-                \Log::debug('Processing rule:', [
+                Log::debug('Processing rule:', [
                     'rule_id' => $ruleId,
                     'rule_data' => $ruleData,
                 ]);
@@ -246,13 +229,13 @@ class RecurringTransactionController extends Controller
                     if ($rule) {
                         $rule->update($ruleData);
                         $updatedRuleIds[] = $ruleId;
-                        \Log::debug('Updated existing rule:', ['rule_id' => $ruleId]);
+                        Log::debug('Updated existing rule:', ['rule_id' => $ruleId]);
                     }
                 } else {
                     // Create new rule
                     $rule = $recurring_transaction->rules()->create($ruleData);
                     $updatedRuleIds[] = $rule->id;
-                    \Log::debug('Created new rule:', ['rule_id' => $rule->id]);
+                    Log::debug('Created new rule:', ['rule_id' => $rule->id]);
                 }
             }
 
@@ -260,26 +243,26 @@ class RecurringTransactionController extends Controller
             $toDelete = array_diff($existingRuleIds, $updatedRuleIds);
             if (!empty($toDelete)) {
                 $recurring_transaction->rules()->whereIn('id', $toDelete)->delete();
-                \Log::debug('Deleted rules:', ['deleted_rule_ids' => $toDelete]);
+                Log::debug('Deleted rules:', ['deleted_rule_ids' => $toDelete]);
             }
 
             // Verify rules were created
             $finalRules = $recurring_transaction->rules()->get();
-            \Log::debug('Final rules after update:', [
+            Log::debug('Final rules after update:', [
                 'count' => $finalRules->count(),
                 'rules' => $finalRules,
             ]);
         } else {
             // If not dynamic amount, delete all rules
             $recurring_transaction->rules()->delete();
-            \Log::debug('Deleted all rules (not a dynamic amount transaction)');
+            Log::debug('Deleted all rules (not a dynamic amount transaction)');
         }
 
         return redirect()->route('recurring-transactions.index', $budget)
             ->with('message', 'Recurring transaction updated successfully');
     }
 
-    /**
+    /**r
      * Remove the specified recurring transaction from storage.
      */
     public function destroy(Budget $budget, RecurringTransactionTemplate $recurring_transaction): RedirectResponse
@@ -310,5 +293,25 @@ class RecurringTransactionController extends Controller
 
         return redirect()->route('recurring-transactions.index', $budget)
             ->with('message', 'Recurring transaction duplicated successfully');
+    }
+
+    /**
+     * @param array $validated
+     * @return array
+     */
+    public function getArr(array $validated): array
+    {
+        $validated['amount_in_cents'] = (int)($validated['amount'] * 100);
+        unset($validated['amount']);
+
+        // Convert dynamic amount values to cents if provided
+        if (isset($validated['min_amount']) && $validated['min_amount'] !== null) {
+            $validated['min_amount'] = (int)($validated['min_amount'] * 100);
+        }
+
+        if (isset($validated['max_amount']) && $validated['max_amount'] !== null) {
+            $validated['max_amount'] = (int)($validated['max_amount'] * 100);
+        }
+        return $validated;
     }
 }

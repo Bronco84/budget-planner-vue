@@ -223,8 +223,12 @@ class RecurringTransactionTemplate extends Model
     public function shouldGenerateForDate(\Carbon\Carbon $date): bool
     {
         // Don't generate if before start date or after end date
-        if ($date->startOfDay()->lt($this->start_date->startOfDay()) ||
-            ($this->end_date && $date->startOfDay()->gt($this->end_date->startOfDay()))) {
+        ;
+        if (
+            $date->startOfDay()->lt($this->start_date->startOfDay()) ||
+            ($this->end_date && $date->startOfDay()->gt($this->end_date->startOfDay())) ||
+            $this->transactions()->where('date', $date->copy()->format('Y-m-d'))->exists()
+        ) {
             return false;
         }
 

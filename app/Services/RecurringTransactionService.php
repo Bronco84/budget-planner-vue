@@ -70,6 +70,7 @@ class RecurringTransactionService
                         'account_id' => $template->account_id,
                         'date' => $date->copy(),
                         'recurring_transaction_template_id' => $template->id,
+                        'is_dynamic_amount' => $template->is_dynamic_amount,
                         'created_by' => $template->created_by ?? null,
                         'is_projected' => true
                     ]);

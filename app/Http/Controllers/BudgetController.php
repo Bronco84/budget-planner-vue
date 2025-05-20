@@ -162,7 +162,7 @@ class BudgetController extends Controller
             default => now()->startOfYear(),
         };
 
-        $endDate = now()->addMonths($monthsToProject);
+        $endDate = now()->addMonths($monthsToProject)->endOfMonth();
 
         // Get actual transactions including pending ones
         $query = $account->transactions()
@@ -182,6 +182,16 @@ class BudgetController extends Controller
                         // since they are technically "future" transactions without a date
                         $q->where('pending', true);
                     });
+            })
+            // Remove any transaction that doesn't have a plaid ID if trx date is in the past
+            // We make the assumption that the plaid feed is the source of truth for transactions in the past
+            ->where(function($query) {
+                $query->where(function($q) {
+                    $q->where('transactions.date', '>', now())->whereNull('transactions.plaid_transaction_id');
+                });
+                $query->orWhere(function($q) {
+                    $q->where('transactions.date', '<=', now())->whereNotNull('transactions.plaid_transaction_id');
+                });
             })
             ->when($request->filled('type'), function($query, $type) {
                 match ($type) {

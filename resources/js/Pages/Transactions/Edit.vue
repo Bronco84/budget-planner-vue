@@ -129,6 +129,33 @@
                 </div>
               </div>
 
+              <!-- File Attachments Section -->
+              <div class="border-t border-gray-200 pt-6 mt-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">File Attachments</h3>
+                <FileUpload
+                  :upload-url="`/transactions/${transaction.id}/files`"
+                  @uploaded="handleFileUploaded"
+                  @error="handleFileError"
+                />
+                <div v-if="attachments.length > 0" class="mt-6">
+                  <FileAttachmentList
+                    :attachments="attachments"
+                    @deleted="handleFileDeleted"
+                  />
+                </div>
+              </div>
+
+              <!-- Activity Log Section -->
+              <div class="border-t border-gray-200 pt-6 mt-6">
+                <ActivityLog :activities="activities" />
+                <div v-if="loadingActivities" class="flex justify-center py-4">
+                  <svg class="animate-spin h-6 w-6 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              </div>
+
               <!-- Note about recurring transactions -->
               <div class="border-t border-gray-200 pt-4 mt-6 text-sm text-gray-600">
                 <p>
@@ -178,7 +205,7 @@
 
 <script setup>
 import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -186,6 +213,9 @@ import TextArea from '@/Components/TextArea.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import FileUpload from '@/Components/FileUpload.vue';
+import FileAttachmentList from '@/Components/FileAttachmentList.vue';
+import ActivityLog from '@/Components/ActivityLog.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 // Props
@@ -197,6 +227,43 @@ const props = defineProps({
   edit: Boolean,
   patterns: Object,
 });
+
+const attachments = ref([]);
+const fileError = ref('');
+const activities = ref([]);
+const loadingActivities = ref(false);
+
+onMounted(() => {
+  loadAttachments();
+  loadActivities();
+});
+
+const loadAttachments = async () => {
+  try {
+    const response = await fetch(`/transactions/${props.transaction.id}/files`);
+    if (response.ok) {
+      const data = await response.json();
+      attachments.value = data.attachments;
+    }
+  } catch (error) {
+    console.error('Failed to load attachments:', error);
+  }
+};
+
+const loadActivities = async () => {
+  loadingActivities.value = true;
+  try {
+    const response = await fetch(`/budget/${props.budget.id}/transactions/${props.transaction.id}/activity-log`);
+    if (response.ok) {
+      const data = await response.json();
+      activities.value = data.activities;
+    }
+  } catch (error) {
+    console.error('Failed to load activity log:', error);
+  } finally {
+    loadingActivities.value = false;
+  }
+};
 
 // Initialize form with transaction data
 const form = useForm({
@@ -211,7 +278,12 @@ const form = useForm({
 
 // Form submission
 const submit = () => {
-  form.patch(route('budget.transaction.update', [props.budget.id, props.transaction.id]));
+  form.patch(route('budget.transaction.update', [props.budget.id, props.transaction.id]), {
+    onSuccess: () => {
+      // Reload activity log to show the update
+      loadActivities();
+    }
+  });
 };
 
 // Delete confirmation
@@ -219,5 +291,22 @@ const confirmDelete = () => {
   if (confirm('Are you sure you want to delete this transaction?')) {
     router.delete(route('budget.transaction.destroy', [props.budget.id, props.transaction.id]));
   }
+};
+
+const handleFileUploaded = (attachment) => {
+  attachments.value.push(attachment);
+  fileError.value = '';
+  // Refresh activity log to show file upload activity
+  loadActivities();
+};
+
+const handleFileError = (error) => {
+  fileError.value = error;
+};
+
+const handleFileDeleted = (attachmentId) => {
+  attachments.value = attachments.value.filter(a => a.id !== attachmentId);
+  // Refresh activity log to show file deletion activity
+  loadActivities();
 };
 </script>

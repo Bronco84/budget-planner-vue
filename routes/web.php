@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\FileController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\RecurringTransactionController;
@@ -68,6 +69,8 @@ Route::middleware('auth')->group(function () {
         ->name('budget.transaction.update');
     Route::delete('budget/{budget}/transactions/{transaction}', [TransactionController::class, 'destroy'])
         ->name('budget.transaction.destroy');
+    Route::get('budget/{budget}/transactions/{transaction}/activity-log', [TransactionController::class, 'getActivityLog'])
+        ->name('budget.transaction.activity-log');
         
     // Routes for recurring transactions
     Route::get('budget/{budget}/recurring-transactions', [RecurringTransactionController::class, 'index'])
@@ -122,6 +125,20 @@ Route::middleware('auth')->group(function () {
         ->name('plaid-transactions.api');
     Route::get('budget/{budget}/account/{account}/plaid-transactions/{plaidTransactionId}', [PlaidTransactionController::class, 'show'])
         ->name('plaid-transactions.show');
+    
+    // File attachment routes
+    Route::post('transactions/{transaction}/files', [FileController::class, 'uploadToTransaction'])
+        ->name('transactions.files.upload');
+    Route::get('transactions/{transaction}/files', [FileController::class, 'getTransactionAttachments'])
+        ->name('transactions.files.index');
+    Route::post('budgets/{budget}/files', [FileController::class, 'uploadToBudget'])
+        ->name('budgets.files.upload');
+    Route::get('budgets/{budget}/files', [FileController::class, 'getBudgetAttachments'])
+        ->name('budgets.files.index');
+    Route::get('files/{attachment}/download', [FileController::class, 'download'])
+        ->name('files.download');
+    Route::delete('files/{attachment}', [FileController::class, 'delete'])
+        ->name('files.delete');
 });
 
 require __DIR__.'/auth.php';

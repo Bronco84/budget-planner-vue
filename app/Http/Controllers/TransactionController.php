@@ -74,8 +74,8 @@ class TransactionController extends Controller
             'recurring_transaction_template_id' => $validated['recurring_transaction_template_id'] ?? null,
         ]);
 
-        return redirect()->route('budget.transaction.index', $budget)
-            ->with('message', 'Transaction created successfully');
+        return redirect()->route('budget.transaction.edit', [$budget, $transaction])
+            ->with('message', 'Transaction created successfully! You can now add file attachments.');
     }
 
     /**
@@ -147,5 +147,17 @@ class TransactionController extends Controller
 
         return redirect()->route('budget.transaction.index', $budget)
             ->with('message', 'Transaction deleted successfully');
+    }
+
+    /**
+     * Get activity log for a transaction.
+     */
+    public function getActivityLog(Budget $budget, Transaction $transaction)
+    {
+        $activityLog = $transaction->getActivityLogFormatted();
+
+        return response()->json([
+            'activities' => $activityLog
+        ]);
     }
 }

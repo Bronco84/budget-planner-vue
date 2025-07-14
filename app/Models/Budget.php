@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Collection;
@@ -112,6 +113,14 @@ class Budget extends Model
     public function recurringTransactionTemplates(): HasMany
     {
         return $this->hasMany(RecurringTransactionTemplate::class);
+    }
+
+    /**
+     * Get all file attachments for this budget.
+     */
+    public function fileAttachments(): MorphMany
+    {
+        return $this->morphMany(FileAttachment::class, 'attachable');
     }
 
     /**

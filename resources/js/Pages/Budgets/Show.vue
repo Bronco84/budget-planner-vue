@@ -29,6 +29,25 @@
                     <div class="text-sm font-medium text-gray-500">Description</div>
                     <div class="text-sm mt-1">{{ budget.description || 'No description provided' }}</div>
                   </div>
+
+                  <!-- File Attachments Section -->
+                  <div class="bg-gray-50 p-3 rounded-lg">
+                    <div class="text-sm font-medium text-gray-500 mb-2">File Attachments</div>
+                    <div class="space-y-2">
+                      <div v-if="budgetAttachments.length === 0" class="text-xs text-gray-500 text-center py-2">
+                        No files attached
+                      </div>
+                      <div v-else>
+                        <FileAttachmentList
+                          :attachments="budgetAttachments"
+                          @deleted="handleFileDeleted"
+                        />
+                      </div>
+                      <button @click="showFileUploadModal = true" class="w-full mt-2 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-300 rounded px-2 py-1">
+                        Attach File
+                      </button>
+                    </div>
+                  </div>
                     <div class="space-y-3">
                         <div>
                             <label for="projection_months" class="block text-sm font-medium text-gray-700">
@@ -445,6 +464,24 @@
       </div>
     </div>
   </AuthenticatedLayout>
+
+  <!-- File Upload Modal -->
+  <Modal :show="showFileUploadModal" @close="showFileUploadModal = false">
+    <div class="p-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Attach File to Budget</h3>
+      <FileUpload
+        :upload-url="`/budgets/${budget.id}/files`"
+        @uploaded="handleFileUploaded"
+        @error="handleFileError"
+      />
+      <div v-if="budgetAttachments.length > 0" class="mt-6">
+        <FileAttachmentList
+          :attachments="budgetAttachments"
+          @deleted="handleFileDeleted"
+        />
+      </div>
+    </div>
+  </Modal>
 </template>
 
 <script setup>
@@ -452,6 +489,9 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, watch, computed, ref, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { PencilIcon } from "@heroicons/vue/24/outline/index.js";
+import Modal from '@/Components/Modal.vue';
+import FileUpload from '@/Components/FileUpload.vue';
+import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 // Define props
@@ -486,6 +526,41 @@ const activeAccountId = computed(() => {
 const projectionForm = reactive({
   months: props.projectionParams?.months || 1,
 });
+
+// File attachment state
+const budgetAttachments = ref([]);
+const showFileUploadModal = ref(false);
+
+// Load budget attachments on mount
+onMounted(() => {
+  loadBudgetAttachments();
+});
+
+const loadBudgetAttachments = async () => {
+  try {
+    const response = await fetch(`/budgets/${props.budget.id}/files`);
+    if (response.ok) {
+      const data = await response.json();
+      budgetAttachments.value = data.attachments;
+    }
+  } catch (error) {
+    console.error('Failed to load budget attachments:', error);
+  }
+};
+
+const handleFileUploaded = (attachment) => {
+  budgetAttachments.value.push(attachment);
+  showFileUploadModal.value = false;
+};
+
+const handleFileDeleted = (attachmentId) => {
+  budgetAttachments.value = budgetAttachments.value.filter(a => a.id !== attachmentId);
+};
+
+const handleFileError = (error) => {
+  console.error('File upload error:', error);
+  // You could add toast notifications here
+};
 
 // Computed property for displayed projected transactions
 const displayedProjectedTransactions = computed(() => {

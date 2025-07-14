@@ -6,11 +6,14 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Query\Builder;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Transaction extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     /**
      * The attributes that are mass assignable.
@@ -29,7 +32,6 @@ class Transaction extends Model
         'is_reconciled',
         'recurring_transaction_template_id',
         'notes',
-        'is_projected',
     ];
 
     /**
@@ -42,7 +44,6 @@ class Transaction extends Model
         'date' => 'date:Y-m-d',
         'is_plaid_imported' => 'boolean',
         'is_reconciled' => 'boolean',
-        'is_projected' => 'boolean',
     ];
 
     /**
@@ -86,6 +87,14 @@ class Transaction extends Model
     }
 
     /**
+     * Get all file attachments for this transaction.
+     */
+    public function fileAttachments(): MorphMany
+    {
+        return $this->morphMany(FileAttachment::class, 'attachable');
+    }
+
+    /**
      * Format amount for display.
      */
     public function getFormattedAmountAttribute(): string
@@ -100,5 +109,76 @@ class Transaction extends Model
             fn($query) => $query->where('date', '>=', $date),
             fn($query) => $query->where('date', '>=', now()->toDate()->format('Y-m-d'))
         );
+    }
+
+    /**
+     * Get activity log options.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'description',
+                'amount_in_cents',
+                'date',
+                'category',
+                'account_id',
+                'notes',
+                'is_reconciled'
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('transaction')
+            ->setDescriptionForEvent(fn(string $eventName) => match($eventName) {
+                'created' => 'Transaction created',
+                'updated' => 'Transaction updated',
+                'deleted' => 'Transaction deleted',
+                default => "Transaction {$eventName}",
+            });
+    }
+
+    /**
+     * Get formatted activity log for this transaction.
+     */
+    public function getActivityLogFormatted()
+    {
+        return $this->activities()
+            ->with('causer')
+            ->latest()
+            ->get()
+            ->map(function ($activity) {
+                return [
+                    'id' => $activity->id,
+                    'description' => $activity->description,
+                    'event' => $activity->event,
+                    'properties' => $activity->properties->toArray(), // Convert Collection to array
+                    'causer' => $activity->causer ? [
+                        'id' => $activity->causer->id,
+                        'name' => $activity->causer->name,
+                        'email' => $activity->causer->email,
+                    ] : null,
+                    'created_at' => $activity->created_at,
+                    'updated_at' => $activity->updated_at,
+                ];
+            });
+    }
+
+    /**
+     * Log a custom activity for this transaction.
+     */
+    public function logActivity(string $description, array $properties = [], ?int $causerId = null): void
+    {
+        $activityBuilder = activity('transaction_custom')
+            ->performedOn($this)
+            ->withProperties($properties);
+
+        if ($causerId) {
+            $user = User::find($causerId);
+            if ($user) {
+                $activityBuilder->causedBy($user);
+            }
+        }
+
+        $activityBuilder->log($description);
     }
 }

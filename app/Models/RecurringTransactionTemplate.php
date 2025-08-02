@@ -158,7 +158,7 @@ class RecurringTransactionTemplate extends Model
                     $nextDate = $baseDate->copy()->addMonth();
                     $daysInMonth = $nextDate->daysInMonth;
 
-                    // Handle cases where the day doesn't exist in the month
+                    // Handle edge cases where the target day doesn't exist (29th-31st → Feb 28th/29th, etc.)
                     $day = min($this->day_of_month, $daysInMonth);
 
                     return $nextDate->setDay($day);
@@ -181,25 +181,51 @@ class RecurringTransactionTemplate extends Model
 
                 $nextDate = $baseDate->copy();
                 $currentDay = $nextDate->day;
+                $daysInMonth = $nextDate->daysInMonth;
+
+                // Adjust target days if they don't exist in this month (29th-31st → Feb 28th/29th, etc.)
+                $targetFirstDay = min($firstDay, $daysInMonth);
+                $targetSecondDay = min($secondDay, $daysInMonth);
 
                 // If we're before the first day of the month, move to the first day
-                if ($currentDay < $firstDay) {
-                    return $nextDate->setDay($firstDay);
+                if ($currentDay < $targetFirstDay) {
+                    return $nextDate->setDay($targetFirstDay);
                 }
 
                 // If we're between the first and second days, move to the second day
-                if ($currentDay < $secondDay) {
-                    return $nextDate->setDay($secondDay);
+                if ($currentDay < $targetSecondDay) {
+                    return $nextDate->setDay($targetSecondDay);
                 }
 
                 // Otherwise, we're past both days this month, move to the first day of next month
-                return $nextDate->addMonth()->setDay($firstDay);
+                $nextMonthDate = $nextDate->addMonth();
+                $nextMonthDays = $nextMonthDate->daysInMonth;
+                $nextMonthFirstDay = min($firstDay, $nextMonthDays);
+                return $nextMonthDate->setDay($nextMonthFirstDay);
 
             case self::FREQUENCY_QUARTERLY:
+                if ($this->day_of_month !== null) {
+                    $nextDate = $baseDate->copy()->addMonths(3);
+                    $daysInMonth = $nextDate->daysInMonth;
+                    // Handle edge cases where target day doesn't exist (29th-31st → Feb 28th/29th, etc.)
+                    $day = min($this->day_of_month, $daysInMonth);
+                    return $nextDate->setDay($day);
+                }
                 return $baseDate->copy()->addMonths(3);
 
             case self::FREQUENCY_YEARLY:
-                return $baseDate->copy()->addYear();
+                $nextDate = $baseDate->copy()->addYear();
+                // Handle leap year edge case (Feb 29th on non-leap years)
+                if ($this->start_date->month == 2 && $this->start_date->day == 29 && !$nextDate->isLeapYear()) {
+                    return $nextDate->setMonth(2)->setDay(28);
+                }
+                // Handle day-of-month edge cases (29th-31st in shorter months)
+                $targetMonth = $this->start_date->month;
+                $targetDay = $this->start_date->day;
+                $nextDate->setMonth($targetMonth);
+                $daysInMonth = $nextDate->daysInMonth;
+                $day = min($targetDay, $daysInMonth);
+                return $nextDate->setDay($day);
 
             default:
                 return null;
@@ -223,7 +249,6 @@ class RecurringTransactionTemplate extends Model
     public function shouldGenerateForDate(\Carbon\Carbon $date): bool
     {
         // Don't generate if before start date or after end date
-        ;
         if (
             $date->startOfDay()->lt($this->start_date->startOfDay()) ||
             ($this->end_date && $date->startOfDay()->gt($this->end_date->startOfDay())) ||
@@ -250,7 +275,18 @@ class RecurringTransactionTemplate extends Model
                 return $weekDiff % 2 === 0;
 
             case self::FREQUENCY_MONTHLY:
-                return $this->day_of_month === null || $date->day == $this->day_of_month;
+                if ($this->day_of_month === null) {
+                    return true;
+                }
+
+                // If the target day exists in this month, check for exact match
+                if ($date->daysInMonth >= $this->day_of_month) {
+                    return $date->day == $this->day_of_month;
+                }
+
+                // If the target day doesn't exist in this month (29th-31st), use the last day of the month
+                // Examples: 31st → Feb 28th/29th, 30th → Feb 28th/29th, 29th → Feb 28th (non-leap years)
+                return $date->day == $date->daysInMonth;
 
             case self::FREQUENCY_BIMONTHLY:
                 // Bi-monthly occurs on two specific days of the month
@@ -264,13 +300,35 @@ class RecurringTransactionTemplate extends Model
                     $secondDay = $temp;
                 }
 
-                // Check if today matches either of the specified days
-                return $date->day === $firstDay || $date->day === $secondDay;
+                $daysInMonth = $date->daysInMonth;
+                $currentDay = $date->day;
+
+                // Check if today matches the first day (or last day if first day doesn't exist in this month)
+                // Handles edge cases: 29th-31st → Feb 28th/29th, etc.
+                $targetFirstDay = $daysInMonth >= $firstDay ? $firstDay : $daysInMonth;
+                if ($currentDay === $targetFirstDay) {
+                    return true;
+                }
+
+                // Check if today matches the second day (or last day if second day doesn't exist in this month)
+                // Handles edge cases: 29th-31st → Feb 28th/29th, etc.
+                $targetSecondDay = $daysInMonth >= $secondDay ? $secondDay : $daysInMonth;
+                if ($currentDay === $targetSecondDay) {
+                    return true;
+                }
+
+                return false;
 
             case self::FREQUENCY_QUARTERLY:
                 // Check if it's the right day of the month
-                if ($this->day_of_month !== null && $date->day != $this->day_of_month) {
-                    return false;
+                if ($this->day_of_month !== null) {
+                    $daysInMonth = $date->daysInMonth;
+                    // Handle edge cases where target day doesn't exist (29th-31st → Feb 28th/29th, etc.)
+                    $targetDay = $daysInMonth >= $this->day_of_month ? $this->day_of_month : $daysInMonth;
+
+                    if ($date->day != $targetDay) {
+                        return false;
+                    }
                 }
 
                 // Check if it's a quarter month (Jan, Apr, Jul, Oct)
@@ -279,7 +337,16 @@ class RecurringTransactionTemplate extends Model
 
             case self::FREQUENCY_YEARLY:
                 // Check if it's the anniversary date (same month and day)
-                return $date->format('m-d') === $this->start_date->format('m-d');
+                if ($date->month !== $this->start_date->month) {
+                    return false;
+                }
+
+                $targetDay = $this->start_date->day;
+                $daysInMonth = $date->daysInMonth;
+                // Handle edge cases: Feb 29th on non-leap years, 29th-31st in shorter months
+                $actualTargetDay = $daysInMonth >= $targetDay ? $targetDay : $daysInMonth;
+
+                return $date->day === $actualTargetDay;
 
             default:
                 return false;
@@ -308,8 +375,40 @@ class RecurringTransactionTemplate extends Model
                 return $fromDate->copy()->addMonth();
 
             case self::FREQUENCY_BIMONTHLY:
-                // Implementation needed
-                return null;
+                // Bi-monthly: move to the next occurrence within the current or next month
+                $firstDay = $this->first_day_of_month ?? 1;
+                $secondDay = $this->day_of_month ?? 15;
+
+                // Ensure first day is before second day
+                if ($firstDay > $secondDay) {
+                    $temp = $firstDay;
+                    $firstDay = $secondDay;
+                    $secondDay = $temp;
+                }
+
+                $nextDate = $fromDate->copy();
+                $currentDay = $nextDate->day;
+                $daysInMonth = $nextDate->daysInMonth;
+
+                // Adjust target days if they don't exist in this month (29th-31st → Feb 28th/29th, etc.)
+                $targetFirstDay = min($firstDay, $daysInMonth);
+                $targetSecondDay = min($secondDay, $daysInMonth);
+
+                // If we're before the first day of the month, move to the first day
+                if ($currentDay < $targetFirstDay) {
+                    return $nextDate->setDay($targetFirstDay);
+                }
+
+                // If we're between the first and second days, move to the second day
+                if ($currentDay < $targetSecondDay) {
+                    return $nextDate->setDay($targetSecondDay);
+                }
+
+                // Otherwise, we're past both days this month, move to the first day of next month
+                $nextMonthDate = $nextDate->addMonth();
+                $nextMonthDays = $nextMonthDate->daysInMonth;
+                $nextMonthFirstDay = min($firstDay, $nextMonthDays);
+                return $nextMonthDate->setDay($nextMonthFirstDay);
 
             case self::FREQUENCY_QUARTERLY:
                 return $fromDate->copy()->addMonths(3);

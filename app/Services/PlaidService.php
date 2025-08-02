@@ -265,6 +265,7 @@ class PlaidService
 
     /**
      * Get transactions for a specific date range
+     * @throws \Exception
      */
     public function getTransactions($accessToken, $startDate, $endDate)
     {
@@ -472,18 +473,18 @@ class PlaidService
 
                     $imported++;
                 }
-                
+
                 // Check if this transaction was previously pending and handle accordingly
                 if (isset($transaction['pending_transaction_id']) && !empty($transaction['pending_transaction_id'])) {
                     // This is a settled transaction that was previously pending
                     // Find the transaction linked to the pending plaid transaction
                     $pendingTransaction = Transaction::where('plaid_transaction_id', $transaction['pending_transaction_id'])
                         ->first();
-                    
+
                     if ($pendingTransaction) {
                         // Delete the pending transaction since it's now settled
                         $pendingTransaction->delete();
-                        
+
                         // Log the deletion for debugging
                         Log::info('Deleted pending transaction after settlement', [
                             'pending_transaction_id' => $transaction['pending_transaction_id'],

@@ -233,6 +233,20 @@ const getNextOccurrence = (template) => {
     return nextDate;
   }
 
+  // Helper function to get the last day of a month
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  // Helper function to set date safely (handles day-of-month edge cases)
+  // Examples: 31st → Feb 28th/29th, 30th → Feb 28th/29th, 29th → Feb 28th (non-leap years)
+  const setSafeDayOfMonth = (date, targetDay) => {
+    const daysInMonth = getDaysInMonth(date);
+    const safeDay = Math.min(targetDay, daysInMonth);
+    date.setDate(safeDay);
+    return date;
+  };
+
   // Otherwise, calculate the next occurrence based on frequency
   switch (template.frequency) {
     case 'daily':
@@ -269,12 +283,39 @@ const getNextOccurrence = (template) => {
 
       // If today's date is before the day of month, it occurs this month
       if (today.getDate() < dayOfMonth) {
-        nextDate.setDate(dayOfMonth);
+        setSafeDayOfMonth(nextDate, dayOfMonth);
       }
       // Otherwise, it's next month
       else {
         nextDate.setMonth(nextDate.getMonth() + 1);
-        nextDate.setDate(dayOfMonth);
+        setSafeDayOfMonth(nextDate, dayOfMonth);
+      }
+      break;
+
+    case 'bimonthly':
+      // Twice per month (e.g., 1st and 15th)
+      const firstDay = template.first_day_of_month || 1;
+      const secondDay = template.day_of_month || 15;
+      
+      // Ensure first day is before second day
+      const actualFirstDay = Math.min(firstDay, secondDay);
+      const actualSecondDay = Math.max(firstDay, secondDay);
+      
+      nextDate = new Date();
+      const currentDay = today.getDate();
+      
+      // If we're before the first day of the month, move to the first day
+      if (currentDay < actualFirstDay) {
+        setSafeDayOfMonth(nextDate, actualFirstDay);
+      }
+      // If we're between the first and second days, move to the second day
+      else if (currentDay < actualSecondDay) {
+        setSafeDayOfMonth(nextDate, actualSecondDay);
+      }
+      // Otherwise, we're past both days this month, move to the first day of next month
+      else {
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        setSafeDayOfMonth(nextDate, actualFirstDay);
       }
       break;
 
@@ -289,11 +330,11 @@ const getNextOccurrence = (template) => {
 
       if (today.getDate() < quarterlyDayOfMonth && monthsUntilQuarterEnd === 2) {
         // If it's the first month of the quarter and day hasn't passed
-        nextDate.setDate(quarterlyDayOfMonth);
+        setSafeDayOfMonth(nextDate, quarterlyDayOfMonth);
       } else {
         // Move to the first month of the next quarter
         nextDate.setMonth(currentMonth + monthsUntilQuarterEnd + 1);
-        nextDate.setDate(quarterlyDayOfMonth);
+        setSafeDayOfMonth(nextDate, quarterlyDayOfMonth);
       }
       break;
 
@@ -304,11 +345,13 @@ const getNextOccurrence = (template) => {
 
       // Set to this year's occurrence
       nextDate.setMonth(startDate.getMonth());
-      nextDate.setDate(startDate.getDate());
+      setSafeDayOfMonth(nextDate, startDate.getDate());
 
       // If this year's date has passed, go to next year
       if (nextDate < today) {
         nextDate.setFullYear(nextDate.getFullYear() + 1);
+        nextDate.setMonth(startDate.getMonth());
+        setSafeDayOfMonth(nextDate, startDate.getDate());
       }
       break;
   }

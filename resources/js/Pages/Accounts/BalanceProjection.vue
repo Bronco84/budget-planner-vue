@@ -6,8 +6,8 @@
       <div class="flex justify-between items-center">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ account.name }} - Balance Projection</h2>
         <div class="flex space-x-2">
-          <Link 
-            :href="route('budgets.show', budget.id)" 
+          <Link
+            :href="route('budgets.show', budget.id)"
             class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300"
           >
             Back to Budget
@@ -22,7 +22,7 @@
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Projection Settings</h3>
-            
+
             <form @submit.prevent="updateProjections" class="flex flex-wrap gap-4 items-end">
               <div class="w-full md:w-auto">
                 <InputLabel for="months" value="Projection Time Range" />
@@ -41,7 +41,7 @@
                   <option value="60">5 years</option>
                 </select>
               </div>
-              
+
               <div class="w-full md:w-auto">
                 <InputLabel for="scenario" value="Scenario" />
                 <select
@@ -55,7 +55,7 @@
                   <option value="pessimistic">Pessimistic (-10%)</option>
                 </select>
               </div>
-              
+
               <div class="w-full md:w-auto">
                 <InputLabel for="groupBy" value="Group By" />
                 <select
@@ -69,7 +69,7 @@
                   <option value="month">Monthly</option>
                 </select>
               </div>
-              
+
               <div>
                 <PrimaryButton type="submit" :disabled="processing">
                   Update Projections
@@ -78,49 +78,49 @@
             </form>
           </div>
         </div>
-        
+
         <!-- Account Balance Summary -->
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Account Balance Summary</h3>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Current Balance</h4>
                 <p class="text-2xl font-bold" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                  ${{ formatCurrency(account.current_balance_cents) }}
+                  {{ formatCurrency(account.current_balance_cents) }}
                 </p>
               </div>
-              
+
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Projected Income</h4>
                 <p class="text-2xl font-bold text-green-600">
-                  ${{ formatCurrency(totalIncome) }}
+                  {{ formatCurrency(totalIncome) }}
                 </p>
               </div>
-              
+
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Projected Expenses</h4>
                 <p class="text-2xl font-bold text-red-600">
-                  ${{ formatCurrency(totalExpenses) }}
+                  {{ formatCurrency(totalExpenses) }}
                 </p>
               </div>
-              
+
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Net Change</h4>
                 <p class="text-2xl font-bold" :class="netChange >= 0 ? 'text-green-600' : 'text-red-600'">
-                  ${{ formatCurrency(netChange) }}
+                  {{ formatCurrency(netChange) }}
                 </p>
               </div>
-              
+
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Ending Balance</h4>
                 <p class="text-2xl font-bold" :class="projectedEndingBalance >= 0 ? 'text-green-600' : 'text-red-600'">
-                  ${{ formatCurrency(projectedEndingBalance) }}
+                  {{ formatCurrency(projectedEndingBalance) }}
                 </p>
                 <p class="text-xs text-gray-500">as of {{ endDate }}</p>
               </div>
-              
+
               <div>
                 <h4 class="text-sm uppercase text-gray-500 mb-1">Monthly Growth Rate</h4>
                 <p class="text-2xl font-bold" :class="averageMonthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'">
@@ -131,20 +131,20 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Balance Projection Chart -->
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Balance Projection Chart</h3>
-            
+
             <div style="height: 500px;">
-              <BalanceChart 
-                :balance-data="balanceProjectionData" 
+              <BalanceChart
+                :balance-data="balanceProjectionData"
                 :height="450"
                 :show-positive-negative="true"
               />
             </div>
-            
+
             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="p-4 bg-gray-50 rounded-lg">
                 <h4 class="font-medium text-gray-700 mb-2">Key Insights</h4>
@@ -152,13 +152,13 @@
                   <li v-if="lowestBalancePoint" class="flex justify-between">
                     <span>Lowest balance:</span>
                     <span :class="lowestBalancePoint.balance < 0 ? 'text-red-600 font-medium' : ''">
-                      ${{ formatCurrency(lowestBalancePoint.balance) }} on {{ formatDate(lowestBalancePoint.date) }}
+                      {{ formatCurrency(lowestBalancePoint.balance) }} on {{ formatDate(lowestBalancePoint.date) }}
                     </span>
                   </li>
                   <li v-if="highestBalancePoint" class="flex justify-between">
                     <span>Highest balance:</span>
                     <span class="text-green-600 font-medium">
-                      ${{ formatCurrency(highestBalancePoint.balance) }} on {{ formatDate(highestBalancePoint.date) }}
+                      {{ formatCurrency(highestBalancePoint.balance) }} on {{ formatDate(highestBalancePoint.date) }}
                     </span>
                   </li>
                   <li class="flex justify-between">
@@ -167,7 +167,7 @@
                   </li>
                 </ul>
               </div>
-              
+
               <div class="p-4 bg-gray-50 rounded-lg">
                 <h4 class="font-medium text-gray-700 mb-2">Critical Points</h4>
                 <ul class="text-sm space-y-2">
@@ -194,12 +194,12 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Monthly Projection Table -->
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
           <div class="p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Monthly Projection</h3>
-            
+
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -219,22 +219,22 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                       <div class="text-sm text-green-600">
-                        ${{ formatCurrency(month.income) }}
+                        {{ formatCurrency(month.income) }}
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                       <div class="text-sm text-red-600">
-                        ${{ formatCurrency(month.expenses) }}
+                        {{ formatCurrency(month.expenses) }}
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                       <div class="text-sm font-medium" :class="month.net >= 0 ? 'text-green-600' : 'text-red-600'">
-                        ${{ formatCurrency(month.net) }}
+                        {{ formatCurrency(month.net) }}
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                       <div class="text-sm font-medium" :class="month.endBalance >= 0 ? 'text-green-600' : 'text-red-600'">
-                        ${{ formatCurrency(month.endBalance) }}
+                        {{ formatCurrency(month.endBalance) }}
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
@@ -310,29 +310,29 @@ const balanceProjectionData = computed(() => {
   if (!props.balanceProjection || !props.balanceProjection.days) {
     return [];
   }
-  
+
   let data = [...props.balanceProjection.days].map(day => ({
     date: day.date,
     balance: parseInt(day.balance)
   }));
-  
+
   // Apply scenario adjustments
   if (form.value.scenario === 'optimistic') {
     // Optimistic: Increase income by 10%, decrease expenses by 10%
     const startingBalance = props.account.current_balance_cents;
     let runningBalance = startingBalance;
-    
+
     data = data.map((day, index) => {
       if (index === 0) return day;
-      
+
       const prevDay = data[index - 1];
       const dayChange = day.balance - prevDay.balance;
-      
+
       // For income (positive change), increase by 10%
       // For expenses (negative change), decrease by 10%
       const adjustedChange = dayChange * (dayChange >= 0 ? 1.1 : 0.9);
       runningBalance += adjustedChange;
-      
+
       return {
         date: day.date,
         balance: Math.round(runningBalance)
@@ -342,36 +342,36 @@ const balanceProjectionData = computed(() => {
     // Pessimistic: Decrease income by 10%, increase expenses by 10%
     const startingBalance = props.account.current_balance_cents;
     let runningBalance = startingBalance;
-    
+
     data = data.map((day, index) => {
       if (index === 0) return day;
-      
+
       const prevDay = data[index - 1];
       const dayChange = day.balance - prevDay.balance;
-      
+
       // For income (positive change), decrease by 10%
       // For expenses (negative change), increase by 10%
       const adjustedChange = dayChange * (dayChange >= 0 ? 0.9 : 1.1);
       runningBalance += adjustedChange;
-      
+
       return {
         date: day.date,
         balance: Math.round(runningBalance)
       };
     });
   }
-  
+
   // Apply grouping if not daily
   if (form.value.groupBy === 'week') {
     // Group by week
     const weeklyData = [];
     let currentWeek = null;
     let lastDate = null;
-    
+
     data.forEach(day => {
       const date = new Date(day.date);
       const weekNum = getWeekNumber(date);
-      
+
       if (currentWeek !== weekNum) {
         if (currentWeek !== null) {
           weeklyData.push({
@@ -381,10 +381,10 @@ const balanceProjectionData = computed(() => {
         }
         currentWeek = weekNum;
       }
-      
+
       lastDate = day.date;
     });
-    
+
     // Add last week
     if (data.length > 0) {
       weeklyData.push({
@@ -392,17 +392,17 @@ const balanceProjectionData = computed(() => {
         balance: data[data.length - 1].balance
       });
     }
-    
+
     return weeklyData;
   } else if (form.value.groupBy === 'month') {
     // Group by month
     const monthlyData = [];
     let currentMonth = null;
-    
+
     data.forEach(day => {
       const date = new Date(day.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-      
+
       if (currentMonth !== monthKey) {
         monthlyData.push({
           date: day.date,
@@ -411,7 +411,7 @@ const balanceProjectionData = computed(() => {
         currentMonth = monthKey;
       }
     });
-    
+
     // Ensure we have the last day of the last month
     if (data.length > 0) {
       const lastDay = data[data.length - 1];
@@ -420,10 +420,10 @@ const balanceProjectionData = computed(() => {
         balance: lastDay.balance
       });
     }
-    
+
     return monthlyData;
   }
-  
+
   return data;
 });
 
@@ -441,7 +441,7 @@ const projectedEndingBalance = computed(() => {
   if (!balanceProjectionData.value || balanceProjectionData.value.length === 0) {
     return props.account.current_balance_cents;
   }
-  
+
   const lastDay = balanceProjectionData.value[balanceProjectionData.value.length - 1];
   return lastDay.balance;
 });
@@ -450,7 +450,7 @@ const endDate = computed(() => {
   if (!balanceProjectionData.value || balanceProjectionData.value.length === 0) {
     return 'N/A';
   }
-  
+
   const lastDay = balanceProjectionData.value[balanceProjectionData.value.length - 1];
   return formatDate(lastDay.date);
 });
@@ -459,18 +459,18 @@ const monthlyData = computed(() => {
   if (!props.balanceProjection || !props.balanceProjection.days) {
     return [];
   }
-  
+
   const days = props.balanceProjection.days;
   const result = [];
-  
+
   // Group transactions by month
   const transactionsByMonth = {};
-  
+
   if (props.projectedTransactions) {
     props.projectedTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-      
+
       if (!transactionsByMonth[monthKey]) {
         transactionsByMonth[monthKey] = {
           month: monthKey,
@@ -483,41 +483,41 @@ const monthlyData = computed(() => {
           growthRate: 0
         };
       }
-      
+
       if (transaction.amount_in_cents > 0) {
         transactionsByMonth[monthKey].income += transaction.amount_in_cents;
       } else {
         transactionsByMonth[monthKey].expenses += Math.abs(transaction.amount_in_cents);
       }
-      
+
       transactionsByMonth[monthKey].net += transaction.amount_in_cents;
     });
   }
-  
+
   // Find the first and last transaction of each month to get start/end balances
   const daysByMonth = {};
   days.forEach(day => {
     const date = new Date(day.date);
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-    
+
     if (!daysByMonth[monthKey]) {
       daysByMonth[monthKey] = [];
     }
-    
+
     daysByMonth[monthKey].push({
       date: day.date,
       balance: parseInt(day.balance)
     });
   });
-  
+
   // Calculate start and end balances for each month
   Object.keys(daysByMonth).sort().forEach(monthKey => {
     const monthDays = daysByMonth[monthKey];
     if (monthDays.length === 0) return;
-    
+
     const startBalance = monthDays[0].balance;
     const endBalance = monthDays[monthDays.length - 1].balance;
-    
+
     if (!transactionsByMonth[monthKey]) {
       // Create an entry if no transactions for this month
       transactionsByMonth[monthKey] = {
@@ -531,23 +531,23 @@ const monthlyData = computed(() => {
         growthRate: 0
       };
     }
-    
+
     transactionsByMonth[monthKey].startBalance = startBalance;
     transactionsByMonth[monthKey].endBalance = endBalance;
-    
+
     // Calculate monthly growth rate
     if (startBalance !== 0) {
       transactionsByMonth[monthKey].growthRate = ((endBalance - startBalance) / Math.abs(startBalance)) * 100;
     }
   });
-  
+
   // Convert to array and sort by month
   return Object.values(transactionsByMonth).sort((a, b) => a.month.localeCompare(b.month));
 });
 
 const averageMonthlyGrowth = computed(() => {
   if (monthlyData.value.length === 0) return 0;
-  
+
   const totalGrowth = monthlyData.value.reduce((sum, month) => sum + month.growthRate, 0);
   return totalGrowth / monthlyData.value.length;
 });
@@ -557,7 +557,7 @@ const lowestBalancePoint = computed(() => {
   if (!balanceProjectionData.value || balanceProjectionData.value.length === 0) {
     return null;
   }
-  
+
   return balanceProjectionData.value.reduce((lowest, current) => {
     return (current.balance < lowest.balance) ? current : lowest;
   }, balanceProjectionData.value[0]);
@@ -567,7 +567,7 @@ const highestBalancePoint = computed(() => {
   if (!balanceProjectionData.value || balanceProjectionData.value.length === 0) {
     return null;
   }
-  
+
   return balanceProjectionData.value.reduce((highest, current) => {
     return (current.balance > highest.balance) ? current : highest;
   }, balanceProjectionData.value[0]);
@@ -577,24 +577,24 @@ const balanceVolatility = computed(() => {
   if (!balanceProjectionData.value || balanceProjectionData.value.length <= 1) {
     return 0;
   }
-  
+
   // Calculate standard deviation of daily changes
   const changes = [];
   for (let i = 1; i < balanceProjectionData.value.length; i++) {
     const prev = balanceProjectionData.value[i-1].balance;
     const curr = balanceProjectionData.value[i].balance;
-    
+
     if (prev !== 0) {
       changes.push(Math.abs((curr - prev) / prev));
     }
   }
-  
+
   if (changes.length === 0) return 0;
-  
+
   const mean = changes.reduce((sum, val) => sum + val, 0) / changes.length;
   const squaredDiffs = changes.map(val => Math.pow(val - mean, 2));
   const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / changes.length;
-  
+
   return Math.sqrt(variance);
 });
 
@@ -602,18 +602,18 @@ const daysToNegative = computed(() => {
   if (!balanceProjectionData.value || balanceProjectionData.value.length === 0) {
     return null;
   }
-  
+
   // If starting balance is already negative
   if (balanceProjectionData.value[0].balance < 0) {
     return 0;
   }
-  
+
   // If ending balance is positive, and we never go negative in between
   const goesNegative = balanceProjectionData.value.some(day => day.balance < 0);
   if (!goesNegative) {
     return null; // Never goes negative
   }
-  
+
   // Find first day with negative balance
   for (let i = 1; i < balanceProjectionData.value.length; i++) {
     if (balanceProjectionData.value[i].balance < 0) {
@@ -623,7 +623,7 @@ const daysToNegative = computed(() => {
       return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
   }
-  
+
   return null;
 });
 
@@ -631,10 +631,10 @@ const timeToDoubleBalance = computed(() => {
   if (!balanceProjectionData.value || balanceProjectionData.value.length === 0 || balanceProjectionData.value[0].balance <= 0) {
     return null;
   }
-  
+
   const startBalance = balanceProjectionData.value[0].balance;
   const targetBalance = startBalance * 2;
-  
+
   // Find first day with double the starting balance
   for (let i = 1; i < balanceProjectionData.value.length; i++) {
     if (balanceProjectionData.value[i].balance >= targetBalance) {
@@ -644,20 +644,20 @@ const timeToDoubleBalance = computed(() => {
       return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
   }
-  
+
   return null; // Never doubles within projection period
 });
 
 // Format helpers
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
-  
+
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   } catch (e) {
     return dateString;
@@ -666,10 +666,10 @@ const formatDate = (dateString) => {
 
 const formatMonthYear = (dateObj) => {
   if (!dateObj) return 'N/A';
-  
+
   try {
-    return dateObj.toLocaleDateString(undefined, { 
-      year: 'numeric', 
+    return dateObj.toLocaleDateString(undefined, {
+      year: 'numeric',
       month: 'long'
     });
   } catch (e) {
@@ -690,4 +690,4 @@ const updateProjections = () => {
     }
   });
 };
-</script> 
+</script>

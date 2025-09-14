@@ -206,8 +206,8 @@
                     <InputError class="mt-2" :message="form.errors.day_of_week" />
                   </div>
 
-                  <!-- Day of month (for monthly/quarterly/bimonthly frequency) -->
-                  <div v-if="form.frequency === 'monthly' || form.frequency === 'quarterly' || form.frequency === 'bimonthly'">
+                  <!-- Day of month (for monthly/quarterly frequency) -->
+                  <div v-if="form.frequency === 'monthly' || form.frequency === 'quarterly'">
                     <InputLabel for="day_of_month" value="Day of Month" />
                     <TextInput
                       id="day_of_month"
@@ -215,25 +215,60 @@
                       min="1"
                       max="31"
                       class="mt-1 block w-full"
-                      v-model="form.day_of_month"
+                      v-model.number="form.day_of_month"
                       required
                     />
+                    <p class="mt-1 text-xs text-gray-500">
+                      The day of the month when the transaction occurs (1-31)
+                    </p>
                     <InputError class="mt-2" :message="form.errors.day_of_month" />
                   </div>
 
-                  <!-- First day of month (for bimonthly frequency) -->
-                  <div v-if="form.frequency === 'bimonthly'">
-                    <InputLabel for="first_day_of_month" value="First Day of Month" />
-                    <TextInput
-                      id="first_day_of_month"
-                      type="number"
-                      min="1"
-                      max="31"
-                      class="mt-1 block w-full"
-                      v-model="form.first_day_of_month"
-                      required
-                    />
-                    <InputError class="mt-2" :message="form.errors.first_day_of_month" />
+                  <!-- Bimonthly frequency fields -->
+                  <div v-if="form.frequency === 'bimonthly'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- First occurrence -->
+                    <div>
+                      <InputLabel for="first_day_of_month" value="First Occurrence" />
+                      <TextInput
+                        id="first_day_of_month"
+                        type="number"
+                        min="1"
+                        max="31"
+                        class="mt-1 block w-full"
+                        v-model.number="form.first_day_of_month"
+                        required
+                      />
+                      <p class="mt-1 text-xs text-gray-500">
+                        First day of the month (e.g., 1 for 1st)
+                      </p>
+                      <InputError class="mt-2" :message="form.errors.first_day_of_month" />
+                    </div>
+
+                    <!-- Second occurrence -->
+                    <div>
+                      <InputLabel for="day_of_month" value="Second Occurrence" />
+                      <TextInput
+                        id="day_of_month"
+                        type="number"
+                        min="1"
+                        max="31"
+                        class="mt-1 block w-full"
+                        v-model.number="form.day_of_month"
+                        required
+                      />
+                      <p class="mt-1 text-xs text-gray-500">
+                        Second day of the month (e.g., 15 for 15th)
+                      </p>
+                      <InputError class="mt-2" :message="form.errors.day_of_month" />
+                    </div>
+                  </div>
+
+                  <!-- Helper text for bimonthly -->
+                  <div v-if="form.frequency === 'bimonthly'" class="col-span-2 bg-blue-50 p-3 rounded-md">
+                    <p class="text-sm text-blue-700">
+                      <strong>Example:</strong> For transactions on the 1st and 15th of every month, enter 1 and 15.
+                      The transaction will occur twice per month on these specific days.
+                    </p>
                   </div>
 
                   <!-- Start Date -->
@@ -408,9 +443,9 @@ const form = useForm({
   account_id: '',
   category: '',
   frequency: '',
-  day_of_month: '',
+  day_of_month: 1,
   day_of_week: new Date().getDay().toString(),
-  first_day_of_month: '',
+  first_day_of_month: 1,
   start_date: today,
   end_date: '',
   min_amount: '',
@@ -438,9 +473,24 @@ const submit = () => {
   // Update values before submitting
   form.is_dynamic_amount = amountType.value === 'dynamic';
 
+  console.log('Submitting form data:', {
+    ...form.data(),
+    is_dynamic_amount: amountType.value === 'dynamic'
+  });
+
   form.transform((form) => ({
       ...form,
       is_dynamic_amount: amountType.value === 'dynamic'
-  })).post(route('recurring-transactions.store', props.budget.id));
+  })).post(route('recurring-transactions.store', props.budget.id), {
+    onSuccess: () => {
+      console.log('Form submitted successfully');
+    },
+    onError: (errors) => {
+      console.error('Form submission errors:', errors);
+    },
+    onFinish: () => {
+      console.log('Form submission finished');
+    }
+  });
 };
 </script>

@@ -22,6 +22,7 @@ class IdentifyRecurringTransactions extends Command
      */
     protected $signature = 'transactions:identify-recurring
                             {budget_id : The ID of the budget to analyze}
+                            {--account_id= : The ID of the specific account to analyze (optional)}
                             {--months=3 : Number of months of historical data to analyze}
                             {--min-occurrences=2 : Minimum number of occurrences to consider a recurring pattern}
                             {--similarity-threshold=85 : Similarity threshold percentage for transaction descriptions}';
@@ -31,7 +32,7 @@ class IdentifyRecurringTransactions extends Command
      *
      * @var string
      */
-    protected $description = 'Identifies potential recurring transactions from existing transactions';
+    protected $description = 'Identifies potential recurring transactions from existing transactions with interactive account selection';
 
     /**
      * Execute the console command.
@@ -39,12 +40,14 @@ class IdentifyRecurringTransactions extends Command
      * @return int
      */
     public function handle()
-    {$budget = Budget::findOrFail($this->argument('budget_id'));
-        $account = Account::findOrFail($this->argument('account_id'));
+    {
+        $budget = Budget::findOrFail($this->argument('budget_id'));
+        $account = $this->selectAccount($budget);
         $minOccurrences = $this->option('min-occurrences');
-        $days = $this->option('days');
+        $days = 90;
 
-        $this->info("Analyzing transactions for budget: {$budget->description}");
+        $this->info("Analyzing transactions for budget: {$budget->name}");
+        $this->info("Selected account: {$account->name} ({$account->type})");
 
         // Get transactions from the last X days
         $transactions = Transaction::where('budget_id', $budget->id)
@@ -140,5 +143,61 @@ class IdentifyRecurringTransactions extends Command
         }
 
         $this->info("Created " . count($templates) . " recurring transaction templates.");
+    }
+
+    /**
+     * Select an account from the budget either via command option or interactive selection.
+     *
+     * @param Budget $budget
+     * @return Account
+     */
+    protected function selectAccount(Budget $budget): Account
+    {
+        // If account_id option is provided, use it
+        if ($accountId = $this->option('account_id')) {
+            $account = $budget->accounts()->where('id', $accountId)->first();
+            if (!$account) {
+                $this->error("Account with ID {$accountId} not found in budget {$budget->name}");
+                exit(1);
+            }
+            return $account;
+        }
+
+        // Load all accounts for this budget
+        $accounts = $budget->accounts()->orderBy('name')->get();
+        
+        if ($accounts->isEmpty()) {
+            $this->error("No accounts found in budget {$budget->name}");
+            exit(1);
+        }
+
+        // If only one account, use it automatically
+        if ($accounts->count() === 1) {
+            $this->info("Using the only available account: {$accounts->first()->name}");
+            return $accounts->first();
+        }
+
+        // Interactive selection
+        $this->info("Available accounts in budget '{$budget->name}':");
+        $this->table(
+            ['ID', 'Name', 'Type', 'Balance'],
+            $accounts->map(function ($account) {
+                return [
+                    $account->id,
+                    $account->name,
+                    ucfirst($account->type),
+                    '$' . number_format($account->current_balance_cents / 100, 2)
+                ];
+            })->toArray()
+        );
+
+        // Use Laravel's choice method with simple array of names
+        $choices = $accounts->pluck('name', 'id')->toArray();
+        $selectedAccountId = $this->choice(
+            'Which account would you like to analyze?',
+            $choices
+        );
+
+        return $accounts->firstWhere('name', $selectedAccountId);
     }
 }

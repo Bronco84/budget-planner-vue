@@ -27,12 +27,12 @@ class RecurringTransactionTemplate extends Model
         'end_date',
         'day_of_week',
         'day_of_month',
+        'first_day_of_month',
         'is_dynamic_amount',
         'min_amount',
         'max_amount',
         'notes',
         'last_generated_date',
-        'first_day_of_month',
         'average_amount',
     ];
 
@@ -47,11 +47,11 @@ class RecurringTransactionTemplate extends Model
         'end_date' => 'date:Y-m-d',
         'day_of_week' => 'integer',
         'day_of_month' => 'integer',
+        'first_day_of_month' => 'integer',
         'is_dynamic_amount' => 'boolean',
         'min_amount' => 'integer',
         'max_amount' => 'integer',
         'last_generated_date' => 'datetime',
-        'first_day_of_month' => 'integer',
         'average_amount' => 'float',
     ];
 
@@ -241,6 +241,28 @@ class RecurringTransactionTemplate extends Model
     }
 
     /**
+     * Check if a transaction exists for the given date.
+     * Uses preloaded relationship if available, otherwise falls back to query.
+     *
+     * @param \Carbon\Carbon $date
+     * @return bool
+     */
+    public function hasTransactionForDate(\Carbon\Carbon $date): bool
+    {
+        $dateString = $date->copy()->format('Y-m-d');
+        
+        // If transactions are loaded, use the collection
+        if ($this->relationLoaded('transactions')) {
+            return $this->transactions->contains(function ($transaction) use ($dateString) {
+                return $transaction->date && $transaction->date->format('Y-m-d') === $dateString;
+            });
+        }
+        
+        // Fallback to database query if relationship not loaded
+        return $this->transactions()->where('date', $dateString)->exists();
+    }
+
+    /**
      * Determine if a transaction should be generated for the given date.
      *
      * @param \Carbon\Carbon $date
@@ -252,7 +274,7 @@ class RecurringTransactionTemplate extends Model
         if (
             $date->startOfDay()->lt($this->start_date->startOfDay()) ||
             ($this->end_date && $date->startOfDay()->gt($this->end_date->startOfDay())) ||
-            $this->transactions()->where('date', $date->copy()->format('Y-m-d'))->exists()
+            $this->hasTransactionForDate($date)
         ) {
             return false;
         }

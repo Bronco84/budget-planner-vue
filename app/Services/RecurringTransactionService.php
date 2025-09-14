@@ -15,12 +15,13 @@ class RecurringTransactionService
     {
         $projectedTransactions = collect();
 
-        // Get all active recurring transaction templates
+        // Get all active recurring transaction templates with their transactions preloaded
         $templates = RecurringTransactionTemplate::where('account_id', $account->id)
             ->where(function ($query) use ($startDate) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', $startDate);
             })
+            ->with('transactions')
             ->get();
 
         foreach ($templates as $template) {
@@ -43,9 +44,10 @@ class RecurringTransactionService
             while ($date <= $templateEndDate) {
                 if ($template->shouldGenerateForDate($date)) {
                     // Determine the amount for this transaction
-                    if ($template->transactions()->where('date', $date->copy()->format('Y-m-d'))->exists()) {
-                        // If there are future transactions, check if it's the date of the next occurrence
-                        $amount = $template->transactions()->where('date', $date)->first()->amount_in_cents;
+                    $existingTransaction = $this->getTransactionForDate($template, $date);
+                    if ($existingTransaction) {
+                        // If there are future transactions, use the existing amount
+                        $amount = $existingTransaction->amount_in_cents;
                     } else {
                         // If this is a dynamic amount template, calculate it based on rules
                         if ($template->is_dynamic_amount) {
@@ -84,6 +86,28 @@ class RecurringTransactionService
     }
 
     /**
+     * Get transaction for a specific date from template's preloaded transactions.
+     * 
+     * @param RecurringTransactionTemplate $template
+     * @param Carbon $date
+     * @return Transaction|null
+     */
+    protected function getTransactionForDate(RecurringTransactionTemplate $template, Carbon $date): ?Transaction
+    {
+        $dateString = $date->copy()->format('Y-m-d');
+        
+        // If transactions are loaded, use the collection
+        if ($template->relationLoaded('transactions')) {
+            return $template->transactions->first(function ($transaction) use ($dateString) {
+                return $transaction->date && $transaction->date->format('Y-m-d') === $dateString;
+            });
+        }
+        
+        // Fallback to database query if relationship not loaded
+        return $template->transactions()->where('date', $dateString)->first();
+    }
+
+    /**
      * Calculate the dynamic amount for a recurring transaction template based on rules.
      *
      * @param RecurringTransactionTemplate $template
@@ -111,22 +135,23 @@ class RecurringTransactionService
             return $template->amount_in_cents;
         }
 
-        // NEW: Filter transactions based on min/max logic BEFORE averaging
+        // Filter transactions based on min/max logic BEFORE averaging
         $filteredTransactions = $matchingTransactions->filter(function ($transaction) use ($template) {
             $amount = $transaction->amount_in_cents;
-
-            if ($amount < 0) {
-                if ($template->max_amount !== null && $template->max_amount < 0 && $amount < $template->max_amount) {
-                    return false; // Exclude if lower than allowed max
-                }
-                if ($template->min_amount !== null && $template->min_amount < 0 && $amount > $template->min_amount) {
-                    return false; // Exclude if higher than allowed min
-                }
-            } else {
-                if ($template->min_amount !== null && $template->min_amount > 0 && $amount < $template->min_amount) {
+            $absAmount = abs($amount); // Use absolute value for comparison
+            
+            // Check against min amount (convert to absolute for comparison)
+            if ($template->min_amount !== null) {
+                $minAmount = abs($template->min_amount);
+                if ($absAmount < $minAmount) {
                     return false; // Exclude if lower than allowed min
                 }
-                if ($template->max_amount !== null && $template->max_amount > 0 && $amount > $template->max_amount) {
+            }
+            
+            // Check against max amount (convert to absolute for comparison)
+            if ($template->max_amount !== null) {
+                $maxAmount = abs($template->max_amount);
+                if ($absAmount > $maxAmount) {
                     return false; // Exclude if higher than allowed max
                 }
             }
@@ -216,6 +241,40 @@ class RecurringTransactionService
         }
 
         return $matchingTransactions->count();
+    }
+
+    /**
+     * Link existing transactions that match the template's rules
+     * This is specifically for dynamic amount transactions with rules
+     */
+    public function linkMatchingTransactionsByRules(RecurringTransactionTemplate $template)
+    {
+        if (!$template->is_dynamic_amount) {
+            return 0;
+        }
+
+        $rules = $template->rules()->where('is_active', true)->get();
+        if ($rules->isEmpty()) {
+            return 0;
+        }
+
+        // Find transactions that match all rules
+        $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
+
+        // Filter out transactions that are already linked to other templates
+        $unlinkedTransactions = $matchingTransactions->filter(function ($transaction) {
+            return $transaction->recurring_transaction_template_id === null;
+        });
+
+        // Link the matching transactions to this template
+        $linkedCount = 0;
+        foreach ($unlinkedTransactions as $transaction) {
+            $transaction->recurring_transaction_template_id = $template->id;
+            $transaction->save();
+            $linkedCount++;
+        }
+
+        return $linkedCount;
     }
 
     /**

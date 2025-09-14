@@ -72,12 +72,29 @@ class RecurringTransactionController extends Controller
      */
     public function store(Request $request, Budget $budget): RedirectResponse
     {
+        \Log::debug('RecurringTransaction store - request data:', $request->all());
 
-        $this->authorize('update', $budget);
+        try {
+            $this->authorize('update', $budget);
+        } catch (\Exception $e) {
+            \Log::error('Authorization failed for recurring transaction store:', [
+                'user_id' => auth()->id(),
+                'budget_id' => $budget->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+
+        \Log::debug('About to validate store request:', [
+            'request_keys' => array_keys($request->all()),
+            'has_account_id' => $request->has('account_id'),
+            'account_id_value' => $request->get('account_id'),
+            'budget_id' => $budget->id
+        ]);
 
         $validated = $request->validate([
             'description' => 'required|string|max:255',
-            'amount' => 'required|numeric',
+            'amount' => 'required_if:is_dynamic_amount,false|nullable|numeric',
             'account_id' => 'required|exists:accounts,id',
             'category' => 'required|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
@@ -85,10 +102,12 @@ class RecurringTransactionController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'day_of_week' => 'nullable|integer|min:0|max:6|required_if:frequency,weekly,biweekly',
             'day_of_month' => 'nullable|integer|min:1|max:31|required_if:frequency,monthly,quarterly,bimonthly',
+            'first_day_of_month' => 'nullable|integer|min:1|max:31|required_if:frequency,bimonthly|different:day_of_month',
             'is_dynamic_amount' => 'required|boolean',
             'min_amount' => 'nullable|numeric',
             'max_amount' => 'nullable|numeric',
             'average_amount' => 'nullable|numeric',
+            'notes' => 'nullable|string',
             'rules' => 'array',
             'rules.*.field' => 'required|string|in:description,amount,category',
             'rules.*.operator' => 'required|string|in:contains,equals,starts_with,ends_with,regex,greater_than,less_than',
@@ -96,18 +115,44 @@ class RecurringTransactionController extends Controller
             'rules.*.is_case_sensitive' => 'boolean',
         ]);
 
+        // Additional validation for bimonthly frequency
+        if ($validated['frequency'] === 'bimonthly') {
+            if ($validated['first_day_of_month'] === $validated['day_of_month']) {
+                return back()->withErrors([
+                    'first_day_of_month' => 'The first day of month must be different from the day of month for bimonthly frequency.',
+                ]);
+            }
+        }
+
         // Convert amount to cents
         $validated = $this->getArr($validated);
 
-        // Convert is_dynamic_amount from string to boolean
-        $validated['is_dynamic_amount'] = $validated['is_dynamic_amount'] === 'true';
+        // Convert is_dynamic_amount to boolean (handle both string and boolean inputs)
+        $validated['is_dynamic_amount'] = filter_var($validated['is_dynamic_amount'], FILTER_VALIDATE_BOOLEAN);
 
         // Extract rules from validated data
         $rules = $validated['rules'] ?? [];
         unset($validated['rules']);
+        
+        // Ensure budget_id is set
+        $validated['budget_id'] = $budget->id;
 
         // Create the recurring transaction
-        $recurringTransaction = $budget->recurringTransactionTemplates()->create($validated);
+        try {
+            $recurringTransaction = $budget->recurringTransactionTemplates()->create($validated);
+            
+            \Log::debug('RecurringTransaction created:', [
+                'id' => $recurringTransaction->id,
+                'validated_data' => $validated
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to create recurring transaction:', [
+                'validated_data' => $validated,
+                'error' => $e->getMessage(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
 
         // Create rules if this is a dynamic amount transaction
         if ($validated['is_dynamic_amount'] && !empty($rules)) {
@@ -116,6 +161,15 @@ class RecurringTransactionController extends Controller
                 $ruleData['priority'] = $index + 1;
                 $recurringTransaction->rules()->create($ruleData);
             }
+            
+            // Link existing transactions that match the rules
+            $recurringService = app(RecurringTransactionService::class);
+            $linkedCount = $recurringService->linkMatchingTransactionsByRules($recurringTransaction);
+            
+            \Log::debug('Linked matching transactions by rules:', [
+                'template_id' => $recurringTransaction->id,
+                'linked_count' => $linkedCount
+            ]);
         }
 
         return redirect()->route('recurring-transactions.index', $budget)
@@ -162,7 +216,7 @@ class RecurringTransactionController extends Controller
 
         $validated = $request->validate([
             'description' => 'required|string|max:255',
-            'amount' => 'required|numeric',
+            'amount' => 'required_if:is_dynamic_amount,false|nullable|numeric',
             'account_id' => 'required|exists:accounts,id',
             'category' => 'required|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
@@ -170,10 +224,12 @@ class RecurringTransactionController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'day_of_week' => 'nullable|integer|min:0|max:6|required_if:frequency,weekly,biweekly',
             'day_of_month' => 'nullable|integer|min:1|max:31|required_if:frequency,monthly,quarterly,bimonthly',
+            'first_day_of_month' => 'nullable|integer|min:1|max:31|required_if:frequency,bimonthly|different:day_of_month',
             'is_dynamic_amount' => 'required|boolean',
             'min_amount' => 'nullable|numeric',
             'max_amount' => 'nullable|numeric',
             'average_amount' => 'nullable|numeric',
+            'notes' => 'nullable|string',
             'rules' => 'array',
             'rules.*.id' => 'nullable|integer|exists:recurring_transaction_rules,id',
             'rules.*.field' => 'required|string|in:description,amount,category',
@@ -181,6 +237,15 @@ class RecurringTransactionController extends Controller
             'rules.*.value' => 'required|string|max:255',
             'rules.*.is_case_sensitive' => 'boolean',
         ]);
+
+        // Additional validation for bimonthly frequency
+        if ($validated['frequency'] === 'bimonthly') {
+            if ($validated['first_day_of_month'] === $validated['day_of_month']) {
+                return back()->withErrors([
+                    'first_day_of_month' => 'The first day of month must be different from the day of month for bimonthly frequency.',
+                ]);
+            }
+        }
 
         // Log validated data for debugging
         Log::debug('Validated recurring transaction data:', [
@@ -301,7 +366,12 @@ class RecurringTransactionController extends Controller
      */
     public function getArr(array $validated): array
     {
-        $validated['amount_in_cents'] = (int)($validated['amount'] * 100);
+        // Handle amount conversion - set to 0 for dynamic amount transactions
+        if (isset($validated['amount']) && $validated['amount'] !== null) {
+            $validated['amount_in_cents'] = (int)($validated['amount'] * 100);
+        } else {
+            $validated['amount_in_cents'] = 0; // Default for dynamic amount transactions
+        }
         unset($validated['amount']);
 
         // Convert dynamic amount values to cents if provided

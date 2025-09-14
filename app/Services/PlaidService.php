@@ -432,7 +432,6 @@ class PlaidService
                         'unofficial_currency_code' => $transaction['unofficial_currency_code'] ?? null,
                         'check_number' => $transaction['check_number'] ?? null,
                         'category' => $transaction['category'][0] ?? null,
-                        'category_id' => end($transaction['category']) ?? null,
                         'counterparties' => isset($transaction['counterparties']) ? json_encode($transaction['counterparties']) : null,
                         'location' => isset($transaction['location']) ? json_encode($transaction['location']) : null,
                         'payment_meta' => isset($transaction['payment_meta']) ? json_encode($transaction['payment_meta']) : null,

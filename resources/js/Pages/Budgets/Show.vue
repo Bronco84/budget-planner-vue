@@ -228,11 +228,22 @@
                         placeholder="Search transactions..."
                       >
                     </div>
+                    <select v-model="form.type" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                      <option value="">All Types</option>
+                      <option value="income">Income</option>
+                      <option value="expense">Expenses</option>
+                      <option value="recurring">Recurring</option>
+                    </select>
                     <select v-model="form.category" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                       <option value="">All Categories</option>
                       <option v-for="category in categories" :key="category" :value="category">
                         {{ category }}
                       </option>
+                    </select>
+                    <select v-model="form.pending" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                      <option value="">All Status</option>
+                      <option value="false">Posted</option>
+                      <option value="true">Pending</option>
                     </select>
                     <select v-model="form.timeframe" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                       <option value="">All Time</option>
@@ -508,7 +519,9 @@ const props = defineProps({
 // Form state for filters
 const form = reactive({
   search: props.filters.search || '',
+  type: props.filters.type || '',
   category: props.filters.category || '',
+  pending: props.filters.pending || '',
   timeframe: props.filters.timeframe || '',
   account_id: props.filters.account_id || (props.accounts.length > 0 ? props.accounts[0].id : null)
 });
@@ -597,7 +610,9 @@ function filter() {
 
   const params = {
     search: form.search || undefined,
+    type: form.type || undefined,
     category: form.category || undefined,
+    pending: form.pending || undefined,
     timeframe: form.timeframe || undefined,
     account_id: form.account_id || undefined,
     projection_months: projectionForm.months || undefined,
@@ -934,7 +949,9 @@ const selectAccount = (accountId) => {
   // Use Inertia post method instead of get for better parameter handling
   router.post(route('budgets.filter', props.budget.id), {
     search: form.search || '',
+    type: form.type || '',
     category: form.category || '',
+    pending: form.pending || '',
     timeframe: form.timeframe || '',
     account_id: accountId,
     projection_months: projectionForm.months || 1

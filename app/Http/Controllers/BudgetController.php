@@ -106,7 +106,9 @@ class BudgetController extends Controller
 
         // Get query parameters for filtering
         $search = $request->input('search');
+        $type = $request->input('type');
         $category = $request->input('category');
+        $pending = $request->input('pending');
         $timeframe = $request->input('timeframe');
 
         // Get projection parameters
@@ -199,6 +201,21 @@ class BudgetController extends Controller
                     'expense' => $query->where('amount_in_cents', '<', 0),
                     'recurring' => $query->whereNotNull('recurring_transaction_template_id'),
                 };
+            })
+            ->when($request->filled('pending'), function($query) use ($request) {
+                $isPending = filter_var($request->input('pending'), FILTER_VALIDATE_BOOLEAN);
+                if ($isPending) {
+                    $query->whereHas('plaidTransaction', function($q) {
+                        $q->where('pending', true);
+                    });
+                } else {
+                    $query->where(function($q) {
+                        $q->whereDoesntHave('plaidTransaction')
+                          ->orWhereHas('plaidTransaction', function($subQ) {
+                              $subQ->where('pending', false);
+                          });
+                    });
+                }
             })
             ->when($request->filled('category'), fn($query, $category) => $query->where('category', $category))
             ->when($request->filled('search'), function($q) use ($request) {
@@ -317,7 +334,9 @@ class BudgetController extends Controller
             'categories' => $categories,
             'filters' => [
                 'search' => $search,
+                'type' => $type,
                 'category' => $category,
+                'pending' => $pending,
                 'timeframe' => $timeframe,
                 'account_id' => $request->input('account_id'),
             ],
@@ -452,7 +471,9 @@ class BudgetController extends Controller
         $params = [
             'account_id' => $request->input('account_id'),
             'search' => $request->input('search'),
+            'type' => $request->input('type'),
             'category' => $request->input('category'),
+            'pending' => $request->input('pending'),
             'timeframe' => $request->input('timeframe'),
             'projection_months' => $request->input('projection_months', 1),
         ];

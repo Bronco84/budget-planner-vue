@@ -28,6 +28,9 @@ class Budget extends Model
         'name',
         'description',
         'starting_balance_account_id',
+        'airtable_base_id',
+        'last_airtable_sync',
+        'airtable_sync_summary',
     ];
 
     /**
@@ -35,7 +38,10 @@ class Budget extends Model
      *
      * @var array<string, string>
      */
-    protected $casts = [];
+    protected $casts = [
+        'last_airtable_sync' => 'datetime',
+        'airtable_sync_summary' => 'array',
+    ];
 
     /**
      * The accessors to append to the model's array form.
@@ -55,7 +61,7 @@ class Budget extends Model
      *
      * @var array
      */
-    protected $with = ['accounts'];
+    protected $with = []; // Remove automatic eager loading of accounts
 
     /**
      * Get the user that owns the budget.
@@ -92,11 +98,52 @@ class Budget extends Model
     }
 
     /**
-     * Get the accounts for this budget.
+     * Get the accounts for this budget (legacy relationship).
      */
     public function accounts(): HasMany
     {
         return $this->hasMany(Account::class);
+    }
+
+    /**
+     * Get virtual accounts from Airtable for this budget.
+     */
+    public function getVirtualAccountsAttribute(): \Illuminate\Support\Collection
+    {
+        $virtualAccountService = app(\App\Services\VirtualAccountService::class);
+        return $virtualAccountService->getAccountsForBudget($this);
+    }
+
+    /**
+     * Get all accounts (virtual and legacy) for this budget.
+     */
+    public function getAllAccounts(): \Illuminate\Support\Collection
+    {
+        $virtualAccounts = $this->virtual_accounts;
+        $legacyAccounts = $this->accounts->map(function ($account) {
+            return [
+                'id' => $account->id,
+                'airtable_id' => null,
+                'budget_id' => $account->budget_id,
+                'name' => $account->name,
+                'type' => $account->type,
+                'current_balance_cents' => $account->current_balance_cents,
+                'balance_updated_at' => $account->balance_updated_at,
+                'include_in_budget' => $account->include_in_budget,
+                'is_legacy' => true,
+            ];
+        });
+
+        return $virtualAccounts->concat($legacyAccounts);
+    }
+
+    /**
+     * Get active virtual accounts for this budget.
+     */
+    public function getActiveAccountsAttribute(): \Illuminate\Support\Collection
+    {
+        return $this->virtual_accounts->where('is_active', true)
+                                     ->where('include_in_budget', true);
     }
 
     /**

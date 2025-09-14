@@ -7,6 +7,8 @@ use App\Models\Account;
 use App\Models\Transaction;
 use App\Services\ProjectionService;
 use App\Services\RecurringTransactionService;
+use App\Services\VirtualAccountService;
+use App\Services\HybridAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -51,44 +53,39 @@ class BudgetController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, VirtualAccountService $virtualAccountService): RedirectResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'account_name' => 'required|string|max:255',
-            'account_type' => 'required|string|in:checking,savings,credit,investment,other',
-            'starting_balance' => 'required|numeric',
         ]);
 
-        // Create the budget with proper type
+        // Create the budget
         /** @var Budget $budget */
         $budget = Auth::user()->budgets()->create([
             'name' => $validated['name'],
             'description' => $validated['description'],
+            'airtable_base_id' => config('services.airtable.base_id'), // Link to current Airtable base
         ]);
 
-        // Create the initial account with proper type
-        /** @var Account $account */
-        $account = $budget->accounts()->create([
-            'name' => $validated['account_name'],
-            'type' => $validated['account_type'],
-            'current_balance_cents' => $validated['starting_balance'] * 100,
-            'balance_updated_at' => now(),
-            'include_in_budget' => true,
-        ]);
-
-        // Set this account as the starting balance account for the budget
-        $budget->update(['starting_balance_account_id' => $account->id]);
+        // Check if we have virtual accounts available
+        $virtualAccounts = $virtualAccountService->getAccountsForBudget($budget);
+        
+        $message = 'Budget created successfully!';
+        if ($virtualAccounts->isEmpty()) {
+            $message .= ' Once Fintable syncs your accounts to Airtable, they will automatically appear here.';
+        } else {
+            $message .= ' Found ' . $virtualAccounts->count() . ' account(s) from your connected financial institutions.';
+        }
 
         return redirect()->route('budgets.show', $budget)
-            ->with('message', 'Budget created successfully');
+            ->with('message', $message);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Budget $budget, Request $request): Response
+    public function show(Budget $budget, Request $request, HybridAccountService $hybridAccountService): Response
     {
         // TODO: Add authorization check for budget access
         // Load relationships including plaidAccount with account
@@ -97,12 +94,38 @@ class BudgetController extends Controller
             'accounts.plaidAccount'
         ]);
 
-        // Get the selected account (or first account if none selected)
-        $account = $budget->accounts()
-            ->when(
-                $request->filled('account_id'),
-                fn($query) => $query->where('id', $request->input('account_id')),
-            )->first();
+        // Get accounts from hybrid service (synchronized with Airtable)
+        $accounts = $hybridAccountService->getAccountsForBudget($budget);
+        $groupedAccounts = $hybridAccountService->getGroupedAccountsForBudget($budget, auth()->id());
+        
+        // Get the selected account
+        $account = null;
+        if ($request->filled('account_id')) {
+            $accountId = $request->input('account_id');
+            $account = $hybridAccountService->getAccount($budget, $accountId);
+        }
+        
+        // Default to first account if none selected
+        if (!$account && $accounts->isNotEmpty()) {
+            $account = $accounts->first();
+        }
+        
+        // If still no account, create a placeholder or handle gracefully
+        if (!$account) {
+            return Inertia::render('Budgets/Show', [
+                'budget' => $budget,
+                'totalBalance' => 0,
+                'accounts' => collect([]),
+                'groupedAccounts' => collect([]),
+                'transactions' => collect([]),
+                'projectedTransactions' => collect([]),
+                'projectionParams' => ['months' => 1],
+                'categories' => collect([]),
+                'filters' => [],
+                'selectedAccount' => null,
+                'message' => 'No accounts found. Please ensure your accounts are synced from Airtable.',
+            ]);
+        }
 
         // Get query parameters for filtering
         $search = $request->input('search');
@@ -325,7 +348,8 @@ class BudgetController extends Controller
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
             'totalBalance' => $totalBalance,
-            'accounts' => $budget->accounts,
+            'accounts' => $accounts, // Hybrid accounts (synchronized with Airtable)
+            'groupedAccounts' => $groupedAccounts, // Accounts organized by category hierarchy
             'transactions' => $accountTransactions,
             'projectedTransactions' => $projectedTransactions,
             'projectionParams' => [
@@ -340,6 +364,7 @@ class BudgetController extends Controller
                 'timeframe' => $timeframe,
                 'account_id' => $request->input('account_id'),
             ],
+            'selectedAccount' => $account,
         ]);
     }
 
@@ -429,22 +454,35 @@ class BudgetController extends Controller
         $months = $validated['months'] ?? 6;
         $endDate = $startDate->copy()->addMonths($months);
 
-        // Get all accounts for this budget
-        $accounts = $budget->accounts;
+        // Get virtual accounts from Airtable for projections
+        $virtualAccountService = app(VirtualAccountService::class);
+        $virtualAccounts = $virtualAccountService->getAccountsForBudget($budget);
+        
         $projections = collect();
 
         // Get the RecurringTransactionService
         $recurringTransactionService = app(RecurringTransactionService::class);
 
-        // Project transactions for each account
-        foreach ($accounts as $account) {
-            $accountProjections = $recurringTransactionService->projectTransactions(
-                $account,
-                $startDate,
-                $endDate
-            );
+        // Project transactions for each virtual account
+        foreach ($virtualAccounts as $virtualAccount) {
+            // For projections, we use the airtable_account_id to find existing transaction patterns
+            $existingTransactions = Transaction::where('airtable_account_id', $virtualAccount['airtable_id'])
+                ->where('budget_id', $budget->id)
+                ->get();
+                
+            // Project based on existing transaction patterns
+            if ($existingTransactions->isNotEmpty()) {
+                // Use the existing projection logic but adapted for virtual accounts
+                // This is a simplified version - you might want to enhance this
+                $accountProjections = $recurringTransactionService->projectTransactionsForVirtualAccount(
+                    $virtualAccount,
+                    $existingTransactions,
+                    $startDate,
+                    $endDate
+                );
 
-            $projections = $projections->merge($accountProjections);
+                $projections = $projections->merge($accountProjections);
+            }
         }
 
         return Inertia::render('Budgets/Projections', [

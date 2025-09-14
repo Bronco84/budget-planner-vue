@@ -142,6 +142,13 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+require __DIR__.'/airtable.php';
+
+// User Preferences Routes
+Route::middleware('auth')->prefix('preferences')->group(function () {
+    Route::post('/account-groups/order', [\App\Http\Controllers\UserPreferenceController::class, 'saveGroupOrder'])->name('preferences.group-order');
+    Route::post('/account-groups/toggle-collapsed', [\App\Http\Controllers\UserPreferenceController::class, 'toggleGroupCollapsed'])->name('preferences.toggle-collapsed');
+});
 
 // Add the debug route at the end of the file
 Route::get('/debug/rules', function () {

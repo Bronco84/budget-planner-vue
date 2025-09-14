@@ -347,4 +347,109 @@ class RecurringTransactionService
                 return false;
         }
     }
+
+    /**
+     * Project transactions for a virtual account based on existing transaction patterns
+     * This is used when we don't have a local Account model but have virtual account data
+     */
+    public function projectTransactionsForVirtualAccount(array $virtualAccount, Collection $existingTransactions, Carbon $startDate, Carbon $endDate): Collection
+    {
+        $projectedTransactions = collect();
+
+        // For now, this is a simplified implementation
+        // You could enhance this to create projections based on transaction patterns
+        // without requiring RecurringTransactionTemplates
+
+        // Example: Find recurring patterns in existing transactions
+        $monthlyPatterns = $this->findMonthlyPatterns($existingTransactions);
+        
+        foreach ($monthlyPatterns as $pattern) {
+            $projected = $this->projectFromPattern($pattern, $virtualAccount, $startDate, $endDate);
+            $projectedTransactions = $projectedTransactions->merge($projected);
+        }
+
+        return $projectedTransactions;
+    }
+
+    /**
+     * Find monthly recurring patterns in existing transactions
+     */
+    protected function findMonthlyPatterns(Collection $transactions): Collection
+    {
+        // Group transactions by description and amount to find patterns
+        $patterns = $transactions
+            ->filter(function ($transaction) {
+                // Only consider transactions from the last 6 months for pattern detection
+                return $transaction->date >= now()->subMonths(6);
+            })
+            ->groupBy(function ($transaction) {
+                // Group by description and rounded amount
+                $amount = round($transaction->amount_in_cents / 100, 0);
+                return md5($transaction->description . '_' . $amount);
+            })
+            ->filter(function ($group) {
+                // Only consider groups with at least 2 occurrences
+                return $group->count() >= 2;
+            })
+            ->map(function ($group) {
+                $first = $group->first();
+                $dates = $group->pluck('date')->sort()->values();
+                
+                // Calculate average interval between occurrences
+                $intervals = [];
+                for ($i = 1; $i < $dates->count(); $i++) {
+                    $intervals[] = $dates[$i]->diffInDays($dates[$i - 1]);
+                }
+                
+                $avgInterval = empty($intervals) ? 30 : round(array_sum($intervals) / count($intervals));
+                
+                return [
+                    'description' => $first->description,
+                    'category' => $first->category,
+                    'amount_in_cents' => $first->amount_in_cents,
+                    'interval_days' => $avgInterval,
+                    'last_occurrence' => $dates->last(),
+                    'occurrences' => $group->count(),
+                ];
+            });
+
+        return $patterns;
+    }
+
+    /**
+     * Project future transactions from a detected pattern
+     */
+    protected function projectFromPattern(array $pattern, array $virtualAccount, Carbon $startDate, Carbon $endDate): Collection
+    {
+        $projections = collect();
+        
+        // Start from the next expected occurrence
+        $nextDate = Carbon::parse($pattern['last_occurrence'])->addDays($pattern['interval_days']);
+        
+        // Only project if the pattern seems reliable (monthly-ish transactions)
+        if ($pattern['interval_days'] < 20 || $pattern['interval_days'] > 40) {
+            return $projections; // Skip non-monthly patterns for now
+        }
+        
+        while ($nextDate <= $endDate) {
+            if ($nextDate >= $startDate) {
+                $projections->push([
+                    'description' => $pattern['description'] . ' (Projected)',
+                    'category' => $pattern['category'],
+                    'amount_in_cents' => $pattern['amount_in_cents'],
+                    'date' => $nextDate->toDateString(),
+                    'is_projected' => true,
+                    'is_recurring' => true,
+                    'projection_confidence' => min(90, $pattern['occurrences'] * 15), // Confidence based on history
+                    'account_name' => $virtualAccount['name'],
+                    'account_id' => null, // Virtual account, no local ID
+                    'airtable_account_id' => $virtualAccount['airtable_id'],
+                ]);
+            }
+            
+            $nextDate->addDays($pattern['interval_days']);
+        }
+        
+        return $projections;
+    }
 }

@@ -22,16 +22,21 @@ class Transaction extends Model
      */
     protected $fillable = [
         'budget_id',
-        'account_id',
+        'account_id', // Now nullable - legacy field for compatibility
         'description',
         'category',
         'amount_in_cents',
         'date',
         'plaid_transaction_id',
+        'airtable_transaction_id',
+        'airtable_account_id', 
         'is_plaid_imported',
+        'is_airtable_imported',
         'is_reconciled',
         'recurring_transaction_template_id',
         'notes',
+        'computed_account_name',
+        'airtable_metadata',
     ];
 
     /**
@@ -43,7 +48,9 @@ class Transaction extends Model
         'amount_in_cents' => 'integer',
         'date' => 'date:Y-m-d',
         'is_plaid_imported' => 'boolean',
+        'is_airtable_imported' => 'boolean',
         'is_reconciled' => 'boolean',
+        'airtable_metadata' => 'array',
     ];
 
     /**
@@ -55,11 +62,71 @@ class Transaction extends Model
     }
 
     /**
-     * Get the account that the transaction belongs to.
+     * Get the account that the transaction belongs to (legacy relationship).
      */
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /**
+     * Get the virtual account data from Airtable for this transaction.
+     */
+    public function getVirtualAccountAttribute(): ?array
+    {
+        if (!$this->airtable_account_id) {
+            return null;
+        }
+
+        $virtualAccountService = app(\App\Services\VirtualAccountService::class);
+        return $virtualAccountService->getAccount($this->budget, $this->airtable_account_id);
+    }
+
+    /**
+     * Get the account name (computed or from virtual account).
+     */
+    public function getAccountNameAttribute(): string
+    {
+        // First try computed account name (cached)
+        if ($this->computed_account_name) {
+            return $this->computed_account_name;
+        }
+
+        // Then try virtual account
+        if ($virtualAccount = $this->virtual_account) {
+            return $virtualAccount['name'];
+        }
+
+        // Finally fall back to legacy account relationship
+        if ($this->account) {
+            return $this->account->name;
+        }
+
+        return 'Unknown Account';
+    }
+
+    /**
+     * Scope to get transactions for a specific Airtable account.
+     */
+    public function scopeForAirtableAccount($query, string $airtableAccountId)
+    {
+        return $query->where('airtable_account_id', $airtableAccountId);
+    }
+
+    /**
+     * Scope to get transactions that are forecast/projected.
+     */
+    public function scopeForecast($query)
+    {
+        return $query->where('date', '>', now());
+    }
+
+    /**
+     * Scope to get actual (non-forecast) transactions.
+     */
+    public function scopeActual($query)
+    {
+        return $query->where('date', '<=', now());
     }
 
     /**

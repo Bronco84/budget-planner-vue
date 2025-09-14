@@ -11,7 +11,7 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
               <div class="p-4">
                   <div class="flex items-center justify-between mb-2">
-                  <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
+                  <h2 class="font-semibold text-xl text-gray-800 leading-tight" data-testid="budget-title">{{ budget.name }}</h2>
                   <Link
                       :href="route('budgets.edit', budget.id)"
                       class="flex items-center text-sm"
@@ -78,20 +78,89 @@
               </div>
             </div>
 
-            <!-- Accounts Card -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-              <div class="p-4">
-                <div class="flex justify-between items-center mb-3">
-                  <h3 class="text-lg font-medium text-gray-900">Accounts</h3>
-                  <Link
-                    :href="route('budgets.accounts.create', budget.id)"
-                    class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
+            <!-- Clean Accounts Sidebar -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div class="p-6">
+                <!-- Simple Account Groups -->
+                <div class="space-y-4 text-sm" v-if="groupedAccounts && Object.keys(groupedAccounts).length > 0">
+                  <Draggable
+                    v-model="reorderableGroups"
+                    group="account-groups"
+                    item-key="id"
+                    @end="onGroupReorder"
+                    handle=".drag-handle"
+                    class="space-y-4"
                   >
-                    Add
-                  </Link>
+                    <template #item="{ element: group }">
+                      <div :key="group.id" class="border border-gray-200 rounded-lg overflow-hidden">
+                        <!-- Simple Group Header -->
+                        <div 
+                          class="px-2 py-3 cursor-pointer select-none flex items-center justify-between"
+                          :class="getSimpleHeaderClass(group.group_type)"
+                          @click="toggleGroup(group.name)"
+                        >
+                          <div class="flex items-center space-x-3">
+                            <div class="drag-handle cursor-move text-gray-400 hover:text-gray-600">
+                              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <div class="font-medium text-gray-900">{{ group.name }}</div>
+                              <p class="text-sm text-gray-500">{{ group.account_count }} {{ group.account_count === 1 ? 'account' : 'accounts' }}</p>
+                            </div>
+                          </div>
+                          <div class="flex items-center space-x-3">
+                            <div class="text-sm" :class="getSimpleBalanceColor(group.total_balance, group.group_type)">
+                              {{ formatCurrency(group.total_balance) }}
+                            </div>
+                            <div class="transition-transform duration-200" :class="group.collapsed ? 'transform rotate-180' : ''">
+                              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Simple Account List -->
+                        <Transition
+                          enter-active-class="transition-all duration-200 ease-out"
+                          enter-from-class="max-h-0 opacity-0"
+                          enter-to-class="max-h-96 opacity-100"
+                          leave-active-class="transition-all duration-200 ease-in"
+                          leave-from-class="max-h-96 opacity-100"
+                          leave-to-class="max-h-0 opacity-0"
+                        >
+                          <div v-show="!group.collapsed" class="bg-white border-t border-gray-200">
+                            <div
+                              v-for="account in group.accounts"
+                              :key="account.id"
+                              class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              @click="selectAccount(account.id)"
+                              :class="selectedAccount && selectedAccount.id === account.id ? 'bg-blue-50 border-blue-200' : ''"
+                            >
+                              <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                  <div class="flex justify-between space-x-2">
+                                    <div class="text-sm text-gray-900 line-clamp-1">{{ account.name }}</div>
+                                    <div>{{ formatCurrency(account.current_balance_cents) }}</div>
+                                  </div>
+                                  <div class="text-xs text-gray-500 capitalize">{{ account.type }}</div>
+                                </div>
+                                <div class="text-sm" :class="getSimpleBalanceColor(account.current_balance_cents, group.group_type)">
+                                  
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </Transition>
+                      </div>
+                    </template>
+                  </Draggable>
                 </div>
 
-                <div class="space-y-3" v-if="accounts.length > 0">
+                <!-- Fallback for flat accounts (if grouped accounts not available) -->
+                <div class="space-y-3" v-else-if="accounts && accounts.length > 0">
                   <div
                     v-for="account in accounts"
                     :key="account.id"
@@ -102,63 +171,22 @@
                       <div>
                         <div class="font-medium text-gray-900">{{ account.name }}</div>
                         <div class="text-xs text-gray-500 capitalize mt-1">{{ account.type }}</div>
-                        <div v-if="account.plaid_account" class="text-xs text-blue-600 mt-1 flex items-center">
-                          <span class="w-2 h-2 rounded-full mr-2"
-                                :class="getLastSyncClass(account.plaid_account)"></span>
-                            <div class="whitespace-nowrap">
-                                {{ account.plaid_account.last_sync_at ? `Last synced ${formatTimeAgo(account.plaid_account.last_sync_at)}` : 'Not synced yet' }}
-                            </div>
-                        </div>
                       </div>
                       <div class="text-sm font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
                         {{ formatCurrency(account.current_balance_cents) }}
                       </div>
                     </div>
-                    <div class="flex items-center justify-between mt-2">
-                      <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                        :class="account.status_classes">
-                        {{ account.status_label }}
-                      </span>
-                      <div class="flex space-x-2">
-                        <Link
-                          v-if="account.plaid_account"
-                          :href="route('plaid.link', [budget.id, account.id])"
-                          class="text-xs text-blue-600 hover:text-blue-900"
-                        >
-                          Bank Sync
-                        </Link>
-                        <Link
-                          v-if="!account.plaid_account"
-                          :href="route('plaid.link', [budget.id, account.id])"
-                          class="text-xs text-blue-600 hover:text-blue-900"
-                        >
-                          Connect to Bank
-                        </Link>
-                        <Link
-                          :href="route('budget.account.projections', [budget.id, account.id])"
-                          class="text-xs text-green-600 hover:text-green-900"
-                        >
-                          Projections
-                        </Link>
-                        <Link
-                          :href="route('budget.account.balance-projection', [budget.id, account.id])"
-                          class="text-xs text-purple-600 hover:text-purple-900"
-                        >
-                          Balance Chart
-                        </Link>
-                        <Link
-                          :href="route('budgets.accounts.edit', [budget.id, account.id])"
-                          class="text-xs text-indigo-600 hover:text-indigo-900"
-                        >
-                          Edit
-                        </Link>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                <div v-else class="bg-gray-50 p-3 text-center rounded-lg">
-                  <p class="text-sm text-gray-500">No accounts found.</p>
+                <div v-else class="text-center py-8">
+                  <p class="text-gray-500 mb-4">No accounts found.</p>
+                  <Link
+                    :href="route('budgets.accounts.create', budget.id)"
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Add Account
+                  </Link>
                 </div>
               </div>
             </div>
@@ -296,7 +324,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                       <!-- Variable to track if we've shown the today marker -->
-                      <template v-for="(transaction, index) in props.transactions.data" :key="transaction.id || ('proj-' + index)">
+                      <template v-for="(transaction, index) in (props.transactions.data || [])" :key="transaction.id || ('proj-' + index)">
                         <!-- Today marker -->
                         <tr v-if="shouldShowTodayMarker(transaction, index)" class="bg-gray-100">
                           <td colspan="7" class="px-6 py-2 text-center text-gray-500">
@@ -387,10 +415,10 @@
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="transactions.data.length > 0" class="mt-4 flex items-center justify-between">
+                <div v-if="transactions?.data && transactions.data.length > 0" class="mt-4 flex items-center justify-between">
                   <div class="flex-1 flex justify-between sm:hidden">
                     <Link
-                      v-if="transactions.prev_page_url"
+                      v-if="transactions?.prev_page_url"
                       :href="transactions.prev_page_url"
                       preserve-scroll
                       class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -402,7 +430,7 @@
                     </span>
 
                     <Link
-                      v-if="transactions.next_page_url"
+                      v-if="transactions?.next_page_url"
                       :href="transactions.next_page_url"
                       preserve-scroll
                       class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
@@ -417,18 +445,18 @@
                     <div>
                       <p class="text-sm text-gray-700">
                         Showing
-                        <span class="font-medium">{{ transactions.from }}</span>
+                        <span class="font-medium">{{ transactions?.from || 0 }}</span>
                         to
-                        <span class="font-medium">{{ transactions.to }}</span>
+                        <span class="font-medium">{{ transactions?.to || 0 }}</span>
                         of
-                        <span class="font-medium">{{ transactions.total }}</span>
+                        <span class="font-medium">{{ transactions?.total || 0 }}</span>
                         results
                       </p>
                     </div>
                     <div>
                       <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                         <Link
-                          v-if="transactions.prev_page_url"
+                          v-if="transactions?.prev_page_url"
                           :href="transactions.prev_page_url"
                           preserve-scroll
                           class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
@@ -448,7 +476,7 @@
                         <!-- Page numbers would go here if needed -->
 
                         <Link
-                          v-if="transactions.next_page_url"
+                          v-if="transactions?.next_page_url"
                           :href="transactions.next_page_url"
                           preserve-scroll
                           class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
@@ -499,16 +527,18 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, watch, computed, ref, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { PencilIcon } from "@heroicons/vue/24/outline/index.js";
+import { PencilIcon, BanknotesIcon, CreditCardIcon, HomeIcon, ChartBarIcon, FolderIcon } from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import { formatCurrency } from '@/utils/format.js';
+import Draggable from 'vuedraggable';
 
 // Define props
 const props = defineProps({
   budget: Object,
   accounts: Array,
+  groupedAccounts: Object,
   totalBalance: Number,
   transactions: Object,
   projectionParams: Object,
@@ -523,12 +553,12 @@ const form = reactive({
   category: props.filters.category || '',
   pending: props.filters.pending || '',
   timeframe: props.filters.timeframe || '',
-  account_id: props.filters.account_id || (props.accounts.length > 0 ? props.accounts[0].id : null)
+  account_id: props.filters.account_id || (props.accounts && props.accounts.length > 0 ? props.accounts[0].id : null)
 });
 
 // Computed property to determine the active account tab
 const activeAccountId = computed(() => {
-  if (!form.account_id && props.accounts.length > 0) {
+  if (!form.account_id && props.accounts && props.accounts.length > 0) {
     form.account_id = props.accounts[0].id;
   }
   // Convert to number for consistent comparison
@@ -543,6 +573,9 @@ const projectionForm = reactive({
 // File attachment state
 const budgetAttachments = ref([]);
 const showFileUploadModal = ref(false);
+
+// Reactive groups for drag and drop
+const reorderableGroups = ref([...Object.values(props.groupedAccounts || {})]);
 
 // Load budget attachments on mount
 onMounted(() => {
@@ -710,7 +743,7 @@ const syncingTransactions = ref(false);
 
 // Check if any accounts have Plaid connections
 const hasPlaidAccounts = computed(() => {
-  return props.accounts.some(account => account.plaid_account !== null);
+  return props.accounts && props.accounts.some(account => account.plaid_account !== null);
 });
 
 // Import transactions from all Plaid-connected accounts
@@ -718,7 +751,7 @@ const importFromBank = () => {
   console.log('Import from bank button clicked');
 
   // Get all accounts with Plaid connections
-  const plaidAccounts = props.accounts.filter(account => account.plaid_account !== null);
+  const plaidAccounts = props.accounts ? props.accounts.filter(account => account.plaid_account !== null) : [];
 
   if (plaidAccounts.length === 0) {
     console.error('No Plaid-connected accounts found');
@@ -801,7 +834,7 @@ const importFromBank = () => {
 
 // Computed property to get connected accounts
 const plaidConnectedAccounts = computed(() => {
-  return props.accounts.filter(account => account.plaid_account !== null);
+  return props.accounts ? props.accounts.filter(account => account.plaid_account !== null) : [];
 });
 
 // Function to get the text about last sync
@@ -900,7 +933,7 @@ const shouldShowTodayMarker = (transaction, index) => {
 
   // Also check if this is the last transaction before today
   if (index > 0) {
-    const prevTransaction = Object.values(props.transactions.data)[index - 1];
+    const prevTransaction = Object.values(props.transactions.data || [])[index - 1];
     if (prevTransaction) {
       const prevDate = new Date(prevTransaction.date);
       prevDate.setHours(0, 0, 0, 0);
@@ -917,14 +950,13 @@ const shouldShowTodayMarker = (transaction, index) => {
 
 // Computed property for sorted transactions
 const sortedTransactions = computed(() => {
-  return props.transactions.data;
   // Reset the today marker flag whenever we recalculate the sorted transactions
   hasShownTodayMarker.value = false;
 
   // Convert transactions data to array if it's an object with numeric keys
-  const actualTransactions = Array.isArray(props.transactions.data)
+  const actualTransactions = Array.isArray(props.transactions?.data)
     ? [...props.transactions.data]
-    : Object.values(props.transactions.data || {});
+    : Object.values(props.transactions?.data || {});
 
   // Convert projected transactions to array if needed
   const projectedTransactions = Array.isArray(props.projectedTransactions)
@@ -978,4 +1010,78 @@ onMounted(() => {
     form.account_id = props.filters.account_id;
   }
 });
+
+// Neutral Account Group Styling
+const getSimpleHeaderClass = (groupType) => {
+  return 'bg-gray-50'; // All groups use neutral gray background
+};
+
+const getSimpleBalanceColor = (balance, groupType) => {
+  return balance >= 0 ? 'text-gray-900' : 'text-red-600'; // Neutral for positive, red for negative
+};
+
+// Updated the template to use the existing selectAccount function
+
+const viewProjections = (account) => {
+  router.visit(route('budget.account.projections', [props.budget.id, account.id]));
+};
+
+const viewBalanceChart = (account) => {
+  router.visit(route('budget.account.balance-projection', [props.budget.id, account.id]));
+};
+
+const editAccount = (account) => {
+  router.visit(route('budgets.accounts.edit', [props.budget.id, account.id]));
+};
+
+// Group management methods
+const toggleGroup = async (groupName) => {
+  try {
+    const response = await fetch(route('preferences.toggle-collapsed'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+      },
+      body: JSON.stringify({ group_name: groupName }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      // Update local state
+      const group = reorderableGroups.value.find(g => g.name === groupName);
+      if (group) {
+        group.collapsed = data.collapsed;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to toggle group:', error);
+  }
+};
+
+const onGroupReorder = async (event) => {
+  const groupOrder = reorderableGroups.value.map(group => group.id);
+  
+  try {
+    await fetch(route('preferences.group-order'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+      },
+      body: JSON.stringify({ group_order: groupOrder }),
+    });
+  } catch (error) {
+    console.error('Failed to save group order:', error);
+  }
+};
+
+// Watch for changes in grouped accounts prop
+watch(() => props.groupedAccounts, (newGroups) => {
+  if (newGroups) {
+    reorderableGroups.value = [...Object.values(newGroups)];
+  }
+}, { immediate: true });
 </script>
+
+

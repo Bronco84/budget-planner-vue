@@ -26,6 +26,9 @@ class Account extends Model
         'current_balance_cents',
         'balance_updated_at',
         'include_in_budget',
+        'airtable_account_id',
+        'airtable_metadata',
+        'last_airtable_sync',
     ];
 
     /**
@@ -37,6 +40,8 @@ class Account extends Model
         'current_balance_cents' => 'integer',
         'balance_updated_at' => 'datetime',
         'include_in_budget' => 'boolean',
+        'airtable_metadata' => 'array',
+        'last_airtable_sync' => 'datetime',
     ];
 
     /**
@@ -75,7 +80,43 @@ class Account extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('include_in_budget', true)->where('is_active', true);
+        return $query->where('include_in_budget', true);
+    }
+
+    /**
+     * Scope to get accounts synchronized with Airtable
+     */
+    public function scopeAirtableSynced($query)
+    {
+        return $query->whereNotNull('airtable_account_id');
+    }
+
+    /**
+     * Scope to get legacy (manually created) accounts
+     */
+    public function scopeLegacy($query)
+    {
+        return $query->whereNull('airtable_account_id');
+    }
+
+    /**
+     * Check if this account is synchronized with Airtable
+     */
+    public function isAirtableSynced(): bool
+    {
+        return !empty($this->airtable_account_id);
+    }
+
+    /**
+     * Check if this account needs a sync update (older than 5 minutes)
+     */
+    public function needsSync(): bool
+    {
+        if (!$this->isAirtableSynced()) {
+            return false;
+        }
+
+        return !$this->last_airtable_sync || $this->last_airtable_sync->isBefore(now()->subMinutes(5));
     }
 
     /**

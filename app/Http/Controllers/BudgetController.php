@@ -7,8 +7,9 @@ use App\Models\Account;
 use App\Models\Transaction;
 use App\Services\ProjectionService;
 use App\Services\RecurringTransactionService;
-use App\Services\VirtualAccountService;
 use App\Services\HybridAccountService;
+use App\Services\VirtualAccountService;
+use App\Services\VirtualTransactionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -85,7 +86,7 @@ class BudgetController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Budget $budget, Request $request, HybridAccountService $hybridAccountService): Response
+    public function show(Budget $budget, Request $request, HybridAccountService $hybridAccountService, VirtualAccountService $virtualAccountService, VirtualTransactionService $virtualTransactionService): Response
     {
         // TODO: Add authorization check for budget access
         // Load relationships including plaidAccount with account
@@ -94,15 +95,16 @@ class BudgetController extends Controller
             'accounts.plaidAccount'
         ]);
 
-        // Get accounts from hybrid service (synchronized with Airtable)
-        $accounts = $hybridAccountService->getAccountsForBudget($budget);
-        $groupedAccounts = $hybridAccountService->getGroupedAccountsForBudget($budget, auth()->id());
+        // Get virtual accounts directly (not stored locally, fetched from Airtable)
+        $accounts = $virtualAccountService->getAccountsForBudget($budget);
+        $groupedAccounts = $virtualAccountService->getGroupedAccountsForBudget($budget, auth()->id());
         
         // Get the selected account
         $account = null;
         if ($request->filled('account_id')) {
             $accountId = $request->input('account_id');
-            $account = $hybridAccountService->getAccount($budget, $accountId);
+            // Find account by generated ID
+            $account = $accounts->firstWhere('id', (int)$accountId);
         }
         
         // Default to first account if none selected
@@ -189,13 +191,13 @@ class BudgetController extends Controller
 
         $endDate = now()->addMonths($monthsToProject)->endOfMonth();
 
-        // Get actual transactions including pending ones
-        $query = $account->transactions()
+        // Get actual transactions including pending ones - filter by budget and account
+        $query = $budget->transactions()
             ->select(
                 'transactions.*',
                 'plaid_transactions.pending as pending',
             )
-            ->selectRaw('transactions.date > CURDATE() as is_projected')
+            ->selectRaw('transactions.date > ? as is_projected', [now()->toDateString()])
             ->selectRaw('false as is_recurring')
             ->with(['account', 'plaidTransaction'])
             ->leftJoin('plaid_transactions', 'transactions.plaid_transaction_id', '=', 'plaid_transactions.plaid_transaction_id')
@@ -209,13 +211,19 @@ class BudgetController extends Controller
                     });
             })
             // Remove any transaction that doesn't have a plaid ID if trx date is in the past
-            // We make the assumption that the plaid feed is the source of truth for transactions in the past
+            // EXCEPT for Airtable imported transactions which are allowed without plaid IDs
             ->where(function($query) {
                 $query->where(function($q) {
+                    // Future transactions without plaid ID (projected/manual)
                     $q->where('transactions.date', '>', now())->whereNull('transactions.plaid_transaction_id');
                 });
                 $query->orWhere(function($q) {
+                    // Past transactions with plaid ID (imported from Plaid)
                     $q->where('transactions.date', '<=', now())->whereNotNull('transactions.plaid_transaction_id');
+                });
+                $query->orWhere(function($q) {
+                    // Airtable imported transactions (allowed regardless of plaid ID)
+                    $q->where('is_airtable_imported', true);
                 });
             })
             ->when($request->filled('type'), function($query, $type) {
@@ -247,16 +255,93 @@ class BudgetController extends Controller
                     ->orWhere('notes', 'like', "%{$request->input('search')}%");
             });
 
-        // Get actual transactions
-        $actualTransactions = $query->get();
+        // Get transactions - use hybrid approach for Airtable accounts, database for legacy
+        if (isset($account['airtable_id'])) {
+            // Use combined historical (Airtable) + projected (local) transactions
+            $allTransactions = $virtualTransactionService->getCombinedTransactionsForAccount(
+                $budget,
+                $account['airtable_id'],
+                $startDate,
+                $endDate,
+                $monthsToProject
+            );
+            
+            // Apply search filter
+            if ($request->filled('search')) {
+                $search = strtolower($request->input('search'));
+                $allTransactions = $allTransactions->filter(function ($transaction) use ($search) {
+                    return str_contains(strtolower($transaction['description']), $search) ||
+                           str_contains(strtolower($transaction['category']), $search);
+                });
+            }
+            
+            // Apply type filter
+            if ($request->filled('type')) {
+                $type = $request->input('type');
+                $allTransactions = $allTransactions->filter(function ($transaction) use ($type) {
+                    if ($type === 'income') {
+                        return $transaction['amount_in_cents'] > 0;
+                    } elseif ($type === 'expense') {
+                        return $transaction['amount_in_cents'] < 0;
+                    }
+                    return true;
+                });
+            }
+            
+            // Convert to object-like structure for compatibility and add account info
+            $actualTransactions = $allTransactions->map(function ($transaction) use ($account) {
+                $transactionObj = (object) $transaction;
+                
+                // For virtual transactions, create a mock account object for frontend compatibility
+                if (!isset($transactionObj->account) && isset($account['name'])) {
+                    $transactionObj->account = (object) [
+                        'name' => $account['name'],
+                        'id' => $account['id'] ?? null,
+                        'airtable_id' => $account['airtable_id'] ?? null,
+                    ];
+                }
+                
+                return $transactionObj;
+            });
+            
+            // No separate projected transactions needed since they're already included
+            $projectedTransactions = collect();
+            
+        } else {
+            // Fallback to database query for legacy accounts
+            $query->where('account_id', $account['id']);
+            $actualTransactions = $query->get();
+        }
 
-        // Get projected transactions
-        $recurringService = app(RecurringTransactionService::class);
-        $projectedTransactions = collect($recurringService->projectTransactions(
-            $account,
-            now()->addDay(),
-            now()->addMonths($monthsToProject)->endOfMonth()
-        ))
+        // Get projected transactions for accounts with recurring templates
+        $projectedTransactions = collect();
+        
+        // For accounts that have local Account models (both legacy and hybrid), generate projections
+        if (isset($account['airtable_id'])) {
+            // Hybrid account: find the corresponding local Account model
+            $localAccount = \App\Models\Account::where('budget_id', $budget->id)
+                ->where('airtable_account_id', $account['airtable_id'])
+                ->first();
+                
+            if ($localAccount && $localAccount->recurringTransactionTemplates()->exists()) {
+                $recurringService = app(RecurringTransactionService::class);
+                $projectedTransactions = collect($recurringService->projectTransactions(
+                    $localAccount,
+                    now()->addDay(),
+                    now()->addMonths($monthsToProject)->endOfMonth()
+                ));
+            }
+        } elseif ($account instanceof \App\Models\Account) {
+            // Legacy account: get projections directly
+            $recurringService = app(RecurringTransactionService::class);
+            $projectedTransactions = collect($recurringService->projectTransactions(
+                $account,
+                now()->addDay(),
+                now()->addMonths($monthsToProject)->endOfMonth()
+            ));
+        }
+        
+        $projectedTransactions = $projectedTransactions
             ->map(function ($transaction) use ($budget) {
                 $model = new Transaction($transaction);
                 $model->account = $transaction['account'] ?? null;
@@ -271,56 +356,87 @@ class BudgetController extends Controller
                 return $model;
             });
 
-        // Merge and sort all transactions
-        $allTransactions = $actualTransactions->concat($projectedTransactions)->sortBy('date')
-            ->values();
-
-        // Split transactions into actual, pending, and projected for this account
-        $accountTransactions = $allTransactions->where('account_id', $account->id);
-
-        // Get actual (non-pending) transactions
-        $actualTransactions = $allTransactions
-            ->where('is_projected', false)
-            ->filter(function($transaction) {
+        // For virtual accounts, transactions are already filtered and processed
+        if (isset($account['airtable_id'])) {
+            // Combine actual transactions with projected transactions
+            $allTransactions = $actualTransactions->concat($projectedTransactions)->sortBy('date')->values();
+            
+            // Split into categories
+            $historicalTransactions = $allTransactions->where('is_airtable_imported', true);
+            // Keep the projected transactions we generated (don't overwrite)
+            $pendingTransactions = collect(); // No pending for virtual accounts
+            
+        } else {
+            // Legacy account processing
+            $allTransactions = $actualTransactions->concat($projectedTransactions)->sortBy('date')->values();
+            
+            // Filter by account_id for legacy accounts
+            $accountTransactions = $allTransactions->filter(function($transaction) use ($account) {
+                return $transaction->account_id === $account['id'];
+            });
+            
+            $historicalTransactions = $accountTransactions->where('is_projected', false)->filter(function($transaction) {
                 return !$transaction->pending;
             });
-
-        // Get pending transactions
-        $pendingTransactions = $accountTransactions
-            ->where('is_projected', false)
-            ->filter(function($transaction) {
+            
+            $pendingTransactions = $accountTransactions->where('is_projected', false)->filter(function($transaction) {
                 return $transaction->pending;
             });
-
-        // Get projected transactions
-        $projectedTransactions = $accountTransactions
-            ->where('is_projected', true);
-
-        $runningBalance = $account->current_balance_cents;
-
-        // Process actual transactions in reverse chronological order
-        foreach ($actualTransactions->reverse() as $transaction) {
-            $transaction->running_balance = $runningBalance;
-            $runningBalance = $runningBalance - $transaction->amount_in_cents;
+            
+            $projectedTransactions = $accountTransactions->where('is_projected', true);
         }
 
-        // Reset balance to current for pending and projected transactions
-        $runningBalance = $account->current_balance_cents;
+        // Calculate running balances using the correct logic:
+        // - Current balance represents "today's balance"
+        // - Historical transactions go backwards from today
+        // - Future transactions go forwards from today
+        
+        $todayBalance = $account['current_balance_cents'] ?? 0;
 
-        // Process pending transactions in chronological order
-        foreach ($pendingTransactions as $transaction) {
+        // Separate transactions by time relative to today
+        $today = now()->startOfDay();
+        $historicalTransactions = $allTransactions->filter(function($transaction) use ($today) {
+            return \Carbon\Carbon::parse($transaction->date)->lt($today);
+        })->sortByDesc('date'); // Most recent first for backward calculation
+
+        $todayTransactions = $allTransactions->filter(function($transaction) use ($today) {
+            return \Carbon\Carbon::parse($transaction->date)->isSameDay($today);
+        })->sortBy('date'); // Chronological for forward calculation
+
+        $futureTransactions = $allTransactions->filter(function($transaction) use ($today) {
+            return \Carbon\Carbon::parse($transaction->date)->gt($today);
+        })->sortBy('date'); // Chronological for forward calculation
+
+        // 1. Calculate historical balances (going backwards from today)
+        $runningBalance = $todayBalance;
+        foreach ($historicalTransactions as $transaction) {
+            // For historical transactions, show the balance AFTER the transaction was applied
+            $transaction->running_balance = $runningBalance;
+            $runningBalance -= $transaction->amount_in_cents;
+        }
+
+        // 2. Calculate today's transactions (going forward from start of day)
+        // Note: todayBalance represents the balance at start of day, so we add transactions as they occur
+        $runningBalance = $todayBalance;
+        foreach ($todayTransactions as $transaction) {
             $runningBalance += $transaction->amount_in_cents;
             $transaction->running_balance = $runningBalance;
         }
 
-        // Process projected transactions in chronological order
-        foreach ($projectedTransactions as $transaction) {
+        // 3. Calculate future transactions (going forward from today's end balance)
+        $runningBalance = $todayBalance;
+        // Add any today transactions to get end-of-day balance
+        foreach ($todayTransactions as $transaction) {
+            $runningBalance += $transaction->amount_in_cents;
+        }
+        
+        foreach ($futureTransactions as $transaction) {
             $runningBalance += $transaction->amount_in_cents;
             $transaction->running_balance = $runningBalance;
         }
 
         // Sort all transactions by date descending for display
-        $allTransactions = $allTransactions->reverse()->values();
+        $allTransactions = $allTransactions->sortByDesc('date')->values();
 
         // Paginate the merged collection
         $perPage = 50;
@@ -342,12 +458,14 @@ class BudgetController extends Controller
             ->orderBy('category')
             ->pluck('category');
 
-        // Get the total balance across all accounts
-        $totalBalance = $budget->accounts->sum('current_balance_cents');
+        // Get the total balance across all virtual accounts
+        $totalBalance = $accounts->sum('current_balance_cents');
+        $totalIncludedBalance = $virtualAccountService->getTotalIncludedBalance($budget, auth()->id());
 
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
             'totalBalance' => $totalBalance,
+            'totalIncludedBalance' => $totalIncludedBalance,
             'accounts' => $accounts, // Hybrid accounts (synchronized with Airtable)
             'groupedAccounts' => $groupedAccounts, // Accounts organized by category hierarchy
             'transactions' => $accountTransactions,

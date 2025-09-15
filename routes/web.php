@@ -148,6 +148,7 @@ require __DIR__.'/airtable.php';
 Route::middleware('auth')->prefix('preferences')->group(function () {
     Route::post('/account-groups/order', [\App\Http\Controllers\UserPreferenceController::class, 'saveGroupOrder'])->name('preferences.group-order');
     Route::post('/account-groups/toggle-collapsed', [\App\Http\Controllers\UserPreferenceController::class, 'toggleGroupCollapsed'])->name('preferences.toggle-collapsed');
+    Route::post('/accounts/toggle-inclusion', [\App\Http\Controllers\UserPreferenceController::class, 'toggleAccountInclusion'])->name('preferences.toggle-account-inclusion');
 });
 
 // Add the debug route at the end of the file

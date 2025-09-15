@@ -24,14 +24,79 @@ class VirtualAccountService
             return collect([]);
         }
 
-        // Cache for 5 minutes to avoid excessive API calls
-        return Cache::remember("budget_{$budget->id}_airtable_accounts", 300, function () use ($budget) {
+        // Cache for 12 hours to align with transaction caching  
+        return Cache::remember("budget_{$budget->id}_airtable_accounts", 43200, function () use ($budget) {
             $airtableAccounts = $this->airtableService->getAccounts();
             
             return $airtableAccounts->map(function ($record) use ($budget) {
                 return $this->transformAirtableRecord($record, $budget);
             })->filter(); // Remove any null results
         });
+    }
+
+    /**
+     * Get account inclusion preferences for a user
+     */
+    public function getAccountInclusionPreferences(int $userId): array
+    {
+        return \App\Models\UserPreference::get($userId, 'account_inclusions', []);
+    }
+
+    /**
+     * Set account inclusion preference
+     */
+    public function setAccountInclusion(int $userId, mixed $accountId, bool $included): void
+    {
+        $inclusions = $this->getAccountInclusionPreferences($userId);
+        // Ensure account ID is always stored as string to avoid type issues with JSON
+        $inclusions[(string)$accountId] = $included;
+        \App\Models\UserPreference::set($userId, 'account_inclusions', $inclusions);
+    }
+
+    /**
+     * Check if an account should be included in total balance calculation
+     */
+    public function isAccountIncluded(int $userId, mixed $accountId, string $groupType = null): bool
+    {
+        $inclusions = $this->getAccountInclusionPreferences($userId);
+        
+        // Ensure account ID is always treated as string for consistent lookups
+        $accountIdStr = (string)$accountId;
+        
+        // If no preference set, use smart defaults based on account type
+        if (!isset($inclusions[$accountIdStr])) {
+            return $this->getDefaultInclusionForAccountType($groupType);
+        }
+        
+        return $inclusions[$accountIdStr];
+    }
+
+    /**
+     * Get default inclusion based on account type
+     */
+    protected function getDefaultInclusionForAccountType(?string $groupType): bool
+    {
+        // By default, include assets (checking, savings) but exclude liabilities (credit cards, loans)
+        return match($groupType) {
+            'banking' => true,      // Banking & Savings accounts
+            'investment' => true,   // Investment accounts
+            'credit' => false,      // Credit Cards - don't include debt in total balance by default
+            'debt' => false,        // Loans & Mortgages - don't include debt in total balance by default
+            default => true
+        };
+    }
+
+    /**
+     * Calculate total included balance across all accounts for a budget
+     */
+    public function getTotalIncludedBalance(Budget $budget, int $userId): int
+    {
+        $accounts = $this->getAccountsForBudget($budget);
+        
+        return $accounts->filter(function ($account) use ($userId) {
+            $groupType = $this->getGroupType($this->getAccountGroup($account));
+            return $this->isAccountIncluded($userId, $account['id'], $groupType);
+        })->sum('current_balance_cents');
     }
 
     /**
@@ -44,12 +109,28 @@ class VirtualAccountService
         $groups = $accounts->groupBy(function ($account) {
             return $this->getAccountGroup($account);
         })->map(function ($groupAccounts, $groupName) use ($userId) {
+            $groupType = $this->getGroupType($groupName);
+            
+            // Add inclusion preference to each account
+            $accountsWithInclusion = $groupAccounts->map(function ($account) use ($userId, $groupType) {
+                $account['included_in_total'] = $userId 
+                    ? $this->isAccountIncluded($userId, $account['id'], $groupType)
+                    : $this->getDefaultInclusionForAccountType($groupType);
+                return $account;
+            });
+            
+            $totalBalance = $accountsWithInclusion->sum('current_balance_cents');
+            $includedBalance = $accountsWithInclusion
+                ->where('included_in_total', true)
+                ->sum('current_balance_cents');
+            
             return [
                 'name' => $groupName,
-                'accounts' => $groupAccounts->sortBy(['type', 'name']),
-                'total_balance' => $groupAccounts->sum('current_balance_cents'),
-                'account_count' => $groupAccounts->count(),
-                'group_type' => $this->getGroupType($groupName),
+                'accounts' => $accountsWithInclusion->sortBy(['type', 'name'])->values()->toArray(),
+                'total_balance' => $totalBalance,
+                'included_balance' => $includedBalance,
+                'account_count' => $accountsWithInclusion->count(),
+                'group_type' => $groupType,
                 'icon' => $this->getGroupIcon($groupName),
                 'id' => \Str::slug($groupName), // For drag/drop identification
                 'collapsed' => $userId ? $this->getGroupCollapsedState($userId, $groupName) : false,

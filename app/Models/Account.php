@@ -71,6 +71,14 @@ class Account extends Model
     }
 
     /**
+     * Get the recurring transaction templates for the account.
+     */
+    public function recurringTransactionTemplates(): HasMany
+    {
+        return $this->hasMany(RecurringTransactionTemplate::class);
+    }
+
+    /**
      * Get the Plaid account information, if this was connected via Plaid.
      */
     public function plaidAccount(): HasOne

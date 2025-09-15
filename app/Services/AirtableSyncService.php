@@ -178,7 +178,8 @@ class AirtableSyncService
      */
     protected function getTransactionDescription(array $fields): string
     {
-        return $fields['description'] ?? 
+        return $fields['*Name'] ?? 
+               $fields['description'] ?? 
                $fields['name'] ?? 
                $fields['merchant_name'] ?? 
                $fields['merchant'] ??
@@ -190,7 +191,8 @@ class AirtableSyncService
      */
     protected function getTransactionCategory(array $fields): string
     {
-        return $fields['category'] ?? 
+        return $fields['*Notes'] ?? 
+               $fields['category'] ?? 
                $fields['primary_category'] ?? 
                $fields['transaction_category'] ??
                'Uncategorized';
@@ -201,7 +203,8 @@ class AirtableSyncService
      */
     protected function getAmountInCents(array $fields): int
     {
-        $amount = $fields['amount'] ?? 
+        $amount = $fields['**USD'] ?? 
+                  $fields['amount'] ?? 
                   $fields['transaction_amount'] ?? 
                   $fields['value'] ?? 0;
 
@@ -214,7 +217,8 @@ class AirtableSyncService
      */
     protected function getTransactionDate(array $fields): Carbon
     {
-        $dateString = $fields['date'] ?? 
+        $dateString = $fields['**Date'] ?? 
+                      $fields['date'] ?? 
                       $fields['transaction_date'] ?? 
                       $fields['created_date'] ?? 
                       now()->toDateString();

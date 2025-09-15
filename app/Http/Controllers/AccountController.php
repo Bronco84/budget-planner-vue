@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Transaction;
+use App\Services\VirtualAccountService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Http\RedirectResponse;
@@ -92,5 +93,24 @@ class AccountController extends Controller
 
         return redirect()->route('budgets.show', $budget)
             ->with('message', 'Account deleted successfully');
+    }
+
+    /**
+     * Show account management page for inclusion settings
+     */
+    public function index(Budget $budget, VirtualAccountService $virtualAccountService)
+    {
+        $groupedAccounts = $virtualAccountService->getGroupedAccountsForBudget($budget, auth()->id());
+        $accounts = $virtualAccountService->getAccountsForBudget($budget);
+        $totalBalance = $accounts->sum('current_balance_cents');
+        $totalIncludedBalance = $virtualAccountService->getTotalIncludedBalance($budget, auth()->id());
+
+        return Inertia::render('Accounts/Index', [
+            'budget' => $budget,
+            'groupedAccounts' => $groupedAccounts,
+            'accounts' => $accounts,
+            'totalBalance' => $totalBalance,
+            'totalIncludedBalance' => $totalIncludedBalance,
+        ]);
     }
 } 

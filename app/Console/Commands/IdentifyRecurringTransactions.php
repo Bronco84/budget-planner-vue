@@ -72,23 +72,44 @@ class IdentifyRecurringTransactions extends Command
 
             $dates = $group->pluck('date')->map(function ($date) {
                 return Carbon::parse($date);
-            })->sort();
+            })->sort()->values(); // Add values() to reset array keys after sorting
 
-            // Determine if it's monthly or weekly based on average interval
+            // Determine frequency based on more intelligent interval analysis
             $intervals = [];
             for ($i = 1; $i < $dates->count(); $i++) {
                 $intervals[] = $dates[$i]->diffInDays($dates[$i-1]);
             }
-            $avgInterval = array_sum($intervals) / count($intervals);
+            $avgInterval = count($intervals) > 0 ? array_sum($intervals) / count($intervals) : 0;
+            
+            // Debug output for interval analysis
+            if ($this->getOutput()->isVerbose()) {
+                $this->line("    Dates: " . $dates->map(fn($d) => $d->format('M j'))->join(', '));
+                $this->line("    Intervals: " . implode(', ', $intervals) . " days");
+                $this->line("    Average: {$avgInterval} days");
+            }
 
+            // Classify frequency based on average interval with better thresholds
             $frequency = 'monthly';
             $dayOfMonth = $dates->first()->day;
             $dayOfWeek = null;
 
-            if ($avgInterval <= 14) {
-                $frequency = $avgInterval <= 8 ? 'weekly' : 'biweekly';
+            if ($avgInterval >= 5 && $avgInterval <= 9) {
+                // Weekly: 7 days ± 2 days tolerance
+                $frequency = 'weekly';
                 $dayOfMonth = null;
                 $dayOfWeek = $dates->first()->dayOfWeek;
+            } elseif ($avgInterval >= 12 && $avgInterval <= 16) {
+                // Biweekly: 14 days ± 2 days tolerance
+                $frequency = 'biweekly';
+                $dayOfMonth = null;
+                $dayOfWeek = $dates->first()->dayOfWeek;
+            } elseif ($avgInterval >= 20 && $avgInterval <= 40) {
+                // Monthly: 20-40 days (accounts for different month lengths)
+                $frequency = 'monthly';
+            } else {
+                // Default to monthly for anything else, but note it's irregular
+                $frequency = 'monthly';
+                $this->warn("  ⚠️  Irregular interval ({$avgInterval} days) - defaulting to monthly");
             }
 
             // Format date pattern for display

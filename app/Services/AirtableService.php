@@ -205,6 +205,34 @@ class AirtableService
     }
 
     /**
+     * Get a single record from any table by ID
+     */
+    public function getRecord(string $tableName, string $recordId): ?array
+    {
+        if (!$this->isConfigured) {
+            throw new \Exception('Airtable service is not properly configured');
+        }
+
+        try {
+            $url = "{$this->baseId}/{$tableName}/{$recordId}";
+            $response = $this->client->get($url);
+
+            if ($response->getStatusCode() === 200) {
+                return json_decode($response->getBody(), true);
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            \Log::error('Failed to get Airtable record', [
+                'table' => $tableName,
+                'record_id' => $recordId,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Get account by ID
      */
     public function getAccount(string $recordId): ?array

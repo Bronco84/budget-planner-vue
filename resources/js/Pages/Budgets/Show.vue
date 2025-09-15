@@ -2,11 +2,11 @@
   <Head :title="budget.name" />
 
   <AuthenticatedLayout>
-    <div class="py-6">
+    <div class="py-6" data-testid="budget-page">
       <div class="max-w-full mx-auto px-6">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <!-- Left sidebar with Budget Overview and Accounts -->
-          <div class="lg:col-span-1">
+          <div class="lg:col-span-1" data-testid="account-sidebar">
             <!-- Budget Overview Card -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
               <div class="p-4">
@@ -22,8 +22,26 @@
                 <div class="space-y-3">
                   <div class="bg-gray-50 p-3 rounded-lg">
                     <div class="text-sm font-medium text-gray-500">Total Balance</div>
-                    <div class="text-xl font-semibold mt-1">{{ formatCurrency(totalBalance) }}</div>
+                    <div class="text-xl font-semibold mt-1" :class="totalIncludedBalance >= 0 ? 'text-gray-900' : 'text-red-600'">
+                      {{ formatCurrency(totalIncludedBalance) }}
+                    </div>
                   </div>
+
+                  <!-- Account Settings Link -->
+                  <Link
+                    :href="route('budgets.accounts.index', budget.id)"
+                    class="block w-full bg-white border border-gray-300 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <div class="text-sm font-medium text-gray-700">Account Settings</div>
+                        <div class="text-xs text-gray-500 mt-1">Manage which accounts are included</div>
+                      </div>
+                      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      </svg>
+                    </div>
+                  </Link>
 
                   <div class="bg-gray-50 p-3 rounded-lg" v-if="budget.description">
                     <div class="text-sm font-medium text-gray-500">Description</div>
@@ -79,10 +97,10 @@
             </div>
 
             <!-- Clean Accounts Sidebar -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div class="p-6">
+            <div>
+              <div class="">
                 <!-- Simple Account Groups -->
-                <div class="space-y-4 text-sm" v-if="groupedAccounts && Object.keys(groupedAccounts).length > 0">
+                <div class="space-y-4 text-sm" v-if="groupedAccounts && Object.keys(groupedAccounts).length > 0" data-testid="account-groups">
                   <Draggable
                     v-model="reorderableGroups"
                     group="account-groups"
@@ -92,12 +110,13 @@
                     class="space-y-4"
                   >
                     <template #item="{ element: group }">
-                      <div :key="group.id" class="border border-gray-200 rounded-lg overflow-hidden">
+                      <div :key="group.id" class="border border-gray-200 rounded-lg overflow-hidden" data-testid="account-group">
                         <!-- Simple Group Header -->
                         <div 
                           class="px-2 py-3 cursor-pointer select-none flex items-center justify-between"
                           :class="getSimpleHeaderClass(group.group_type)"
                           @click="toggleGroup(group.name)"
+                          data-testid="group-header"
                         >
                           <div class="flex items-center space-x-3">
                             <div class="drag-handle cursor-move text-gray-400 hover:text-gray-600">
@@ -138,17 +157,15 @@
                               class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                               @click="selectAccount(account.id)"
                               :class="selectedAccount && selectedAccount.id === account.id ? 'bg-blue-50 border-blue-200' : ''"
+                              data-testid="account-item"
                             >
-                              <div class="flex items-center justify-between">
+                              <div class="flex items-center  text-gray-700 justify-between">
                                 <div class="flex-1">
                                   <div class="flex justify-between space-x-2">
-                                    <div class="text-sm text-gray-900 line-clamp-1">{{ account.name }}</div>
-                                    <div>{{ formatCurrency(account.current_balance_cents) }}</div>
+                                    <div class="text-sm line-clamp-1">{{ account.name }}</div>
+                                    <div data-testid="account-balance">{{ formatCurrency(account.current_balance_cents) }}</div>
                                   </div>
                                   <div class="text-xs text-gray-500 capitalize">{{ account.type }}</div>
-                                </div>
-                                <div class="text-sm" :class="getSimpleBalanceColor(account.current_balance_cents, group.group_type)">
-                                  
                                 </div>
                               </div>
                             </div>
@@ -254,6 +271,7 @@
                         v-model="form.search"
                         class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                         placeholder="Search transactions..."
+                        data-testid="search-input"
                       >
                     </div>
                     <select v-model="form.type" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -284,30 +302,15 @@
                   </div>
                 </form>
 
-                <!-- Account Tabs -->
-                <div class="mb-4 border-b border-gray-200">
-                  <div class="overflow-x-auto overflow-y-hidden">
-                    <nav class="flex -mb-px min-w-full whitespace-nowrap">
-                      <a
-                        v-for="account in accounts"
-                        :key="account.id"
-                        href="#"
-                        @click.prevent="selectAccount(account.id)"
-                        class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm"
-                        :class="[
-                          activeAccountId === parseInt(account.id, 10) ?
-                            'border-indigo-500 text-indigo-600' :
-                            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        ]"
-                      >
-                        {{ account.name }}
-                      </a>
-                    </nav>
-                  </div>
+
+                <!-- Selected Account Header -->
+                <div v-if="selectedAccount" class="mb-4" data-testid="selected-account-header">
+                  <h3 class="text-lg font-medium text-gray-900">{{ selectedAccount.name }}</h3>
+                  <p class="text-sm text-gray-500 capitalize">{{ selectedAccount.type }} • {{ formatCurrency(selectedAccount.current_balance_cents) }}</p>
                 </div>
 
                 <!-- Transactions Table -->
-                <div class="border rounded-lg overflow-x-auto">
+                <div class="border rounded-lg overflow-x-auto" data-testid="transactions-table">
                   <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                       <tr>
@@ -540,6 +543,7 @@ const props = defineProps({
   accounts: Array,
   groupedAccounts: Object,
   totalBalance: Number,
+  totalIncludedBalance: Number,
   transactions: Object,
   projectionParams: Object,
   categories: Array,
@@ -556,14 +560,29 @@ const form = reactive({
   account_id: props.filters.account_id || (props.accounts && props.accounts.length > 0 ? props.accounts[0].id : null)
 });
 
-// Computed property to determine the active account tab
-const activeAccountId = computed(() => {
-  if (!form.account_id && props.accounts && props.accounts.length > 0) {
-    form.account_id = props.accounts[0].id;
+// Computed property to find the selected account
+const selectedAccount = computed(() => {
+  if (!form.account_id) return null;
+  
+  // Look in flat accounts first
+  if (props.accounts && props.accounts.length > 0) {
+    const account = props.accounts.find(acc => acc.id === parseInt(form.account_id));
+    if (account) return account;
   }
-  // Convert to number for consistent comparison
-  return form.account_id ? parseInt(form.account_id, 10) : null;
+  
+  // Look in grouped accounts
+  if (props.groupedAccounts) {
+    for (const group of Object.values(props.groupedAccounts)) {
+      if (group.accounts && Array.isArray(group.accounts)) {
+        const account = group.accounts.find(acc => acc.id === parseInt(form.account_id));
+        if (account) return account;
+      }
+    }
+  }
+  
+  return null;
 });
+
 
 // Form state for projections
 const projectionForm = reactive({
@@ -999,6 +1018,7 @@ const selectAccount = (accountId) => {
     }
   });
 };
+
 
 // Log initial values when mounted
 onMounted(() => {

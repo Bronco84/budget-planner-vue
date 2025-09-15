@@ -10,6 +10,8 @@ Route::middleware(['auth', 'verified'])->prefix('airtable')->name('airtable.')->
     // Budget-specific routes
     Route::prefix('budgets/{budget}')->group(function () {
         Route::get('/summary', [AirtableController::class, 'summary'])->name('summary');
+        Route::get('/cache-status', [AirtableController::class, 'cacheStatus'])->name('cache-status');
+        Route::post('/clear-cache', [AirtableController::class, 'clearCache'])->name('clear-cache');
         
         // Account-specific routes
         Route::prefix('accounts/{account}')->group(function () {

@@ -50,4 +50,30 @@ class UserPreferenceController extends Controller
             'collapsed' => $isCollapsed
         ]);
     }
+
+    /**
+     * Toggle account inclusion in total balance calculation
+     */
+    public function toggleAccountInclusion(Request $request): JsonResponse
+    {
+        $request->validate([
+            'account_id' => 'required', // Allow both string and integer
+            'included' => 'required|boolean'
+        ]);
+
+        $this->virtualAccountService->setAccountInclusion(
+            auth()->id(),
+            $request->input('account_id'),
+            $request->boolean('included')
+        );
+
+        // Return the new total included balance
+        $budget = \App\Models\Budget::where('user_id', auth()->id())->latest()->first();
+        $totalIncludedBalance = $budget ? $this->virtualAccountService->getTotalIncludedBalance($budget, auth()->id()) : 0;
+
+        return response()->json([
+            'success' => true,
+            'total_included_balance' => $totalIncludedBalance
+        ]);
+    }
 }

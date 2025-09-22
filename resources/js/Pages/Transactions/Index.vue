@@ -88,9 +88,32 @@
                       <div class="text-sm text-gray-900">{{ formatDate(transaction.date) }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm font-medium text-gray-900">{{ transaction.description }}</div>
-                      <div v-if="transaction.notes" class="text-xs text-gray-500 mt-1 max-w-xs truncate">
-                        {{ transaction.notes }}
+                      <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                          <div class="text-sm font-medium text-gray-900">{{ transaction.description }}</div>
+                          <div v-if="transaction.notes" class="text-xs text-gray-500 mt-1 max-w-xs truncate">
+                            {{ transaction.notes }}
+                          </div>
+                          <!-- Recurring transaction indicator -->
+                          <div v-if="transaction.recurring_template" class="mt-2 flex items-center space-x-2">
+                            <div class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                              </svg>
+                              Recurring
+                            </div>
+                            <Link 
+                              :href="route('recurring-transactions.edit', [budget.id, transaction.recurring_template.id])"
+                              class="inline-flex items-center text-xs text-purple-600 hover:text-purple-800"
+                              title="View recurring transaction template"
+                            >
+                              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                              </svg>
+                              View Template
+                            </Link>
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">

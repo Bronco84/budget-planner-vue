@@ -16,7 +16,28 @@
           <div class="p-6 bg-white border-b border-gray-200">
             <form @submit.prevent="submit">
               <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-2">Transaction Details</h3>
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-medium text-gray-900">Transaction Details</h3>
+                  <!-- Recurring transaction indicator -->
+                  <div v-if="recurringTemplate" class="flex items-center space-x-3">
+                    <div class="inline-flex items-center px-3 py-2 text-sm font-medium bg-purple-100 text-purple-800 rounded-lg">
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                      </svg>
+                      Linked to Recurring Transaction
+                    </div>
+                    <Link 
+                      :href="route('recurring-transactions.edit', [budget.id, recurringTemplate.id])"
+                      class="inline-flex items-center px-3 py-2 text-sm text-purple-600 bg-purple-50 hover:bg-purple-100 hover:text-purple-800 rounded-lg transition-colors"
+                      title="View recurring transaction template"
+                    >
+                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                      </svg>
+                      View Template: {{ recurringTemplate.description }}
+                    </Link>
+                  </div>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <!-- Account Selection -->
                   <div>

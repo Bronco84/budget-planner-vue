@@ -942,4 +942,16 @@ class RecurringTransactionService
             ]
         ]);
     }
+    
+    /**
+     * Get the next occurrence date for a recurring transaction template
+     *
+     * @param RecurringTransactionTemplate $template
+     * @return Carbon|null
+     */
+    public function getNextOccurrenceDate(RecurringTransactionTemplate $template): ?Carbon
+    {
+        return $template->calculateNextOccurrence();
+    }
+    
 }

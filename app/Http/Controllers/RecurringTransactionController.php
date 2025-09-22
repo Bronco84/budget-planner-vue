@@ -384,4 +384,5 @@ class RecurringTransactionController extends Controller
         }
         return $validated;
     }
+    
 }

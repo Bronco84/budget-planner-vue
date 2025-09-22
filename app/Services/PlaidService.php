@@ -123,6 +123,9 @@ class PlaidService
                 'account_filters' => [
                     'depository' => [
                         'account_subtypes' => ['checking', 'savings']
+                    ],
+                    'credit' => [
+                        'account_subtypes' => ['credit card']
                     ]
                 ],
                 'link_customization_name' => 'default',

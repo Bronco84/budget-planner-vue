@@ -179,6 +179,13 @@ const initializePlaid = () => {
     onExit: (err, metadata) => {
       if (err) {
         console.error('Plaid Link error:', err);
+        
+        // Handle specific error cases
+        if (err.error_type === 'INSTITUTION_ERROR' && err.error_code === 'INSTITUTION_REGISTRATION_REQUIRED') {
+          alert(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
+        } else if (err.error_message) {
+          alert(`Connection Error: ${err.error_message}`);
+        }
       }
     },
   });

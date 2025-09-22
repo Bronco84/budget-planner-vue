@@ -102,7 +102,7 @@ class BudgetController extends Controller
             ->when(
                 $request->filled('account_id'),
                 fn($query) => $query->where('id', $request->input('account_id')),
-            )->first();
+            )->firstOrFail();
 
         // Get query parameters for filtering
         $search = $request->input('search');
@@ -186,7 +186,7 @@ class BudgetController extends Controller
                     });
             })
             // Remove any transaction that doesn't have a plaid ID if trx date is in the past
-            // We make the assumption that the plaid feed is the source of truth for transactions in the past
+            // We consider plaid feed as the source of truth for transactions in the past
             ->where(function($query) {
                 $query->where(function($q) {
                     $q->where('transactions.date', '>', now())->whereNull('transactions.plaid_transaction_id');

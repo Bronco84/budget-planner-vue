@@ -73,6 +73,38 @@ class Account extends Model
         return $this->hasOne(PlaidAccount::class);
     }
 
+    /**
+     * Get all bank feeds for this account.
+     */
+    public function bankFeeds(): HasMany
+    {
+        return $this->hasMany(BankFeed::class);
+    }
+
+    /**
+     * Get the active bank feeds for this account.
+     */
+    public function activeBankFeeds(): HasMany
+    {
+        return $this->bankFeeds()->where('status', BankFeed::STATUS_ACTIVE);
+    }
+
+    /**
+     * Check if this account has any active bank feeds.
+     */
+    public function hasActiveBankFeeds(): bool
+    {
+        return $this->activeBankFeeds()->exists();
+    }
+
+    /**
+     * Get the bank feed for a specific source type.
+     */
+    public function getBankFeedBySource(string $sourceType): ?BankFeed
+    {
+        return $this->bankFeeds()->where('source_type', $sourceType)->first();
+    }
+
     public function scopeActive($query)
     {
         return $query->where('include_in_budget', true)->where('is_active', true);

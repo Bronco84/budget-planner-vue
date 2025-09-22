@@ -31,6 +31,8 @@ class Transaction extends Model
         'is_plaid_imported',
         'is_reconciled',
         'recurring_transaction_template_id',
+        'bank_feed_transaction_id',
+        'import_source',
         'notes',
     ];
 
@@ -84,6 +86,53 @@ class Transaction extends Model
     public function recurringTransactionTemplate()
     {
         return $this->belongsTo(RecurringTransactionTemplate::class);
+    }
+
+    /**
+     * Get the bank feed transaction that generated this transaction.
+     */
+    public function bankFeedTransaction(): BelongsTo
+    {
+        return $this->belongsTo(BankFeedTransaction::class);
+    }
+
+    /**
+     * Check if this transaction was imported from a bank feed.
+     */
+    public function isImported(): bool
+    {
+        return $this->import_source !== 'manual';
+    }
+
+    /**
+     * Check if this transaction was imported from Plaid.
+     */
+    public function isPlaidImported(): bool
+    {
+        return $this->import_source === 'plaid' || $this->is_plaid_imported;
+    }
+
+    /**
+     * Check if this transaction was imported from Airtable.
+     */
+    public function isAirtableImported(): bool
+    {
+        return $this->import_source === 'airtable';
+    }
+
+    /**
+     * Get the import source display name.
+     */
+    public function getImportSourceDisplayAttribute(): string
+    {
+        return match($this->import_source) {
+            'plaid' => 'Plaid',
+            'airtable' => 'Airtable',
+            'csv' => 'CSV Import',
+            'ofx' => 'OFX Import',
+            'manual' => 'Manual Entry',
+            default => 'Unknown',
+        };
     }
 
     /**

@@ -42,4 +42,9 @@ return [
         'proxy' => env('PLAID_PROXY', null),
         'base_url' => env('PLAID_BASE_URL', 'https://sandbox.plaid.com'),
     ],
+
+    'airtable' => [
+        'api_key' => env('AIRTABLE_API_KEY'),
+        'base_url' => env('AIRTABLE_BASE_URL', 'https://api.airtable.com/v0'),
+    ],
 ];

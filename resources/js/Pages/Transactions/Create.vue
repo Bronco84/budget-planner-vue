@@ -12,6 +12,28 @@
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6 bg-white border-b border-gray-200">
+            <!-- Pre-filled notification -->
+            <div v-if="props.prefillData.recurring_transaction_template_id" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-blue-800">
+                    Creating transaction from recurring template
+                  </h3>
+                  <div class="mt-2 text-sm text-blue-700">
+                    <p>
+                      The form has been pre-filled with data from your recurring transaction template. 
+                      You can adjust the amount and add notes as needed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <form @submit.prevent="submit">
               <div class="mb-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-2">Transaction Details</h3>
@@ -176,19 +198,23 @@ const props = defineProps({
   budget: Object,
   accounts: Array,
   recurringTemplates: Array,
+  prefillData: {
+    type: Object,
+    default: () => ({})
+  }
 });
 
 // Format today's date for input field YYYY-MM-DD
 const today = new Date().toISOString().split('T')[0];
 
 const form = useForm({
-  description: '',
-  amount: '',
-  account_id: '',
-  category: '',
-  date: today,
+  description: props.prefillData.description || '',
+  amount: props.prefillData.amount || '',
+  account_id: props.prefillData.account_id || '',
+  category: props.prefillData.category || '',
+  date: props.prefillData.date || today,
   notes: '',
-  recurring_transaction_template_id: '',
+  recurring_transaction_template_id: props.prefillData.recurring_transaction_template_id || '',
 });
 
 const submit = () => {

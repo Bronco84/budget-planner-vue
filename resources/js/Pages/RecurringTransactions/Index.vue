@@ -13,6 +13,15 @@
             Back to Budget
           </Link>
           <Link 
+            :href="route('budget.transaction.create', budget.id)"
+            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition duration-150 ease-in-out hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
+          >
+            <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Create Transaction
+          </Link>
+          <Link 
             :href="route('recurring-transactions.create', budget.id)"
             class="inline-flex items-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-gray-700 focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:bg-gray-900"
           >
@@ -26,21 +35,62 @@
       <div class="max-w-8xl mx-auto sm:px-2 lg:px-4 overflow-x-auto">
         <div class="bg-white shadow-sm sm:rounded-lg">
           <div class="p-6">
-            <!-- Account filter selector -->
-            <div class="mb-6">
+            <!-- Filter selectors -->
+            <div class="mb-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+              <div>
+                <label for="account-filter" class="block text-sm font-medium text-gray-700">Filter by Account</label>
+                <select
+                  id="account-filter"
+                  v-model="selectedAccountId"
+                  class="mt-1 block w-full sm:w-64 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                >
+                  <option value="all">All Accounts</option>
+                  <option v-for="account in accountsToUse" :key="account.id" :value="account.id">
+                    {{ account.name }}
+                  </option>
+                </select>
+              </div>
 
-              <label for="account-filter" class="block text-sm font-medium text-gray-700">Filter by Account</label>
-              <select
-                id="account-filter"
-                v-model="selectedAccountId"
-                class="mt-1 block w-full sm:w-64 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              >
-                <option value="all">All Accounts</option>
-                <option v-for="account in accountsToUse" :key="account.id" :value="account.id">
-                  {{ account.name }}
-                </option>
-              </select>
+              <div>
+                <label for="amount-type-filter" class="block text-sm font-medium text-gray-700">Amount Type</label>
+                <select
+                  id="amount-type-filter"
+                  v-model="selectedAmountType"
+                  class="mt-1 block w-full sm:w-48 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                >
+                  <option value="all">All Types</option>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="variable">Variable Amount</option>
+                </select>
+              </div>
+            </div>
 
+            <!-- Summary stats -->
+            <div v-if="props.recurringTransactions.length > 0" class="mb-4 flex flex-wrap gap-4">
+              <div class="inline-flex items-center px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-700">
+                <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Total: {{ props.recurringTransactions.length }}
+              </div>
+              <div class="inline-flex items-center px-3 py-2 bg-blue-50 rounded-lg text-sm text-blue-700">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                Variable: {{ variableTransactionsCount }}
+              </div>
+              <div class="inline-flex items-center px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                Fixed: {{ fixedTransactionsCount }}
+              </div>
+              <div v-if="filteredTransactions.length !== props.recurringTransactions.length" class="inline-flex items-center px-3 py-2 bg-indigo-50 rounded-lg text-sm text-indigo-700">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                </svg>
+                Showing: {{ filteredTransactions.length }}
+              </div>
             </div>
 
             <div v-if="filteredTransactions.length > 0">
@@ -69,8 +119,8 @@
                       <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Next Date
                       </th>
-                      <th scope="col" class="relative px-6 py-3">
-                        <span class="sr-only">Actions</span>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -83,8 +133,23 @@
                         <div class="text-sm font-medium text-gray-900">{{ template.description }}</div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm" :class="template.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                          {{ formatCurrency(template.amount_in_cents) }}
+                        <div class="flex items-center space-x-2">
+                          <div class="text-sm" :class="template.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
+                            {{ formatCurrency(template.amount_in_cents) }}
+                          </div>
+                          <!-- Variable amount indicator -->
+                          <div v-if="template.is_dynamic_amount" class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full" title="Variable amount based on rules">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Variable
+                          </div>
+                          <div v-else class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full" title="Fixed amount">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                            Fixed
+                          </div>
                         </div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
@@ -99,21 +164,59 @@
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm text-gray-900">{{ formatDate(getNextOccurrence(template)) }}</div>
                       </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div class="flex space-x-2 justify-end">
-                          <Link :href="route('recurring-transactions.edit', [budget.id, template.id])" class="text-indigo-600 hover:text-indigo-900">
-                            Edit
-                          </Link>
-                          <Link :href="route('recurring-transactions.rules.index', [budget.id, template.id])" class="text-purple-600 hover:text-purple-900">
-                            Rules
-                          </Link>
-                          <button @click="duplicate(template)" class="text-blue-600 hover:text-blue-900">
-                            Duplicate
-                          </button>
-                          <button @click="confirmDelete(template)" class="text-red-600 hover:text-red-900">
-                            Delete
-                          </button>
-                        </div>
+                      <td class="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                        <Dropdown align="left" width="48">
+                          <template #trigger>
+                            <button type="button" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm leading-4 font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                              Actions
+                              <svg class="-mr-1 ml-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                              </svg>
+                            </button>
+                          </template>
+                          <template #content>
+                            <DropdownLink :href="createTransactionUrl(template)">
+                              <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Create Transaction
+                              </div>
+                            </DropdownLink>
+                            <DropdownLink :href="route('recurring-transactions.edit', [budget.id, template.id])">
+                              <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                                Edit Template
+                              </div>
+                            </DropdownLink>
+                            <DropdownLink :href="route('recurring-transactions.rules.index', [budget.id, template.id])">
+                              <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                </svg>
+                                Manage Rules
+                              </div>
+                            </DropdownLink>
+                            <button @click="duplicate(template)" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
+                              <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                Duplicate
+                              </div>
+                            </button>
+                            <button @click="confirmDelete(template)" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
+                              <div class="flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                Delete
+                              </div>
+                            </button>
+                          </template>
+                        </Dropdown>
                       </td>
                     </tr>
                   </tbody>
@@ -141,10 +244,12 @@
 
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Dropdown from '@/Components/Dropdown.vue';
+import DropdownLink from '@/Components/DropdownLink.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 const props = defineProps({
@@ -183,22 +288,41 @@ const accountSource = computed(() => {
 // Account filtering
 const selectedAccountId = ref('all');
 
-// Filtered transactions based on selected account
-const filteredTransactions = computed(() => {
-  console.log('Filtering transactions with selectedAccountId:', selectedAccountId.value, typeof selectedAccountId.value);
+// Amount type filtering
+const selectedAmountType = ref('all');
 
-  if (selectedAccountId.value === 'all') {
-    return props.recurringTransactions;
+// Filtered transactions based on selected account and amount type
+const filteredTransactions = computed(() => {
+  let filtered = props.recurringTransactions;
+
+  // Filter by account
+  if (selectedAccountId.value !== 'all') {
+    const accountId = parseInt(selectedAccountId.value);
+    filtered = filtered.filter(transaction => transaction.account_id === accountId);
   }
 
-  // Convert selectedAccountId to number for comparison
-  const accountId = parseInt(selectedAccountId.value);
-  console.log('Using accountId for filtering:', accountId, typeof accountId);
+  // Filter by amount type
+  if (selectedAmountType.value !== 'all') {
+    filtered = filtered.filter(transaction => {
+      if (selectedAmountType.value === 'variable') {
+        return transaction.is_dynamic_amount;
+      } else if (selectedAmountType.value === 'fixed') {
+        return !transaction.is_dynamic_amount;
+      }
+      return true;
+    });
+  }
 
-  return props.recurringTransactions.filter(transaction => {
-    console.log('Transaction account_id:', transaction.account_id, typeof transaction.account_id);
-    return transaction.account_id === accountId;
-  });
+  return filtered;
+});
+
+// Count statistics
+const variableTransactionsCount = computed(() => {
+  return props.recurringTransactions.filter(t => t.is_dynamic_amount).length;
+});
+
+const fixedTransactionsCount = computed(() => {
+  return props.recurringTransactions.filter(t => !t.is_dynamic_amount).length;
 });
 
 const confirmDelete = (template) => {
@@ -360,5 +484,22 @@ const getNextOccurrence = (template) => {
   }
 
   return nextDate;
+};
+
+// Create transaction URL with pre-filled data
+const createTransactionUrl = (template) => {
+  const nextDate = getNextOccurrence(template);
+  const nextDateString = nextDate ? nextDate.toISOString().split('T')[0] : '';
+  
+  const params = new URLSearchParams({
+    description: template.description || '',
+    account_id: template.account_id || '',
+    category: template.category || '',
+    date: nextDateString,
+    recurring_transaction_template_id: template.id,
+    amount: Math.abs(template.amount_in_cents / 100).toString() // Convert to positive dollars for easier editing
+  });
+  
+  return route('budget.transaction.create', props.budget.id) + '?' + params.toString();
 };
 </script>

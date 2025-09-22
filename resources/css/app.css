@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark mode enhancements */
+@layer base {
+  /* Ensure smooth transitions for theme switching */
+  html {
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  }
+
+  /* Base typography colors for dark mode */
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    @apply text-gray-100;
+  }
+
+  .dark p, .dark span, .dark div {
+    @apply text-gray-300;
+  }
+
+  /* Form elements in dark mode */
+  .dark input, .dark textarea, .dark select {
+    @apply bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-400;
+  }
+
+  .dark input:focus, .dark textarea:focus, .dark select:focus {
+    @apply border-indigo-500 ring-indigo-500;
+  }
+
+  /* Tables in dark mode */
+  .dark table {
+    @apply text-gray-300;
+  }
+
+  .dark th {
+    @apply text-gray-100 bg-gray-800;
+  }
+
+  .dark td {
+    @apply border-gray-700;
+  }
+
+  .dark tr:nth-child(even) {
+    @apply bg-gray-800/50;
+  }
+
+  /* Cards and panels in dark mode */
+  .dark .bg-white {
+    @apply bg-gray-800;
+  }
+
+  .dark .shadow-sm {
+    @apply shadow-gray-900/25;
+  }
+
+  .dark .border-gray-200 {
+    @apply border-gray-700;
+  }
+}

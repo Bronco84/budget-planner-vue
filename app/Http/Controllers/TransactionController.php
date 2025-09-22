@@ -18,7 +18,7 @@ class TransactionController extends Controller
     public function index(Budget $budget): Response
     {
         $transactions = $budget->transactions()
-            ->with('account')
+            ->with(['account', 'recurringTemplate'])
             ->orderByDesc('date')
             ->paginate(20);
 
@@ -31,17 +31,28 @@ class TransactionController extends Controller
     /**
      * Show the form for creating a new transaction.
      */
-    public function create(Budget $budget): Response
+    public function create(Request $request, Budget $budget): Response
     {
         $accounts = $budget->accounts()->get();
         $recurringTemplates = $budget->recurringTransactionTemplates()
             ->with('account')
             ->get();
 
+        // Get pre-fill data from query parameters
+        $prefillData = [
+            'description' => $request->query('description', ''),
+            'account_id' => $request->query('account_id', ''),
+            'category' => $request->query('category', ''),
+            'date' => $request->query('date', ''),
+            'amount' => $request->query('amount', ''),
+            'recurring_transaction_template_id' => $request->query('recurring_transaction_template_id', ''),
+        ];
+
         return Inertia::render('Transactions/Create', [
             'budget' => $budget,
             'accounts' => $accounts,
             'recurringTemplates' => $recurringTemplates,
+            'prefillData' => $prefillData,
         ]);
     }
 

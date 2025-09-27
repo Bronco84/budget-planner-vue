@@ -79,7 +79,7 @@
             </div>
 
             <!-- Accounts Card -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg divide-red-50 divide-x">
               <div class="p-4">
                 <div class="flex justify-between items-center mb-3">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Accounts</h3>
@@ -102,72 +102,152 @@
                     </Link>
                   </div>
                 </div>
-
-                <div class="space-y-3" v-if="accounts.length > 0">
-                  <div
-                    v-for="account in accounts"
-                    :key="account.id"
-                    class="bg-gray-50 p-3 rounded-lg border-l-4"
-                    :class="account.current_balance_cents >= 0 ? 'border-green-500' : 'border-red-500'"
-                  >
-                    <div class="flex justify-between items-start">
-                      <div>
-                        <div class="font-medium text-gray-900">{{ account.name }}</div>
-                        <div class="text-xs text-gray-500 capitalize mt-1">{{ account.type }}</div>
-                        <div v-if="account.plaid_account" class="text-xs text-blue-600 mt-1 flex items-center">
-                          <span class="w-2 h-2 rounded-full mr-2"
-                                :class="getLastSyncClass(account.plaid_account)"></span>
-                            <div class="whitespace-nowrap">
-                                {{ account.plaid_account.last_sync_at ? `Last synced ${formatTimeAgo(account.plaid_account.last_sync_at)}` : 'Not synced yet' }}
+                <draggable
+                  v-if="accounts.length > 0"
+                  v-model="draggableAccountGroups"
+                  item-key="type"
+                  :animation="200"
+                  :disabled="false"
+                  ghost-class="sortable-ghost"
+                  chosen-class="sortable-chosen"
+                  drag-class="sortable-drag"
+                  handle=".drag-handle"
+                  @start="onDragStart"
+                  @end="onDragEnd"
+                  @change="onDragChange"
+                  class="space-y-4"
+                  :class="{ 'opacity-75': isDragging }"
+                >
+                  <template #item="{ element: typeGroup }">
+                    <div
+                      :key="typeGroup.type"
+                      class="space-y-2 transition-all duration-200"
+                      :class="{ 'transform scale-[1.02] shadow-lg': isDragging }"
+                    >
+                      <!-- Type Header - Only this part is draggable -->
+                      <div class="flex justify-between items-center border-b border-gray-200 pb-2 hover:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-move drag-handle">
+                        <div class="flex items-center">
+                          <svg class="w-4 h-4 mr-2 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                          </svg>
+                          <div>
+                            <h4 class="text-sm font-medium text-gray-900">{{ typeGroup.displayName }}</h4>
+                            <div class="text-xs text-gray-500">
+                              {{ typeGroup.accounts.length }}
+                              account{{ typeGroup.accounts.length !== 1 ? 's' : '' }}
                             </div>
+                          </div>
+                        </div>
+                        <div class="text-sm font-semibold"
+                             :class="typeGroup.total >= 0 ? 'text-green-600' : 'text-red-600'">
+                          {{ formatCurrency(typeGroup.total) }}
                         </div>
                       </div>
-                      <div class="text-sm font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
-                        {{ formatCurrency(account.current_balance_cents) }}
+
+                      <!-- Accounts in this group -->
+                      <div class="space-y-2 ml-2">
+                        <div
+                          v-for="account in typeGroup.accounts"
+                          :key="account.id"
+                          class="bg-gray-50 p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                          :class="[
+                            account.current_balance_cents >= 0 ? 'border-green-500' : 'border-red-500',
+                            activeAccountId === account.id ? 'border-l-8 bg-gray-100' : ''
+                          ]"
+                          @click="selectAccount(account.id)"
+                      >
+                        <div class="flex justify-between items-start">
+                          <div>
+                            <div class="font-medium text-sm capitalize text-gray-900">{{ account.name }}</div>
+                            <div v-if="account.plaid_account" class="text-xs text-blue-600 mt-1 flex items-center">
+                              <span class="w-2 h-2 rounded-full mr-2"
+                                    :class="getLastSyncClass(account.plaid_account)"></span>
+                                <div class="whitespace-nowrap">
+                                    {{ account.plaid_account.last_sync_at ? `Last synced ${formatTimeAgo(account.plaid_account.last_sync_at)}` : 'Not synced yet' }}
+                                </div>
+                            </div>
+                          </div>
+                          <div class="text-sm font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
+                            {{ formatCurrency(account.current_balance_cents) }}
+                          </div>
+                        </div>
+                        <div class="flex items-center justify-between mt-2">
+                          <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                            :class="account.status_classes">
+                            {{ account.status_label }}
+                          </span>
+                          <div class="relative" @click.stop>
+                            <button
+                              @click="toggleAccountDropdown(account.id)"
+                              class="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                              Actions
+                              <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            <div
+                              v-if="openDropdown === account.id"
+                              class="absolute right-0 z-10 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg"
+                              @click.stop
+                            >
+                              <div class="py-1">
+                                <Link
+                                  v-if="account.plaid_account"
+                                  :href="route('plaid.link', [budget.id, account.id])"
+                                  class="block px-4 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                                >
+                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                  Bank Sync
+                                </Link>
+                                <Link
+                                  v-if="!account.plaid_account"
+                                  :href="route('plaid.link', [budget.id, account.id])"
+                                  class="block px-4 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                                >
+                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                  Connect to Bank
+                                </Link>
+                                <Link
+                                  :href="route('budget.account.projections', [budget.id, account.id])"
+                                  class="block px-4 py-2 text-xs text-green-600 hover:bg-gray-50"
+                                >
+                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                  </svg>
+                                  Projections
+                                </Link>
+                                <Link
+                                  :href="route('budget.account.balance-projection', [budget.id, account.id])"
+                                  class="block px-4 py-2 text-xs text-purple-600 hover:bg-gray-50"
+                                >
+                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                  </svg>
+                                  Balance Chart
+                                </Link>
+                                <Link
+                                  :href="route('budgets.accounts.edit', [budget.id, account.id])"
+                                  class="block px-4 py-2 text-xs text-indigo-600 hover:bg-gray-50"
+                                >
+                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  Edit
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        </div>
                       </div>
                     </div>
-                    <div class="flex items-center justify-between mt-2">
-                      <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                        :class="account.status_classes">
-                        {{ account.status_label }}
-                      </span>
-                      <div class="flex space-x-2">
-                        <Link
-                          v-if="account.plaid_account"
-                          :href="route('plaid.link', [budget.id, account.id])"
-                          class="text-xs text-blue-600 hover:text-blue-900"
-                        >
-                          Bank Sync
-                        </Link>
-                        <Link
-                          v-if="!account.plaid_account"
-                          :href="route('plaid.link', [budget.id, account.id])"
-                          class="text-xs text-blue-600 hover:text-blue-900"
-                        >
-                          Connect to Bank
-                        </Link>
-                        <Link
-                          :href="route('budget.account.projections', [budget.id, account.id])"
-                          class="text-xs text-green-600 hover:text-green-900"
-                        >
-                          Projections
-                        </Link>
-                        <Link
-                          :href="route('budget.account.balance-projection', [budget.id, account.id])"
-                          class="text-xs text-purple-600 hover:text-purple-900"
-                        >
-                          Balance Chart
-                        </Link>
-                        <Link
-                          :href="route('budgets.accounts.edit', [budget.id, account.id])"
-                          class="text-xs text-indigo-600 hover:text-indigo-900"
-                        >
-                          Edit
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  </template>
+                </draggable>
 
                 <div v-else class="bg-gray-50 p-3 text-center rounded-lg">
                   <p class="text-sm text-gray-500">No accounts found.</p>
@@ -273,7 +353,7 @@
                   <div class="overflow-x-auto overflow-y-hidden">
                     <nav class="flex -mb-px min-w-full whitespace-nowrap">
                       <a
-                        v-for="account in accounts"
+                        v-for="account in orderedAccounts"
                         :key="account.id"
                         href="#"
                         @click.prevent="selectAccount(account.id)"
@@ -507,15 +587,31 @@
   </Modal>
 </template>
 
+<style scoped>
+.sortable-ghost {
+  opacity: 0.5;
+  background: #f0f0f0;
+}
+
+.sortable-chosen {
+  background: #e0e7ff;
+}
+
+.sortable-drag {
+  background: #ddd6fe;
+}
+</style>
+
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
-import { reactive, watch, computed, ref, onMounted } from 'vue';
+import { reactive, watch, computed, ref, onMounted, onUnmounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { PencilIcon } from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import { formatCurrency } from '@/utils/format.js';
+import draggable from 'vuedraggable';
 
 // Define props
 const props = defineProps({
@@ -525,7 +621,8 @@ const props = defineProps({
   transactions: Object,
   projectionParams: Object,
   categories: Array,
-  filters: Object
+  filters: Object,
+  userAccountTypeOrder: Array
 });
 
 // Form state for filters
@@ -540,12 +637,68 @@ const form = reactive({
 
 // Computed property to determine the active account tab
 const activeAccountId = computed(() => {
-  if (!form.account_id && props.accounts.length > 0) {
-    form.account_id = props.accounts[0].id;
+  if (!form.account_id && orderedAccounts.value.length > 0) {
+    // Use the first account from the user's preferred order instead of database order
+    form.account_id = orderedAccounts.value[0].id;
   }
   // Convert to number for consistent comparison
   return form.account_id ? parseInt(form.account_id, 10) : null;
 });
+
+// Group accounts by type with totals
+const accountsByType = computed(() => {
+  const groups = {};
+
+  props.accounts.forEach(account => {
+    const type = account.type || 'other';
+    if (!groups[type]) {
+      groups[type] = {
+        accounts: [],
+        total: 0,
+        displayName: getAccountTypeDisplayName(type)
+      };
+    }
+    groups[type].accounts.push(account);
+    groups[type].total += account.current_balance_cents || 0;
+  });
+
+  // Sort groups by user's preferred order
+  const userOrder = props.userAccountTypeOrder || [
+    'checking', 'savings', 'money market', 'cd', 'investment',
+    'credit card', 'credit', 'loan', 'line of credit', 'mortgage', 'other'
+  ];
+
+  // Create a mapping for quick lookup of order indices
+  const orderMap = {};
+  userOrder.forEach((type, index) => {
+    orderMap[type] = index;
+  });
+
+  return Object.keys(groups)
+    .sort((a, b) => (orderMap[a] ?? 999) - (orderMap[b] ?? 999))
+    .map(type => ({
+      type,
+      ...groups[type]
+    }));
+});
+
+// Helper function to get display name for account type
+const getAccountTypeDisplayName = (type) => {
+  const typeMap = {
+    'checking': 'Checking Accounts',
+    'savings': 'Savings Accounts',
+    'money market': 'Money Market Accounts',
+    'cd': 'Certificates of Deposit',
+    'investment': 'Investment Accounts',
+    'credit card': 'Credit Cards',
+    'credit': 'Credit Accounts',
+    'loan': 'Loans',
+    'line of credit': 'Lines of Credit',
+    'mortgage': 'Mortgages',
+    'other': 'Other Accounts'
+  };
+  return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1) + ' Accounts';
+};
 
 // Form state for projections
 const projectionForm = reactive({
@@ -556,9 +709,148 @@ const projectionForm = reactive({
 const budgetAttachments = ref([]);
 const showFileUploadModal = ref(false);
 
+// Dropdown state for account actions
+const openDropdown = ref(null);
+
+// Selected account tracking is handled by activeAccountId computed property
+
+// Simple draggable array - this is what vue-draggable will manipulate directly
+const draggableAccountGroups = ref([]);
+const isDragging = ref(false);
+
+// Methods for drag and drop
+const onDragStart = () => {
+  isDragging.value = true;
+};
+
+const onDragChange = () => {
+  // Handle drag change events if needed
+};
+
+const onDragEnd = async (evt) => {
+  isDragging.value = false;
+
+  if (evt.oldIndex !== evt.newIndex) {
+    // Extract the new order from the dragged array
+    const newDisplayOrder = draggableAccountGroups.value.map(group => group.type);
+
+    // Merge with the full user preference list to preserve ordering of types not currently shown
+    const existingTypes = [...new Set(props.accounts.map(acc => acc.type || 'other'))];
+    const currentFullOrder = props.userAccountTypeOrder || [];
+
+    // Create the new full order by:
+    // 1. Taking account types from newDisplayOrder that exist
+    // 2. Adding remaining types from currentFullOrder in their original positions
+    const newFullOrder = [
+      ...newDisplayOrder,
+      ...currentFullOrder.filter(type => !existingTypes.includes(type))
+    ];
+
+    try {
+      // Save the new order to user preferences
+      await saveAccountTypeOrder(newFullOrder);
+
+      // Force a re-render by updating the page props
+      router.reload({
+        only: ['userAccountTypeOrder'],
+        preserveScroll: true
+      });
+    } catch (error) {
+      // Rebuild the draggable array from current props to revert
+      rebuildDraggableArray();
+    }
+  }
+};
+
+// Function to rebuild the draggable array from current props
+const rebuildDraggableArray = () => {
+  const groups = {};
+
+  // First, group accounts by type
+  props.accounts.forEach(account => {
+    const type = account.type || 'other';
+    if (!groups[type]) {
+      groups[type] = {
+        type,
+        accounts: [],
+        total: 0,
+        displayName: getAccountTypeDisplayName(type)
+      };
+    }
+    groups[type].accounts.push(account);
+    groups[type].total += account.current_balance_cents || 0;
+  });
+
+  // Get account types that exist
+  const existingTypes = [...new Set(props.accounts.map(acc => acc.type || 'other'))];
+
+  // Order them according to user preferences
+  const userOrder = props.userAccountTypeOrder || [];
+  const orderedTypes = userOrder.filter(type => existingTypes.includes(type));
+
+  // Build the final draggable array
+  draggableAccountGroups.value = orderedTypes
+    .filter(type => groups[type])
+    .map(type => groups[type]);
+};
+
+// Save account type order to backend
+const saveAccountTypeOrder = async (order) => {
+  const response = await fetch('/api/preferences/account-type-order', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+    },
+    body: JSON.stringify({ order })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to save preferences: ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// Get accounts in the same order as the draggable groups (for tabs)
+const orderedAccounts = computed(() => {
+  const orderedAccountsList = [];
+
+  for (const group of draggableAccountGroups.value) {
+    orderedAccountsList.push(...group.accounts);
+  }
+
+  return orderedAccountsList;
+});
+
+// Watch for changes in props and rebuild the draggable array
+watch([() => props.userAccountTypeOrder, () => props.accounts], () => {
+  rebuildDraggableArray();
+}, { immediate: true });
+
+// Toggle account dropdown
+const toggleAccountDropdown = (accountId) => {
+  openDropdown.value = openDropdown.value === accountId ? null : accountId;
+};
+
+// Close dropdown when clicking outside
+const closeDropdown = () => {
+  openDropdown.value = null;
+};
+
+// Account selection functionality is handled by the existing selectAccount function
+
 // Load budget attachments on mount
 onMounted(() => {
   loadBudgetAttachments();
+
+  // Add click outside listener
+  document.addEventListener('click', closeDropdown);
+});
+
+// Cleanup on unmount
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdown);
 });
 
 const loadBudgetAttachments = async () => {

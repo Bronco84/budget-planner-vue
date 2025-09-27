@@ -80,12 +80,12 @@
 
               <!-- Account Selection -->
               <div class="space-y-3">
-                <div v-for="account in discoveredAccounts" :key="account.account_id" 
+                <div v-for="account in discoveredAccounts" :key="account.id"
                      class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                   <label class="flex items-start space-x-3 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      :value="account.account_id"
+                    <input
+                      type="checkbox"
+                      :value="String(account.id)"
                       v-model="selectedAccounts"
                       class="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
                     >
@@ -204,9 +204,22 @@ const initializePlaid = () => {
       
       // Store discovered accounts
       if (metadata.accounts && metadata.accounts.length > 0) {
+        console.log('Raw Plaid accounts:', metadata.accounts);
+        console.log('Account count:', metadata.accounts.length);
+
+        // Check for duplicates or type issues - use 'id' field, not 'account_id'
+        const accountIds = metadata.accounts.map(acc => acc.id);
+        console.log('Account IDs:', accountIds);
+        console.log('Account ID types:', accountIds.map(id => typeof id));
+        console.log('Unique account IDs:', [...new Set(accountIds)]);
+
         discoveredAccounts.value = metadata.accounts;
-        // Pre-select all accounts by default
-        selectedAccounts.value = metadata.accounts.map(acc => acc.id);
+
+        // Pre-select all accounts by default - ensure strings and uniqueness
+        selectedAccounts.value = [...new Set(metadata.accounts.map(acc => String(acc.id)))];
+
+        console.log('Discovered accounts set:', discoveredAccounts.value.length);
+        console.log('Selected account IDs:', selectedAccounts.value);
       } else {
         alert('No accounts were found. Please try connecting a different institution.');
       }

@@ -36,7 +36,17 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     
     Route::resource('budgets', BudgetController::class);
-    
+
+    // Budget setup routes
+    Route::get('budgets/{budget}/setup', [BudgetController::class, 'setup'])
+        ->name('budgets.setup');
+    Route::get('budgets/{budget}/setup/connect', [PlaidController::class, 'discover'])
+        ->name('budgets.setup.connect');
+    Route::post('budgets/{budget}/setup/connect', [PlaidController::class, 'import'])
+        ->name('budgets.setup.import');
+    Route::get('budgets/{budget}/setup/manual', [AccountController::class, 'create'])
+        ->name('budgets.setup.manual');
+
     Route::post('budgets/{budget}/filter', [BudgetController::class, 'filter'])
         ->name('budgets.filter');
     
@@ -143,6 +153,16 @@ Route::middleware('auth')->group(function () {
         ->name('files.download');
     Route::delete('files/{attachment}', [FileController::class, 'delete'])
         ->name('files.delete');
+
+    // User preferences routes (JSON API but accessible from frontend)
+    Route::get('/api/preferences/account-type-order', [App\Http\Controllers\Api\UserPreferencesController::class, 'getAccountTypeOrder'])
+        ->name('preferences.account-type-order.get');
+    Route::post('/api/preferences/account-type-order', [App\Http\Controllers\Api\UserPreferencesController::class, 'updateAccountTypeOrder'])
+        ->name('preferences.account-type-order.update');
+    Route::get('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'show'])
+        ->name('preferences.show');
+    Route::post('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'update'])
+        ->name('preferences.update');
 });
 
 require __DIR__.'/auth.php';

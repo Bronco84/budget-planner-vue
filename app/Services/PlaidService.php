@@ -118,8 +118,7 @@ class PlaidService
                     'client_user_id' => (string) $userId,
                     'email_address' => null, // Optional: Add user's email if available
                 ],
-                'products' => ['liabilities'],
-                'additional_consented_products' => ['transactions','identity','assets'],
+                'products' => ['transactions'],
                 'country_codes' => ['US'],
                 'language' => 'en',
                 // Remove account_filters to allow ALL account types
@@ -141,9 +140,7 @@ class PlaidService
                 'user_id' => $userId,
                 'mode' => $existingAccessToken ? 'update' : 'create',
                 'products' => $payload['products'],
-                'additional_consented_products' => $payload['additional_consented_products'] ?? [],
-                'account_filters_removed' => true,
-                'liabilities_product_enabled' => in_array('liabilities', $payload['products'])
+                'account_filters_removed' => true
             ]);
 
             $response = $this->client->post('/link/token/create', [

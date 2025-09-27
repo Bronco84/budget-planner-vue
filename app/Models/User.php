@@ -15,6 +15,23 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasFactory, Notifiable;
 
     /**
+     * Available account types in default order.
+     */
+    public const ACCOUNT_TYPES = [
+        'checking',
+        'savings',
+        'money market',
+        'cd',
+        'investment',
+        'credit card',
+        'credit',
+        'loan',
+        'line of credit',
+        'mortgage',
+        'other'
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -62,6 +79,46 @@ class User extends Authenticatable implements MustVerifyEmail
     public function linked_budgets(): BelongsToMany
     {
         return $this->belongsToMany(Budget::class);
+    }
+
+    /**
+     * Get the user's preferences.
+     */
+    public function preferences(): HasMany
+    {
+        return $this->hasMany(UserPreference::class);
+    }
+
+    /**
+     * Get a user preference value.
+     */
+    public function getPreference(string $key, $default = null)
+    {
+        return UserPreference::getUserPreference($this->id, $key, $default);
+    }
+
+    /**
+     * Set a user preference value.
+     */
+    public function setPreference(string $key, $value): void
+    {
+        UserPreference::setUserPreference($this->id, $key, $value);
+    }
+
+    /**
+     * Get the user's account type order preference.
+     */
+    public function getAccountTypeOrder(): array
+    {
+        return $this->getPreference('account_type_order', self::ACCOUNT_TYPES);
+    }
+
+    /**
+     * Set the user's account type order preference.
+     */
+    public function setAccountTypeOrder(array $order): void
+    {
+        $this->setPreference('account_type_order', $order);
     }
 
     /**

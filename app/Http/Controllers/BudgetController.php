@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\Transaction;
 use App\Services\ProjectionService;
 use App\Services\RecurringTransactionService;
+use App\Services\PlaidService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -56,33 +57,47 @@ class BudgetController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'account_name' => 'required|string|max:255',
-            'account_type' => 'required|string|max:50',
-            'starting_balance' => 'required|numeric',
         ]);
 
-        // Create the budget with proper type
+        // Create the budget
         /** @var Budget $budget */
         $budget = Auth::user()->budgets()->create([
             'name' => $validated['name'],
             'description' => $validated['description'],
         ]);
 
-        // Create the initial account with proper type
-        /** @var Account $account */
-        $account = $budget->accounts()->create([
-            'name' => $validated['account_name'],
-            'type' => $validated['account_type'],
-            'current_balance_cents' => $validated['starting_balance'] * 100,
-            'balance_updated_at' => now(),
-            'include_in_budget' => true,
+        return redirect()->route('budgets.setup', $budget)
+            ->with('message', 'Budget created! Now let\'s set up your accounts.');
+    }
+
+    /**
+     * Show the account setup page for a newly created budget.
+     */
+    public function setup(Budget $budget): Response|RedirectResponse
+    {
+        $this->authorize('view', $budget);
+
+        // If budget already has accounts, redirect to budget show
+        if ($budget->accounts()->exists()) {
+            return redirect()->route('budgets.show', $budget)
+                ->with('message', 'Budget already has accounts configured.');
+        }
+
+        try {
+            $plaidService = app(PlaidService::class);
+            $linkToken = $plaidService->createLinkToken(Auth::id());
+        } catch (\Exception $e) {
+            $linkToken = null;
+            \Log::warning('Failed to create Plaid link token for setup', [
+                'error' => $e->getMessage(),
+                'budget_id' => $budget->id
+            ]);
+        }
+
+        return Inertia::render('Budgets/Setup', [
+            'budget' => $budget,
+            'linkToken' => $linkToken,
         ]);
-
-        // Set this account as the starting balance account for the budget
-        $budget->update(['starting_balance_account_id' => $account->id]);
-
-        return redirect()->route('budgets.show', $budget)
-            ->with('message', 'Budget created successfully');
     }
 
     /**
@@ -96,6 +111,12 @@ class BudgetController extends Controller
             'categories.expenses',
             'accounts.plaidAccount'
         ]);
+
+        // Check if budget has accounts
+        if (!$budget->accounts->count()) {
+            return redirect()->route('budgets.setup', $budget)
+                ->with('message', 'Add your first account to get started with this budget.');
+        }
 
         // Get the selected account (or first account if none selected)
         $account = $budget->accounts()
@@ -340,6 +361,7 @@ class BudgetController extends Controller
                 'timeframe' => $timeframe,
                 'account_id' => $request->input('account_id'),
             ],
+            'userAccountTypeOrder' => Auth::user()->getAccountTypeOrder(),
         ]);
     }
 

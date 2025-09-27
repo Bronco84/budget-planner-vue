@@ -36,56 +36,19 @@
               </div>
               
               <div class="mb-8">
-                <h3 class="text-lg font-medium text-gray-900 mb-2">Initial Account</h3>
-                <p class="mb-4 text-sm text-gray-600">Your budget needs at least one account to track your finances. You can add more accounts later.</p>
-                
-                <div class="bg-gray-50 p-4 rounded-lg">
-                  <div class="mb-4">
-                    <InputLabel for="account_name" value="Account Name" />
-                    <TextInput
-                      id="account_name"
-                      type="text"
-                      class="mt-1 block w-full"
-                      v-model="form.account_name"
-                      required
-                      placeholder="e.g., Checking, Credit Card, etc."
-                    />
-                    <InputError class="mt-2" :message="form.errors.account_name" />
-                  </div>
-                  
-                  <div class="mb-4">
-                    <InputLabel for="account_type" value="Account Type" />
-                    <SelectInput
-                      id="account_type"
-                      class="mt-1 block w-full"
-                      v-model="form.account_type"
-                      required
-                    >
-                      <option value="checking">Checking</option>
-                      <option value="savings">Savings</option>
-                      <option value="credit">Credit Card</option>
-                      <option value="investment">Investment</option>
-                      <option value="other">Other</option>
-                    </SelectInput>
-                    <InputError class="mt-2" :message="form.errors.account_type" />
-                  </div>
-                  
-                  <div class="mb-0">
-                    <InputLabel for="starting_balance" value="Starting Balance" />
-                    <div class="relative mt-1 rounded-md shadow-sm">
-                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <span class="text-gray-500 sm:text-sm">$</span>
-                      </div>
-                      <TextInput
-                        id="starting_balance"
-                        type="number"
-                        step="0.01"
-                        class="mt-1 block w-full pl-7"
-                        v-model="form.starting_balance"
-                        required
-                      />
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div class="flex">
+                    <div class="flex-shrink-0">
+                      <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                      </svg>
                     </div>
-                    <InputError class="mt-2" :message="form.errors.starting_balance" />
+                    <div class="ml-3">
+                      <h3 class="text-sm font-medium text-blue-800">What's next?</h3>
+                      <p class="mt-1 text-sm text-blue-700">
+                        After creating your budget, you can connect your bank accounts for automatic transaction syncing, or add accounts manually for full control.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -122,10 +85,7 @@ import SelectInput from '@/Components/SelectInput.vue';
 // Initialize form with default values
 const form = useForm({
   name: '',
-  description: '',
-  account_name: '',
-  account_type: 'checking',
-  starting_balance: 0
+  description: ''
 });
 
 // Submit form handler

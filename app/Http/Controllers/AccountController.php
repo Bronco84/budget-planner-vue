@@ -28,7 +28,7 @@ class AccountController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|string|in:checking,savings,credit,investment,other',
+            'type' => 'required|string|max:50',
             'current_balance' => 'required|numeric',
             'include_in_budget' => 'boolean',
         ]);
@@ -67,7 +67,7 @@ class AccountController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|string|in:checking,savings,credit,investment,other',
+            'type' => 'required|string|max:50',
             'include_in_budget' => 'boolean',
         ]);
 

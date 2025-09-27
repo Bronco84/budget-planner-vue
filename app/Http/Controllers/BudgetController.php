@@ -57,7 +57,7 @@ class BudgetController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'account_name' => 'required|string|max:255',
-            'account_type' => 'required|string|in:checking,savings,credit,investment,other',
+            'account_type' => 'required|string|max:50',
             'starting_balance' => 'required|numeric',
         ]);
 

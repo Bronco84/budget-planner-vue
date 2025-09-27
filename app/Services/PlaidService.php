@@ -120,14 +120,8 @@ class PlaidService
                 'products' => ['transactions'],
                 'country_codes' => ['US'],
                 'language' => 'en',
-                'account_filters' => [
-                    'depository' => [
-                        'account_subtypes' => ['checking', 'savings']
-                    ],
-                    'credit' => [
-                        'account_subtypes' => ['credit card']
-                    ]
-                ],
+                // Remove account_filters to allow ALL account types
+                // 'account_filters' => [...],
                 'link_customization_name' => 'default',
             ];
 
@@ -349,6 +343,39 @@ class PlaidService
             $itemId = 'plaid-item-' . uniqid();
         }
 
+        // Fetch account details from Plaid to get the actual account type
+        try {
+            $plaidAccounts = $this->getAccounts($accessToken);
+            $plaidAccountData = collect($plaidAccounts)->firstWhere('account_id', $plaidAccountId);
+            
+            if ($plaidAccountData) {
+                // Map Plaid account type and subtype to a readable format
+                $accountType = $this->mapPlaidAccountType($plaidAccountData);
+                
+                // Update the local account with the correct type from Plaid
+                $account->update([
+                    'type' => $accountType,
+                    // Also update balance if available
+                    'current_balance_cents' => isset($plaidAccountData['balances']['current']) 
+                        ? (int) round($plaidAccountData['balances']['current'] * 100) 
+                        : $account->current_balance_cents,
+                    'balance_updated_at' => now(),
+                ]);
+                
+                Log::info('Updated account with Plaid data', [
+                    'account_id' => $account->id,
+                    'plaid_type' => $plaidAccountData['type'] ?? 'unknown',
+                    'plaid_subtype' => $plaidAccountData['subtype'] ?? 'unknown',
+                    'mapped_type' => $accountType,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to fetch account details during linking', [
+                'error' => $e->getMessage(),
+                'plaid_account_id' => $plaidAccountId,
+            ]);
+        }
+
         return PlaidAccount::updateOrCreate(
             [
                 'plaid_account_id' => $plaidAccountId,
@@ -361,6 +388,48 @@ class PlaidService
                 'access_token' => $accessToken,
             ]
         );
+    }
+
+    /**
+     * Map Plaid account type and subtype to a readable format
+     */
+    protected function mapPlaidAccountType(array $plaidAccount): string
+    {
+        $type = $plaidAccount['type'] ?? 'other';
+        $subtype = $plaidAccount['subtype'] ?? '';
+        
+        // If there's a subtype, use it for more specific typing
+        if (!empty($subtype)) {
+            // Common mappings for better readability
+            $subtypeMap = [
+                'checking' => 'checking',
+                'savings' => 'savings',
+                'credit card' => 'credit card',
+                'cd' => 'certificate of deposit',
+                'money market' => 'money market',
+                'hsa' => 'health savings account',
+                'ira' => 'traditional ira',
+                'roth' => 'roth ira',
+                '401k' => '401k',
+                '403B' => '403b',
+                '457b' => '457b',
+                'brokerage' => 'brokerage',
+                'mutual fund' => 'mutual fund',
+                'mortgage' => 'mortgage',
+                'auto' => 'auto loan',
+                'student' => 'student loan',
+                'home equity' => 'home equity',
+                'line of credit' => 'line of credit',
+                'business' => 'business loan',
+                'paypal' => 'paypal',
+                'prepaid' => 'prepaid',
+            ];
+            
+            return $subtypeMap[$subtype] ?? $subtype;
+        }
+        
+        // Fallback to main type if no subtype
+        return $type;
     }
 
     /**

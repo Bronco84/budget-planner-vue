@@ -12,47 +12,67 @@ class PlaidAccount extends Model
 
     /**
      * The attributes that are mass assignable.
-     *
-     * @var list<string>
      */
     protected $fillable = [
-        'budget_id',
+        'plaid_connection_id',
         'account_id',
         'plaid_account_id',
-        'plaid_item_id',
-        'institution_name',
-        'access_token',
+        'account_name',
+        'account_type',
+        'account_subtype',
+        'account_mask',
         'current_balance_cents',
         'available_balance_cents',
         'balance_updated_at',
-        'last_sync_at',
     ];
 
     /**
      * The attributes that should be cast.
-     *
-     * @var array<string, string>
      */
     protected $casts = [
         'current_balance_cents' => 'integer',
         'available_balance_cents' => 'integer',
         'balance_updated_at' => 'datetime',
-        'last_sync_at' => 'datetime',
     ];
 
     /**
-     * Get the budget that the Plaid account belongs to.
+     * Get the Plaid connection that this account belongs to.
      */
-    public function budget(): BelongsTo
+    public function plaidConnection(): BelongsTo
     {
-        return $this->belongsTo(Budget::class);
+        return $this->belongsTo(PlaidConnection::class);
     }
 
     /**
-     * Get the account that the Plaid account belongs to.
+     * Get the budget account that this Plaid account is linked to.
      */
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /**
+     * Get the budget through the Plaid connection.
+     */
+    public function budget(): BelongsTo
+    {
+        return $this->belongsTo(Budget::class, 'budget_id', 'id')
+                    ->through('plaidConnection');
+    }
+
+    /**
+     * Helper to get institution name through connection.
+     */
+    public function getInstitutionNameAttribute(): string
+    {
+        return $this->plaidConnection->institution_name ?? 'Unknown Institution';
+    }
+
+    /**
+     * Helper to get access token through connection.
+     */
+    public function getAccessTokenAttribute(): string
+    {
+        return $this->plaidConnection->access_token ?? '';
     }
 } 

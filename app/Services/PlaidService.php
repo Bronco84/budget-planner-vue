@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PlaidAccount;
+use App\Models\PlaidConnection;
 use App\Models\PlaidTransaction;
 use App\Models\Transaction;
 use Carbon\Carbon;
@@ -376,6 +377,128 @@ class PlaidService
     }
 
     /**
+     * Create or find a PlaidConnection for the given item.
+     *
+     * @param Budget $budget
+     * @param string $accessToken
+     * @param string $itemId
+     * @param string|null $institutionId
+     * @param string|null $institutionName
+     * @return PlaidConnection
+     */
+    public function createOrFindConnection(
+        Budget $budget,
+        string $accessToken,
+        string $itemId,
+        ?string $institutionId = null,
+        ?string $institutionName = null
+    ): PlaidConnection {
+        return PlaidConnection::updateOrCreate(
+            [
+                'budget_id' => $budget->id,
+                'plaid_item_id' => $itemId,
+            ],
+            [
+                'institution_id' => $institutionId,
+                'institution_name' => $institutionName ?? 'Unknown Institution',
+                'access_token' => $accessToken,
+                'status' => PlaidConnection::STATUS_ACTIVE,
+                'error_message' => null,
+                'last_sync_at' => null,
+            ]
+        );
+    }
+
+    /**
+     * Link multiple Plaid accounts to budget accounts under a single connection.
+     *
+     * @param Budget $budget
+     * @param array $accountData Array of [local_account, plaid_account_data] pairs
+     * @param string $accessToken
+     * @param string $itemId
+     * @param string|null $institutionId
+     * @param string|null $institutionName
+     * @return array Array of created PlaidAccount records
+     */
+    public function linkMultipleAccounts(
+        Budget $budget,
+        array $accountData,
+        string $accessToken,
+        string $itemId,
+        ?string $institutionId = null,
+        ?string $institutionName = null
+    ): array {
+        // Create or find the PlaidConnection
+        $plaidConnection = $this->createOrFindConnection(
+            $budget,
+            $accessToken,
+            $itemId,
+            $institutionId,
+            $institutionName
+        );
+
+        $plaidAccounts = [];
+        foreach ($accountData as $data) {
+            $localAccount = $data['local_account'];
+            $plaidAccountData = $data['plaid_account_data'];
+
+            $plaidAccounts[] = $this->linkAccountToConnection(
+                $plaidConnection,
+                $localAccount,
+                $plaidAccountData
+            );
+        }
+
+        return $plaidAccounts;
+    }
+
+    /**
+     * Link a single Plaid account to a connection.
+     *
+     * @param PlaidConnection $plaidConnection
+     * @param Account $account
+     * @param array $plaidAccountData
+     * @return PlaidAccount
+     */
+    public function linkAccountToConnection(
+        PlaidConnection $plaidConnection,
+        Account $account,
+        array $plaidAccountData
+    ): PlaidAccount {
+        // Update the local account with Plaid data
+        $accountType = $this->mapPlaidAccountType($plaidAccountData);
+        $account->update([
+            'type' => $accountType,
+            'current_balance_cents' => isset($plaidAccountData['balances']['current'])
+                ? (int) round($plaidAccountData['balances']['current'] * 100)
+                : $account->current_balance_cents,
+            'balance_updated_at' => now(),
+        ]);
+
+        // Create or update the PlaidAccount record
+        return PlaidAccount::updateOrCreate(
+            [
+                'plaid_account_id' => $plaidAccountData['account_id'],
+                'plaid_connection_id' => $plaidConnection->id,
+            ],
+            [
+                'account_id' => $account->id,
+                'account_name' => $plaidAccountData['name'] ?? 'Unknown Account',
+                'account_type' => $plaidAccountData['type'] ?? null,
+                'account_subtype' => $plaidAccountData['subtype'] ?? null,
+                'account_mask' => $plaidAccountData['mask'] ?? null,
+                'current_balance_cents' => isset($plaidAccountData['balances']['current'])
+                    ? (int) round($plaidAccountData['balances']['current'] * 100)
+                    : 0,
+                'available_balance_cents' => isset($plaidAccountData['balances']['available'])
+                    ? (int) round($plaidAccountData['balances']['available'] * 100)
+                    : null,
+                'balance_updated_at' => now(),
+            ]
+        );
+    }
+
+    /**
      * Link a Plaid account to an application account.
      *
      * @param Budget $budget
@@ -399,51 +522,25 @@ class PlaidService
             $itemId = 'plaid-item-' . uniqid();
         }
 
-        // Fetch account details from Plaid to get the actual account type
-        try {
-            $plaidAccounts = $this->getAccounts($accessToken);
-            $plaidAccountData = collect($plaidAccounts)->firstWhere('account_id', $plaidAccountId);
+        // Get the account data from Plaid
+        $plaidAccounts = $this->getAccounts($accessToken);
+        $plaidAccountData = collect($plaidAccounts)->firstWhere('account_id', $plaidAccountId);
 
-            if ($plaidAccountData) {
-                // Map Plaid account type and subtype to a readable format
-                $accountType = $this->mapPlaidAccountType($plaidAccountData);
-
-                // Update the local account with the correct type from Plaid
-                $account->update([
-                    'type' => $accountType,
-                    // Also update balance if available
-                    'current_balance_cents' => isset($plaidAccountData['balances']['current'])
-                        ? (int) round($plaidAccountData['balances']['current'] * 100)
-                        : $account->current_balance_cents,
-                    'balance_updated_at' => now(),
-                ]);
-
-                Log::info('Updated account with Plaid data', [
-                    'account_id' => $account->id,
-                    'plaid_type' => $plaidAccountData['type'] ?? 'unknown',
-                    'plaid_subtype' => $plaidAccountData['subtype'] ?? 'unknown',
-                    'mapped_type' => $accountType,
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::warning('Failed to fetch account details during linking', [
-                'error' => $e->getMessage(),
-                'plaid_account_id' => $plaidAccountId,
-            ]);
+        if (!$plaidAccountData) {
+            throw new \Exception("Plaid account {$plaidAccountId} not found");
         }
 
-        return PlaidAccount::updateOrCreate(
-            [
-                'plaid_account_id' => $plaidAccountId,
-                'plaid_item_id' => $itemId,
-            ],
-            [
-                'budget_id' => $budget->id,
-                'account_id' => $account->id,
-                'institution_name' => $institutionName,
-                'access_token' => $accessToken,
-            ]
+        // Create or find the PlaidConnection
+        $plaidConnection = $this->createOrFindConnection(
+            $budget,
+            $accessToken,
+            $itemId,
+            null, // We don't have institution_id in legacy calls
+            $institutionName
         );
+
+        // Link the account to the connection
+        return $this->linkAccountToConnection($plaidConnection, $account, $plaidAccountData);
     }
 
     /**
@@ -500,10 +597,12 @@ class PlaidService
         $endDate = Carbon::today();
         $startDate = Carbon::today()->subDays($days);
 
-        if (!$plaidAccount->access_token) {
+        $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
+
+        if (!$accessToken) {
             Log::error('Sync transactions failed: Access token is null', [
                 'plaid_account_id' => $plaidAccount->id,
-                'plaid_item_id' => $plaidAccount->plaid_item_id
+                'connection_id' => $plaidAccount->plaid_connection_id
             ]);
 
             return [
@@ -514,7 +613,7 @@ class PlaidService
 
         try {
             $transactions = $this->getTransactions(
-                $plaidAccount->access_token,
+                $accessToken,
                 $startDate,
                 $endDate
             );
@@ -588,7 +687,7 @@ class PlaidService
                 } else {
                     // Create new transaction
                     Transaction::create([
-                        'budget_id' => $plaidAccount->budget_id,
+                        'budget_id' => $plaidAccount->account->budget_id,
                         'account_id' => $plaidAccount->account_id,
                         'description' => $transaction['name'],
                         'category' => $transaction['category'][0] ?? 'Uncategorized',
@@ -622,9 +721,7 @@ class PlaidService
             }
 
             // Update last sync timestamp
-            $plaidAccount->update([
-                'last_sync_at' => now()
-            ]);
+            $plaidAccount->plaidConnection->markSynced();
 
             // Update account balance
             $this->updateAccountBalance($plaidAccount);
@@ -656,17 +753,19 @@ class PlaidService
      */
     public function updateAccountBalance(PlaidAccount $plaidAccount): bool
     {
-        if (!$plaidAccount->access_token) {
+        $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
+
+        if (!$accessToken) {
             Log::error('Update account balance failed: Access token is null', [
                 'plaid_account_id' => $plaidAccount->id,
-                'plaid_item_id' => $plaidAccount->plaid_item_id
+                'connection_id' => $plaidAccount->plaid_connection_id
             ]);
 
             return false;
         }
 
         try {
-            $accounts = $this->getAccounts($plaidAccount->access_token);
+            $accounts = $this->getAccounts($accessToken);
 
             if (empty($accounts)) {
                 return false;

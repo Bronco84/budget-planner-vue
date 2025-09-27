@@ -96,44 +96,52 @@ class PlaidController extends Controller
             // Get all accounts from Plaid
             $plaidAccounts = $this->plaidService->getAccounts($accessToken);
             $selectedPlaidAccounts = array_filter($plaidAccounts, function($account) use ($validated) {
-                return in_array($account['account_id'], $validated['selected_accounts']);
+                // Use 'id' field for Plaid metadata accounts, 'account_id' for API accounts
+                $accountId = $account['id'] ?? $account['account_id'];
+                return in_array($accountId, $validated['selected_accounts']);
             });
             
             $importedCount = 0;
-            $itemId = $validated['metadata']['item']['id'] ?? 
-                     $validated['metadata']['item_id'] ?? 
+            $itemId = $validated['metadata']['item']['id'] ??
+                     $validated['metadata']['item_id'] ??
                      'plaid-item-' . uniqid();
-            
+
+            // Prepare account data for batch linking
+            $accountData = [];
             foreach ($selectedPlaidAccounts as $plaidAccount) {
                 // Create local account
                 $accountType = $this->plaidService->mapPlaidAccountType($plaidAccount);
                 $localAccount = $budget->accounts()->create([
                     'name' => $plaidAccount['name'],
                     'type' => $accountType,
-                    'current_balance_cents' => isset($plaidAccount['balances']['current']) 
-                        ? (int) round($plaidAccount['balances']['current'] * 100) 
+                    'current_balance_cents' => isset($plaidAccount['balances']['current'])
+                        ? (int) round($plaidAccount['balances']['current'] * 100)
                         : 0,
                     'balance_updated_at' => now(),
                     'include_in_budget' => true,
                 ]);
-                
-                // Link to Plaid
-                $this->plaidService->linkAccount(
-                    $budget,
-                    $localAccount,
-                    $accessToken,
-                    $plaidAccount['account_id'],
-                    $itemId,
-                    $validated['metadata']['institution']['name']
-                );
-                
-                // Sync transactions
-                $plaidAccountRecord = PlaidAccount::where('plaid_account_id', $plaidAccount['account_id'])->first();
-                if ($plaidAccountRecord) {
-                    $this->plaidService->syncTransactions($plaidAccountRecord);
-                }
-                
+
+                $accountData[] = [
+                    'local_account' => $localAccount,
+                    'plaid_account_data' => $plaidAccount
+                ];
+
                 $importedCount++;
+            }
+
+            // Link all accounts to Plaid under single connection
+            $plaidAccounts = $this->plaidService->linkMultipleAccounts(
+                $budget,
+                $accountData,
+                $accessToken,
+                $itemId,
+                $validated['metadata']['institution']['institution_id'] ?? null,
+                $validated['metadata']['institution']['name']
+            );
+
+            // Sync transactions for all linked accounts
+            foreach ($plaidAccounts as $plaidAccount) {
+                $this->plaidService->syncTransactions($plaidAccount);
             }
             
             return redirect()->route('budgets.show', $budget)

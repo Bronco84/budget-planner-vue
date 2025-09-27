@@ -117,7 +117,7 @@ class PlaidService
                     'client_user_id' => (string) $userId,
                     'email_address' => null, // Optional: Add user's email if available
                 ],
-                'products' => ['transactions'],
+                'products' => ['transactions', 'auth', 'identity', 'assets', 'liabilities'],
                 'country_codes' => ['US'],
                 'language' => 'en',
                 // Remove account_filters to allow ALL account types
@@ -137,7 +137,9 @@ class PlaidService
                 'environment' => $this->environment,
                 'client_name' => config('app.name'),
                 'user_id' => $userId,
-                'mode' => $existingAccessToken ? 'update' : 'create'
+                'mode' => $existingAccessToken ? 'update' : 'create',
+                'products' => $payload['products'],
+                'account_filters_removed' => true
             ]);
 
             $response = $this->client->post('/link/token/create', [
@@ -309,7 +311,24 @@ class PlaidService
             ]);
 
             $result = json_decode($response->getBody(), true);
-            return $result['accounts'] ?? [];
+            $accounts = $result['accounts'] ?? [];
+            
+            // Log detailed account information for debugging
+            Log::info('Plaid accounts retrieved', [
+                'total_accounts' => count($accounts),
+                'accounts_summary' => array_map(function ($account) {
+                    return [
+                        'account_id' => $account['account_id'],
+                        'name' => $account['name'],
+                        'type' => $account['type'],
+                        'subtype' => $account['subtype'] ?? 'no_subtype',
+                        'mask' => $account['mask'] ?? 'no_mask',
+                        'balance' => $account['balances']['current'] ?? 'no_balance'
+                    ];
+                }, $accounts)
+            ]);
+            
+            return $accounts;
         } catch (RequestException $e) {
             Log::error('Plaid accounts fetch failed', [
                 'error' => $e->getMessage(),

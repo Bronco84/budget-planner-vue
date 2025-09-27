@@ -412,7 +412,7 @@ class PlaidService
     /**
      * Map Plaid account type and subtype to a readable format
      */
-    protected function mapPlaidAccountType(array $plaidAccount): string
+    public function mapPlaidAccountType(array $plaidAccount): string
     {
         $type = $plaidAccount['type'] ?? 'other';
         $subtype = $plaidAccount['subtype'] ?? '';

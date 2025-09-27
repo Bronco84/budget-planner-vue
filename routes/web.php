@@ -103,6 +103,10 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.rules.apply');
     
     // Plaid integration routes
+    Route::get('budget/{budget}/plaid/discover', [PlaidController::class, 'discover'])
+        ->name('plaid.discover');
+    Route::post('budget/{budget}/plaid/import', [PlaidController::class, 'import'])
+        ->name('plaid.import');
     Route::get('budget/{budget}/account/{account}/plaid/link', [PlaidController::class, 'showLinkForm'])
         ->name('plaid.link');
     Route::post('budget/{budget}/account/{account}/plaid/store', [PlaidController::class, 'store'])

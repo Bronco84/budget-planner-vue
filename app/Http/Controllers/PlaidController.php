@@ -52,6 +52,104 @@ class PlaidController extends Controller
     }
     
     /**
+     * Discover all available accounts from Plaid for a budget.
+     */
+    public function discover(Budget $budget): Response
+    {
+        $linkToken = null;
+        try {
+            $linkToken = $this->plaidService->createLinkToken((string) Auth::id());
+        } catch (\Exception $e) {
+            Log::error('Failed to create link token for discovery', [
+                'error' => $e->getMessage()
+            ]);
+        }
+        
+        return Inertia::render('Plaid/Discover', [
+            'budget' => $budget,
+            'linkToken' => $linkToken,
+        ]);
+    }
+    
+    /**
+     * Import multiple accounts from Plaid.
+     */
+    public function import(Request $request, Budget $budget): RedirectResponse
+    {
+        $validated = $request->validate([
+            'public_token' => 'required|string',
+            'metadata' => 'required|array',
+            'metadata.institution' => 'required|array',
+            'metadata.institution.name' => 'required|string',
+            'selected_accounts' => 'required|array',
+            'selected_accounts.*' => 'required|string',
+        ]);
+        
+        try {
+            // Exchange the public token for an access token
+            $accessToken = $this->plaidService->exchangePublicToken($validated['public_token']);
+            
+            if (!$accessToken) {
+                return redirect()->back()->with('error', 'Failed to connect to Plaid.');
+            }
+            
+            // Get all accounts from Plaid
+            $plaidAccounts = $this->plaidService->getAccounts($accessToken);
+            $selectedPlaidAccounts = array_filter($plaidAccounts, function($account) use ($validated) {
+                return in_array($account['account_id'], $validated['selected_accounts']);
+            });
+            
+            $importedCount = 0;
+            $itemId = $validated['metadata']['item']['id'] ?? 
+                     $validated['metadata']['item_id'] ?? 
+                     'plaid-item-' . uniqid();
+            
+            foreach ($selectedPlaidAccounts as $plaidAccount) {
+                // Create local account
+                $accountType = $this->plaidService->mapPlaidAccountType($plaidAccount);
+                $localAccount = $budget->accounts()->create([
+                    'name' => $plaidAccount['name'],
+                    'type' => $accountType,
+                    'current_balance_cents' => isset($plaidAccount['balances']['current']) 
+                        ? (int) round($plaidAccount['balances']['current'] * 100) 
+                        : 0,
+                    'balance_updated_at' => now(),
+                    'include_in_budget' => true,
+                ]);
+                
+                // Link to Plaid
+                $this->plaidService->linkAccount(
+                    $budget,
+                    $localAccount,
+                    $accessToken,
+                    $plaidAccount['account_id'],
+                    $itemId,
+                    $validated['metadata']['institution']['name']
+                );
+                
+                // Sync transactions
+                $plaidAccountRecord = PlaidAccount::where('plaid_account_id', $plaidAccount['account_id'])->first();
+                if ($plaidAccountRecord) {
+                    $this->plaidService->syncTransactions($plaidAccountRecord);
+                }
+                
+                $importedCount++;
+            }
+            
+            return redirect()->route('budgets.show', $budget)
+                ->with('message', "Successfully imported {$importedCount} accounts from Plaid.");
+                
+        } catch (\Exception $e) {
+            Log::error('Plaid import failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return redirect()->back()->with('error', 'Failed to import accounts: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Store a new Plaid link.
      */
     public function store(Request $request, Budget $budget, Account $account): RedirectResponse

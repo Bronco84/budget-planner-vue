@@ -103,6 +103,7 @@ class PlaidService
 
     /**
      * Create a link token for initializing Plaid Link
+     * @throws \Exception
      */
     public function createLinkToken($userId, $existingAccessToken = null)
     {
@@ -117,7 +118,8 @@ class PlaidService
                     'client_user_id' => (string) $userId,
                     'email_address' => null, // Optional: Add user's email if available
                 ],
-                'products' => ['transactions', 'auth', 'identity', 'assets', 'liabilities'],
+                'products' => ['liabilities'],
+                'additional_consented_products' => ['transactions','identity','assets'],
                 'country_codes' => ['US'],
                 'language' => 'en',
                 // Remove account_filters to allow ALL account types
@@ -139,7 +141,9 @@ class PlaidService
                 'user_id' => $userId,
                 'mode' => $existingAccessToken ? 'update' : 'create',
                 'products' => $payload['products'],
-                'account_filters_removed' => true
+                'additional_consented_products' => $payload['additional_consented_products'] ?? [],
+                'account_filters_removed' => true,
+                'liabilities_product_enabled' => in_array('liabilities', $payload['products'])
             ]);
 
             $response = $this->client->post('/link/token/create', [
@@ -312,7 +316,7 @@ class PlaidService
 
             $result = json_decode($response->getBody(), true);
             $accounts = $result['accounts'] ?? [];
-            
+
             // Log detailed account information for debugging
             Log::info('Plaid accounts retrieved', [
                 'total_accounts' => count($accounts),
@@ -327,10 +331,46 @@ class PlaidService
                     ];
                 }, $accounts)
             ]);
-            
+
             return $accounts;
         } catch (RequestException $e) {
             Log::error('Plaid accounts fetch failed', [
+                'error' => $e->getMessage(),
+                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Get liabilities (loans, mortgages, credit cards) from Plaid
+     */
+    public function getLiabilities(string $accessToken)
+    {
+        if (!$this->isConfigured) {
+            throw new \Exception('Plaid service is not properly configured');
+        }
+
+        try {
+            $response = $this->client->post('/liabilities/get', [
+                'json' => [
+                    'access_token' => $accessToken,
+                ]
+            ]);
+
+            $result = json_decode($response->getBody(), true);
+            
+            Log::info('Plaid liabilities retrieved', [
+                'credit_cards' => count($result['liabilities']['credit'] ?? []),
+                'mortgages' => count($result['liabilities']['mortgage'] ?? []),
+                'student_loans' => count($result['liabilities']['student'] ?? []),
+                'other_liabilities' => count($result['liabilities']['other'] ?? []),
+                'raw_data' => $result
+            ]);
+            
+            return $result['liabilities'] ?? [];
+        } catch (RequestException $e) {
+            Log::error('Plaid liabilities fetch failed', [
                 'error' => $e->getMessage(),
                 'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
             ]);
@@ -366,21 +406,21 @@ class PlaidService
         try {
             $plaidAccounts = $this->getAccounts($accessToken);
             $plaidAccountData = collect($plaidAccounts)->firstWhere('account_id', $plaidAccountId);
-            
+
             if ($plaidAccountData) {
                 // Map Plaid account type and subtype to a readable format
                 $accountType = $this->mapPlaidAccountType($plaidAccountData);
-                
+
                 // Update the local account with the correct type from Plaid
                 $account->update([
                     'type' => $accountType,
                     // Also update balance if available
-                    'current_balance_cents' => isset($plaidAccountData['balances']['current']) 
-                        ? (int) round($plaidAccountData['balances']['current'] * 100) 
+                    'current_balance_cents' => isset($plaidAccountData['balances']['current'])
+                        ? (int) round($plaidAccountData['balances']['current'] * 100)
                         : $account->current_balance_cents,
                     'balance_updated_at' => now(),
                 ]);
-                
+
                 Log::info('Updated account with Plaid data', [
                     'account_id' => $account->id,
                     'plaid_type' => $plaidAccountData['type'] ?? 'unknown',
@@ -416,7 +456,7 @@ class PlaidService
     {
         $type = $plaidAccount['type'] ?? 'other';
         $subtype = $plaidAccount['subtype'] ?? '';
-        
+
         // If there's a subtype, use it for more specific typing
         if (!empty($subtype)) {
             // Common mappings for better readability
@@ -443,10 +483,10 @@ class PlaidService
                 'paypal' => 'paypal',
                 'prepaid' => 'prepaid',
             ];
-            
+
             return $subtypeMap[$subtype] ?? $subtype;
         }
-        
+
         // Fallback to main type if no subtype
         return $type;
     }

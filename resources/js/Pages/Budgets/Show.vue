@@ -995,9 +995,9 @@ const formatDateTime = (dateTimeString) => {
 
 // Helper function to get balance color class based on account type
 const getBalanceColorClass = (account) => {
-  const nonCashAccountTypes = ['mortgage', 'line of credit'];
+  const liabilityAccountTypes = ['mortgage', 'line of credit', 'credit', 'credit card', 'loan'];
 
-  if (nonCashAccountTypes.includes(account.type)) {
+  if (liabilityAccountTypes.includes(account.type)) {
     return 'text-gray-600';
   }
 
@@ -1006,9 +1006,9 @@ const getBalanceColorClass = (account) => {
 
 // Helper function to get border color class based on account type
 const getBorderColorClass = (account) => {
-  const nonCashAccountTypes = ['mortgage', 'line of credit'];
+  const liabilityAccountTypes = ['mortgage', 'line of credit', 'credit', 'credit card', 'loan'];
 
-  if (nonCashAccountTypes.includes(account.type)) {
+  if (liabilityAccountTypes.includes(account.type)) {
     return 'border-gray-400';
   }
 
@@ -1017,9 +1017,9 @@ const getBorderColorClass = (account) => {
 
 // Helper function to get group total color class based on account type
 const getGroupTotalColorClass = (typeGroup) => {
-  const nonCashAccountTypes = ['mortgage', 'line of credit'];
+  const liabilityAccountTypes = ['mortgage', 'line of credit', 'credit', 'credit card', 'loan'];
 
-  if (nonCashAccountTypes.includes(typeGroup.type)) {
+  if (liabilityAccountTypes.includes(typeGroup.type)) {
     return 'text-gray-600';
   }
 

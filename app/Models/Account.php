@@ -15,6 +15,17 @@ class Account extends Model
     use HasFactory;
 
     /**
+     * Account types that are considered liabilities.
+     */
+    public const LIABILITY_TYPES = [
+        'mortgage',
+        'line of credit',
+        'credit',
+        'credit card',
+        'loan'
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -145,7 +156,7 @@ class Account extends Model
      */
     public function isLiability(): bool
     {
-        return in_array($this->type, ['mortgage', 'line of credit', 'credit', 'loan']);
+        return in_array($this->type, self::LIABILITY_TYPES);
     }
 
     /**

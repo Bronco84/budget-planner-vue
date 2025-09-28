@@ -42,7 +42,10 @@
                   <option value="checking">Checking</option>
                   <option value="savings">Savings</option>
                   <option value="credit">Credit Card</option>
+                  <option value="line of credit">Line of Credit</option>
+                  <option value="mortgage">Mortgage</option>
                   <option value="investment">Investment</option>
+                  <option value="loan">Loan</option>
                   <option value="other">Other</option>
                 </SelectInput>
                 <InputError class="mt-2" :message="form.errors.type" />
@@ -82,6 +85,26 @@
                   </p>
                 </div>
               </div>
+
+              <div class="mb-6">
+                <InputLabel for="total_balance_setting" value="Total Balance Display" />
+                <div class="mt-2">
+                  <div class="flex items-center">
+                    <input
+                      id="exclude-from-total-balance"
+                      type="checkbox"
+                      v-model="form.exclude_from_total_balance"
+                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500 rounded"
+                    />
+                    <label for="exclude-from-total-balance" class="ml-2 block text-sm text-gray-700">
+                      Exclude from total balance calculation
+                    </label>
+                  </div>
+                  <p class="text-sm text-gray-500 mt-1">
+                    When checked, this account's balance will not be included in the total balance shown at the top of your budget. Useful for accounts you want to track but not include in your net worth calculation.
+                  </p>
+                </div>
+              </div>
               
               <div class="flex items-center justify-end mt-6 space-x-4">
                 <Link
@@ -117,7 +140,7 @@
                   <div>
                     <p class="font-medium text-blue-800">{{ account.plaid_account.institution_name }}</p>
                     <p class="text-sm text-blue-600 mt-1">
-                      Last synced: {{ formatDateTime(account.plaid_account.last_sync_at) || 'Never' }}
+                      Last synced: {{ formatDateTime(account.plaid_account?.plaid_connection?.last_sync_at) || 'Never' }}
                     </p>
                   </div>
                   <div>
@@ -202,6 +225,7 @@ const form = useForm({
   name: props.account.name,
   type: props.account.type,
   include_in_budget: props.account.include_in_budget,
+  exclude_from_total_balance: props.account.exclude_from_total_balance,
 });
 
 // Watch for changes to account status and update include_in_budget

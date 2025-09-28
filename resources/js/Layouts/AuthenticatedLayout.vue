@@ -6,6 +6,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import ThemeToggle from '@/Components/ThemeToggle.vue';
+import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import { Link } from '@inertiajs/vue3';
 import { useTheme } from '@/composables/useTheme';
 
@@ -187,6 +188,13 @@ initializeTheme();
                     </div>
                 </div>
             </nav>
+
+            <!-- Breadcrumbs -->
+            <div class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200" v-if="$page.props.breadcrumbs">
+                <div class="mx-auto max-w-full px-4 py-3 sm:px-6 lg:px-8">
+                    <Breadcrumbs :breadcrumbs="$page.props.breadcrumbs" />
+                </div>
+            </div>
 
             <!-- Page Heading -->
             <header

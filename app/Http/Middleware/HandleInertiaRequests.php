@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Diglactic\Breadcrumbs\Breadcrumbs;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -35,6 +36,33 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'breadcrumbs' => $this->getBreadcrumbs($request),
         ];
+    }
+
+    /**
+     * Get breadcrumbs for the current route.
+     */
+    protected function getBreadcrumbs(Request $request): array
+    {
+        $routeName = $request->route()?->getName();
+
+        if (!$routeName) {
+            return [];
+        }
+
+        try {
+            $breadcrumbs = Breadcrumbs::generate($routeName, ...array_values($request->route()->parameters()));
+
+            return $breadcrumbs->map(function ($breadcrumb) {
+                return [
+                    'title' => $breadcrumb->title,
+                    'url' => $breadcrumb->url,
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            // If breadcrumbs don't exist for this route, return empty array
+            return [];
+        }
     }
 }

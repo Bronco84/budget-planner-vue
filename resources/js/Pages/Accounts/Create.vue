@@ -36,7 +36,10 @@
                   <option value="checking">Checking</option>
                   <option value="savings">Savings</option>
                   <option value="credit">Credit Card</option>
+                  <option value="line of credit">Line of Credit</option>
+                  <option value="mortgage">Mortgage</option>
                   <option value="investment">Investment</option>
+                  <option value="loan">Loan</option>
                   <option value="other">Other</option>
                 </SelectInput>
                 <InputError class="mt-2" :message="form.errors.type" />

@@ -119,11 +119,34 @@ class BudgetController extends Controller
         }
 
         // Get the selected account (or first account if none selected)
-        $account = $budget->accounts()
-            ->when(
-                $request->filled('account_id'),
-                fn($query) => $query->where('id', $request->input('account_id')),
-            )->firstOrFail();
+        if ($request->filled('account_id')) {
+            $account = $budget->accounts()->where('id', $request->input('account_id'))->firstOrFail();
+        } else {
+            // Get the first account according to user's preferred account type order
+            $userAccountTypeOrder = Auth::user()->getAccountTypeOrder();
+            $accounts = $budget->accounts()->get();
+
+            // Group accounts by type
+            $accountsByType = $accounts->groupBy('type');
+
+            // Find the first account type that has accounts, according to user preference
+            $account = null;
+            foreach ($userAccountTypeOrder as $type) {
+                if ($accountsByType->has($type) && $accountsByType[$type]->isNotEmpty()) {
+                    $account = $accountsByType[$type]->first();
+                    break;
+                }
+            }
+
+            // Fallback to just the first account if no match found
+            if (!$account) {
+                $account = $accounts->first();
+            }
+
+            if (!$account) {
+                throw new \Exception('No accounts found for this budget.');
+            }
+        }
 
         // Get query parameters for filtering
         $search = $request->input('search');
@@ -340,8 +363,19 @@ class BudgetController extends Controller
             ->orderBy('category')
             ->pluck('category');
 
-        // Get the total balance across all accounts
-        $totalBalance = $budget->accounts->sum('current_balance_cents');
+        // Calculate the total balance across all accounts
+        // Assets are added, liabilities are subtracted, excluded accounts are ignored
+        $totalBalance = $budget->accounts
+            ->filter(fn($account) => !$account->exclude_from_total_balance)
+            ->reduce(function ($total, $account) {
+                if ($account->isLiability()) {
+                    // Subtract liabilities (mortgages, lines of credit, etc.)
+                    return $total - $account->current_balance_cents;
+                } else {
+                    // Add assets (checking, savings, etc.)
+                    return $total + $account->current_balance_cents;
+                }
+            }, 0);
 
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
@@ -359,7 +393,7 @@ class BudgetController extends Controller
                 'category' => $category,
                 'pending' => $pending,
                 'timeframe' => $timeframe,
-                'account_id' => $request->input('account_id'),
+                'account_id' => $account->id, // Pass the actual selected account ID
             ],
             'userAccountTypeOrder' => Auth::user()->getAccountTypeOrder(),
         ]);

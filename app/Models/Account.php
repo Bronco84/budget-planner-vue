@@ -26,6 +26,7 @@ class Account extends Model
         'current_balance_cents',
         'balance_updated_at',
         'include_in_budget',
+        'exclude_from_total_balance',
     ];
 
     /**
@@ -37,6 +38,7 @@ class Account extends Model
         'current_balance_cents' => 'integer',
         'balance_updated_at' => 'datetime',
         'include_in_budget' => 'boolean',
+        'exclude_from_total_balance' => 'boolean',
     ];
 
     /**
@@ -115,7 +117,7 @@ class Account extends Model
      */
     protected function getStatusAttribute(): AccountStatus
     {
-        return AccountStatus::fromIncludeInBudget($this->include_in_budget);
+        return AccountStatus::fromIncludeInBudget($this->include_in_budget ?? true);
     }
 
     /**
@@ -136,5 +138,21 @@ class Account extends Model
         return Attribute::make(
             get: fn () => $this->getStatusAttribute()->classes(),
         );
+    }
+
+    /**
+     * Check if this account type is a liability (should be subtracted from total balance).
+     */
+    public function isLiability(): bool
+    {
+        return in_array($this->type, ['mortgage', 'line of credit', 'credit', 'loan']);
+    }
+
+    /**
+     * Check if this account type is an asset (should be added to total balance).
+     */
+    public function isAsset(): bool
+    {
+        return !$this->isLiability();
     }
 }

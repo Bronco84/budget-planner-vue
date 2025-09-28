@@ -79,7 +79,7 @@
             </div>
 
             <!-- Accounts Card -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg divide-red-50 divide-x">
+            <div class="bg-white overflow-visible shadow-sm sm:rounded-lg divide-red-50 divide-x">
               <div class="p-4">
                 <div class="flex justify-between items-center mb-3">
                   <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Accounts</h3>
@@ -139,7 +139,7 @@
                           </div>
                         </div>
                         <div class="text-sm font-semibold"
-                             :class="typeGroup.total >= 0 ? 'text-green-600' : 'text-red-600'">
+                             :class="getGroupTotalColorClass(typeGroup)">
                           {{ formatCurrency(typeGroup.total) }}
                         </div>
                       </div>
@@ -151,7 +151,7 @@
                           :key="account.id"
                           class="bg-gray-50 p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-100 transition-colors"
                           :class="[
-                            account.current_balance_cents >= 0 ? 'border-green-500' : 'border-red-500',
+                            getBorderColorClass(account),
                             activeAccountId === account.id ? 'border-l-8 bg-gray-100' : ''
                           ]"
                           @click="selectAccount(account.id)"
@@ -163,11 +163,11 @@
                               <span class="w-2 h-2 rounded-full mr-2"
                                     :class="getLastSyncClass(account.plaid_account)"></span>
                                 <div class="whitespace-nowrap">
-                                    {{ account.plaid_account.last_sync_at ? `Last synced ${formatTimeAgo(account.plaid_account.last_sync_at)}` : 'Not synced yet' }}
+                                    {{ account.plaid_account?.plaid_connection?.last_sync_at ? `Last synced ${formatTimeAgo(account.plaid_account.plaid_connection.last_sync_at)}` : 'Not synced yet' }}
                                 </div>
                             </div>
                           </div>
-                          <div class="text-sm font-medium" :class="account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600'">
+                          <div class="text-sm font-medium" :class="getBalanceColorClass(account)">
                             {{ formatCurrency(account.current_balance_cents) }}
                           </div>
                         </div>
@@ -188,7 +188,7 @@
                             </button>
                             <div
                               v-if="openDropdown === account.id"
-                              class="absolute right-0 z-10 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg"
+                              class="absolute right-0 z-50 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg"
                               @click.stop
                             >
                               <div class="py-1">
@@ -993,6 +993,39 @@ const formatDateTime = (dateTimeString) => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
+// Helper function to get balance color class based on account type
+const getBalanceColorClass = (account) => {
+  const nonCashAccountTypes = ['mortgage', 'line of credit'];
+
+  if (nonCashAccountTypes.includes(account.type)) {
+    return 'text-gray-600';
+  }
+
+  return account.current_balance_cents >= 0 ? 'text-green-600' : 'text-red-600';
+};
+
+// Helper function to get border color class based on account type
+const getBorderColorClass = (account) => {
+  const nonCashAccountTypes = ['mortgage', 'line of credit'];
+
+  if (nonCashAccountTypes.includes(account.type)) {
+    return 'border-gray-400';
+  }
+
+  return account.current_balance_cents >= 0 ? 'border-green-500' : 'border-red-500';
+};
+
+// Helper function to get group total color class based on account type
+const getGroupTotalColorClass = (typeGroup) => {
+  const nonCashAccountTypes = ['mortgage', 'line of credit'];
+
+  if (nonCashAccountTypes.includes(typeGroup.type)) {
+    return 'text-gray-600';
+  }
+
+  return typeGroup.total >= 0 ? 'text-green-600' : 'text-red-600';
+};
+
 // Format time ago (e.g., "3 minutes ago", "2 hours ago")
 const formatTimeAgo = (dateTimeString) => {
   if (!dateTimeString) return 'N/A';
@@ -1036,7 +1069,7 @@ const importFromBank = () => {
 
   // Check if we've already synced today to avoid unnecessary API costs
   const syncTimes = plaidAccounts
-    .map(account => account.plaid_account?.last_sync_at)
+    .map(account => account.plaid_account?.plaid_connection?.last_sync_at)
     .filter(time => time !== null && time !== undefined);
 
   if (syncTimes.length > 0) {
@@ -1117,7 +1150,7 @@ const getLastSyncText = () => {
   if (!hasPlaidAccounts.value) return '';
 
   const syncTimes = plaidConnectedAccounts.value
-    .map(account => account.plaid_account?.last_sync_at)
+    .map(account => account.plaid_account?.plaid_connection?.last_sync_at)
     .filter(time => time !== null && time !== undefined);
 
   if (syncTimes.length === 0) return 'No sync history';
@@ -1143,9 +1176,9 @@ const getLastSyncText = () => {
 
 // Function to get a colored indicator based on how recent the sync is
 const getLastSyncClass = (plaidAccount) => {
-  if (!plaidAccount || !plaidAccount.last_sync_at) return 'bg-gray-400';
+  if (!plaidAccount?.plaid_connection?.last_sync_at) return 'bg-gray-400';
 
-  const lastSync = new Date(plaidAccount.last_sync_at);
+  const lastSync = new Date(plaidAccount.plaid_connection.last_sync_at);
   const now = new Date();
   const diffHours = (now - lastSync) / (1000 * 60 * 60);
 
@@ -1159,7 +1192,7 @@ onMounted(() => {
   if (hasPlaidAccounts.value) {
     // Get the latest sync time across all accounts
     const syncTimes = plaidConnectedAccounts.value
-      .map(account => account.plaid_account?.last_sync_at)
+      .map(account => account.plaid_account?.plaid_connection?.last_sync_at)
       .filter(time => time !== null && time !== undefined);
 
     if (syncTimes.length > 0) {

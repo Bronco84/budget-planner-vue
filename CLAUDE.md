@@ -36,8 +36,9 @@ This is a budget planning application built with:
 
 This project uses **Laravel Herd** for local development:
 - **Local URL**: `http://budget_planner_vue.test`
-- **No need to run `php artisan serve`** - Herd handles the web server automatically
-- **Vite dev server is assumed to be running** for hot module replacement and instant CSS/JS updates
+- **NEVER run `php artisan serve`** - This will interfere with Herd processes that are already running
+- **Herd and Vite are assumed to be running** - They provide the web server and hot module replacement for instant page updates
+- **Always use the .test domain** for all local development and testing
 
 ## Development Commands
 ```bash
@@ -287,3 +288,44 @@ This project follows [Claude Code best practices](https://www.anthropic.com/engi
 4. Confirming that no existing functionality was broken
 
 **Example**: If you modify account display logic, you must verify that accounts are actually visible in the UI, not just that the code compiles without errors.
+
+## Package Selection Priority Rule
+
+**MANDATORY**: When selecting packages to solve problems, always follow this hierarchy:
+
+### 1. First-Party Packages (Highest Priority)
+Always prefer official packages from the framework authors:
+- **Laravel**: Packages published under `laravel/*` namespace (e.g., `laravel/sanctum`, `laravel/horizon`)
+- **Vue**: Official Vue packages like `@vue/*` (e.g., `@vue/router`, `@vue/devtools`)
+- **Inertia**: Official Inertia packages `@inertiajs/*` (e.g., `@inertiajs/vue3`, `@inertiajs/progress`)
+
+### 2. Well-Established Community Packages (Second Priority)
+If first-party solutions don't exist, choose packages with:
+- **High adoption**: >100k weekly downloads on npm/packagist
+- **Active maintenance**: Updated within last 6 months
+- **Strong community**: >1000 GitHub stars, active issues/discussions
+- **Good documentation**: Clear README and usage examples
+- **Framework compatibility**: Explicitly supports current versions
+
+### 3. Package Selection Process
+Before adding any package:
+1. **Research first-party options** - Check Laravel docs, Vue ecosystem guide, Inertia docs
+2. **Evaluate alternatives** - Compare popular options on npm/packagist
+3. **Check compatibility** - Ensure supports current Laravel/Vue/Inertia versions
+4. **Verify maintenance** - Recent commits, active maintainers, security updates
+5. **Review dependencies** - Minimal dependency tree, no security vulnerabilities
+
+### 4. Examples of Preferred Packages
+- **Authentication**: `laravel/sanctum` over third-party auth packages
+- **Validation**: Laravel's built-in validation over external validators
+- **HTTP Client**: Laravel's HTTP client over axios (where applicable)
+- **State Management**: Vue's built-in reactivity over complex state libraries
+- **UI Components**: Headless UI or first-party solutions over heavy component libraries
+- **Testing**: Laravel's built-in testing tools + Pest over external frameworks
+
+### 5. When to Avoid Packages
+- **Unmaintained packages**: No updates >1 year
+- **Experimental packages**: Pre-1.0 versions for production
+- **Overcomplicated packages**: Heavy solutions for simple problems
+- **Duplicate functionality**: When framework already provides the feature
+- **Security concerns**: Packages with known vulnerabilities or poor security practices

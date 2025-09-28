@@ -44,7 +44,7 @@
                   <div>
                     <p class="font-medium text-blue-800">{{ plaidAccount.institution_name }}</p>
                     <p class="text-sm text-blue-600">
-                      Last synced: {{ formatDateTime(plaidAccount.last_sync_at) || 'Never' }}
+                      Last synced: {{ formatDateTime(plaidAccount.plaid_connection?.last_sync_at) || 'Never' }}
                     </p>
                   </div>
                   <div class="flex space-x-2">

@@ -31,6 +31,7 @@ class AccountController extends Controller
             'type' => 'required|string|max:50',
             'current_balance' => 'required|numeric',
             'include_in_budget' => 'boolean',
+            'exclude_from_total_balance' => 'boolean',
         ]);
 
         /** @var Account $account */
@@ -40,6 +41,7 @@ class AccountController extends Controller
             'current_balance_cents' => $validated['current_balance'] * 100,
             'balance_updated_at' => now(),
             'include_in_budget' => $validated['include_in_budget'] ?? true,
+            'exclude_from_total_balance' => $validated['exclude_from_total_balance'] ?? false,
         ]);
 
         return redirect()->route('budgets.show', $budget)
@@ -51,8 +53,8 @@ class AccountController extends Controller
      */
     public function edit(Budget $budget, Account $account)
     {
-        // Load the Plaid account relationship
-        $account->load('plaidAccount');
+        // Load the Plaid account and connection relationships
+        $account->load('plaidAccount.plaidConnection');
         
         return Inertia::render('Accounts/Edit', [
             'budget' => $budget,
@@ -69,6 +71,7 @@ class AccountController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:50',
             'include_in_budget' => 'boolean',
+            'exclude_from_total_balance' => 'boolean',
         ]);
 
         $account->update($validated);

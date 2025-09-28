@@ -611,7 +611,7 @@ import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import { formatCurrency } from '@/utils/format.js';
-import draggable from 'vuedraggable';
+import draggable from 'vuedraggable'
 
 // Define props
 const props = defineProps({
@@ -825,7 +825,11 @@ const orderedAccounts = computed(() => {
 
 // Watch for changes in props and rebuild the draggable array
 watch([() => props.userAccountTypeOrder, () => props.accounts], () => {
+  console.log('DEBUG: Watcher triggered');
+  console.log('DEBUG: accounts.length:', props.accounts?.length);
+  console.log('DEBUG: userAccountTypeOrder:', props.userAccountTypeOrder);
   rebuildDraggableArray();
+  console.log('DEBUG: draggableAccountGroups after rebuild:', draggableAccountGroups.value);
 }, { immediate: true });
 
 // Toggle account dropdown

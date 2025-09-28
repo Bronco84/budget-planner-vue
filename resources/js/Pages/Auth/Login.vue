@@ -38,7 +38,7 @@ const submit = () => {
             {{ status }}
         </div>
 
-        <LoginLink v-if="$page.props.environment === 'local'" label="Login as bamccoley@gmail.com" class="pb-3 text-red-500" :redirect-url="route('dashboard')" />
+        <LoginLink v-if="$page.props.environment === 'local'" label="Login as bamccoley@gmail.com" email="bamccoley@gmail.com" class="pb-3 text-red-500" :redirect-url="route('dashboard')" />
 
 
         <form @submit.prevent="submit">

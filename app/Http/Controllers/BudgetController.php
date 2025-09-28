@@ -106,10 +106,10 @@ class BudgetController extends Controller
     public function show(Budget $budget, Request $request): Response
     {
         // TODO: Add authorization check for budget access
-        // Load relationships including plaidAccount with account
+        // Load relationships including plaidAccount with connection
         $budget->load([
             'categories.expenses',
-            'accounts.plaidAccount'
+            'accounts.plaidAccount.plaidConnection'
         ]);
 
         // Check if budget has accounts

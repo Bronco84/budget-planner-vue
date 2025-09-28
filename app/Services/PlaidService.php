@@ -286,12 +286,26 @@ class PlaidService
             $result = json_decode($response->getBody(), true);
             return $result['transactions'] ?? [];
         } catch (RequestException $e) {
+            $response = null;
+            $errorDetails = null;
+
+            if ($e->hasResponse()) {
+                $response = $e->getResponse();
+                $errorDetails = json_decode($response->getBody(), true);
+            }
+
             Log::error('Plaid transactions fetch failed', [
                 'error' => $e->getMessage(),
-                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null,
+                'response' => $errorDetails,
                 'start_date' => $startDate,
                 'end_date' => $endDate
             ]);
+
+            // If it's a PRODUCT_NOT_READY error, throw a specific exception
+            if ($errorDetails && isset($errorDetails['error_code']) && $errorDetails['error_code'] === 'PRODUCT_NOT_READY') {
+                throw new \Exception('PRODUCT_NOT_READY: ' . ($errorDetails['error_message'] ?? 'Transaction data is not yet ready'));
+            }
+
             return [];
         }
     }

@@ -202,9 +202,34 @@ const openPlaidLink = () => {
 const syncTransactions = () => {
   syncInProgress.value = true;
   router.post(
-    route('plaid.sync', [props.budget.id, props.account.id]), 
-    {}, 
-    { 
+    route('plaid.sync', [props.budget.id, props.account.id]),
+    {},
+    {
+      onSuccess: (page) => {
+        // Debug: log all flash data
+        console.log('Sync response - Flash data:', page.props.flash);
+        console.log('Sync response - All props:', page.props);
+
+        // Show success or error message if available
+        if (page.props.flash && page.props.flash.message) {
+          alert('Success: ' + page.props.flash.message);
+        } else if (page.props.flash && page.props.flash.error) {
+          alert('Error: ' + page.props.flash.error);
+        } else {
+          console.log('No flash message found in response');
+          // Let's also check if there's any error in the page props directly
+          if (page.props.error) {
+            alert('Page Error: ' + page.props.error);
+          }
+        }
+      },
+      onError: (errors) => {
+        console.log('Sync onError called with:', errors);
+        // Show error message if available
+        if (errors.message) {
+          alert('OnError: ' + errors.message);
+        }
+      },
       onFinish: () => {
         syncInProgress.value = false;
       }
@@ -215,9 +240,23 @@ const syncTransactions = () => {
 const updateBalance = () => {
   balanceUpdateInProgress.value = true;
   router.post(
-    route('plaid.balance', [props.budget.id, props.account.id]), 
-    {}, 
-    { 
+    route('plaid.balance', [props.budget.id, props.account.id]),
+    {},
+    {
+      onSuccess: (page) => {
+        // Show success or error message if available
+        if (page.props.flash && page.props.flash.message) {
+          alert(page.props.flash.message);
+        } else if (page.props.flash && page.props.flash.error) {
+          alert(page.props.flash.error);
+        }
+      },
+      onError: (errors) => {
+        // Show error message if available
+        if (errors.message) {
+          alert(errors.message);
+        }
+      },
       onFinish: () => {
         balanceUpdateInProgress.value = false;
       }

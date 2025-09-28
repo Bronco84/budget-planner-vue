@@ -215,15 +215,31 @@ class PlaidController extends Controller
     public function syncTransactions(Budget $budget, Account $account): RedirectResponse
     {
         $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
-        
+
         if (!$plaidAccount) {
             return redirect()->back()->with('error', 'Account is not linked to Plaid.');
         }
-        
-        $result = $this->plaidService->syncTransactions($plaidAccount);
-        
-        return redirect()->back()->with('message', 
-            'Synced ' . $result['imported'] . ' new and updated ' . $result['updated'] . ' transactions.');
+
+        try {
+            $result = $this->plaidService->syncTransactions($plaidAccount);
+
+            return redirect()->back()->with('message',
+                'Synced ' . $result['imported'] . ' new and updated ' . $result['updated'] . ' transactions.');
+        } catch (\Exception $e) {
+            // Handle PRODUCT_NOT_READY error specifically
+            if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY')) {
+                return redirect()->back()->with('error',
+                    'Transaction data for this account is still being processed by Plaid. This can take 1-3 days for credit cards after initial connection. Please try again later.');
+            }
+
+            Log::error('Single account sync error', [
+                'account_id' => $account->id,
+                'plaid_account_id' => $plaidAccount->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->back()->with('error', 'Failed to sync transactions: ' . $e->getMessage());
+        }
     }
     
     /**
@@ -307,22 +323,33 @@ class PlaidController extends Controller
                     'account_id' => $plaidAccount->account_id,
                     'institution' => $plaidAccount->institution_name
                 ]);
-                
+
                 $result = $this->plaidService->syncTransactions($plaidAccount);
                 $totalImported += $result['imported'];
                 $totalUpdated += $result['updated'];
-                
+
                 Log::info('Sync successful', [
                     'plaid_account_id' => $plaidAccount->id,
                     'imported' => $result['imported'],
                     'updated' => $result['updated']
                 ]);
             } catch (\Exception $e) {
-                // Make sure to access the name safely
                 $accountName = $plaidAccount->account ? $plaidAccount->account->name : 'Unknown';
+
+                // Handle PRODUCT_NOT_READY error specifically
+                if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY')) {
+                    Log::info('Account transaction data not ready yet', [
+                        'plaid_account_id' => $plaidAccount->id,
+                        'account_name' => $accountName,
+                        'institution' => $plaidAccount->institution_name
+                    ]);
+                    // Don't add to errors array for this specific case
+                    continue;
+                }
+
                 $errorMessage = "Error syncing account {$accountName}: {$e->getMessage()}";
                 $errors[] = $errorMessage;
-                
+
                 Log::error('Sync error', [
                     'plaid_account_id' => $plaidAccount->id,
                     'account_id' => $plaidAccount->account_id,

@@ -10,71 +10,101 @@
             <!-- Budget Overview Card -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
               <div class="p-4">
-                  <div class="flex items-center justify-between mb-2">
-                  <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
-                  <Link
-                      :href="route('budgets.edit', budget.id)"
-                      class="flex items-center text-sm"
+                  <!-- Always visible header with Total Balance -->
+                  <div class="cursor-pointer" @click="budgetCardExpanded = !budgetCardExpanded">
+                    <div class="flex items-center justify-between mb-2">
+                      <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
+                      <div class="flex items-center space-x-2">
+                        <Link
+                            :href="route('budgets.edit', budget.id)"
+                            class="flex items-center text-sm hover:text-gray-600"
+                            @click.stop
+                        >
+                            Edit Budget <PencilIcon class="ml-2 w-3 h-3" />
+                        </Link>
+                        <!-- Expand/Collapse Icon -->
+                        <svg
+                          class="w-5 h-5 text-gray-500 transition-transform duration-200"
+                          :class="{ 'rotate-180': budgetCardExpanded }"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    <!-- Always visible Total Balance -->
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                      <div class="text-sm font-medium text-gray-500">Total Balance</div>
+                      <div class="text-xl font-semibold mt-1">{{ formatCurrency(totalBalance) }}</div>
+                    </div>
+                  </div>
+
+                  <!-- Collapsible content -->
+                  <transition
+                    enter-active-class="transition duration-300 ease-out"
+                    enter-from-class="transform opacity-0 -translate-y-2"
+                    enter-to-class="transform opacity-100 translate-y-0"
+                    leave-active-class="transition duration-200 ease-in"
+                    leave-from-class="transform opacity-100 translate-y-0"
+                    leave-to-class="transform opacity-0 -translate-y-2"
                   >
-                      Edit Budget <PencilIcon class="ml-2 w-3 h-3" />
-                  </Link>
-                  </div>
-                <div class="space-y-3">
-                  <div class="bg-gray-50 p-3 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500">Total Balance</div>
-                    <div class="text-xl font-semibold mt-1">{{ formatCurrency(totalBalance) }}</div>
-                  </div>
-
-                  <div class="bg-gray-50 p-3 rounded-lg" v-if="budget.description">
-                    <div class="text-sm font-medium text-gray-500">Description</div>
-                    <div class="text-sm mt-1">{{ budget.description || 'No description provided' }}</div>
-                  </div>
-
-                  <!-- File Attachments Section -->
-                  <div class="bg-gray-50 p-3 rounded-lg">
-                    <div class="text-sm font-medium text-gray-500 mb-2">File Attachments</div>
-                    <div class="space-y-2">
-                      <div v-if="budgetAttachments.length === 0" class="text-xs text-gray-500 text-center py-2">
-                        No files attached
+                    <div v-show="budgetCardExpanded" class="space-y-3 mt-3">
+                      <div class="bg-gray-50 p-3 rounded-lg" v-if="budget.description">
+                        <div class="text-sm font-medium text-gray-500">Description</div>
+                        <div class="text-sm mt-1">{{ budget.description || 'No description provided' }}</div>
                       </div>
-                      <div v-else>
-                        <FileAttachmentList
-                          :attachments="budgetAttachments"
-                          @deleted="handleFileDeleted"
-                        />
-                      </div>
-                      <button @click="showFileUploadModal = true" class="w-full mt-2 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-300 rounded px-2 py-1">
-                        Attach File
-                      </button>
-                    </div>
-                  </div>
-                    <div class="space-y-3">
-                        <div>
-                            <label for="projection_months" class="block text-sm font-medium text-gray-700">
-                                Project Future Transactions
-                            </label>
-                            <select
-                                id="projection_months"
-                                v-model="projectionForm.months"
-                                @change="updateProjections"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
-                                <option value="0">No projections</option>
-                                <option value="1">1 month</option>
-                                <option value="2">2 months</option>
-                                <option value="3">3 months</option>
-                                <option value="6">6 months</option>
-                                <option value="12">12 months</option>
-                            </select>
-                        </div>
 
-                        <div v-if="projectionForm.months > 0" class="space-y-3">
-                            <div v-if="displayedProjectedTransactions.length > 0" class="mt-2 text-sm text-blue-600">
-                                Showing {{ displayedProjectedTransactions.length }} projected transaction{{ displayedProjectedTransactions.length === 1 ? '' : 's' }}
-                            </div>
+                      <!-- File Attachments Section -->
+                      <div class="bg-gray-50 p-3 rounded-lg">
+                        <div class="text-sm font-medium text-gray-500 mb-2">File Attachments</div>
+                        <div class="space-y-2">
+                          <div v-if="budgetAttachments.length === 0" class="text-xs text-gray-500 text-center py-2">
+                            No files attached
+                          </div>
+                          <div v-else>
+                            <FileAttachmentList
+                              :attachments="budgetAttachments"
+                              @deleted="handleFileDeleted"
+                            />
+                          </div>
+                          <button @click="showFileUploadModal = true" class="w-full mt-2 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-300 rounded px-2 py-1">
+                            Attach File
+                          </button>
                         </div>
+                      </div>
+
+                      <!-- Projections Section -->
+                      <div class="space-y-3">
+                          <div>
+                              <label for="projection_months" class="block text-sm font-medium text-gray-700">
+                                  Project Future Transactions
+                              </label>
+                              <select
+                                  id="projection_months"
+                                  v-model="projectionForm.months"
+                                  @change="updateProjections"
+                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                              >
+                                  <option value="0">No projections</option>
+                                  <option value="1">1 month</option>
+                                  <option value="2">2 months</option>
+                                  <option value="3">3 months</option>
+                                  <option value="6">6 months</option>
+                                  <option value="12">12 months</option>
+                              </select>
+                          </div>
+
+                          <div v-if="projectionForm.months > 0" class="space-y-3">
+                              <div v-if="displayedProjectedTransactions.length > 0" class="mt-2 text-sm text-blue-600">
+                                  Showing {{ displayedProjectedTransactions.length }} projected transaction{{ displayedProjectedTransactions.length === 1 ? '' : 's' }}
+                              </div>
+                          </div>
+                      </div>
                     </div>
-                </div>
+                  </transition>
               </div>
             </div>
 
@@ -711,6 +741,9 @@ const showFileUploadModal = ref(false);
 
 // Dropdown state for account actions
 const openDropdown = ref(null);
+
+// Budget card accordion state (collapsed by default)
+const budgetCardExpanded = ref(false);
 
 // Selected account tracking is handled by activeAccountId computed property
 

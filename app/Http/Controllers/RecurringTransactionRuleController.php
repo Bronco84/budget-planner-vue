@@ -6,6 +6,7 @@ use App\Models\Budget;
 use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
+use App\Services\RecurringTransactionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,6 +14,16 @@ use Inertia\Response;
 
 class RecurringTransactionRuleController extends Controller
 {
+    protected RecurringTransactionService $recurringTransactionService;
+
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct(RecurringTransactionService $recurringTransactionService)
+    {
+        $this->recurringTransactionService = $recurringTransactionService;
+    }
+
     /**
      * Display rules for a recurring transaction template.
      */
@@ -88,8 +99,16 @@ class RecurringTransactionRuleController extends Controller
 
         $rule->update($validated);
 
-        return redirect()->route('recurring-transactions.rules.index', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
-            ->with('message', 'Rule updated successfully');
+        // Re-evaluate all transaction links based on updated rules
+        $results = $this->recurringTransactionService->reevaluateTransactionLinks($recurring_transaction);
+
+        $message = 'Rule updated successfully';
+        if ($results['linked'] > 0 || $results['unlinked'] > 0) {
+            $message .= sprintf(' (%d transactions linked, %d unlinked)', $results['linked'], $results['unlinked']);
+        }
+
+        return redirect()->route('recurring-transactions.edit', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
+            ->with('message', $message);
     }
 
     /**
@@ -106,8 +125,16 @@ class RecurringTransactionRuleController extends Controller
 
         $rule->delete();
 
-        return redirect()->route('recurring-transactions.rules.index', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
-            ->with('message', 'Rule deleted successfully');
+        // Re-evaluate transaction links after deleting the rule
+        $results = $this->recurringTransactionService->reevaluateTransactionLinks($recurring_transaction);
+
+        $message = 'Rule deleted successfully';
+        if ($results['unlinked'] > 0) {
+            $message .= sprintf(' (%d transactions unlinked)', $results['unlinked']);
+        }
+
+        return redirect()->route('recurring-transactions.edit', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
+            ->with('message', $message);
     }
 
     /**
@@ -146,6 +173,57 @@ class RecurringTransactionRuleController extends Controller
             'rule' => $validated,
             'matchingTransactions' => $matchingTransactions,
             'totalTested' => $transactions->count(),
+        ]);
+    }
+
+    /**
+     * Preview what transactions would be matched by active rules.
+     */
+    public function preview(Budget $budget, RecurringTransactionTemplate $recurring_transaction): Response
+    {
+        $this->authorize('view', $budget);
+
+        $account = $recurring_transaction->account;
+        $rules = $recurring_transaction->rules()
+            ->where('is_active', true)
+            ->orderBy('priority')
+            ->get();
+
+        if ($rules->isEmpty()) {
+            return Inertia::render('RecurringTransactions/Rules/Preview', [
+                'budget' => $budget,
+                'recurringTransaction' => $recurring_transaction,
+                'matchingTransactions' => [],
+                'hasActiveRules' => false,
+            ]);
+        }
+
+        // Get unlinked transactions from the last 90 days
+        $transactions = Transaction::where('account_id', $account->id)
+            ->whereNull('recurring_transaction_template_id')
+            ->where('date', '>=', now()->subDays(90)->toDateString())
+            ->latest('date')
+            ->get();
+
+        $matchingTransactions = [];
+
+        foreach ($transactions as $transaction) {
+            foreach ($rules as $rule) {
+                if ($rule->matchesTransaction($transaction)) {
+                    $matchingTransactions[] = [
+                        'transaction' => $transaction,
+                        'matched_by_rule' => $rule,
+                    ];
+                    break; // Stop checking rules once a match is found
+                }
+            }
+        }
+
+        return Inertia::render('RecurringTransactions/Rules/Preview', [
+            'budget' => $budget,
+            'recurringTransaction' => $recurring_transaction,
+            'matchingTransactions' => $matchingTransactions,
+            'hasActiveRules' => true,
         ]);
     }
 
@@ -193,5 +271,54 @@ class RecurringTransactionRuleController extends Controller
 
         return redirect()->route('recurring-transactions.rules.index', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
             ->with('message', $message);
+    }
+
+    /**
+     * Unlink a transaction from its recurring transaction template.
+     */
+    public function unlink(Request $request, Budget $budget, RecurringTransactionTemplate $recurring_transaction): RedirectResponse
+    {
+        $this->authorize('update', $budget);
+
+        $validated = $request->validate([
+            'transaction_id' => 'required|exists:transactions,id',
+        ]);
+
+        $transaction = Transaction::findOrFail($validated['transaction_id']);
+
+        // Ensure the transaction belongs to this budget
+        if ($transaction->budget_id !== $budget->id) {
+            abort(403, 'Transaction does not belong to this budget');
+        }
+
+        // Ensure the transaction is currently linked to this recurring transaction
+        if ($transaction->recurring_transaction_template_id !== $recurring_transaction->id) {
+            abort(400, 'Transaction is not linked to this recurring transaction');
+        }
+
+        $transaction->update([
+            'recurring_transaction_template_id' => null
+        ]);
+
+        return back()->with('message', 'Transaction unlinked successfully');
+    }
+
+    /**
+     * Get all transactions linked to this recurring transaction template.
+     */
+    public function linked(Budget $budget, RecurringTransactionTemplate $recurring_transaction): Response
+    {
+        $this->authorize('view', $budget);
+
+        $linkedTransactions = Transaction::where('recurring_transaction_template_id', $recurring_transaction->id)
+            ->with('account')
+            ->latest('date')
+            ->paginate(50);
+
+        return Inertia::render('RecurringTransactions/Rules/Linked', [
+            'budget' => $budget,
+            'recurringTransaction' => $recurring_transaction,
+            'linkedTransactions' => $linkedTransactions,
+        ]);
     }
 } 

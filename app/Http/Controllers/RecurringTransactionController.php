@@ -56,13 +56,23 @@ class RecurringTransactionController extends Controller
     /**
      * Show the form for creating a new recurring transaction.
      */
-    public function create(Budget $budget): Response
+    public function create(Request $request, Budget $budget): Response
     {
         $this->authorize('update', $budget);
+
+        $sourceTransaction = null;
+
+        // If creating from an existing transaction, fetch its data
+        if ($request->has('from_transaction')) {
+            $sourceTransaction = \App\Models\Transaction::where('id', $request->input('from_transaction'))
+                ->where('budget_id', $budget->id)
+                ->first();
+        }
 
         return Inertia::render('RecurringTransactions/Create', [
             'budget' => $budget,
             'accounts' => $budget->accounts,
+            'sourceTransaction' => $sourceTransaction,
         ]);
     }
 
@@ -192,12 +202,14 @@ class RecurringTransactionController extends Controller
             ->orderBy('date', 'desc')
             ->get();
 
-        return Inertia::render('RecurringTransactions/Edit', [
+        return Inertia::render('RecurringTransactions/Show', [
             'budget' => $budget,
             'accounts' => $budget->accounts,
-            'recurringTransaction' => $recurring_transaction,
+            'recurringTransaction' => $recurring_transaction->load('account'),
             'rules' => $rules,
             'linkedTransactions' => $linkedTransactions,
+            'fieldOptions' => \App\Models\RecurringTransactionRule::getFieldOptions(),
+            'operatorOptions' => \App\Models\RecurringTransactionRule::getOperatorOptions(),
         ]);
     }
 

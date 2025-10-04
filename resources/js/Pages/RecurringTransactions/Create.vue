@@ -10,6 +10,22 @@
 
     <div class="py-12">
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <!-- Info banner when creating from transaction -->
+        <div v-if="sourceTransaction" class="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-blue-700">
+                Creating recurring transaction from existing transaction. Details have been pre-filled for you.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6 bg-white border-b border-gray-200">
             <form @submit.prevent="submit">
@@ -429,6 +445,7 @@ import { formatCurrency } from '@/utils/format.js';
 const props = defineProps({
   budget: Object,
   accounts: Array,
+  sourceTransaction: Object,
 });
 
 // UI state
@@ -437,16 +454,17 @@ const amountType = ref('static');
 // Today's date for default start date
 const today = new Date().toISOString().substring(0, 10);
 
+// Initialize form with sourceTransaction data if available
 const form = useForm({
-  description: '',
-  amount: '',
-  account_id: '',
-  category: '',
+  description: props.sourceTransaction?.description || '',
+  amount: props.sourceTransaction ? Math.abs(props.sourceTransaction.amount_in_cents / 100) : '',
+  account_id: props.sourceTransaction?.account_id || '',
+  category: props.sourceTransaction?.category || '',
   frequency: '',
   day_of_month: 1,
   day_of_week: new Date().getDay().toString(),
   first_day_of_month: 1,
-  start_date: today,
+  start_date: props.sourceTransaction?.date || today,
   end_date: '',
   min_amount: '',
   max_amount: '',
@@ -478,10 +496,29 @@ const submit = () => {
     is_dynamic_amount: amountType.value === 'dynamic'
   });
 
-  form.transform((form) => ({
-      ...form,
+  form.transform((data) => {
+    const transformed = {
+      ...data,
       is_dynamic_amount: amountType.value === 'dynamic'
-  })).post(route('recurring-transactions.store', props.budget.id), {
+    };
+
+    // Remove fields not needed for the selected frequency
+    if (form.frequency === 'biweekly' || form.frequency === 'weekly') {
+      delete transformed.day_of_month;
+      delete transformed.first_day_of_month;
+    } else if (form.frequency === 'monthly' || form.frequency === 'quarterly') {
+      delete transformed.day_of_week;
+      delete transformed.first_day_of_month;
+    } else if (form.frequency === 'bimonthly') {
+      delete transformed.day_of_week;
+    } else if (form.frequency === 'daily' || form.frequency === 'yearly') {
+      delete transformed.day_of_week;
+      delete transformed.day_of_month;
+      delete transformed.first_day_of_month;
+    }
+
+    return transformed;
+  }).post(route('recurring-transactions.store', props.budget.id), {
     onSuccess: () => {
       console.log('Form submitted successfully');
     },

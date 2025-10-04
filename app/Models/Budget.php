@@ -116,6 +116,14 @@ class Budget extends Model
     }
 
     /**
+     * Get the payoff plans for the budget.
+     */
+    public function payoffPlans(): HasMany
+    {
+        return $this->hasMany(PayoffPlan::class);
+    }
+
+    /**
      * Get all file attachments for this budget.
      */
     public function fileAttachments(): MorphMany

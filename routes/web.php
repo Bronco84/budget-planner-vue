@@ -12,6 +12,8 @@ use App\Http\Controllers\RecurringTransactionRuleController;
 use App\Http\Controllers\PlaidController;
 use App\Http\Controllers\PlaidTransactionController;
 use App\Http\Controllers\ProjectionsController;
+use App\Http\Controllers\RecurringTransactionAnalysisController;
+use App\Http\Controllers\PayoffPlanController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -109,9 +111,41 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.rules.destroy');
     Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/test', [RecurringTransactionRuleController::class, 'test'])
         ->name('recurring-transactions.rules.test');
+    Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/preview', [RecurringTransactionRuleController::class, 'preview'])
+        ->name('recurring-transactions.rules.preview');
     Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/apply', [RecurringTransactionRuleController::class, 'apply'])
         ->name('recurring-transactions.rules.apply');
-    
+    Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/rules/unlink', [RecurringTransactionRuleController::class, 'unlink'])
+        ->name('recurring-transactions.rules.unlink');
+    Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/linked', [RecurringTransactionRuleController::class, 'linked'])
+        ->name('recurring-transactions.rules.linked');
+
+    // Routes for recurring transaction analysis
+    Route::get('budget/{budget}/recurring-transactions-analysis', [RecurringTransactionAnalysisController::class, 'show'])
+        ->name('recurring-transactions.analysis');
+    Route::post('budget/{budget}/recurring-transactions-analysis/analyze', [RecurringTransactionAnalysisController::class, 'analyze'])
+        ->name('recurring-transactions.analysis.analyze');
+    Route::post('budget/{budget}/recurring-transactions-analysis/create-templates', [RecurringTransactionAnalysisController::class, 'createTemplates'])
+        ->name('recurring-transactions.analysis.create-templates');
+
+    // Routes for payoff plans
+    Route::get('budget/{budget}/payoff-plans', [PayoffPlanController::class, 'index'])
+        ->name('payoff-plans.index');
+    Route::get('budget/{budget}/payoff-plans/create', [PayoffPlanController::class, 'create'])
+        ->name('payoff-plans.create');
+    Route::post('budget/{budget}/payoff-plans', [PayoffPlanController::class, 'store'])
+        ->name('payoff-plans.store');
+    Route::get('budget/{budget}/payoff-plans/{payoff_plan}', [PayoffPlanController::class, 'show'])
+        ->name('payoff-plans.show');
+    Route::get('budget/{budget}/payoff-plans/{payoff_plan}/edit', [PayoffPlanController::class, 'edit'])
+        ->name('payoff-plans.edit');
+    Route::patch('budget/{budget}/payoff-plans/{payoff_plan}', [PayoffPlanController::class, 'update'])
+        ->name('payoff-plans.update');
+    Route::delete('budget/{budget}/payoff-plans/{payoff_plan}', [PayoffPlanController::class, 'destroy'])
+        ->name('payoff-plans.destroy');
+    Route::post('budget/{budget}/payoff-plans/preview', [PayoffPlanController::class, 'preview'])
+        ->name('payoff-plans.preview');
+
     // Plaid integration routes
     Route::get('budget/{budget}/plaid/discover', [PlaidController::class, 'discover'])
         ->name('plaid.discover');

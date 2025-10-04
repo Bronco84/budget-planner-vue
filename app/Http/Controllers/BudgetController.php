@@ -30,15 +30,20 @@ class BudgetController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): Response
+    public function index(): Response|RedirectResponse
     {
         $budgets = Auth::user()->budgets()
             ->with(['categories', 'categories.expenses', 'accounts'])
             ->get();
 
-        return Inertia::render('Budgets/Index', [
-            'budgets' => $budgets
-        ]);
+        // If no budgets exist, redirect to create page
+        if ($budgets->isEmpty()) {
+            return redirect()->route('budgets.create');
+        }
+
+        // If budgets exist, redirect to the first budget
+        $firstBudget = $budgets->first();
+        return redirect()->route('budgets.show', $firstBudget);
     }
 
     /**
@@ -377,8 +382,19 @@ class BudgetController extends Controller
                 }
             }, 0);
 
+        // Get all user's budgets for the budget switcher
+        $allBudgets = Auth::user()->budgets()
+            ->select('id', 'name', 'description')
+            ->orderBy('name')
+            ->get();
+
+        // Calculate projected monthly cash flow for the selected account
+        // This is based on recurring transactions for the next month
+        $monthlyProjectedCashFlow = $recurringService->calculateMonthlyProjectedCashFlow($account);
+
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
+            'allBudgets' => $allBudgets,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
             'transactions' => $accountTransactions,
@@ -396,6 +412,7 @@ class BudgetController extends Controller
                 'account_id' => $account->id, // Pass the actual selected account ID
             ],
             'userAccountTypeOrder' => Auth::user()->getAccountTypeOrder(),
+            'monthlyProjectedCashFlow' => $monthlyProjectedCashFlow,
         ]);
     }
 

@@ -52,34 +52,6 @@
                     </div>
                   </div>
 
-                  <div class="mt-3">
-                    <div class="flex justify-between text-sm mb-1">
-                      <span class="text-gray-600">Budget Amount</span>
-                      <span class="font-medium">{{ formatCurrency(budget.total_amount * 100) }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm mb-1">
-                      <span class="text-gray-600">Remaining</span>
-                      <span class="font-medium">{{ formatCurrency(budget.remaining_amount * 100) }}</span>
-                    </div>
-                    <div class="flex justify-between text-sm">
-                      <span class="text-gray-600">Period</span>
-                      <span class="font-medium">{{ formatDate(budget.start_date) }} - {{ formatDate(budget.end_date) }}</span>
-                    </div>
-                  </div>
-
-                  <div class="mt-4">
-                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                      <div
-                        class="h-2.5 rounded-full"
-                        :class="getBudgetProgressColor(budget.percent_used)"
-                        :style="{ width: `${isNaN(budget.percent_used) ? 0 : Math.min(budget.percent_used, 100)}%` }"
-                      ></div>
-                    </div>
-                    <div class="flex justify-between mt-1 text-xs text-gray-500">
-                      <span>{{ isNaN(budget.percent_used) ? '0' : Math.round(budget.percent_used) }}% used</span>
-                      <span>{{ isNaN(budget.percent_used) ? '100' : Math.min(100 - Math.round(budget.percent_used), 100) }}% remaining</span>
-                    </div>
-                  </div>
 
                   <div class="mt-5 pt-4 border-t flex justify-between">
                     <Link
@@ -133,13 +105,4 @@ const formatDate = (dateString) => {
   }
 };
 
-// Get appropriate color class based on percentage used
-const getBudgetProgressColor = (percentUsed) => {
-  const percent = parseFloat(percentUsed);
-  
-  if (isNaN(percent)) return 'bg-gray-300';
-  if (percent >= 90) return 'bg-red-500';
-  if (percent >= 75) return 'bg-yellow-500';
-  return 'bg-green-500';
-};
 </script> 

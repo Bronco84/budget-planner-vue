@@ -129,10 +129,11 @@
 
 <script>
 import { useForm } from '@inertiajs/vue3';
+import { watch } from 'vue';
 
 export default {
     name: 'RecurringTransactionRuleForm',
-    
+
     props: {
         fieldOptions: {
             type: Object,
@@ -170,9 +171,9 @@ export default {
             default: false
         }
     },
-    
+
     emits: ['submitted', 'test'],
-    
+
     setup(props, { emit }) {
         const form = useForm({
             field: props.rule.field,
@@ -182,6 +183,17 @@ export default {
             is_active: props.rule.is_active,
             priority: props.rule.priority
         });
+
+        // Watch for changes to the rule prop and update form fields
+        watch(() => props.rule, (newRule) => {
+            form.field = newRule.field;
+            form.operator = newRule.operator;
+            form.value = newRule.value;
+            form.is_case_sensitive = newRule.is_case_sensitive;
+            form.is_active = newRule.is_active;
+            form.priority = newRule.priority;
+            form.clearErrors();
+        }, { deep: true });
 
         const submit = () => {
             form[props.submitMethod](props.submitUrl, {

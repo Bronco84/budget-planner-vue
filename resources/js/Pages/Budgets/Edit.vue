@@ -35,24 +35,6 @@
                 <InputError class="mt-2" :message="form.errors.description" />
               </div>
               
-              <div class="mb-4">
-                <InputLabel for="total_amount" value="Total Budget Amount" />
-                <div class="relative mt-1 rounded-md shadow-sm">
-                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <span class="text-gray-500 sm:text-sm">$</span>
-                  </div>
-                  <TextInput
-                    id="total_amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    class="mt-1 block w-full pl-7"
-                    v-model="form.total_amount"
-                    required
-                  />
-                </div>
-                <InputError class="mt-2" :message="form.errors.total_amount" />
-              </div>
               
               <div class="flex items-center justify-between mt-6">
                 <DeleteButton @click="confirmBudgetDeletion" class="mr-auto">
@@ -130,7 +112,6 @@ const props = defineProps({
 const form = useForm({
   name: props.budget.name,
   description: props.budget.description || '',
-  total_amount: props.budget.total_amount,
 });
 
 // Submit form handler

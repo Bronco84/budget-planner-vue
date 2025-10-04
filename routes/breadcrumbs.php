@@ -70,6 +70,27 @@ Breadcrumbs::for('budgets.transactions.edit', function (BreadcrumbTrail $trail, 
     $trail->push('Edit Transaction', route('budgets.transactions.edit', [$budget, $transaction]));
 });
 
+// Recurring Transactions
+Breadcrumbs::for('recurring-transactions.index', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('budgets.show', $budget);
+    $trail->push('Recurring Transactions', route('recurring-transactions.index', $budget));
+});
+
+Breadcrumbs::for('recurring-transactions.create', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('recurring-transactions.index', $budget);
+    $trail->push('Create Recurring Transaction', route('recurring-transactions.create', $budget));
+});
+
+Breadcrumbs::for('recurring-transactions.edit', function (BreadcrumbTrail $trail, Budget $budget, $recurringTransaction) {
+    $trail->parent('recurring-transactions.index', $budget);
+    $trail->push('Edit: ' . $recurringTransaction->description, route('recurring-transactions.edit', [$budget, $recurringTransaction]));
+});
+
+Breadcrumbs::for('recurring-transactions.analysis', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('recurring-transactions.index', $budget);
+    $trail->push('Recurring Transaction Analysis', route('recurring-transactions.analysis', $budget));
+});
+
 // Profile
 Breadcrumbs::for('profile.edit', function (BreadcrumbTrail $trail) {
     $trail->parent('dashboard');

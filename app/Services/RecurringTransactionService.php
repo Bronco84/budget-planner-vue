@@ -33,8 +33,8 @@ class RecurringTransactionService
             // End at the earlier of endDate or template's end_date
             $templateEndDate = $template->end_date ? min($endDate, $template->end_date) : $endDate;
 
-            // For weekly transactions, move to the next occurrence of the specified day
-            if ($template->frequency === 'weekly') {
+            // For weekly and biweekly transactions, move to the next occurrence of the specified day
+            if ($template->frequency === 'weekly' || $template->frequency === 'biweekly') {
                 while ($date->dayOfWeek !== $template->day_of_week) {
                     $date->addDay();
                 }
@@ -281,6 +281,52 @@ class RecurringTransactionService
         }
 
         return $linkedCount;
+    }
+
+    /**
+     * Re-evaluate and update all transaction links for a template based on current rules
+     * This will unlink transactions that no longer match and link new ones that do
+     */
+    public function reevaluateTransactionLinks(RecurringTransactionTemplate $template)
+    {
+        $rules = $template->rules()->where('is_active', true)->get();
+
+        // If no rules, unlink all transactions
+        if ($rules->isEmpty()) {
+            $unlinkedCount = Transaction::where('recurring_transaction_template_id', $template->id)
+                ->update(['recurring_transaction_template_id' => null]);
+            return ['unlinked' => $unlinkedCount, 'linked' => 0];
+        }
+
+        // Find all transactions that currently match the rules
+        $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
+        $matchingIds = $matchingTransactions->pluck('id')->toArray();
+
+        // Get currently linked transactions
+        $currentlyLinked = Transaction::where('recurring_transaction_template_id', $template->id)->get();
+
+        // Unlink transactions that no longer match
+        $unlinkedCount = 0;
+        foreach ($currentlyLinked as $transaction) {
+            if (!in_array($transaction->id, $matchingIds)) {
+                $transaction->recurring_transaction_template_id = null;
+                $transaction->save();
+                $unlinkedCount++;
+            }
+        }
+
+        // Link transactions that match but aren't linked yet
+        $linkedCount = 0;
+        foreach ($matchingTransactions as $transaction) {
+            // Only link if not already linked to any template
+            if ($transaction->recurring_transaction_template_id === null) {
+                $transaction->recurring_transaction_template_id = $template->id;
+                $transaction->save();
+                $linkedCount++;
+            }
+        }
+
+        return ['unlinked' => $unlinkedCount, 'linked' => $linkedCount];
     }
 
     /**
@@ -953,5 +999,25 @@ class RecurringTransactionService
     {
         return $template->calculateNextOccurrence();
     }
-    
+
+    /**
+     * Calculate projected monthly cash flow for an account based on recurring transactions
+     *
+     * @param Account $account
+     * @return int Cash flow in cents (positive = net income, negative = net expense)
+     */
+    public function calculateMonthlyProjectedCashFlow(Account $account): int
+    {
+        // Project transactions for the next 30 days
+        $startDate = Carbon::now();
+        $endDate = Carbon::now()->addDays(30);
+
+        $projectedTransactions = $this->projectTransactions($account, $startDate, $endDate);
+
+        // Calculate net cash flow (income - expenses)
+        $netCashFlow = $projectedTransactions->sum('amount_in_cents');
+
+        return $netCashFlow;
+    }
+
 }

@@ -28,7 +28,7 @@ const navigationItems = [
     { name: 'Budgets', href: 'budgets.index', icon: BanknotesIcon, route: 'budgets.*' },
     { name: 'Transactions', href: '#', icon: CurrencyDollarIcon, route: 'transactions.*', disabled: true },
     { name: 'Reports', href: '#', icon: ChartBarIcon, route: 'reports.*', disabled: true },
-    { name: 'Calendar', href: '#', icon: CalendarIcon, route: 'calendar.*', disabled: true },
+    { name: 'Calendar', href: 'calendar.index', icon: CalendarIcon, route: 'calendar.*' },
 ];
 </script>
 

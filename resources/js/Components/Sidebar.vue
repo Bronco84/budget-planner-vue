@@ -6,6 +6,7 @@ import {
     CurrencyDollarIcon,
     ChartBarIcon,
     CalendarIcon,
+    ArrowPathIcon,
     ChevronLeftIcon,
     ChevronRightIcon
 } from '@heroicons/vue/24/outline';
@@ -27,8 +28,9 @@ const navigationItems = [
     { name: 'Dashboard', href: 'dashboard', icon: HomeIcon, route: 'dashboard' },
     { name: 'Budgets', href: 'budgets.index', icon: BanknotesIcon, route: 'budgets.*' },
     { name: 'Transactions', href: 'transactions.index', icon: CurrencyDollarIcon, route: 'budget.transaction.*' },
-    { name: 'Reports', href: '#', icon: ChartBarIcon, route: 'reports.*', disabled: true },
+    { name: 'Recurring', href: 'recurring-transactions.redirect', icon: ArrowPathIcon, route: 'recurring-transactions.*' },
     { name: 'Calendar', href: 'calendar.index', icon: CalendarIcon, route: 'calendar.*' },
+    { name: 'Reports', href: '#', icon: ChartBarIcon, route: 'reports.*', disabled: true },
 ];
 </script>
 

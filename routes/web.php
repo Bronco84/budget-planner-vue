@@ -50,6 +50,15 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('budget.transaction.index', $firstBudget->id);
     })->name('transactions.index');
 
+    // Recurring transactions redirect route - redirects to first budget's recurring transactions
+    Route::get('/recurring-transactions', function () {
+        $firstBudget = auth()->user()->budgets()->first();
+        if (!$firstBudget) {
+            return redirect()->route('budgets.create');
+        }
+        return redirect()->route('recurring-transactions.index', $firstBudget->id);
+    })->name('recurring-transactions.redirect');
+
     Route::resource('budgets', BudgetController::class);
 
     // Budget setup routes

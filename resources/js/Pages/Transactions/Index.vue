@@ -4,61 +4,65 @@
   <AuthenticatedLayout>
     <div class="py-6">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Action buttons -->
-        <div class="mb-6 flex justify-end gap-3">
-          <Link
-            :href="route('budgets.show', budget.id)"
-            class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-50 dark:hover:bg-gray-600 transition"
-          >
-            Back to Budget
-          </Link>
-          <Link
-            :href="route('budget.transaction.create', budget.id)"
-            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 transition"
-          >
-            Add Transaction
-          </Link>
-        </div>
-
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6">
-            <!-- Search and Filter Controls -->
+            <!-- Search, Filter Controls, and Action Buttons -->
             <form @submit.prevent="filter">
-              <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                <div class="relative rounded-md shadow-sm flex-grow">
-                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <span class="text-gray-500 sm:text-sm">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                      </svg>
-                    </span>
+              <div class="mb-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                <!-- Search and filter controls -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+                  <div class="relative rounded-md shadow-sm flex-grow">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <span class="text-gray-500 dark:text-gray-400 sm:text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      v-model="form.search"
+                      class="pl-10 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="Search transactions..."
+                    >
                   </div>
-                  <input 
-                    type="text" 
-                    v-model="form.search"
-                    class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                    placeholder="Search transactions..."
-                  >
+                  <select v-model="form.account_id" class="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <option value="">All Accounts</option>
+                    <option v-for="account in accounts" :key="account.id" :value="account.id">
+                      {{ account.name }}
+                    </option>
+                  </select>
+                  <select v-model="form.category" class="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <option value="">All Categories</option>
+                    <option v-for="category in categories" :key="category" :value="category">
+                      {{ category }}
+                    </option>
+                  </select>
+                  <select v-model="form.timeframe" class="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <option value="">All Time</option>
+                    <option value="this_month">This Month</option>
+                    <option value="last_month">Last Month</option>
+                    <option value="last_3_months">Last 3 Months</option>
+                    <option value="this_year">This Year</option>
+                  </select>
                 </div>
-                <select v-model="form.account_id" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                  <option value="">All Accounts</option>
-                  <option v-for="account in accounts" :key="account.id" :value="account.id">
-                    {{ account.name }}
-                  </option>
-                </select>
-                <select v-model="form.category" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                  <option value="">All Categories</option>
-                  <option v-for="category in categories" :key="category" :value="category">
-                    {{ category }}
-                  </option>
-                </select>
-                <select v-model="form.timeframe" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                  <option value="">All Time</option>
-                  <option value="this_month">This Month</option>
-                  <option value="last_month">Last Month</option>
-                  <option value="last_3_months">Last 3 Months</option>
-                  <option value="this_year">This Year</option>
-                </select>
+
+                <!-- Action buttons -->
+                <div class="flex gap-2">
+                  <Link
+                    :href="route('budgets.show', budget.id)"
+                    class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-50 dark:hover:bg-gray-600 transition whitespace-nowrap"
+                  >
+                    Back to Budget
+                  </Link>
+                  <Link
+                    :href="route('budget.transaction.create', budget.id)"
+                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 transition whitespace-nowrap"
+                  >
+                    Add Transaction
+                  </Link>
+                </div>
+
                 <button type="submit" class="hidden">Filter</button>
               </div>
             </form>

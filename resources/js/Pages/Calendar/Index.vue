@@ -83,19 +83,9 @@ const changeBudget = (budgetId) => {
     <AuthenticatedLayout>
         <div class="py-6">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <!-- Compact Header with Budget Selector -->
-                <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div class="flex-1">
-                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                            Transaction Calendar
-                        </h1>
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            View your posted and projected transactions
-                        </p>
-                    </div>
-
-                    <!-- Budget selector (if user has multiple budgets) -->
-                    <div v-if="budgets.length > 1" class="flex items-center gap-2">
+                <!-- Budget selector (if user has multiple budgets) -->
+                <div v-if="budgets.length > 1" class="mb-4 flex justify-end">
+                    <div class="flex items-center gap-2">
                         <label for="budget-select" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                             Budget:
                         </label>

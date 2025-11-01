@@ -162,18 +162,56 @@ class CalendarController extends Controller
     private function calculateOccurrences(RecurringTransactionTemplate $recurring, Carbon $startDate, Carbon $endDate)
     {
         $occurrences = [];
-        $currentDate = Carbon::parse($recurring->start_date);
+        $recurringStart = Carbon::parse($recurring->start_date);
 
         // Don't project if start date is after the period we're looking at
-        if ($currentDate->gt($endDate)) {
+        if ($recurringStart->gt($endDate)) {
             return $occurrences;
         }
 
-        // Start from the beginning of our range if recurring started before
+        // Calculate the first occurrence within our date range
+        $currentDate = $recurringStart->copy();
+
+        // If the recurring transaction started before our range,
+        // fast-forward to find the first occurrence in our range
         if ($currentDate->lt($startDate)) {
-            $currentDate = $startDate->copy();
+            // Calculate how many periods to skip
+            $daysDiff = $currentDate->diffInDays($startDate);
+
+            switch ($recurring->frequency) {
+                case 'daily':
+                    $periodsToSkip = $daysDiff;
+                    $currentDate->addDays($periodsToSkip);
+                    break;
+                case 'weekly':
+                    $periodsToSkip = floor($daysDiff / 7);
+                    $currentDate->addWeeks($periodsToSkip);
+                    break;
+                case 'biweekly':
+                    $periodsToSkip = floor($daysDiff / 14);
+                    $currentDate->addWeeks($periodsToSkip * 2);
+                    break;
+                case 'monthly':
+                    $periodsToSkip = $currentDate->diffInMonths($startDate);
+                    $currentDate->addMonths($periodsToSkip);
+                    break;
+                case 'bimonthly':
+                    $periodsToSkip = floor($currentDate->diffInMonths($startDate) / 2);
+                    $currentDate->addMonths($periodsToSkip * 2);
+                    break;
+                case 'yearly':
+                    $periodsToSkip = $currentDate->diffInYears($startDate);
+                    $currentDate->addYears($periodsToSkip);
+                    break;
+            }
+
+            // Make sure we're not before the range after fast-forwarding
+            while ($currentDate->lt($startDate)) {
+                $this->addPeriod($currentDate, $recurring->frequency);
+            }
         }
 
+        // Now generate occurrences within the date range
         while ($currentDate->lte($endDate)) {
             // Check if we've passed the end date (if set)
             if ($recurring->end_date && $currentDate->gt(Carbon::parse($recurring->end_date))) {
@@ -183,26 +221,38 @@ class CalendarController extends Controller
             // Add this occurrence
             $occurrences[] = $currentDate->copy();
 
-            // Calculate next occurrence based on frequency
-            switch ($recurring->frequency) {
-                case 'daily':
-                    $currentDate->addDays($recurring->frequency_value ?? 1);
-                    break;
-                case 'weekly':
-                    $currentDate->addWeeks($recurring->frequency_value ?? 1);
-                    break;
-                case 'monthly':
-                    $currentDate->addMonths($recurring->frequency_value ?? 1);
-                    break;
-                case 'yearly':
-                    $currentDate->addYears($recurring->frequency_value ?? 1);
-                    break;
-                default:
-                    // Unknown frequency, break to avoid infinite loop
-                    break 2;
-            }
+            // Move to next occurrence
+            $this->addPeriod($currentDate, $recurring->frequency);
         }
 
         return $occurrences;
+    }
+
+    private function addPeriod(Carbon $date, string $frequency)
+    {
+        switch ($frequency) {
+            case 'daily':
+                $date->addDay();
+                break;
+            case 'weekly':
+                $date->addWeek();
+                break;
+            case 'biweekly':
+                $date->addWeeks(2);
+                break;
+            case 'monthly':
+                $date->addMonth();
+                break;
+            case 'bimonthly':
+                $date->addMonths(2);
+                break;
+            case 'yearly':
+                $date->addYear();
+                break;
+            default:
+                // Unknown frequency
+                $date->addCentury(); // Effectively stop the loop
+                break;
+        }
     }
 }

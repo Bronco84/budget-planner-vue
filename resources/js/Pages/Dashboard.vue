@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { BanknotesIcon, ChartBarIcon, CalendarIcon, CurrencyDollarIcon } from '@heroicons/vue/24/outline';
+import { ArrowRightIcon } from '@heroicons/vue/24/outline';
 </script>
 
 <template>
@@ -10,44 +10,55 @@ import { BanknotesIcon, ChartBarIcon, CalendarIcon, CurrencyDollarIcon } from '@
     <AuthenticatedLayout>
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg p-6">
-                    <h3 class="text-lg font-medium mb-6">Welcome to Your Budget Planner</h3>
+                <div class="overflow-hidden bg-white dark:bg-gray-800 shadow-sm sm:rounded-lg p-8">
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">Welcome to Your Budget Planner</h1>
+                    <p class="text-lg text-gray-600 dark:text-gray-300 mb-8">
+                        Manage your finances, track spending, and plan for the future all in one place.
+                    </p>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <!-- Budget Card -->
-                        <Link :href="route('budgets.index')" class="block bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-5">
-                            <div class="flex items-center justify-between">
-                                <h4 class="text-lg font-medium">Budgets</h4>
-                                <BanknotesIcon class="w-8 h-8 text-blue-500" />
-                            </div>
-                            <p class="text-gray-600 mt-2">Manage and track your various budgets</p>
-                        </Link>
-
-                        <!-- Transactions Card -->
-                        <div class="block bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-5">
-                            <div class="flex items-center justify-between">
-                                <h4 class="text-lg font-medium">Transactions</h4>
-                                <CurrencyDollarIcon class="w-8 h-8 text-green-500" />
-                            </div>
-                            <p class="text-gray-600 mt-2">Track your income and expenses</p>
+                    <div class="space-y-6">
+                        <!-- Getting Started Section -->
+                        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                            <h2 class="text-xl font-semibold text-blue-900 dark:text-blue-100 mb-3">Getting Started</h2>
+                            <ul class="space-y-3">
+                                <li class="flex items-start">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">1</span>
+                                    <div>
+                                        <Link :href="route('budgets.index')" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                                            Create your first budget
+                                        </Link>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Set up budgets to organize and track your finances</p>
+                                    </div>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">2</span>
+                                    <div>
+                                        <span class="text-gray-700 dark:text-gray-300 font-medium">Connect your bank accounts</span>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Link accounts via Plaid for automatic transaction syncing</p>
+                                    </div>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">3</span>
+                                    <div>
+                                        <span class="text-gray-700 dark:text-gray-300 font-medium">Set up recurring transactions</span>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Automate tracking of bills and regular income</p>
+                                    </div>
+                                </li>
+                            </ul>
                         </div>
 
-                        <!-- Reports Card -->
-                        <div class="block bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-5">
-                            <div class="flex items-center justify-between">
-                                <h4 class="text-lg font-medium">Reports</h4>
-                                <ChartBarIcon class="w-8 h-8 text-purple-500" />
+                        <!-- Quick Actions -->
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
+                            <div class="flex flex-wrap gap-3">
+                                <Link
+                                    :href="route('budgets.index')"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
+                                >
+                                    View Budgets
+                                    <ArrowRightIcon class="ml-2 w-4 h-4" />
+                                </Link>
                             </div>
-                            <p class="text-gray-600 mt-2">View reports and analysis of your finances</p>
-                        </div>
-
-                        <!-- Calendar Card -->
-                        <div class="block bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow p-5">
-                            <div class="flex items-center justify-between">
-                                <h4 class="text-lg font-medium">Calendar</h4>
-                                <CalendarIcon class="w-8 h-8 text-red-500" />
-                            </div>
-                            <p class="text-gray-600 mt-2">See upcoming bills and income</p>
                         </div>
                     </div>
                 </div>

@@ -140,11 +140,17 @@ class CalendarController extends Controller
     private function projectRecurringTransactions($recurringTransactions, Carbon $startDate, Carbon $endDate)
     {
         $projected = collect();
+        $today = Carbon::today();
 
         foreach ($recurringTransactions as $recurring) {
             $occurrences = $this->calculateOccurrences($recurring, $startDate, $endDate);
 
             foreach ($occurrences as $date) {
+                // Only include projections for today or future dates
+                if ($date->lt($today)) {
+                    continue;
+                }
+
                 $dateKey = $date->format('Y-m-d');
 
                 if (!$projected->has($dateKey)) {

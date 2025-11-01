@@ -41,6 +41,15 @@ Route::middleware('auth')->group(function () {
     // Calendar routes
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
 
+    // Transactions redirect route - redirects to first budget's transactions
+    Route::get('/transactions', function () {
+        $firstBudget = auth()->user()->budgets()->first();
+        if (!$firstBudget) {
+            return redirect()->route('budgets.create');
+        }
+        return redirect()->route('budget.transaction.index', $firstBudget->id);
+    })->name('transactions.index');
+
     Route::resource('budgets', BudgetController::class);
 
     // Budget setup routes

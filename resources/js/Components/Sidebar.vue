@@ -26,7 +26,7 @@ const emit = defineEmits(['toggle', 'close']);
 const navigationItems = [
     { name: 'Dashboard', href: 'dashboard', icon: HomeIcon, route: 'dashboard' },
     { name: 'Budgets', href: 'budgets.index', icon: BanknotesIcon, route: 'budgets.*' },
-    { name: 'Transactions', href: '#', icon: CurrencyDollarIcon, route: 'transactions.*', disabled: true },
+    { name: 'Transactions', href: 'transactions.index', icon: CurrencyDollarIcon, route: 'transactions.*' },
     { name: 'Reports', href: '#', icon: ChartBarIcon, route: 'reports.*', disabled: true },
     { name: 'Calendar', href: 'calendar.index', icon: CalendarIcon, route: 'calendar.*' },
 ];

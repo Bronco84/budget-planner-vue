@@ -83,31 +83,33 @@ const changeBudget = (budgetId) => {
     <AuthenticatedLayout>
         <div class="py-6">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <!-- Header -->
-                <div class="mb-6">
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                        Transaction Calendar
-                    </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        View your posted and projected transactions in a calendar view
-                    </p>
-                </div>
+                <!-- Compact Header with Budget Selector -->
+                <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex-1">
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                            Transaction Calendar
+                        </h1>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            View your posted and projected transactions
+                        </p>
+                    </div>
 
-                <!-- Budget selector (if user has multiple budgets) -->
-                <div v-if="budgets.length > 1" class="mb-4">
-                    <label for="budget-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Select Budget
-                    </label>
-                    <select
-                        id="budget-select"
-                        :value="selectedBudget?.id"
-                        @change="changeBudget($event.target.value)"
-                        class="block w-full sm:w-64 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    >
-                        <option v-for="budget in budgets" :key="budget.id" :value="budget.id">
-                            {{ budget.name }}
-                        </option>
-                    </select>
+                    <!-- Budget selector (if user has multiple budgets) -->
+                    <div v-if="budgets.length > 1" class="flex items-center gap-2">
+                        <label for="budget-select" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            Budget:
+                        </label>
+                        <select
+                            id="budget-select"
+                            :value="selectedBudget?.id"
+                            @change="changeBudget($event.target.value)"
+                            class="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                        >
+                            <option v-for="budget in budgets" :key="budget.id" :value="budget.id">
+                                {{ budget.name }}
+                            </option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Empty state (no budget selected) -->
@@ -131,16 +133,17 @@ const changeBudget = (budgetId) => {
 
                 <!-- Calendar view -->
                 <div v-else>
-                    <!-- Calendar controls -->
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center space-x-2">
+                    <!-- Compact Calendar controls with Legend -->
+                    <div class="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                        <!-- Month navigation -->
+                        <div class="flex items-center gap-2">
                             <button
                                 @click="navigateToMonth(-1)"
                                 class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                             >
                                 <ChevronLeftIcon class="w-5 h-5" />
                             </button>
-                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white min-w-[200px] text-center">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white min-w-[140px] text-center">
                                 {{ calendarData.monthName }}
                             </h2>
                             <button
@@ -149,32 +152,32 @@ const changeBudget = (budgetId) => {
                             >
                                 <ChevronRightIcon class="w-5 h-5" />
                             </button>
+                            <button
+                                @click="navigateToToday"
+                                class="ml-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+                            >
+                                Today
+                            </button>
                         </div>
-                        <button
-                            @click="navigateToToday"
-                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                        >
-                            Today
-                        </button>
-                    </div>
 
-                    <!-- Legend -->
-                    <div class="mb-4 flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                        <div class="flex items-center">
-                            <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-                            <span>Posted Income</span>
-                        </div>
-                        <div class="flex items-center">
-                            <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
-                            <span>Posted Expense</span>
-                        </div>
-                        <div class="flex items-center">
-                            <div class="w-3 h-3 rounded-full border-2 border-green-500 mr-2"></div>
-                            <span>Projected Income</span>
-                        </div>
-                        <div class="flex items-center">
-                            <div class="w-3 h-3 rounded-full border-2 border-red-500 mr-2"></div>
-                            <span>Projected Expense</span>
+                        <!-- Legend -->
+                        <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                                <span>Posted Income</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                <span>Posted Expense</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full border-2 border-green-500"></div>
+                                <span>Projected Income</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2.5 h-2.5 rounded-full border-2 border-red-500"></div>
+                                <span>Projected Expense</span>
+                            </div>
                         </div>
                     </div>
 

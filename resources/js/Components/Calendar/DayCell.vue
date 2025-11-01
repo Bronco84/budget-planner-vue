@@ -32,13 +32,14 @@ const isPositive = computed(() => netAmount.value >= 0);
     <div
         @click="emit('click', day)"
         :class="[
-            'min-h-24 border border-gray-200 dark:border-gray-700 p-2 cursor-pointer transition-colors',
+            'min-h-24 border p-2 cursor-pointer transition-colors',
             {
                 'bg-white dark:bg-gray-800': isCurrentMonth,
                 'bg-gray-50 dark:bg-gray-900': !isCurrentMonth,
                 'bg-blue-50 dark:bg-blue-900/20': day.isToday,
                 'hover:bg-gray-50 dark:hover:bg-gray-700': isCurrentMonth && !day.isToday,
-                'ring-2 ring-blue-500': day.isToday
+                'border-gray-200 dark:border-gray-700': !day.isToday,
+                'border-2 border-blue-500': day.isToday
             }
         ]"
     >

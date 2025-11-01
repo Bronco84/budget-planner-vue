@@ -2,29 +2,25 @@
   <Head :title="'Transactions'" />
 
   <AuthenticatedLayout>
-    <template #header>
-      <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Transactions - {{ budget.name }}</h2>
-        <div class="flex space-x-2">
-          <Link 
-            :href="route('budget.transaction.create', budget.id)" 
-            class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-          >
-            Add Transaction
-          </Link>
-          <Link 
-            :href="route('budgets.show', budget.id)" 
-            class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300"
+    <div class="py-6">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Action buttons -->
+        <div class="mb-6 flex justify-end gap-3">
+          <Link
+            :href="route('budgets.show', budget.id)"
+            class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-50 dark:hover:bg-gray-600 transition"
           >
             Back to Budget
           </Link>
+          <Link
+            :href="route('budget.transaction.create', budget.id)"
+            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 transition"
+          >
+            Add Transaction
+          </Link>
         </div>
-      </div>
-    </template>
 
-    <div class="py-12">
-      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6">
             <!-- Search and Filter Controls -->
             <form @submit.prevent="filter">

@@ -22,9 +22,22 @@ class TransactionController extends Controller
             ->orderByDesc('date')
             ->paginate(20);
 
+        $accounts = $budget->accounts()->get();
+        $categories = $budget->transactions()
+            ->select('category')
+            ->distinct()
+            ->whereNotNull('category')
+            ->pluck('category');
+
         return Inertia::render('Transactions/Index', [
             'budget' => $budget,
             'transactions' => $transactions,
+            'accounts' => $accounts,
+            'categories' => $categories,
+            'breadcrumbs' => [
+                ['title' => 'Dashboard', 'url' => route('dashboard')],
+                ['title' => 'Transactions', 'url' => null],
+            ],
         ]);
     }
 

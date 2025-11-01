@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import CalendarGrid from '@/Components/Calendar/CalendarGrid.vue';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 import { formatCurrency } from '@/utils/format.js';
@@ -76,20 +75,12 @@ const changeBudget = (budgetId) => {
         month: currentDate.value.month
     });
 };
-
-// Breadcrumbs
-const breadcrumbs = computed(() => [
-    { title: 'Dashboard', url: route('dashboard') },
-    { title: 'Calendar', url: null }
-]);
 </script>
 
 <template>
     <Head title="Calendar" />
 
     <AuthenticatedLayout>
-        <Breadcrumbs :breadcrumbs="breadcrumbs" />
-
         <div class="py-6">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <!-- Header -->

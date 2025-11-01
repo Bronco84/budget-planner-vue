@@ -27,6 +27,10 @@ class CalendarController extends Controller
                 'selectedBudget' => null,
                 'calendarData' => null,
                 'currentMonth' => now()->format('Y-m'),
+                'breadcrumbs' => [
+                    ['title' => 'Dashboard', 'url' => route('dashboard')],
+                    ['title' => 'Calendar', 'url' => null],
+                ],
             ]);
         }
 
@@ -44,7 +48,11 @@ class CalendarController extends Controller
                 'budget_id' => $selectedBudgetId,
                 'year' => $year,
                 'month' => $month,
-            ]
+            ],
+            'breadcrumbs' => [
+                ['title' => 'Dashboard', 'url' => route('dashboard')],
+                ['title' => 'Calendar', 'url' => null],
+            ],
         ]);
     }
 

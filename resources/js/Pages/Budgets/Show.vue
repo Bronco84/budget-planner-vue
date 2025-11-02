@@ -161,13 +161,6 @@
                           >
                             Connect to Bank
                           </Link>
-
-                          <Link
-                            :href="route('recurring-transactions.index', budget.id)"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500"
-                          >
-                            Recurring Transactions
-                          </Link>
                           <Link
                             :href="route('recurring-transactions.analysis', budget.id)"
                             class="w-full inline-flex items-center justify-center px-3 py-2 bg-purple-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-purple-500"
@@ -179,12 +172,6 @@
                             class="w-full inline-flex items-center justify-center px-3 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500"
                           >
                             Debt Payoff Plans
-                          </Link>
-                          <Link
-                            :href="route('budget.transaction.index', budget.id)"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-                          >
-                            Regular Transactions
                           </Link>
                         </div>
 
@@ -296,7 +283,11 @@
                               <span class="w-2 h-2 rounded-full mr-2"
                                     :class="getLastSyncClass(account.plaid_account)"></span>
                                 <div class="whitespace-nowrap">
-                                    {{ account.plaid_account?.plaid_connection?.last_sync_at ? `Last synced ${formatTimeAgo(account.plaid_account.plaid_connection.last_sync_at)}` : 'Not synced yet' }}
+                                    Last synced <PlaidSyncTimestamp
+                                      :timestamp="account.plaid_account?.plaid_connection?.last_sync_at"
+                                      format="relative"
+                                      never-text="never"
+                                    />
                                 </div>
                             </div>
                           </div>
@@ -328,7 +319,7 @@
                                 <Link
                                   v-if="account.plaid_account"
                                   :href="route('plaid.link', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-blue-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -338,7 +329,7 @@
                                 <Link
                                   v-if="!account.plaid_account"
                                   :href="route('plaid.link', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-blue-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -347,7 +338,7 @@
                                 </Link>
                                 <Link
                                   :href="route('budget.account.projections', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-green-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-green-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -356,7 +347,7 @@
                                 </Link>
                                 <Link
                                   :href="route('budget.account.balance-projection', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-purple-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-purple-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -365,7 +356,7 @@
                                 </Link>
                                 <Link
                                   :href="route('budgets.accounts.edit', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-indigo-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-indigo-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -559,15 +550,15 @@
                               </button>
                               <div
                                 v-if="openTransactionDropdown === transaction.id"
-                                class="absolute right-0 top-full z-50 mt-1 w-52 bg-white border border-gray-300 rounded-md shadow-lg"
+                                class="absolute right-0 top-full z-50 mt-1 w-auto bg-white border border-gray-300 rounded-md shadow-lg"
                                 @click.stop
                               >
                                 <div class="py-1">
                                   <Link
                                     :href="route('recurring-transactions.edit', [budget.id, transaction.recurring_transaction_template_id])"
-                                    class="block px-3 py-2 text-xs text-indigo-600 hover:bg-gray-50"
+                                    class="block px-2 py-2 text-xs text-indigo-600 hover:bg-gray-50"
                                   >
-                                    <svg class="w-3 h-3 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                     Edit Recurring Template
@@ -589,15 +580,15 @@
                               </button>
                               <div
                                 v-if="openTransactionDropdown === transaction.id"
-                                class="absolute right-0 top-full z-50 mt-1 w-52 bg-white border border-gray-300 rounded-md shadow-lg"
+                                class="absolute right-0 top-full z-50 mt-1 w-auto bg-white border border-gray-300 rounded-md shadow-lg"
                                 @click.stop
                               >
                                 <div class="py-1">
                                   <Link
                                     :href="route('budget.transaction.edit', [budget.id, transaction.id])"
-                                    class="block px-3 py-2 text-xs text-indigo-600 hover:bg-gray-50"
+                                    class="block px-2 py-2 text-xs text-indigo-600 hover:bg-gray-50"
                                   >
-                                    <svg class="w-3 h-3 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                     Edit Transaction
@@ -607,9 +598,9 @@
                                       budget: budget.id,
                                       from_transaction: transaction.id
                                     })"
-                                    class="block px-3 py-2 text-xs text-green-600 hover:bg-gray-50"
+                                    class="block px-2 py-2 text-xs text-green-600 hover:bg-gray-50"
                                   >
-                                    <svg class="w-3 h-3 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
                                     Make Recurring
@@ -764,6 +755,7 @@ import { PencilIcon } from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
+import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable'
 
@@ -1198,25 +1190,6 @@ const getGroupTotalColorClass = (typeGroup) => {
   return typeGroup.total >= 0 ? 'text-green-600' : 'text-red-600';
 };
 
-// Format time ago (e.g., "3 minutes ago", "2 hours ago")
-const formatTimeAgo = (dateTimeString) => {
-  if (!dateTimeString) return 'N/A';
-
-  const date = new Date(dateTimeString);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 60) {
-    return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-  } else {
-    return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-  }
-};
 
 // State for Plaid sync
 const syncingTransactions = ref(false);

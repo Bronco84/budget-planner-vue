@@ -269,10 +269,10 @@
                         <div
                           v-for="account in typeGroup.accounts"
                           :key="account.id"
-                          class="bg-gray-50 p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                          class="p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-50 transition-colors"
                           :class="[
                             getBorderColorClass(account),
-                            activeAccountId === account.id ? 'border-l-8 bg-gray-100' : ''
+                            activeAccountId === account.id ? 'border-l-8 bg-gray-50' : ''
                           ]"
                           @click="selectAccount(account.id)"
                       >

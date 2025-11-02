@@ -135,9 +135,9 @@ import { ref, computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeftIcon } from '@heroicons/vue/24/solid';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import RecurringTransactionOverview from '@/Components/RecurringTransactionOverview.vue';
-import RecurringTransactionRules from '@/Components/RecurringTransactionRules.vue';
-import RecurringTransactionLinked from '@/Components/RecurringTransactionLinked.vue';
+import RecurringTransactionOverview from './Partials/RecurringTransactionOverview.vue';
+import RecurringTransactionRules from './Partials/RecurringTransactionRules.vue';
+import RecurringTransactionLinked from './Partials/RecurringTransactionLinked.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 const props = defineProps({

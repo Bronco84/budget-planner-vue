@@ -297,7 +297,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ref, computed, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import RecurringTransactionConfirmationModal from '@/Components/RecurringTransactionConfirmationModal.vue';
+import RecurringTransactionConfirmationModal from './Partials/RecurringTransactionConfirmationModal.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 const props = defineProps({

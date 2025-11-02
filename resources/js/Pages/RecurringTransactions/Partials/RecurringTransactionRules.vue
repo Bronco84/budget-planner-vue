@@ -238,7 +238,7 @@
 import { ref, computed } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } from '@headlessui/vue';
-import RecurringTransactionRuleForm from '@/Components/RecurringTransactionRuleForm.vue';
+import RecurringTransactionRuleForm from './RecurringTransactionRuleForm.vue';
 
 const props = defineProps({
   budget: Object,

@@ -385,28 +385,6 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
               <div class="p-6">
 
-                <!-- Account Tabs -->
-                <div class="mb-4 border-b border-gray-200">
-                  <div class="overflow-x-auto overflow-y-hidden">
-                    <nav class="flex -mb-px min-w-full whitespace-nowrap">
-                      <a
-                        v-for="account in orderedAccounts"
-                        :key="account.id"
-                        href="#"
-                        @click.prevent="selectAccount(account.id)"
-                        class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm"
-                        :class="[
-                          activeAccountId === parseInt(account.id, 10) ?
-                            'border-indigo-500 text-indigo-600' :
-                            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        ]"
-                      >
-                        {{ account.name }}
-                      </a>
-                    </nav>
-                  </div>
-                </div>
-
                 <!-- Transactions Table -->
                 <div class="border rounded-lg overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200">

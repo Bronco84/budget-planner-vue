@@ -113,7 +113,7 @@ class BudgetController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Budget $budget, Request $request): Response
+    public function show(Budget $budget, Request $request): Response|RedirectResponse
     {
         // TODO: Add authorization check for budget access
         // Load relationships including plaidAccount with connection

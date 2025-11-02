@@ -63,7 +63,7 @@ const handleDateRangeChange = (dateRangeData) => {
     <Head :title="`Reports - ${budget.name}`" />
 
     <AuthenticatedLayout>
-        <div class="py-6">
+        <div class="py-4">
             <div class="max-w-full mx-auto px-6">
                 <!-- Consolidated Header: Tabs + Date Range Picker -->
                 <div class="mb-6">

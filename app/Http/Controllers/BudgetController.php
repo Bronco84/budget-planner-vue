@@ -153,57 +153,10 @@ class BudgetController extends Controller
             }
         }
 
-        // Get query parameters for filtering
-        $search = $request->input('search');
-        $type = $request->input('type');
-        $category = $request->input('category');
-        $pending = $request->input('pending');
-        $timeframe = $request->input('timeframe');
-
         // Get projection parameters
         $monthsToProject = (int) $request->input('projection_months', 1);
 
-        // Build transaction query
-        $transactionQuery = $budget->transactions()->with('account');
-
-        // Apply search filter if provided
-        $transactionQuery->when(
-            isset($search),
-            fn ($query) => $query->where(function($query) use ($search) {
-                $query->where('description', 'like', "%{$search}%")
-                    ->orWhere('category', 'like', "%{$search}%");
-            })
-        );
-
-        $transactionQuery->when(
-            isset($category),
-            fn ($query) => $query->where('category', $category)
-        );
-
-        // Apply time filter if provided
-        if ($timeframe) {
-            $now = Carbon::now();
-            switch ($timeframe) {
-                case 'this_month':
-                    $transactionQuery->whereMonth('date', $now->month)
-                        ->whereYear('date', $now->year);
-                    break;
-                case 'last_month':
-                    $lastMonth = $now->copy()->subMonth();
-                    $transactionQuery->whereMonth('date', $lastMonth->month)
-                        ->whereYear('date', $lastMonth->year);
-                    break;
-                case 'last_3_months':
-                    $threeMonthsAgo = $now->copy()->subMonths(3);
-                    $transactionQuery->where('date', '>=', $threeMonthsAgo->startOfDay());
-                    break;
-                case 'this_year':
-                    $transactionQuery->whereYear('date', $now->year);
-                    break;
-            }
-        }
-
-        // Get the date range from the filter
+        // Get the date range
         $dateRange = $request->input('date_range', '90');
         $startDate = match($dateRange) {
             '7' => now()->subDays(7),
@@ -221,7 +174,7 @@ class BudgetController extends Controller
                 'transactions.*',
                 'plaid_transactions.pending as pending',
             )
-            ->selectRaw('transactions.date > CURDATE() as is_projected')
+            ->selectRaw("transactions.date > ? as is_projected", [now()->toDateString()])
             ->selectRaw('false as is_recurring')
             ->with(['account', 'plaidTransaction'])
             ->leftJoin('plaid_transactions', 'transactions.plaid_transaction_id', '=', 'plaid_transactions.plaid_transaction_id')
@@ -243,34 +196,6 @@ class BudgetController extends Controller
                 $query->orWhere(function($q) {
                     $q->where('transactions.date', '<=', now())->whereNotNull('transactions.plaid_transaction_id');
                 });
-            })
-            ->when($request->filled('type'), function($query, $type) {
-                match ($type) {
-                    'income' => $query->where('amount_in_cents', '>', 0),
-                    'expense' => $query->where('amount_in_cents', '<', 0),
-                    'recurring' => $query->whereNotNull('recurring_transaction_template_id'),
-                };
-            })
-            ->when($request->filled('pending'), function($query) use ($request) {
-                $isPending = filter_var($request->input('pending'), FILTER_VALIDATE_BOOLEAN);
-                if ($isPending) {
-                    $query->whereHas('plaidTransaction', function($q) {
-                        $q->where('pending', true);
-                    });
-                } else {
-                    $query->where(function($q) {
-                        $q->whereDoesntHave('plaidTransaction')
-                          ->orWhereHas('plaidTransaction', function($subQ) {
-                              $subQ->where('pending', false);
-                          });
-                    });
-                }
-            })
-            ->when($request->filled('category'), fn($query, $category) => $query->where('category', $category))
-            ->when($request->filled('search'), function($q) use ($request) {
-                $q->where('description', 'like', "%{$request->input('search')}%")
-                    ->orWhere('category', 'like', "%{$request->input('search')}%")
-                    ->orWhere('notes', 'like', "%{$request->input('search')}%");
             });
 
         // Get actual transactions
@@ -361,13 +286,6 @@ class BudgetController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        // Get unique categories for filter dropdown
-        $categories = $budget->transactions()
-            ->select('category')
-            ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
-
         // Calculate the total balance across all accounts
         // Assets are added, liabilities are subtracted, excluded accounts are ignored
         $totalBalance = $budget->accounts
@@ -401,15 +319,6 @@ class BudgetController extends Controller
             'projectedTransactions' => $projectedTransactions,
             'projectionParams' => [
                 'months' => $monthsToProject,
-            ],
-            'categories' => $categories,
-            'filters' => [
-                'search' => $search,
-                'type' => $type,
-                'category' => $category,
-                'pending' => $pending,
-                'timeframe' => $timeframe,
-                'account_id' => $account->id, // Pass the actual selected account ID
             ],
             'userAccountTypeOrder' => Auth::user()->getAccountTypeOrder(),
             'monthlyProjectedCashFlow' => $monthlyProjectedCashFlow,
@@ -527,39 +436,5 @@ class BudgetController extends Controller
                 'months' => $months,
             ],
         ]);
-    }
-
-    /**
-     * Handle filtering of transactions (to work around GET param issues)
-     */
-    public function filter(Request $request, Budget $budget): RedirectResponse
-    {
-        // Log received parameters
-        \Log::info('Filtering budget transactions', [
-            'budget_id' => $budget->id,
-            'params' => $request->all()
-        ]);
-
-        // Extract filter parameters
-        $params = [
-            'account_id' => $request->input('account_id'),
-            'search' => $request->input('search'),
-            'type' => $request->input('type'),
-            'category' => $request->input('category'),
-            'pending' => $request->input('pending'),
-            'timeframe' => $request->input('timeframe'),
-            'projection_months' => $request->input('projection_months', 1),
-        ];
-
-        // Remove empty parameters
-        $params = array_filter($params, function ($value) {
-            return $value !== null && $value !== '';
-        });
-
-        // Redirect to show with query parameters
-        return redirect()->route('budgets.show', array_merge(
-            ['budget' => $budget->id],
-            $params
-        ));
     }
 }

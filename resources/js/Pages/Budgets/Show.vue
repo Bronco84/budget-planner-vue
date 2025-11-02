@@ -385,52 +385,6 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
               <div class="p-6">
 
-                <!-- Search and Filter Controls -->
-                <form @submit.prevent="filter">
-                  <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                    <div class="relative rounded-md shadow-sm flex-grow">
-                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <span class="text-gray-500 sm:text-sm">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                          </svg>
-                        </span>
-                      </div>
-                      <input
-                        type="text"
-                        v-model="form.search"
-                        class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        placeholder="Search transactions..."
-                      >
-                    </div>
-                    <select v-model="form.type" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Types</option>
-                      <option value="income">Income</option>
-                      <option value="expense">Expenses</option>
-                      <option value="recurring">Recurring</option>
-                    </select>
-                    <select v-model="form.category" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Categories</option>
-                      <option v-for="category in categories" :key="category" :value="category">
-                        {{ category }}
-                      </option>
-                    </select>
-                    <select v-model="form.pending" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Status</option>
-                      <option value="false">Posted</option>
-                      <option value="true">Pending</option>
-                    </select>
-                    <select v-model="form.timeframe" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Time</option>
-                      <option value="this_month">This Month</option>
-                      <option value="last_month">Last Month</option>
-                      <option value="last_3_months">Last 3 Months</option>
-                      <option value="this_year">This Year</option>
-                    </select>
-                    <button type="submit" class="hidden">Filter</button>
-                  </div>
-                </form>
-
                 <!-- Account Tabs -->
                 <div class="mb-4 border-b border-gray-200">
                   <div class="overflow-x-auto overflow-y-hidden">
@@ -767,20 +721,13 @@ const props = defineProps({
   totalBalance: Number,
   transactions: Object,
   projectionParams: Object,
-  categories: Array,
-  filters: Object,
   userAccountTypeOrder: Array,
   monthlyProjectedCashFlow: Number
 });
 
-// Form state for filters
+// Form state for account selection
 const form = reactive({
-  search: props.filters.search || '',
-  type: props.filters.type || '',
-  category: props.filters.category || '',
-  pending: props.filters.pending || '',
-  timeframe: props.filters.timeframe || '',
-  account_id: props.filters.account_id || (props.accounts.length > 0 ? props.accounts[0].id : null)
+  account_id: props.accounts.length > 0 ? props.accounts[0].id : null
 });
 
 // Computed property to determine the active account tab
@@ -1057,95 +1004,24 @@ const displayedProjectedTransactions = computed(() => {
   if (!props.projectedTransactions || projectionForm.months === 0) return [];
 
   // Convert to array if it's an object with numeric keys
-    // Filter projected transactions based on the same criteria as actual transactions
-  let filtered = Array.isArray(props.projectedTransactions)
+  let projected = Array.isArray(props.projectedTransactions)
       ? [...props.projectedTransactions]
       : Object.values(props.projectedTransactions || {});
 
-  if (form.search) {
-    const searchLower = form.search.toLowerCase();
-    filtered = filtered.filter(tx =>
-      tx.description.toLowerCase().includes(searchLower) ||
-      tx.category?.toLowerCase().includes(searchLower)
-    );
-  }
-
-  if (form.category) {
-    filtered = filtered.filter(tx => tx.category === form.category);
-  }
-
   // Sort by date (newest first)
-  return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return projected.sort((a, b) => new Date(b.date) - new Date(a.date));
 });
-
-// Apply debounced filtering when form values change
-watch(form, debounce(() => filter(), 300));
-
-// Filter function
-function filter() {
-  console.log('Filtering with account_id:', form.account_id);
-
-  const params = {
-    search: form.search || undefined,
-    type: form.type || undefined,
-    category: form.category || undefined,
-    pending: form.pending || undefined,
-    timeframe: form.timeframe || undefined,
-    account_id: form.account_id || undefined,
-    projection_months: projectionForm.months || undefined,
-    page: 1 // Reset to first page when filtering
-  };
-
-  // Remove undefined values
-  Object.keys(params).forEach(key => {
-    if (params[key] === undefined) {
-      delete params[key];
-    }
-  });
-
-  console.log('URL params:', params);
-
-  router.visit(route('budgets.show', props.budget.id), {
-    data: params,
-    preserveState: true,
-    preserveScroll: true,
-    replace: true
-  });
-}
 
 // Update projections
 function updateProjections() {
-  const params = {
-    search: form.search || undefined,
-    category: form.category || undefined,
-    timeframe: form.timeframe || undefined,
-    account_id: form.account_id || undefined,
-    projection_months: projectionForm.months,
-    page: 1
-  };
-
-  // Remove undefined values
-  Object.keys(params).forEach(key => {
-    if (params[key] === undefined) {
-      delete params[key];
-    }
-  });
-
   router.visit(route('budgets.show', props.budget.id), {
-    data: params,
+    data: {
+      account_id: form.account_id,
+      projection_months: projectionForm.months
+    },
     preserveState: true,
     preserveScroll: true
   });
-}
-
-// Debounce helper
-function debounce(fn, delay = 300) {
-  let timeout;
-
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), delay);
-  };
 }
 
 // Helper functions for formatting dates
@@ -1404,25 +1280,15 @@ const selectAccount = (accountId) => {
   console.log('Selecting account:', accountId);
   form.account_id = accountId;
 
-  // Use Inertia post method instead of get for better parameter handling
-  router.post(route('budgets.filter', props.budget.id), {
-    search: form.search || '',
-    type: form.type || '',
-    category: form.category || '',
-    pending: form.pending || '',
-    timeframe: form.timeframe || '',
-    account_id: accountId,
-    projection_months: projectionForm.months || 1
-  }, {
+  // Navigate to the budget page with the selected account
+  router.visit(route('budgets.show', props.budget.id), {
+    data: {
+      account_id: accountId,
+      projection_months: projectionForm.months || 1
+    },
     preserveState: true,
     preserveScroll: true,
-    replace: true,
-    onSuccess: () => {
-      console.log('Filter success with account_id:', accountId);
-    },
-    onError: (error) => {
-      console.error('Filter error:', error);
-    }
+    replace: true
   });
 };
 

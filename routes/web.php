@@ -71,9 +71,6 @@ Route::middleware('auth')->group(function () {
     Route::get('budgets/{budget}/setup/manual', [AccountController::class, 'create'])
         ->name('budgets.setup.manual');
 
-    Route::post('budgets/{budget}/filter', [BudgetController::class, 'filter'])
-        ->name('budgets.filter');
-    
     Route::get('budget/{budget}/statistics/yearly', [BudgetController::class, 'yearlyStatistics'])
         ->name('budget.statistics.yearly');
     Route::get('budget/{budget}/statistics/monthly/{month?}/{year?}', [BudgetController::class, 'monthlyStatistics'])

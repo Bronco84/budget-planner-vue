@@ -15,6 +15,7 @@ use App\Http\Controllers\PlaidTransactionController;
 use App\Http\Controllers\ProjectionsController;
 use App\Http\Controllers\RecurringTransactionAnalysisController;
 use App\Http\Controllers\PayoffPlanController;
+use App\Http\Controllers\ReportsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -30,7 +31,36 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+    $user = auth()->user();
+
+    // Check completion status for getting started steps
+    $hasBudget = $user->budgets()->exists();
+    $hasPlaidAccounts = DB::table('plaid_accounts')
+        ->whereIn('account_id', function($query) use ($user) {
+            $query->select('id')
+                ->from('accounts')
+                ->whereIn('budget_id', function($q) use ($user) {
+                    $q->select('id')
+                        ->from('budgets')
+                        ->where('user_id', $user->id);
+                });
+        })
+        ->exists();
+    $hasRecurringTransactions = DB::table('recurring_transaction_templates')
+        ->whereIn('budget_id', function($query) use ($user) {
+            $query->select('id')
+                ->from('budgets')
+                ->where('user_id', $user->id);
+        })
+        ->exists();
+
+    return Inertia::render('Dashboard', [
+        'gettingStarted' => [
+            'hasBudget' => $hasBudget,
+            'hasPlaidAccounts' => $hasPlaidAccounts,
+            'hasRecurringTransactions' => $hasRecurringTransactions,
+        ],
+    ]);
 })->middleware(['auth'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -41,22 +71,22 @@ Route::middleware('auth')->group(function () {
     // Calendar routes
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
 
-    // Transactions redirect route - redirects to first budget's transactions
+    // Transactions redirect route - redirects to active budget's transactions
     Route::get('/transactions', function () {
-        $firstBudget = auth()->user()->budgets()->first();
-        if (!$firstBudget) {
+        $activeBudget = auth()->user()->getActiveBudget();
+        if (!$activeBudget) {
             return redirect()->route('budgets.create');
         }
-        return redirect()->route('budget.transaction.index', $firstBudget->id);
+        return redirect()->route('budget.transaction.index', $activeBudget->id);
     })->name('transactions.index');
 
-    // Recurring transactions redirect route - redirects to first budget's recurring transactions
+    // Recurring transactions redirect route - redirects to active budget's recurring transactions
     Route::get('/recurring-transactions', function () {
-        $firstBudget = auth()->user()->budgets()->first();
-        if (!$firstBudget) {
+        $activeBudget = auth()->user()->getActiveBudget();
+        if (!$activeBudget) {
             return redirect()->route('budgets.create');
         }
-        return redirect()->route('recurring-transactions.index', $firstBudget->id);
+        return redirect()->route('recurring-transactions.index', $activeBudget->id);
     })->name('recurring-transactions.redirect');
 
     Route::resource('budgets', BudgetController::class);
@@ -81,7 +111,11 @@ Route::middleware('auth')->group(function () {
         ->name('budget.account.projections');
     Route::get('budget/{budget}/account/{account}/balance-projection', [ProjectionsController::class, 'showBalanceProjection'])
         ->name('budget.account.balance-projection');
-        
+
+    // Reports route
+    Route::get('budget/{budget}/reports', [ReportsController::class, 'index'])
+        ->name('reports.index');
+
     Route::resource('budgets.accounts', AccountController::class);
     
     Route::resource('budgets.categories', CategoryController::class);
@@ -212,6 +246,10 @@ Route::middleware('auth')->group(function () {
         ->name('preferences.account-type-order.get');
     Route::post('/api/preferences/account-type-order', [App\Http\Controllers\Api\UserPreferencesController::class, 'updateAccountTypeOrder'])
         ->name('preferences.account-type-order.update');
+    Route::get('/api/preferences/active-budget', [App\Http\Controllers\Api\UserPreferencesController::class, 'getActiveBudget'])
+        ->name('preferences.active-budget.get');
+    Route::post('/api/preferences/active-budget', [App\Http\Controllers\Api\UserPreferencesController::class, 'setActiveBudget'])
+        ->name('preferences.active-budget.set');
     Route::get('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'show'])
         ->name('preferences.show');
     Route::post('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'update'])

@@ -1,5 +1,6 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import {
     HomeIcon,
     BanknotesIcon,
@@ -8,10 +9,11 @@ import {
     CalendarIcon,
     ArrowPathIcon,
     ChevronLeftIcon,
-    ChevronRightIcon
+    ChevronRightIcon,
+    PlusIcon
 } from '@heroicons/vue/24/outline';
 
-defineProps({
+const props = defineProps({
     isCollapsed: {
         type: Boolean,
         default: false
@@ -22,16 +24,54 @@ defineProps({
     }
 });
 
-const emit = defineEmits(['toggle', 'close']);
+const emit = defineEmits(['toggle', 'close', 'create-budget', 'create-transaction', 'create-recurring', 'connect-account']);
 
-const navigationItems = [
+const page = usePage();
+const activeBudget = computed(() => page.props.activeBudget);
+const hasActiveBudget = computed(() => !!activeBudget.value);
+
+const showAddMenu = ref(false);
+const addMenuRef = ref(null);
+
+const navigationItems = computed(() => [
     { name: 'Dashboard', href: 'dashboard', icon: HomeIcon, route: 'dashboard' },
     { name: 'Budgets', href: 'budgets.index', icon: BanknotesIcon, route: 'budgets.*' },
     { name: 'Transactions', href: 'transactions.index', icon: CurrencyDollarIcon, route: 'budget.transaction.*' },
     { name: 'Recurring', href: 'recurring-transactions.redirect', icon: ArrowPathIcon, route: 'recurring-transactions.*' },
     { name: 'Calendar', href: 'calendar.index', icon: CalendarIcon, route: 'calendar.*' },
-    { name: 'Reports', href: '#', icon: ChartBarIcon, route: 'reports.*', disabled: true },
-];
+    { name: 'Reports', href: 'reports.index', icon: ChartBarIcon, route: 'reports.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null },
+]);
+
+const toggleAddMenu = () => {
+    showAddMenu.value = !showAddMenu.value;
+};
+
+const handleAction = (action) => {
+    showAddMenu.value = false;
+    emit(action);
+};
+
+// Close dropdown when clicking outside
+const handleClickOutside = (event) => {
+    if (addMenuRef.value && !addMenuRef.value.contains(event.target)) {
+        showAddMenu.value = false;
+    }
+};
+
+// Close dropdown when mobile sidebar closes
+watch(() => props.isMobileOpen, (newValue) => {
+    if (!newValue) {
+        showAddMenu.value = false;
+    }
+});
+
+onMounted(() => {
+    document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
+});
 </script>
 
 <template>
@@ -83,10 +123,11 @@ const navigationItems = [
 
         <!-- Navigation items -->
         <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+            <!-- Regular Navigation Items -->
             <template v-for="item in navigationItems" :key="item.name">
                 <Link
                     v-if="!item.disabled"
-                    :href="route(item.href)"
+                    :href="item.params ? route(item.href, item.params) : route(item.href)"
                     :class="[
                         'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
                         route().current(item.route)
@@ -126,5 +167,77 @@ const navigationItems = [
                 </div>
             </template>
         </nav>
+
+        <!-- Add Menu Item (outside scrollable nav to prevent clipping) -->
+        <div ref="addMenuRef" class="relative px-2 pb-4" @click.stop>
+            <button
+                @click.stop="toggleAddMenu"
+                :class="[
+                    'w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                ]"
+                :title="isCollapsed && !isMobileOpen ? 'Add' : ''"
+            >
+                <PlusIcon
+                    :class="[
+                        'flex-shrink-0',
+                        isCollapsed && !isMobileOpen ? 'w-6 h-6' : 'w-5 h-5 mr-3'
+                    ]"
+                />
+                <span v-if="!isCollapsed || isMobileOpen">Add</span>
+            </button>
+
+            <!-- Add Menu Dropdown -->
+            <div
+                v-if="showAddMenu"
+                :class="[
+                    'absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50',
+                    isCollapsed && !isMobileOpen ? 'left-full bottom-0 ml-2 w-56' : 'left-2 right-2 bottom-full mb-1'
+                ]"
+                @click.stop
+            >
+                <div class="py-1">
+                    <!-- New Budget -->
+                    <button
+                        @click="handleAction('create-budget')"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                    >
+                        <BanknotesIcon class="w-4 h-4 mr-2" />
+                        New Budget
+                    </button>
+
+                    <!-- Conditional items based on active budget -->
+                    <template v-if="hasActiveBudget">
+                        <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+
+                        <button
+                            @click="handleAction('create-transaction')"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                        >
+                            <CurrencyDollarIcon class="w-4 h-4 mr-2" />
+                            New Transaction
+                        </button>
+
+                        <button
+                            @click="handleAction('create-recurring')"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                        >
+                            <ArrowPathIcon class="w-4 h-4 mr-2" />
+                            New Recurring
+                        </button>
+
+                        <button
+                            @click="handleAction('connect-account')"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            Connect Bank
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
     </div>
 </template>

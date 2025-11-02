@@ -32,18 +32,16 @@ class BudgetController extends Controller
      */
     public function index(): Response|RedirectResponse
     {
-        $budgets = Auth::user()->budgets()
-            ->with(['categories', 'categories.expenses', 'accounts'])
-            ->get();
+        $user = Auth::user();
+        $activeBudget = $user->getActiveBudget();
 
         // If no budgets exist, redirect to create page
-        if ($budgets->isEmpty()) {
+        if (!$activeBudget) {
             return redirect()->route('budgets.create');
         }
 
-        // If budgets exist, redirect to the first budget
-        $firstBudget = $budgets->first();
-        return redirect()->route('budgets.show', $firstBudget);
+        // Redirect to active budget
+        return redirect()->route('budgets.show', $activeBudget);
     }
 
     /**
@@ -64,12 +62,19 @@ class BudgetController extends Controller
             'description' => 'nullable|string',
         ]);
 
+        $user = Auth::user();
+
         // Create the budget
         /** @var Budget $budget */
-        $budget = Auth::user()->budgets()->create([
+        $budget = $user->budgets()->create([
             'name' => $validated['name'],
             'description' => $validated['description'],
         ]);
+
+        // Set as active budget if user has no active budget
+        if (!$user->getActiveBudget()) {
+            $user->setActiveBudget($budget->id);
+        }
 
         return redirect()->route('budgets.setup', $budget)
             ->with('message', 'Budget created! Now let\'s set up your accounts.');
@@ -315,6 +320,7 @@ class BudgetController extends Controller
             'allBudgets' => $allBudgets,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
+            'selectedAccountId' => $account->id,
             'transactions' => $accountTransactions,
             'projectedTransactions' => $projectedTransactions,
             'projectionParams' => [
@@ -356,6 +362,15 @@ class BudgetController extends Controller
      */
     public function destroy(Budget $budget): RedirectResponse
     {
+        $user = Auth::user();
+        $activeBudget = $user->getActiveBudget();
+
+        // If deleting the active budget, clear the preference
+        // The redirect to budgets.index will set a new active budget automatically
+        if ($activeBudget && $activeBudget->id === $budget->id) {
+            $user->setActiveBudget(null);
+        }
+
         $budget->delete();
 
         return redirect()->route('budgets.index')

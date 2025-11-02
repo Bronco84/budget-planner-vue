@@ -32,18 +32,38 @@
                             @click.stop
                           >
                             <div class="py-1 max-h-60 overflow-y-auto">
-                              <Link
+                              <button
                                 v-for="budgetOption in allBudgets"
                                 :key="budgetOption.id"
-                                :href="route('budgets.show', budgetOption.id)"
-                                class="block px-4 py-2 text-sm hover:bg-gray-50"
+                                @click="switchToActiveBudget(budgetOption.id)"
+                                type="button"
+                                class="w-full text-left block px-4 py-2 text-sm hover:bg-gray-50"
                                 :class="{
                                   'bg-blue-50 text-blue-700 font-medium': budgetOption.id === budget.id,
                                   'text-gray-700': budgetOption.id !== budget.id
                                 }"
                               >
-                                <div class="font-medium">{{ budgetOption.name }}</div>
-                                <div v-if="budgetOption.description" class="text-xs text-gray-500 mt-1">{{ budgetOption.description }}</div>
+                                <div class="flex items-center justify-between">
+                                  <div class="flex-1">
+                                    <div class="font-medium">{{ budgetOption.name }}</div>
+                                    <div v-if="budgetOption.description" class="text-xs text-gray-500 mt-1">{{ budgetOption.description }}</div>
+                                  </div>
+                                  <svg v-if="$page.props.activeBudget && budgetOption.id === $page.props.activeBudget.id" class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                  </svg>
+                                </div>
+                              </button>
+                              <div class="border-t border-gray-200"></div>
+                              <Link
+                                :href="route('budgets.create')"
+                                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <div class="flex items-center">
+                                  <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                  </svg>
+                                  <span class="font-medium">New Budget</span>
+                                </div>
                               </Link>
                             </div>
                           </div>
@@ -696,6 +716,7 @@ const props = defineProps({
   budget: Object,
   allBudgets: Array,
   accounts: Array,
+  selectedAccountId: Number,
   totalBalance: Number,
   transactions: Object,
   projectionParams: Object,
@@ -705,7 +726,7 @@ const props = defineProps({
 
 // Form state for account selection
 const form = reactive({
-  account_id: props.accounts.length > 0 ? props.accounts[0].id : null
+  account_id: props.selectedAccountId || (props.accounts.length > 0 ? props.accounts[0].id : null)
 });
 
 // Computed property to determine the active account tab
@@ -927,6 +948,28 @@ const toggleTransactionDropdown = (transactionId) => {
 // Toggle budget dropdown
 const toggleBudgetDropdown = () => {
   showBudgetDropdown.value = !showBudgetDropdown.value;
+};
+
+// Switch to active budget and navigate
+const switchToActiveBudget = async (budgetId) => {
+  try {
+    // Set as active budget via API
+    await fetch(route('preferences.active-budget.set'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+      },
+      body: JSON.stringify({ budget_id: budgetId }),
+    });
+
+    // Navigate to the budget
+    router.visit(route('budgets.show', budgetId));
+  } catch (error) {
+    console.error('Failed to set active budget:', error);
+    // Still navigate even if API call fails
+    router.visit(route('budgets.show', budgetId));
+  }
 };
 
 // Close dropdown when clicking outside

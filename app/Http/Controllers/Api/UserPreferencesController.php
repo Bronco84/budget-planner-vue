@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Budget;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -93,5 +94,65 @@ class UserPreferencesController extends Controller
             ],
             default => ['nullable'],
         };
+    }
+
+    /**
+     * Get the user's active budget.
+     */
+    public function getActiveBudget(): JsonResponse
+    {
+        $user = Auth::user();
+        $activeBudget = $user->getActiveBudget();
+
+        if (!$activeBudget) {
+            return response()->json([
+                'active_budget' => null,
+                'message' => 'No active budget set',
+            ]);
+        }
+
+        return response()->json([
+            'active_budget' => [
+                'id' => $activeBudget->id,
+                'name' => $activeBudget->name,
+                'description' => $activeBudget->description,
+                'starting_balance' => $activeBudget->starting_balance,
+            ],
+        ]);
+    }
+
+    /**
+     * Set the user's active budget.
+     */
+    public function setActiveBudget(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'budget_id' => [
+                'required',
+                'integer',
+                'exists:budgets,id',
+                function ($attribute, $value, $fail) use ($user) {
+                    $budget = Budget::find($value);
+                    if ($budget && !$user->hasBudget($budget)) {
+                        $fail('You do not have access to this budget.');
+                    }
+                },
+            ],
+        ]);
+
+        $user->setActiveBudget($validated['budget_id']);
+        $activeBudget = $user->getActiveBudget();
+
+        return response()->json([
+            'active_budget' => [
+                'id' => $activeBudget->id,
+                'name' => $activeBudget->name,
+                'description' => $activeBudget->description,
+                'starting_balance' => $activeBudget->starting_balance,
+            ],
+            'message' => 'Active budget updated successfully',
+        ]);
     }
 }

@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -8,7 +9,10 @@ import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import ThemeToggle from '@/Components/ThemeToggle.vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import Sidebar from '@/Components/Sidebar.vue';
-import { Link } from '@inertiajs/vue3';
+import CreateBudgetModal from '@/Components/Modals/CreateBudgetModal.vue';
+import QuickAddTransactionModal from '@/Components/Modals/QuickAddTransactionModal.vue';
+import QuickAddRecurringModal from '@/Components/Modals/QuickAddRecurringModal.vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import { useTheme } from '@/composables/useTheme';
 import { useSidebar } from '@/composables/useSidebar';
 
@@ -16,8 +20,35 @@ const showingNavigationDropdown = ref(false);
 const { initializeTheme } = useTheme();
 const { isCollapsed, isMobileOpen, toggleCollapsed, openMobile, closeMobile } = useSidebar();
 
+// Modal state
+const showCreateBudgetModal = ref(false);
+const showQuickAddTransactionModal = ref(false);
+const showQuickAddRecurringModal = ref(false);
+
+const page = usePage();
+
 // Initialize theme on component mount
 initializeTheme();
+
+// Handle AddMenu actions
+const handleCreateBudget = () => {
+    showCreateBudgetModal.value = true;
+};
+
+const handleCreateTransaction = () => {
+    showQuickAddTransactionModal.value = true;
+};
+
+const handleCreateRecurring = () => {
+    showQuickAddRecurringModal.value = true;
+};
+
+const handleConnectAccount = () => {
+    const activeBudget = page.props.activeBudget;
+    if (activeBudget) {
+        router.visit(route('plaid.discover', activeBudget.id));
+    }
+};
 </script>
 
 <template>
@@ -28,6 +59,10 @@ initializeTheme();
             :is-mobile-open="isMobileOpen"
             @toggle="toggleCollapsed"
             @close="closeMobile"
+            @create-budget="handleCreateBudget"
+            @create-transaction="handleCreateTransaction"
+            @create-recurring="handleCreateRecurring"
+            @connect-account="handleConnectAccount"
         />
 
         <!-- Main Content Area -->
@@ -154,5 +189,19 @@ initializeTheme();
                 <slot />
             </main>
         </div>
+
+        <!-- Modals -->
+        <CreateBudgetModal
+            :show="showCreateBudgetModal"
+            @close="showCreateBudgetModal = false"
+        />
+        <QuickAddTransactionModal
+            :show="showQuickAddTransactionModal"
+            @close="showQuickAddTransactionModal = false"
+        />
+        <QuickAddRecurringModal
+            :show="showQuickAddRecurringModal"
+            @close="showQuickAddRecurringModal = false"
+        />
     </div>
 </template>

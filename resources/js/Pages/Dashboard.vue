@@ -1,7 +1,11 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowRightIcon } from '@heroicons/vue/24/outline';
+import { CheckCircleIcon } from '@heroicons/vue/24/solid';
+
+defineProps({
+    gettingStarted: Object,
+});
 </script>
 
 <template>
@@ -22,43 +26,100 @@ import { ArrowRightIcon } from '@heroicons/vue/24/outline';
                             <h2 class="text-xl font-semibold text-blue-900 dark:text-blue-100 mb-3">Getting Started</h2>
                             <ul class="space-y-3">
                                 <li class="flex items-start">
-                                    <span class="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">1</span>
-                                    <div>
-                                        <Link :href="route('budgets.index')" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                                    <span
+                                        class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold mr-3"
+                                        :class="gettingStarted.hasBudget
+                                            ? 'bg-green-600 text-white'
+                                            : 'bg-blue-600 text-white'"
+                                    >
+                                        <CheckCircleIcon v-if="gettingStarted.hasBudget" class="w-5 h-5" />
+                                        <span v-else>1</span>
+                                    </span>
+                                    <div class="flex-1">
+                                        <Link
+                                            :href="route('budgets.index')"
+                                            class="font-medium"
+                                            :class="gettingStarted.hasBudget
+                                                ? 'text-green-700 dark:text-green-400 hover:underline'
+                                                : 'text-blue-600 dark:text-blue-400 hover:underline'"
+                                        >
                                             Create your first budget
                                         </Link>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">Set up budgets to organize and track your finances</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Set up budgets to organize and track your finances
+                                        </p>
+                                        <span
+                                            v-if="gettingStarted.hasBudget"
+                                            class="inline-flex items-center text-xs font-medium text-green-700 dark:text-green-400 mt-1"
+                                        >
+                                            <CheckCircleIcon class="w-4 h-4 mr-1" />
+                                            Completed
+                                        </span>
                                     </div>
                                 </li>
                                 <li class="flex items-start">
-                                    <span class="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">2</span>
-                                    <div>
-                                        <span class="text-gray-700 dark:text-gray-300 font-medium">Connect your bank accounts</span>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">Link accounts via Plaid for automatic transaction syncing</p>
+                                    <span
+                                        class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold mr-3"
+                                        :class="gettingStarted.hasPlaidAccounts
+                                            ? 'bg-green-600 text-white'
+                                            : 'bg-blue-600 text-white'"
+                                    >
+                                        <CheckCircleIcon v-if="gettingStarted.hasPlaidAccounts" class="w-5 h-5" />
+                                        <span v-else>2</span>
+                                    </span>
+                                    <div class="flex-1">
+                                        <span
+                                            class="font-medium"
+                                            :class="gettingStarted.hasPlaidAccounts
+                                                ? 'text-green-700 dark:text-green-400'
+                                                : 'text-gray-700 dark:text-gray-300'"
+                                        >
+                                            Connect your bank accounts
+                                        </span>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Link accounts via Plaid for automatic transaction syncing
+                                        </p>
+                                        <span
+                                            v-if="gettingStarted.hasPlaidAccounts"
+                                            class="inline-flex items-center text-xs font-medium text-green-700 dark:text-green-400 mt-1"
+                                        >
+                                            <CheckCircleIcon class="w-4 h-4 mr-1" />
+                                            Completed
+                                        </span>
                                     </div>
                                 </li>
                                 <li class="flex items-start">
-                                    <span class="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3">3</span>
-                                    <div>
-                                        <span class="text-gray-700 dark:text-gray-300 font-medium">Set up recurring transactions</span>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">Automate tracking of bills and regular income</p>
+                                    <span
+                                        class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold mr-3"
+                                        :class="gettingStarted.hasRecurringTransactions
+                                            ? 'bg-green-600 text-white'
+                                            : 'bg-blue-600 text-white'"
+                                    >
+                                        <CheckCircleIcon v-if="gettingStarted.hasRecurringTransactions" class="w-5 h-5" />
+                                        <span v-else>3</span>
+                                    </span>
+                                    <div class="flex-1">
+                                        <span
+                                            class="font-medium"
+                                            :class="gettingStarted.hasRecurringTransactions
+                                                ? 'text-green-700 dark:text-green-400'
+                                                : 'text-gray-700 dark:text-gray-300'"
+                                        >
+                                            Set up recurring transactions
+                                        </span>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Automate tracking of bills and regular income
+                                        </p>
+                                        <span
+                                            v-if="gettingStarted.hasRecurringTransactions"
+                                            class="inline-flex items-center text-xs font-medium text-green-700 dark:text-green-400 mt-1"
+                                        >
+                                            <CheckCircleIcon class="w-4 h-4 mr-1" />
+                                            Completed
+                                        </span>
                                     </div>
                                 </li>
                             </ul>
-                        </div>
-
-                        <!-- Quick Actions -->
-                        <div>
-                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-                            <div class="flex flex-wrap gap-3">
-                                <Link
-                                    :href="route('budgets.index')"
-                                    class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
-                                >
-                                    View Budgets
-                                    <ArrowRightIcon class="ml-2 w-4 h-4" />
-                                </Link>
-                            </div>
                         </div>
                     </div>
                 </div>

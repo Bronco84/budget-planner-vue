@@ -128,4 +128,60 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->linked_budgets->contains($budget) || $this->id === $budget->user_id;
     }
+
+    /**
+     * Get all budgets accessible to the user (owned + shared).
+     */
+    public function accessibleBudgets()
+    {
+        return Budget::where('user_id', $this->id)
+            ->orWhereHas('connected_users', function ($query) {
+                $query->where('user_id', $this->id);
+            })
+            ->get();
+    }
+
+    /**
+     * Get the user's active budget with fallback logic.
+     * Returns null if user has no budgets.
+     */
+    public function getActiveBudget(): ?Budget
+    {
+        $activeBudgetId = UserPreference::getActiveBudgetId($this->id);
+
+        // If active budget ID is set, try to get it
+        if ($activeBudgetId) {
+            $budget = Budget::find($activeBudgetId);
+
+            // Verify user still has access to this budget
+            if ($budget && $this->hasBudget($budget)) {
+                return $budget;
+            }
+
+            // If budget doesn't exist or user lost access, clear the preference
+            UserPreference::clearActiveBudget($this->id);
+        }
+
+        // Fallback: get first accessible budget
+        return $this->accessibleBudgets()->first();
+    }
+
+    /**
+     * Set the user's active budget.
+     */
+    public function setActiveBudget(?int $budgetId): void
+    {
+        if ($budgetId) {
+            $budget = Budget::find($budgetId);
+
+            // Only set if budget exists and user has access
+            if ($budget && $this->hasBudget($budget)) {
+                UserPreference::setActiveBudgetId($this->id, $budgetId);
+                return;
+            }
+        }
+
+        // If invalid budget ID or null, clear it
+        UserPreference::clearActiveBudget($this->id);
+    }
 }

@@ -70,4 +70,29 @@ class UserPreference extends Model
         $preference->other_preferences = $otherPrefs;
         $preference->save();
     }
+
+    /**
+     * Get the active budget ID for a user.
+     */
+    public static function getActiveBudgetId(int $userId): ?int
+    {
+        $value = static::getUserPreference($userId, 'active_budget_id');
+        return $value ? (int) $value : null;
+    }
+
+    /**
+     * Set the active budget ID for a user.
+     */
+    public static function setActiveBudgetId(int $userId, ?int $budgetId): void
+    {
+        static::setUserPreference($userId, 'active_budget_id', $budgetId);
+    }
+
+    /**
+     * Clear the active budget for a user.
+     */
+    public static function clearActiveBudget(int $userId): void
+    {
+        static::setActiveBudgetId($userId, null);
+    }
 }

@@ -398,7 +398,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                       <!-- Variable to track if we've shown the today marker -->
-                      <template v-for="(transaction, index) in props.transactions.data" :key="transaction.id || ('proj-' + index)">
+                      <template v-for="(transaction, index) in sortedTransactions" :key="transaction.id || ('proj-' + index)">
                         <!-- Today marker -->
                         <tr v-if="shouldShowTodayMarker(transaction, index)">
                           <td colspan="7" class="px-6 py-3">
@@ -1200,7 +1200,7 @@ const shouldShowTodayMarker = (transaction, index) => {
 
   // Also check if this is the last transaction before today
   if (index > 0) {
-    const prevTransaction = Object.values(props.transactions.data)[index - 1];
+    const prevTransaction = sortedTransactions.value[index - 1];
     if (prevTransaction) {
       const prevDate = new Date(prevTransaction.date);
       prevDate.setHours(0, 0, 0, 0);
@@ -1217,7 +1217,6 @@ const shouldShowTodayMarker = (transaction, index) => {
 
 // Computed property for sorted transactions
 const sortedTransactions = computed(() => {
-  return props.transactions.data;
   // Reset the today marker flag whenever we recalculate the sorted transactions
   hasShownTodayMarker.value = false;
 
@@ -1238,7 +1237,7 @@ const sortedTransactions = computed(() => {
   }));
 
   const transactions = [...actualTransactions, ...projectedWithFlag];
-  return transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+  return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 });
 
 // Function to select an account

@@ -5,24 +5,8 @@ use Diglactic\Breadcrumbs\Generator as BreadcrumbTrail;
 use App\Models\Budget;
 use App\Models\Account;
 
-// Dashboard
-Breadcrumbs::for('dashboard', function (BreadcrumbTrail $trail) {
-    $trail->push('Dashboard', route('dashboard'));
-});
-
-// Budgets
-Breadcrumbs::for('budgets.index', function (BreadcrumbTrail $trail) {
-    $trail->parent('dashboard');
-    $trail->push('Budgets', route('budgets.index'));
-});
-
-Breadcrumbs::for('budgets.create', function (BreadcrumbTrail $trail) {
-    $trail->parent('budgets.index');
-    $trail->push('Create Budget', route('budgets.create'));
-});
-
+// Home (Budget) - This is the root, no parent
 Breadcrumbs::for('budgets.show', function (BreadcrumbTrail $trail, Budget $budget) {
-    $trail->parent('budgets.index');
     $trail->push($budget->name, route('budgets.show', $budget));
 });
 
@@ -98,6 +82,5 @@ Breadcrumbs::for('recurring-transactions.analysis', function (BreadcrumbTrail $t
 
 // Profile
 Breadcrumbs::for('profile.edit', function (BreadcrumbTrail $trail) {
-    $trail->parent('dashboard');
     $trail->push('Profile', route('profile.edit'));
 });

@@ -140,7 +140,10 @@
                   <div>
                     <p class="font-medium text-blue-800">{{ account.plaid_account.institution_name }}</p>
                     <p class="text-sm text-blue-600 mt-1">
-                      Last synced: {{ formatDateTime(account.plaid_account?.plaid_connection?.last_sync_at) || 'Never' }}
+                      Last synced: <PlaidSyncTimestamp
+                        :timestamp="account.plaid_account?.plaid_connection?.last_sync_at"
+                        format="absolute"
+                      />
                     </p>
                   </div>
                   <div>
@@ -210,6 +213,7 @@ import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import Modal from '@/Components/Modal.vue';
+import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 
 // Define props to receive the budget and account
 const props = defineProps({
@@ -254,24 +258,12 @@ const closeModal = () => {
 
 const deleteAccount = () => {
   deleting.value = true;
-  
+
   form.delete(route('budgets.accounts.destroy', [props.budget.id, props.account.id]), {
     onFinish: () => {
       deleting.value = false;
       closeModal();
     },
   });
-};
-
-// In the script section, add formatDateTime helper
-const formatDateTime = (dateTimeString) => {
-  if (!dateTimeString) return null;
-  
-  try {
-    const date = new Date(dateTimeString);
-    return date.toLocaleString();
-  } catch (e) {
-    return dateTimeString;
-  }
 };
 </script> 

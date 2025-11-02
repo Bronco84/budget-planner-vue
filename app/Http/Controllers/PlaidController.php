@@ -30,9 +30,11 @@ class PlaidController extends Controller
      */
     public function showLinkForm(Budget $budget, Account $account): Response
     {
-        // Check if the account is already linked to Plaid
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
-        
+        // Check if the account is already linked to Plaid and load the connection relationship
+        $plaidAccount = PlaidAccount::with('plaidConnection')
+            ->where('account_id', $account->id)
+            ->first();
+
         $linkToken = null;
         try {
             $linkToken = $this->plaidService->createLinkToken((string) Auth::id());
@@ -41,7 +43,7 @@ class PlaidController extends Controller
                 'error' => $e->getMessage()
             ]);
         }
-        
+
         return Inertia::render('Plaid/Link', [
             'budget' => $budget,
             'account' => $account,

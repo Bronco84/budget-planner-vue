@@ -44,7 +44,10 @@
                   <div>
                     <p class="font-medium text-blue-800">{{ plaidAccount.institution_name }}</p>
                     <p class="text-sm text-blue-600">
-                      Last synced: {{ formatDateTime(plaidAccount.plaid_connection?.last_sync_at) || 'Never' }}
+                      Last synced: <PlaidSyncTimestamp
+                        :timestamp="plaidAccount.plaid_connection?.last_sync_at"
+                        format="absolute"
+                      />
                     </p>
                   </div>
                   <div class="flex space-x-2">
@@ -117,6 +120,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 // Props
@@ -267,18 +271,6 @@ const updateBalance = () => {
 const confirmDisconnect = () => {
   if (confirm('Are you sure you want to disconnect from Plaid? This will not delete any imported transactions.')) {
     router.delete(route('plaid.destroy', [props.budget.id, props.account.id]));
-  }
-};
-
-// Format date helper
-const formatDateTime = (dateTimeString) => {
-  if (!dateTimeString) return null;
-  
-  try {
-    const date = new Date(dateTimeString);
-    return date.toLocaleString();
-  } catch (e) {
-    return dateTimeString;
   }
 };
 </script> 

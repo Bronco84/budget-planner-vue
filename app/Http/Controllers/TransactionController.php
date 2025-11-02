@@ -34,10 +34,6 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'accounts' => $accounts,
             'categories' => $categories,
-            'breadcrumbs' => [
-                ['title' => 'Dashboard', 'url' => route('dashboard')],
-                ['title' => 'Transactions', 'url' => null],
-            ],
         ]);
     }
 

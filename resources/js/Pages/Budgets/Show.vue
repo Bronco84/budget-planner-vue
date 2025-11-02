@@ -1328,15 +1328,4 @@ const monthlyCashFlow = computed(() => {
 
   return null;
 });
-
-// Log initial values when mounted
-onMounted(() => {
-  console.log('Initial filters:', props.filters);
-  console.log('Initial account_id:', props.filters.account_id);
-
-  if (props.filters.account_id) {
-    console.log('Setting initial account_id:', props.filters.account_id);
-    form.account_id = props.filters.account_id;
-  }
-});
 </script>

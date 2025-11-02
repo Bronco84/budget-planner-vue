@@ -13,62 +13,7 @@
                   <!-- Always visible header with Total Balance -->
                   <div class="cursor-pointer" @click="budgetCardExpanded = !budgetCardExpanded">
                     <div class="flex items-center justify-between mb-2">
-                      <div class="flex items-center space-x-3">
-                        <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
-                        <!-- Budget Switcher Dropdown -->
-                        <div v-if="allBudgets.length > 1" class="relative" @click.stop>
-                          <button
-                            @click="toggleBudgetDropdown"
-                            class="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          >
-                            Switch Budget
-                            <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          <div
-                            v-if="showBudgetDropdown"
-                            class="absolute left-0 z-50 mt-1 w-64 bg-white border border-gray-300 rounded-md shadow-lg"
-                            @click.stop
-                          >
-                            <div class="py-1 max-h-60 overflow-y-auto">
-                              <button
-                                v-for="budgetOption in allBudgets"
-                                :key="budgetOption.id"
-                                @click="switchToActiveBudget(budgetOption.id)"
-                                type="button"
-                                class="w-full text-left block px-4 py-2 text-sm hover:bg-gray-50"
-                                :class="{
-                                  'bg-blue-50 text-blue-700 font-medium': budgetOption.id === budget.id,
-                                  'text-gray-700': budgetOption.id !== budget.id
-                                }"
-                              >
-                                <div class="flex items-center justify-between">
-                                  <div class="flex-1">
-                                    <div class="font-medium">{{ budgetOption.name }}</div>
-                                    <div v-if="budgetOption.description" class="text-xs text-gray-500 mt-1">{{ budgetOption.description }}</div>
-                                  </div>
-                                  <svg v-if="$page.props.activeBudget && budgetOption.id === $page.props.activeBudget.id" class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                  </svg>
-                                </div>
-                              </button>
-                              <div class="border-t border-gray-200"></div>
-                              <Link
-                                :href="route('budgets.create')"
-                                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                <div class="flex items-center">
-                                  <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                  </svg>
-                                  <span class="font-medium">New Budget</span>
-                                </div>
-                              </Link>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
                       <div class="flex items-center space-x-2">
                         <!-- Expand/Collapse Icon -->
                         <svg
@@ -746,7 +691,6 @@ import draggable from 'vuedraggable'
 // Define props
 const props = defineProps({
   budget: Object,
-  allBudgets: Array,
   accounts: Array,
   selectedAccountId: Number,
   totalBalance: Number,
@@ -843,9 +787,6 @@ const openTransactionDropdown = ref(null);
 
 // Budget card accordion state (collapsed by default)
 const budgetCardExpanded = ref(false);
-
-// Budget switcher dropdown state
-const showBudgetDropdown = ref(false);
 
 // Selected account tracking is handled by activeAccountId computed property
 
@@ -977,38 +918,10 @@ const toggleTransactionDropdown = (transactionId) => {
   openTransactionDropdown.value = openTransactionDropdown.value === transactionId ? null : transactionId;
 };
 
-// Toggle budget dropdown
-const toggleBudgetDropdown = () => {
-  showBudgetDropdown.value = !showBudgetDropdown.value;
-};
-
-// Switch to active budget and navigate
-const switchToActiveBudget = async (budgetId) => {
-  try {
-    // Set as active budget via API
-    await fetch(route('preferences.active-budget.set'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-      },
-      body: JSON.stringify({ budget_id: budgetId }),
-    });
-
-    // Navigate to the budget
-    router.visit(route('budgets.show', budgetId));
-  } catch (error) {
-    console.error('Failed to set active budget:', error);
-    // Still navigate even if API call fails
-    router.visit(route('budgets.show', budgetId));
-  }
-};
-
 // Close dropdown when clicking outside
 const closeDropdown = () => {
   openDropdown.value = null;
   openTransactionDropdown.value = null;
-  showBudgetDropdown.value = false;
 };
 
 // Account selection functionality is handled by the existing selectAccount function

@@ -31,36 +31,8 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    $user = auth()->user();
-
-    // Check completion status for getting started steps
-    $hasBudget = $user->budgets()->exists();
-    $hasPlaidAccounts = DB::table('plaid_accounts')
-        ->whereIn('account_id', function($query) use ($user) {
-            $query->select('id')
-                ->from('accounts')
-                ->whereIn('budget_id', function($q) use ($user) {
-                    $q->select('id')
-                        ->from('budgets')
-                        ->where('user_id', $user->id);
-                });
-        })
-        ->exists();
-    $hasRecurringTransactions = DB::table('recurring_transaction_templates')
-        ->whereIn('budget_id', function($query) use ($user) {
-            $query->select('id')
-                ->from('budgets')
-                ->where('user_id', $user->id);
-        })
-        ->exists();
-
-    return Inertia::render('Dashboard', [
-        'gettingStarted' => [
-            'hasBudget' => $hasBudget,
-            'hasPlaidAccounts' => $hasPlaidAccounts,
-            'hasRecurringTransactions' => $hasRecurringTransactions,
-        ],
-    ]);
+    // Redirect to the budget index, which will redirect to the active budget
+    return redirect()->route('budgets.index');
 })->middleware(['auth'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {

@@ -313,15 +313,8 @@ class BudgetController extends Controller
             $monthlyProjectedCashFlow = $recurringService->calculateMonthlyProjectedCashFlow($account);
         }
 
-        // Get all user's budgets for the budget switcher
-        $allBudgets = Auth::user()->budgets()
-            ->select('id', 'name', 'description')
-            ->orderBy('name')
-            ->get();
-
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
-            'allBudgets' => $allBudgets,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
             'selectedAccountId' => $account?->id,

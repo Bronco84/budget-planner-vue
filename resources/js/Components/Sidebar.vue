@@ -4,7 +4,6 @@ import { Link, usePage } from '@inertiajs/vue3';
 import {
     HomeIcon,
     BanknotesIcon,
-    CurrencyDollarIcon,
     ChartBarIcon,
     CalendarIcon,
     ArrowPathIcon,
@@ -24,7 +23,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['toggle', 'close', 'create-budget', 'create-transaction', 'create-recurring', 'connect-account']);
+const emit = defineEmits(['toggle', 'close', 'create-transaction', 'create-recurring', 'connect-account']);
 
 const page = usePage();
 const activeBudget = computed(() => page.props.activeBudget);
@@ -34,9 +33,8 @@ const showAddMenu = ref(false);
 const addMenuRef = ref(null);
 
 const navigationItems = computed(() => [
-    { name: 'Dashboard', href: 'dashboard', icon: HomeIcon, route: 'dashboard' },
-    { name: 'Budgets', href: 'budgets.index', icon: BanknotesIcon, route: 'budgets.*' },
-    { name: 'Transactions', href: 'transactions.index', icon: CurrencyDollarIcon, route: 'budget.transaction.*' },
+    { name: 'Home', href: 'budgets.show', icon: HomeIcon, route: 'budgets.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null },
+    { name: 'Transactions', href: 'transactions.index', icon: BanknotesIcon, route: 'budget.transaction.*' },
     { name: 'Recurring', href: 'recurring-transactions.redirect', icon: ArrowPathIcon, route: 'recurring-transactions.*' },
     { name: 'Calendar', href: 'calendar.index', icon: CalendarIcon, route: 'calendar.*' },
     { name: 'Reports', href: 'reports.index', icon: ChartBarIcon, route: 'reports.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null },
@@ -197,24 +195,13 @@ onUnmounted(() => {
                 @click.stop
             >
                 <div class="py-1">
-                    <!-- New Budget -->
-                    <button
-                        @click="handleAction('create-budget')"
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
-                    >
-                        <BanknotesIcon class="w-4 h-4 mr-2" />
-                        New Budget
-                    </button>
-
                     <!-- Conditional items based on active budget -->
                     <template v-if="hasActiveBudget">
-                        <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-
                         <button
                             @click="handleAction('create-transaction')"
                             class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                         >
-                            <CurrencyDollarIcon class="w-4 h-4 mr-2" />
+                            <BanknotesIcon class="w-4 h-4 mr-2" />
                             New Transaction
                         </button>
 

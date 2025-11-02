@@ -65,44 +65,37 @@ const handleDateRangeChange = (dateRangeData) => {
     <AuthenticatedLayout>
         <div class="py-6">
             <div class="max-w-full mx-auto px-6">
-                <!-- Header -->
-                <div class="mb-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-                                Reports
-                            </h1>
-                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                                {{ budget.name }}
-                            </p>
-                        </div>
-                        <DateRangePicker
-                            :start-date="dateRange.start"
-                            :end-date="dateRange.end"
-                            :preset="dateRange.preset"
-                            @update="handleDateRangeChange"
-                        />
-                    </div>
-                </div>
-
-                <!-- Tab Navigation -->
+                <!-- Consolidated Header: Tabs + Date Range Picker -->
                 <div class="mb-6">
                     <div class="border-b border-gray-200 dark:border-gray-700">
-                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                            <button
-                                v-for="tab in tabs"
-                                :key="tab.component"
-                                @click="activeTab = tab.component"
-                                :class="[
-                                    activeTab === tab.component
-                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
-                                    'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors'
-                                ]"
-                            >
-                                {{ tab.name }}
-                            </button>
-                        </nav>
+                        <div class="flex items-center justify-between">
+                            <!-- Tabs (left side) -->
+                            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                                <button
+                                    v-for="tab in tabs"
+                                    :key="tab.component"
+                                    @click="activeTab = tab.component"
+                                    :class="[
+                                        activeTab === tab.component
+                                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                            : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
+                                        'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors'
+                                    ]"
+                                >
+                                    {{ tab.name }}
+                                </button>
+                            </nav>
+
+                            <!-- Date Range Picker (right side) -->
+                            <div class="pb-2">
+                                <DateRangePicker
+                                    :start-date="dateRange.start"
+                                    :end-date="dateRange.end"
+                                    :preset="dateRange.preset"
+                                    @update="handleDateRangeChange"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
 

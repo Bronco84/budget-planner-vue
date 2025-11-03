@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\ProfileController;
@@ -226,6 +227,16 @@ Route::middleware('auth')->group(function () {
         ->name('preferences.show');
     Route::post('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'update'])
         ->name('preferences.update');
+
+    // Chat routes with rate limiting
+    Route::prefix('chat')->name('chat.')->middleware('throttle:60,1')->group(function () {
+        Route::post('/message', [ChatController::class, 'send'])->middleware('throttle:30,1')->name('send');
+        Route::post('/stream', [ChatController::class, 'stream'])->middleware('throttle:30,1')->name('stream');
+        Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations');
+        Route::get('/conversations/{id}', [ChatController::class, 'show'])->name('conversations.show');
+        Route::delete('/conversations/{id}', [ChatController::class, 'destroy'])->name('conversations.destroy');
+        Route::post('/conversations/bulk-delete', [ChatController::class, 'bulkDestroy'])->name('conversations.bulk-destroy');
+    });
 });
 
 require __DIR__.'/auth.php';

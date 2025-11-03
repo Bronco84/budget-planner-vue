@@ -9,7 +9,8 @@ import {
     ArrowPathIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
-    PlusCircleIcon
+    PlusCircleIcon,
+    ChatBubbleLeftIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -23,7 +24,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['toggle', 'close', 'create-transaction', 'create-recurring', 'connect-account']);
+const emit = defineEmits(['toggle', 'close', 'create-transaction', 'create-recurring', 'connect-account', 'toggle-chat']);
 
 const page = usePage();
 const activeBudget = computed(() => page.props.activeBudget);
@@ -172,6 +173,26 @@ onUnmounted(() => {
                 </div>
             </template>
         </nav>
+
+        <!-- Chat Button (outside scrollable nav) -->
+        <div class="px-2 pb-2">
+            <button
+                @click="emit('toggle-chat')"
+                :class="[
+                    'w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                ]"
+                :title="isCollapsed && !isMobileOpen ? 'Chat Assistant' : ''"
+            >
+                <ChatBubbleLeftIcon
+                    :class="[
+                        'flex-shrink-0',
+                        isCollapsed && !isMobileOpen ? 'w-6 h-6' : 'w-5 h-5 mr-3'
+                    ]"
+                />
+                <span v-if="!isCollapsed || isMobileOpen">Chat Assistant</span>
+            </button>
+        </div>
 
         <!-- Add Menu Item (outside scrollable nav to prevent clipping) -->
         <div ref="addMenuRef" class="relative px-2 pb-4" @click.stop>

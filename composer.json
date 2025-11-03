@@ -9,6 +9,7 @@
         "php": "^8.2",
         "aws/aws-sdk-php": "^3.349",
         "diglactic/laravel-breadcrumbs": "^10.0",
+        "echolabsdev/prism": "^0.97.1",
         "guzzlehttp/guzzle": "^7.9",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",

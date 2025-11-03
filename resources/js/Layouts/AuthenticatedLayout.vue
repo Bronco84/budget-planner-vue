@@ -9,6 +9,7 @@ import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import ThemeToggle from '@/Components/ThemeToggle.vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import Sidebar from '@/Components/Sidebar.vue';
+import ChatPanel from '@/Components/ChatPanel.vue';
 import CreateBudgetModal from '@/Components/Modals/CreateBudgetModal.vue';
 import QuickAddTransactionModal from '@/Components/Modals/QuickAddTransactionModal.vue';
 import QuickAddRecurringModal from '@/Components/Modals/QuickAddRecurringModal.vue';
@@ -24,6 +25,7 @@ const { isCollapsed, isMobileOpen, toggleCollapsed, openMobile, closeMobile } = 
 const showCreateBudgetModal = ref(false);
 const showQuickAddTransactionModal = ref(false);
 const showQuickAddRecurringModal = ref(false);
+const showChatPanel = ref(false);
 
 const page = usePage();
 
@@ -49,6 +51,10 @@ const handleConnectAccount = () => {
         router.visit(route('plaid.discover', activeBudget.id));
     }
 };
+
+const handleToggleChat = () => {
+    showChatPanel.value = !showChatPanel.value;
+};
 </script>
 
 <template>
@@ -63,6 +69,13 @@ const handleConnectAccount = () => {
             @create-transaction="handleCreateTransaction"
             @create-recurring="handleCreateRecurring"
             @connect-account="handleConnectAccount"
+            @toggle-chat="handleToggleChat"
+        />
+
+        <!-- Chat Panel -->
+        <ChatPanel
+            :is-open="showChatPanel"
+            @close="showChatPanel = false"
         />
 
         <!-- Main Content Area -->
@@ -186,11 +199,11 @@ const handleConnectAccount = () => {
 
             <!-- Scrollable Page Content -->
             <main class="flex-1 overflow-y-auto">
-                <Transition name="fade" mode="out-in">
+
                     <div :key="$page.url">
                         <slot />
                     </div>
-                </Transition>
+
             </main>
         </div>
 

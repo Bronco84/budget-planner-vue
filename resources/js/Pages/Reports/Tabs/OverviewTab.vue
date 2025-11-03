@@ -28,10 +28,6 @@ const savingsRate = computed(() => {
 
 <template>
     <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            Financial Overview
-        </h2>
-
         <!-- Key Metrics Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Net Worth -->

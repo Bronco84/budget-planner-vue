@@ -15,10 +15,6 @@ const formatPercent = (value) => {
 
 <template>
     <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            Net Worth Tracking
-        </h2>
-
         <!-- Summary Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-800 rounded-lg p-6">

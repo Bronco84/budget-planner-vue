@@ -9,10 +9,6 @@ const props = defineProps({
 
 <template>
     <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            Budget Performance
-        </h2>
-
         <!-- Summary Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">

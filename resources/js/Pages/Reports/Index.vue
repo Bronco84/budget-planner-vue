@@ -63,12 +63,13 @@ const handleDateRangeChange = (dateRangeData) => {
     <Head :title="`Reports - ${budget.name}`" />
 
     <AuthenticatedLayout>
-        <div class="py-4">
-            <div class="max-w-full mx-auto px-6">
-                <!-- Consolidated Header: Tabs + Date Range Picker -->
-                <div class="mb-6">
+        <div class="">
+            <div class="max-w-full mx-auto px-6 pt-6">
+                <!-- White Container with Integrated Tabs -->
+                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
+                    <!-- Tabs as header inside container -->
                     <div class="border-b border-gray-200 dark:border-gray-700">
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between px-6">
                             <!-- Tabs (left side) -->
                             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                                 <button
@@ -87,7 +88,7 @@ const handleDateRangeChange = (dateRangeData) => {
                             </nav>
 
                             <!-- Date Range Picker (right side) -->
-                            <div class="pb-2">
+                            <div class="">
                                 <DateRangePicker
                                     :start-date="dateRange.start"
                                     :end-date="dateRange.end"
@@ -97,21 +98,21 @@ const handleDateRangeChange = (dateRangeData) => {
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Tab Content -->
-                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6">
-                    <component
-                        :is="activeComponent"
-                        :budget="budget"
-                        :date-range="dateRange"
-                        :overview="overview"
-                        :net-worth="netWorth"
-                        :cash-flow="cashFlow"
-                        :budget-performance="budgetPerformance"
-                        :spending-patterns="spendingPatterns"
-                        :debt-payoff="debtPayoff"
-                    />
+                    <!-- Tab Content -->
+                    <div class="p-6">
+                        <component
+                            :is="activeComponent"
+                            :budget="budget"
+                            :date-range="dateRange"
+                            :overview="overview"
+                            :net-worth="netWorth"
+                            :cash-flow="cashFlow"
+                            :budget-performance="budgetPerformance"
+                            :spending-patterns="spendingPatterns"
+                            :debt-payoff="debtPayoff"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

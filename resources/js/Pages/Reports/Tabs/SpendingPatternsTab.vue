@@ -9,10 +9,6 @@ const props = defineProps({
 
 <template>
     <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            Spending Patterns
-        </h2>
-
         <!-- Summary Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">

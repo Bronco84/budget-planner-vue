@@ -83,8 +83,9 @@ const changeBudget = (budgetId) => {
     <AuthenticatedLayout>
         <div class="py-6">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <!-- Budget selector (if user has multiple budgets) -->
-                <div v-if="budgets.length > 1" class="mb-4 flex justify-end">
+                <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6">
+                    <!-- Budget selector (if user has multiple budgets) -->
+                    <div v-if="budgets.length > 1" class="mb-4 flex justify-end">
                     <div class="flex items-center gap-2">
                         <label for="budget-select" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                             Budget:
@@ -102,8 +103,8 @@ const changeBudget = (budgetId) => {
                     </div>
                 </div>
 
-                <!-- Empty state (no budget selected) -->
-                <div v-if="!selectedBudget" class="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+                    <!-- Empty state (no budget selected) -->
+                    <div v-if="!selectedBudget" class="p-12 text-center">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -121,61 +122,62 @@ const changeBudget = (budgetId) => {
                     </div>
                 </div>
 
-                <!-- Calendar view -->
-                <div v-else>
-                    <!-- Compact Calendar controls with Legend -->
-                    <div class="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                        <!-- Month navigation -->
-                        <div class="flex items-center gap-2">
-                            <button
-                                @click="navigateToMonth(-1)"
-                                class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                            >
-                                <ChevronLeftIcon class="w-5 h-5" />
-                            </button>
-                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white min-w-[140px] text-center">
-                                {{ calendarData.monthName }}
-                            </h2>
-                            <button
-                                @click="navigateToMonth(1)"
-                                class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                            >
-                                <ChevronRightIcon class="w-5 h-5" />
-                            </button>
-                            <button
-                                @click="navigateToToday"
-                                class="ml-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                            >
-                                Today
-                            </button>
+                    <!-- Calendar view -->
+                    <div v-else>
+                        <!-- Compact Calendar controls with Legend -->
+                        <div class="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            <!-- Month navigation -->
+                            <div class="flex items-center gap-2">
+                                <button
+                                    @click="navigateToMonth(-1)"
+                                    class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                >
+                                    <ChevronLeftIcon class="w-5 h-5" />
+                                </button>
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white min-w-[140px] text-center">
+                                    {{ calendarData.monthName }}
+                                </h2>
+                                <button
+                                    @click="navigateToMonth(1)"
+                                    class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                >
+                                    <ChevronRightIcon class="w-5 h-5" />
+                                </button>
+                                <button
+                                    @click="navigateToToday"
+                                    class="ml-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+                                >
+                                    Today
+                                </button>
+                            </div>
+
+                            <!-- Legend -->
+                            <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                                    <span>Posted Income</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                                    <span>Posted Expense</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-2.5 h-2.5 rounded-full border-2 border-green-500"></div>
+                                    <span>Projected Income</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-2.5 h-2.5 rounded-full border-2 border-red-500"></div>
+                                    <span>Projected Expense</span>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Legend -->
-                        <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                            <div class="flex items-center gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                                <span>Posted Income</span>
-                            </div>
-                            <div class="flex items-center gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                                <span>Posted Expense</span>
-                            </div>
-                            <div class="flex items-center gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full border-2 border-green-500"></div>
-                                <span>Projected Income</span>
-                            </div>
-                            <div class="flex items-center gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full border-2 border-red-500"></div>
-                                <span>Projected Expense</span>
-                            </div>
-                        </div>
+                        <!-- Calendar grid -->
+                        <CalendarGrid
+                            :calendar-data="calendarData"
+                            @day-click="handleDayClick"
+                        />
                     </div>
-
-                    <!-- Calendar grid -->
-                    <CalendarGrid
-                        :calendar-data="calendarData"
-                        @day-click="handleDayClick"
-                    />
                 </div>
 
                 <!-- Day detail modal -->

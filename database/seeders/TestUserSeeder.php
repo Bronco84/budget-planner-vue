@@ -296,6 +296,8 @@ class TestUserSeeder extends Seeder
                     'amount_in_cents' => 280000,
                     'date' => $date->copy(),
                     'is_reconciled' => true,
+                    'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                    'is_plaid_imported' => true,
                 ]);
                 $date->addWeeks(2);
             } else {
@@ -328,6 +330,8 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => is_array($bill['amount']) ? rand($bill['amount'][0], $bill['amount'][1]) : $bill['amount'],
                         'date' => $billDate,
                         'is_reconciled' => true,
+                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'is_plaid_imported' => true,
                     ]);
                 }
             }
@@ -353,6 +357,8 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => -rand(4500, 15000), // $45 - $150
                         'date' => $shopDate,
                         'is_reconciled' => true,
+                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'is_plaid_imported' => true,
                     ]);
                 }
             }
@@ -378,6 +384,8 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => -rand(3500, 6500), // $35 - $65
                         'date' => $gasDate,
                         'is_reconciled' => true,
+                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'is_plaid_imported' => true,
                     ]);
                 }
             }
@@ -406,6 +414,8 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => -rand(800, 8500), // $8 - $85
                         'date' => $dineDate,
                         'is_reconciled' => true,
+                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'is_plaid_imported' => true,
                     ]);
                 }
             }
@@ -431,6 +441,8 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => -rand(2500, 20000), // $25 - $200
                         'date' => $shopDate,
                         'is_reconciled' => true,
+                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'is_plaid_imported' => true,
                     ]);
                 }
             }
@@ -464,6 +476,8 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => is_array($item['amount']) ? rand($item['amount'][0], $item['amount'][1]) : $item['amount'],
                         'date' => $miscDate,
                         'is_reconciled' => true,
+                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'is_plaid_imported' => true,
                     ]);
                 }
             }
@@ -486,6 +500,8 @@ class TestUserSeeder extends Seeder
                     'amount_in_cents' => -rand(50000, 100000), // $500 - $1,000
                     'date' => $paymentDate,
                     'is_reconciled' => true,
+                    'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                    'is_plaid_imported' => true,
                 ]);
             }
             $currentMonth->addMonth();

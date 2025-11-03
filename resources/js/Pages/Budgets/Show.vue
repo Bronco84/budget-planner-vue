@@ -2,8 +2,8 @@
   <Head :title="budget.name" />
 
   <AuthenticatedLayout>
-    <div class="py-6">
-      <div class="max-w-full mx-auto px-6">
+    <div class="py-4">
+      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <!-- Left sidebar with Budget Overview and Accounts -->
           <div class="lg:col-span-1">

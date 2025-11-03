@@ -81,8 +81,8 @@ const changeBudget = (budgetId) => {
     <Head title="Calendar" />
 
     <AuthenticatedLayout>
-        <div class="py-6">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="py-4">
+            <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6">
                     <!-- Budget selector (if user has multiple budgets) -->
                     <div v-if="budgets.length > 1" class="mb-4 flex justify-end">

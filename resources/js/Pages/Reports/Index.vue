@@ -63,8 +63,8 @@ const handleDateRangeChange = (dateRangeData) => {
     <Head :title="`Reports - ${budget.name}`" />
 
     <AuthenticatedLayout>
-        <div class="">
-            <div class="max-w-full mx-auto px-6 pt-6">
+        <div class="py-4">
+            <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
                 <!-- White Container with Integrated Tabs -->
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
                     <!-- Tabs as header inside container -->

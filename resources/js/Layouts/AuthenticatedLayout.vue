@@ -186,7 +186,11 @@ const handleConnectAccount = () => {
 
             <!-- Scrollable Page Content -->
             <main class="flex-1 overflow-y-auto">
-                <slot />
+                <Transition name="fade" mode="out-in">
+                    <div :key="$page.url">
+                        <slot />
+                    </div>
+                </Transition>
             </main>
         </div>
 
@@ -205,3 +209,15 @@ const handleConnectAccount = () => {
         />
     </div>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+</style>

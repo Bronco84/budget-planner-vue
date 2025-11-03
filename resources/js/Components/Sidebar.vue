@@ -9,7 +9,7 @@ import {
     ArrowPathIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
-    PlusIcon
+    PlusCircleIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -31,6 +31,7 @@ const hasActiveBudget = computed(() => !!activeBudget.value);
 
 const showAddMenu = ref(false);
 const addMenuRef = ref(null);
+const isAddButtonAnimating = ref(false);
 
 const navigationItems = computed(() => [
     { name: 'Home', href: 'budgets.show', icon: HomeIcon, route: 'budgets.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null },
@@ -42,6 +43,12 @@ const navigationItems = computed(() => [
 
 const toggleAddMenu = () => {
     showAddMenu.value = !showAddMenu.value;
+
+    // Trigger animation
+    isAddButtonAnimating.value = true;
+    setTimeout(() => {
+        isAddButtonAnimating.value = false;
+    }, 300); // Match animation duration
 };
 
 const handleAction = (action) => {
@@ -172,11 +179,12 @@ onUnmounted(() => {
                 @click.stop="toggleAddMenu"
                 :class="[
                     'w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
-                    'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white',
+                    { 'animate-pulse-scale': isAddButtonAnimating }
                 ]"
                 :title="isCollapsed && !isMobileOpen ? 'Add' : ''"
             >
-                <PlusIcon
+                <PlusCircleIcon
                     :class="[
                         'flex-shrink-0',
                         isCollapsed && !isMobileOpen ? 'w-6 h-6' : 'w-5 h-5 mr-3'
@@ -190,7 +198,7 @@ onUnmounted(() => {
                 v-if="showAddMenu"
                 :class="[
                     'absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50',
-                    isCollapsed && !isMobileOpen ? 'left-full bottom-0 ml-2 w-56' : 'left-2 right-2 bottom-full mb-1'
+                    isCollapsed && !isMobileOpen ? 'left-full bottom-10 w-56' : 'left-2 right-2 bottom-full'
                 ]"
                 @click.stop
             >
@@ -228,3 +236,18 @@ onUnmounted(() => {
         </div>
     </div>
 </template>
+
+<style scoped>
+@keyframes pulse-scale {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.animate-pulse-scale {
+    animation: pulse-scale 0.3s ease-in-out;
+}
+</style>

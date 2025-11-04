@@ -204,18 +204,11 @@ class BudgetService
      */
     public function calculateTotalBalance(Budget $budget): int
     {
-        // Assets are added, liabilities are subtracted, excluded accounts are ignored
+        // Sum all account balances. Assets are positive, liabilities are negative in DB.
+        // Excluded accounts are ignored.
         return $budget->accounts
             ->filter(fn($account) => !$account->exclude_from_total_balance)
-            ->reduce(function ($total, $account) {
-                if ($account->isLiability()) {
-                    // Subtract liabilities (mortgages, lines of credit, etc.)
-                    return $total - $account->current_balance_cents;
-                } else {
-                    // Add assets (checking, savings, etc.)
-                    return $total + $account->current_balance_cents;
-                }
-            }, 0);
+            ->sum('current_balance_cents');
     }
 
     /**

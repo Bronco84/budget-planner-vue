@@ -244,12 +244,8 @@ const props = defineProps({
   accounts: Array,
 });
 
-// Debug accounts on mount
 onMounted(() => {
-  console.log('Budget object:', props.budget);
-  console.log('Direct accounts received:', props.accounts);
-  console.log('Budget.accounts:', props.budget.accounts);
-  console.log('Recurring transactions:', props.recurringTransactions);
+  // Component mounted
 });
 
 // Determine which accounts source to use

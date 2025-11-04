@@ -235,45 +235,28 @@ onMounted(() => {
 
 const initializePlaid = () => {
   if (!window.Plaid || !props.linkToken) {
-    console.error('Plaid Link script failed to load or no link token');
     return;
   }
 
   linkHandler = window.Plaid.create({
     token: props.linkToken,
     onSuccess: (public_token, metadata) => {
-      console.log('Plaid Link Success:', metadata);
-      
       currentPublicToken = public_token;
       currentMetadata = metadata;
       institutionName.value = metadata.institution?.name || 'Your Bank';
-      
+
       // Store discovered accounts
       if (metadata.accounts && metadata.accounts.length > 0) {
-        console.log('Raw Plaid accounts:', metadata.accounts);
-        console.log('Account count:', metadata.accounts.length);
-
-        // Check for duplicates or type issues - use 'id' field, not 'account_id'
-        const accountIds = metadata.accounts.map(acc => acc.id);
-        console.log('Account IDs:', accountIds);
-        console.log('Account ID types:', accountIds.map(id => typeof id));
-        console.log('Unique account IDs:', [...new Set(accountIds)]);
-
         discoveredAccounts.value = metadata.accounts;
 
         // Pre-select all accounts by default - ensure strings and uniqueness
         selectedAccounts.value = [...new Set(metadata.accounts.map(acc => String(acc.id)))];
-
-        console.log('Discovered accounts set:', discoveredAccounts.value.length);
-        console.log('Selected account IDs:', selectedAccounts.value);
       } else {
         alert('No accounts were found. Please try connecting a different institution.');
       }
     },
     onExit: (err, metadata) => {
       if (err) {
-        console.error('Plaid Link error:', err);
-        
         if (err.error_type === 'INSTITUTION_ERROR' && err.error_code === 'INSTITUTION_REGISTRATION_REQUIRED') {
           alert(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
         } else if (err.error_message) {
@@ -287,8 +270,6 @@ const initializePlaid = () => {
 const openPlaidLink = () => {
   if (linkHandler) {
     linkHandler.open();
-  } else {
-    console.error('Plaid Link not initialized');
   }
 };
 
@@ -315,9 +296,6 @@ const importSelectedAccounts = () => {
   }, {
     onFinish: () => {
       importing.value = false;
-    },
-    onError: (errors) => {
-      console.error('Import errors:', errors);
     }
   });
 };

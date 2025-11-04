@@ -413,7 +413,7 @@ async function createTemplates() {
 
         await emit('create', templatesData)
     } catch (error) {
-        console.error('Error creating templates:', error)
+        // Error creating templates
     } finally {
         processing.value = false
     }

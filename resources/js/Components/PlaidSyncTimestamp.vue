@@ -58,7 +58,6 @@ const formattedTimestamp = computed(() => {
       }
     }
   } catch (e) {
-    console.error('Error formatting timestamp:', e);
     return props.timestamp;
   }
 });

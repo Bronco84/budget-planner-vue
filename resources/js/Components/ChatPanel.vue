@@ -83,7 +83,7 @@ const loadConversations = async () => {
         const response = await axios.get(route('chat.conversations'));
         conversations.value = response.data.conversations;
     } catch (err) {
-        console.error('Failed to load conversations:', err);
+        // Failed to load conversations
     }
 };
 
@@ -96,7 +96,6 @@ const loadConversation = async (conversationId) => {
         currentView.value = 'chat'; // Switch to chat view
         error.value = null;
     } catch (err) {
-        console.error('Failed to load conversation:', err);
         error.value = 'Failed to load conversation';
     } finally {
         isLoading.value = false;
@@ -162,7 +161,6 @@ const sendMessage = async () => {
             throw new Error(data.error || 'Failed to get response');
         }
     } catch (err) {
-        console.error('Failed to send message:', err);
         error.value = err.message || 'Failed to send message. Please try again.';
         // Remove the user message
         messages.value.pop();
@@ -241,7 +239,6 @@ const bulkDeleteConversations = async () => {
         selectedConversations.value = [];
         isSelectMode.value = false;
     } catch (err) {
-        console.error('Failed to delete conversations:', err);
         error.value = 'Failed to delete conversations';
     }
 };
@@ -260,7 +257,6 @@ const deleteConversation = async (conversationId) => {
             startNewConversation();
         }
     } catch (err) {
-        console.error('Failed to delete conversation:', err);
         error.value = 'Failed to delete conversation';
     }
 };

@@ -341,15 +341,10 @@ const allPatternsSelected = computed(() => {
 const runAnalysis = () => {
   form.post(route('recurring-transactions.analysis.analyze', props.budget.id), {
     onSuccess: (page) => {
-      console.log('Analysis success response:', page);
-      console.log('Analysis result prop:', page.props.analysisResult);
       if (page.props.analysisResult) {
         analysisResults.value = page.props.analysisResult;
         selectedPatterns.value = [];
       }
-    },
-    onError: (errors) => {
-      console.error('Analysis failed:', errors);
     },
     preserveState: true,
   });
@@ -379,13 +374,11 @@ const handleTemplateCreation = async (templatesData) => {
 
   templateForm.post(route('recurring-transactions.analysis.create-templates', props.budget.id), {
     onSuccess: (page) => {
-      console.log('Template creation success:', page);
       creatingTemplates.value = false;
       selectedPatterns.value = [];
       showConfirmationModal.value = false;
     },
     onError: (errors) => {
-      console.error('Template creation failed:', errors);
       creatingTemplates.value = false;
     },
     onFinish: () => {

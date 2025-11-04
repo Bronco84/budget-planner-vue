@@ -895,11 +895,7 @@ const orderedAccounts = computed(() => {
 
 // Watch for changes in props and rebuild the draggable array
 watch([() => props.userAccountTypeOrder, () => props.accounts], () => {
-  console.log('DEBUG: Watcher triggered');
-  console.log('DEBUG: accounts.length:', props.accounts?.length);
-  console.log('DEBUG: userAccountTypeOrder:', props.userAccountTypeOrder);
   rebuildDraggableArray();
-  console.log('DEBUG: draggableAccountGroups after rebuild:', draggableAccountGroups.value);
 }, { immediate: true });
 
 // Toggle account dropdown
@@ -941,7 +937,7 @@ const loadBudgetAttachments = async () => {
       budgetAttachments.value = data.attachments;
     }
   } catch (error) {
-    console.error('Failed to load budget attachments:', error);
+    // Failed to load attachments
   }
 };
 
@@ -955,8 +951,7 @@ const handleFileDeleted = (attachmentId) => {
 };
 
 const handleFileError = (error) => {
-  console.error('File upload error:', error);
-  // You could add toast notifications here
+  // Handle file upload error
 };
 
 // Computed property for displayed projected transactions
@@ -988,7 +983,6 @@ function updateProjections() {
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  console.log(date);
   return date.toString();
 };
 
@@ -1037,13 +1031,10 @@ const hasPlaidAccounts = computed(() => {
 
 // Import transactions from all Plaid-connected accounts
 const importFromBank = () => {
-  console.log('Import from bank button clicked');
-
   // Get all accounts with Plaid connections
   const plaidAccounts = props.accounts.filter(account => account.plaid_account !== null);
 
   if (plaidAccounts.length === 0) {
-    console.error('No Plaid-connected accounts found');
     alert('No Plaid-connected accounts found. Please connect an account to Plaid first.');
     return;
   }
@@ -1076,7 +1067,6 @@ const importFromBank = () => {
 
   // Use the sync-all route
   const syncAllUrl = route('plaid.sync-all', props.budget.id);
-  console.log('Attempting to sync using URL:', syncAllUrl);
 
   router.post(
     syncAllUrl,
@@ -1084,15 +1074,11 @@ const importFromBank = () => {
     {
       preserveScroll: true,
       onSuccess: (page) => {
-        console.log('Sync all operation succeeded, response:', page);
         syncingTransactions.value = false;
 
         // Show success message to user
         if (page.props.flash && page.props.flash.message) {
-          console.log('Sync message:', page.props.flash.message);
-          alert(page.props.flash.message); // Show an alert for testing
-        } else {
-          console.log('No flash message in response');
+          alert(page.props.flash.message);
         }
 
         // Reload only the necessary components
@@ -1102,7 +1088,6 @@ const importFromBank = () => {
         });
       },
       onError: (errors) => {
-        console.error('Sync all operation failed:', errors);
         syncingTransactions.value = false;
 
         // Show detailed error information
@@ -1114,7 +1099,6 @@ const importFromBank = () => {
           errorMessage = `Server returned error code ${errors.response.status}`;
         }
 
-        console.error('Error details:', errorMessage);
         alert(errorMessage);
       }
     }
@@ -1155,14 +1139,10 @@ onMounted(() => {
 
       // Only auto-sync if we haven't synced in the last 12 hours
       if (diffHours > 12) {
-        console.log('Auto-syncing because last sync was more than 12 hours ago');
         importFromBank();
-      } else {
-        console.log('Skipping auto-sync because already synced within the last 12 hours');
       }
     } else {
       // No sync history, do initial sync
-      console.log('Auto-syncing because no previous sync history');
       importFromBank();
     }
   }
@@ -1236,7 +1216,6 @@ const sortedTransactions = computed(() => {
 
 // Function to select an account
 const selectAccount = (accountId) => {
-  console.log('Selecting account:', accountId);
   form.account_id = accountId;
 
   // Navigate to the budget page with the selected account

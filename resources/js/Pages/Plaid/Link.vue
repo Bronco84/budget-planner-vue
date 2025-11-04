@@ -174,7 +174,6 @@ onMounted(() => {
 
 const initializePlaid = () => {
   if (!window.Plaid) {
-    console.error('Plaid Link script failed to load');
     return;
   }
 
@@ -200,8 +199,6 @@ const initializePlaid = () => {
     },
     onExit: (err, metadata) => {
       if (err) {
-        console.error('Plaid Link error:', err);
-        
         // Handle specific error cases
         if (err.error_type === 'INSTITUTION_ERROR' && err.error_code === 'INSTITUTION_REGISTRATION_REQUIRED') {
           alert(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
@@ -216,8 +213,6 @@ const initializePlaid = () => {
 const openPlaidLink = () => {
   if (linkHandler) {
     linkHandler.open();
-  } else {
-    console.error('Plaid Link not initialized');
   }
 };
 
@@ -228,26 +223,16 @@ const syncTransactions = () => {
     {},
     {
       onSuccess: (page) => {
-        // Debug: log all flash data
-        console.log('Sync response - Flash data:', page.props.flash);
-        console.log('Sync response - All props:', page.props);
-
         // Show success or error message if available
         if (page.props.flash && page.props.flash.message) {
           alert('Success: ' + page.props.flash.message);
         } else if (page.props.flash && page.props.flash.error) {
           alert('Error: ' + page.props.flash.error);
-        } else {
-          console.log('No flash message found in response');
-          // Let's also check if there's any error in the page props directly
-          if (page.props.error) {
-            alert('Page Error: ' + page.props.error);
-          }
+        } else if (page.props.error) {
+          alert('Page Error: ' + page.props.error);
         }
       },
       onError: (errors) => {
-        console.log('Sync onError called with:', errors);
-        // Show error message if available
         if (errors.message) {
           alert('OnError: ' + errors.message);
         }

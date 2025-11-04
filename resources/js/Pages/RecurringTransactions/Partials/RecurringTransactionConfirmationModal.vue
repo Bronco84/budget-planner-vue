@@ -323,7 +323,7 @@ const props = defineProps({
     },
     account: {
         type: Object,
-        required: true
+        default: null
     }
 })
 

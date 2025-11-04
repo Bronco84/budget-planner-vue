@@ -16,10 +16,21 @@ createInertiaApp({
             import.meta.glob('./Pages/**/*.vue'),
         ),
     setup({ el, App, props, plugin }) {
-        return createApp({ render: () => h(App, props) })
+        const app = createApp({ render: () => h(App, props) })
             .use(plugin)
-            .use(ZiggyVue)
-            .mount(el);
+            .use(ZiggyVue);
+
+        // Suppress specific Vue warnings
+        app.config.warnHandler = (msg, instance, trace) => {
+            // Suppress "Extraneous non-emits event listeners" warnings
+            if (msg.includes('Extraneous non-emits event listeners')) {
+                return;
+            }
+            // Allow other warnings to show
+            console.warn('[Vue warn]:', msg, trace);
+        };
+
+        return app.mount(el);
     },
     progress: {
         color: '#4B5563',

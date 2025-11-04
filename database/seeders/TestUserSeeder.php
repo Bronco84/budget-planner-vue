@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Category;
+use App\Models\PayoffPlan;
+use App\Models\PayoffPlanDebt;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
@@ -33,6 +35,7 @@ class TestUserSeeder extends Seeder
         $this->createBudget();
         $this->createCategories();
         $this->createAccounts();
+        $this->createPayoffPlans();
         $this->createRecurringTransactions();
         $this->createTransactions();
         $this->setUserPreferences();
@@ -164,6 +167,45 @@ class TestUserSeeder extends Seeder
         ]);
 
         $this->command->info('Created ' . count($this->accounts) . ' accounts');
+    }
+
+    /**
+     * Create a debt payoff plan with realistic payment schedules
+     */
+    private function createPayoffPlans(): void
+    {
+        // Create the main payoff plan using the avalanche strategy
+        $payoffPlan = PayoffPlan::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'Aggressive Debt Payoff 2025',
+            'description' => 'Focus on paying off high-interest debt first, then tackle the mortgage.',
+            'strategy' => 'avalanche', // Pay highest interest rate first
+            'monthly_extra_payment_cents' => 50000, // $500 extra per month for debt payoff
+            'is_active' => true,
+            'start_date' => Carbon::now()->startOfMonth(),
+        ]);
+
+        // Add the credit card as a debt (highest interest, highest priority)
+        PayoffPlanDebt::create([
+            'payoff_plan_id' => $payoffPlan->id,
+            'account_id' => $this->accounts['credit_card']->id,
+            'starting_balance_cents' => 245000, // $2,450 starting balance
+            'interest_rate' => 18.99, // 18.99% APR (typical credit card rate)
+            'minimum_payment_cents' => 5000, // $50 minimum payment
+            'priority' => 1, // Highest priority
+        ]);
+
+        // Add the mortgage as a debt (lower interest, lower priority)
+        PayoffPlanDebt::create([
+            'payoff_plan_id' => $payoffPlan->id,
+            'account_id' => $this->accounts['mortgage']->id,
+            'starting_balance_cents' => 28500000, // $285,000 starting balance
+            'interest_rate' => 3.75, // 3.75% APR (typical mortgage rate)
+            'minimum_payment_cents' => 180000, // $1,800 monthly payment (principal + interest)
+            'priority' => 2, // Lower priority (tackled after credit card)
+        ]);
+
+        $this->command->info('Created payoff plan with 2 debts (Credit Card, Mortgage)');
     }
 
     /**

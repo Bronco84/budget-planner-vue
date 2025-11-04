@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
 use App\Models\Budget;
+use App\Models\PayoffPlanDebt;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -325,8 +327,13 @@ class ReportsController extends Controller
      */
     private function getDebtPayoffData(Budget $budget, Carbon $startDate, Carbon $endDate): array
     {
-        $debtAccounts = $budget->accounts()->where('type', 'like', '%liability%')->get();
-        $payoffPlans = $budget->payoffPlans()->with('account')->get();
+        // Get all liability accounts for this budget
+        $debtAccounts = $budget->accounts()->whereIn('type', Account::LIABILITY_TYPES)->get();
+
+        // Get all PayoffPlanDebts for accounts in this budget, with the related PayoffPlan
+        $payoffPlanDebts = PayoffPlanDebt::whereHas('payoffPlan', function($query) use ($budget) {
+            $query->where('budget_id', $budget->id);
+        })->with('payoffPlan')->get()->keyBy('account_id');
 
         $debtSummary = [];
 
@@ -335,8 +342,8 @@ class ReportsController extends Controller
             $currentBalance = $account->current_balance_cents;
             $paidOff = $startBalance - $currentBalance;
 
-            // Find associated payoff plan
-            $payoffPlan = $payoffPlans->firstWhere('account_id', $account->id);
+            // Find associated payoff plan debt for this account
+            $payoffPlanDebt = $payoffPlanDebts->get($account->id);
 
             $debtSummary[] = [
                 'accountName' => $account->name,
@@ -345,11 +352,11 @@ class ReportsController extends Controller
                 'currentBalance' => $currentBalance,
                 'paidOff' => $paidOff,
                 'percentPaidOff' => $startBalance > 0 ? ($paidOff / $startBalance) * 100 : 0,
-                'hasPayoffPlan' => $payoffPlan !== null,
-                'payoffPlan' => $payoffPlan ? [
-                    'targetDate' => $payoffPlan->target_payoff_date,
-                    'monthlyPayment' => $payoffPlan->monthly_payment_cents,
-                    'interestRate' => $payoffPlan->interest_rate,
+                'hasPayoffPlan' => $payoffPlanDebt !== null,
+                'payoffPlan' => $payoffPlanDebt ? [
+                    'targetDate' => null, // TODO: Calculate estimated payoff date based on payment schedule
+                    'monthlyPayment' => $payoffPlanDebt->minimum_payment_cents,
+                    'interestRate' => $payoffPlanDebt->interest_rate,
                 ] : null,
             ];
         }

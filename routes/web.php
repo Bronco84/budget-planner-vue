@@ -87,7 +87,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('budgets.accounts', AccountController::class);
     
     Route::resource('budgets.categories', CategoryController::class);
-    
+    Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])
+        ->name('budgets.categories.reorder');
+
     Route::resource('budgets.categories.expenses', ExpenseController::class);
     
     Route::get('budget/{budget}/transactions', [TransactionController::class, 'index'])

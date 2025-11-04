@@ -93,13 +93,18 @@ Breadcrumbs::for('plaid.link', function (BreadcrumbTrail $trail, Budget $budget,
 // CATEGORIES
 // ============================================================
 
-Breadcrumbs::for('budgets.categories.create', function (BreadcrumbTrail $trail, Budget $budget) {
+Breadcrumbs::for('budgets.categories.index', function (BreadcrumbTrail $trail, Budget $budget) {
     $trail->parent('budgets.show', $budget);
+    $trail->push('Categories', route('budgets.categories.index', $budget));
+});
+
+Breadcrumbs::for('budgets.categories.create', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('budgets.categories.index', $budget);
     $trail->push('Create Category', route('budgets.categories.create', $budget));
 });
 
 Breadcrumbs::for('budgets.categories.edit', function (BreadcrumbTrail $trail, Budget $budget, $category) {
-    $trail->parent('budgets.show', $budget);
+    $trail->parent('budgets.categories.index', $budget);
     $trail->push('Edit Category: ' . $category->name, route('budgets.categories.edit', [$budget, $category]));
 });
 

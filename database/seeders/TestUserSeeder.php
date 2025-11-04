@@ -79,26 +79,29 @@ class TestUserSeeder extends Seeder
 
     /**
      * Create budget categories
+     * Note: Amounts represent 6-month totals to align with the 6 months of transaction history
      */
     private function createCategories(): void
     {
         $categoryData = [
-            ['name' => 'Housing', 'amount' => 1800, 'color' => '#ef4444'],
-            ['name' => 'Food & Dining', 'amount' => 600, 'color' => '#f59e0b'],
-            ['name' => 'Transportation', 'amount' => 400, 'color' => '#10b981'],
-            ['name' => 'Utilities', 'amount' => 200, 'color' => '#3b82f6'],
-            ['name' => 'Entertainment', 'amount' => 150, 'color' => '#8b5cf6'],
-            ['name' => 'Insurance', 'amount' => 300, 'color' => '#6366f1'],
-            ['name' => 'Savings', 'amount' => 500, 'color' => '#06b6d4'],
-            ['name' => 'Miscellaneous', 'amount' => 200, 'color' => '#64748b'],
+            ['name' => 'Housing', 'amount' => 10800, 'color' => '#ef4444', 'description' => 'Mortgage, rent, and housing-related expenses'],
+            ['name' => 'Food & Dining', 'amount' => 11500, 'color' => '#f59e0b', 'description' => 'Groceries, restaurants, and food delivery'],
+            ['name' => 'Transportation', 'amount' => 2000, 'color' => '#10b981', 'description' => 'Gas, car maintenance, and transportation costs'],
+            ['name' => 'Utilities', 'amount' => 2100, 'color' => '#3b82f6', 'description' => 'Electric, water, internet, and phone bills'],
+            ['name' => 'Entertainment', 'amount' => 300, 'color' => '#8b5cf6', 'description' => 'Subscriptions, hobbies, and leisure activities'],
+            ['name' => 'Insurance', 'amount' => 1100, 'color' => '#6366f1', 'description' => 'Car insurance, health copays, and medical expenses'],
+            ['name' => 'Savings', 'amount' => 500, 'color' => '#06b6d4', 'description' => 'Emergency fund and long-term savings goals'],
+            ['name' => 'Miscellaneous', 'amount' => 1800, 'color' => '#64748b', 'description' => 'Shopping, personal care, and other expenses'],
         ];
 
-        foreach ($categoryData as $data) {
+        foreach ($categoryData as $index => $data) {
             $this->categories[] = Category::create([
                 'budget_id' => $this->budget->id,
                 'name' => $data['name'],
                 'amount' => $data['amount'],
                 'color' => $data['color'],
+                'description' => $data['description'],
+                'order' => $index + 1,
             ]);
         }
 

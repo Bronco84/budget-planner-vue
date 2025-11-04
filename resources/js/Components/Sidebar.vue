@@ -10,7 +10,8 @@ import {
     ChevronLeftIcon,
     ChevronRightIcon,
     PlusCircleIcon,
-    ChatBubbleLeftIcon
+    ChatBubbleLeftIcon,
+    TagIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -38,6 +39,7 @@ const navigationItems = computed(() => [
     { name: 'Home', href: 'budgets.show', icon: HomeIcon, route: 'budgets.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null },
     { name: 'Transactions', href: 'transactions.index', icon: BanknotesIcon, route: 'budget.transaction.*' },
     { name: 'Recurring', href: 'recurring-transactions.redirect', icon: ArrowPathIcon, route: 'recurring-transactions.*' },
+    { name: 'Categories', href: 'budgets.categories.index', icon: TagIcon, route: 'budgets.categories.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null },
     { name: 'Calendar', href: 'calendar.index', icon: CalendarIcon, route: 'calendar.*' },
     { name: 'Reports', href: 'reports.index', icon: ChartBarIcon, route: 'reports.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null },
 ]);

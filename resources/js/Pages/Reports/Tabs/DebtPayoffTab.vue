@@ -1,8 +1,10 @@
 <script setup>
 import { formatCurrency } from '@/utils/format.js';
 import DebtProgressChart from '@/Components/Charts/DebtProgressChart.vue';
+import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
+    budget: Object,
     debtPayoff: Object,
 });
 
@@ -36,6 +38,27 @@ const formatDate = (dateString) => {
         </div>
 
         <div v-else>
+            <!-- Header with Action Button -->
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Debt Payoff Progress
+                    </h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Track progress on your active debt payoff plans
+                    </p>
+                </div>
+                <Link
+                    :href="route('payoff-plans.index', budget.id)"
+                    class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                    Manage Plans
+                </Link>
+            </div>
+
             <!-- Summary Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">

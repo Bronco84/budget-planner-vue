@@ -166,46 +166,182 @@ class TestUserSeeder extends Seeder
             'balance_updated_at' => now(),
         ]);
 
+        // 5. Car Loan (In Progress - 34% paid off)
+        $this->accounts['car_loan'] = Account::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'Toyota Camry Auto Loan',
+            'type' => 'loan',
+            'current_balance_cents' => -1850000, // -$18,500 (started at -$28,000)
+            'account_number' => '****' . rand(1000, 9999),
+            'institution' => 'Capital One Auto Finance',
+            'is_active' => true,
+            'include_in_budget' => true,
+            'exclude_from_total_balance' => false,
+            'balance_updated_at' => now(),
+        ]);
+
+        // 6. Student Loan (In Progress - 28% paid off)
+        $this->accounts['student_loan'] = Account::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'Federal Student Loan',
+            'type' => 'loan',
+            'current_balance_cents' => -3240000, // -$32,400 (started at -$45,000)
+            'account_number' => '****' . rand(1000, 9999),
+            'institution' => 'Navient',
+            'is_active' => true,
+            'include_in_budget' => true,
+            'exclude_from_total_balance' => false,
+            'balance_updated_at' => now(),
+        ]);
+
+        // 7. Personal Loan (Nearly Paid Off - 85% paid off)
+        $this->accounts['personal_loan'] = Account::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'Personal Loan',
+            'type' => 'loan',
+            'current_balance_cents' => -120000, // -$1,200 (started at -$8,000)
+            'account_number' => '****' . rand(1000, 9999),
+            'institution' => 'Marcus by Goldman Sachs',
+            'is_active' => true,
+            'include_in_budget' => true,
+            'exclude_from_total_balance' => false,
+            'balance_updated_at' => now(),
+        ]);
+
+        // 8. Second Credit Card (No Plan - Won't Show on Debt Payoff Page)
+        $this->accounts['credit_card_2'] = Account::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'Discover It Card',
+            'type' => 'credit card',
+            'current_balance_cents' => -45000, // -$450 (liability, no plan)
+            'account_number' => '****' . rand(1000, 9999),
+            'institution' => 'Discover',
+            'is_active' => true,
+            'include_in_budget' => true,
+            'exclude_from_total_balance' => false,
+            'balance_updated_at' => now(),
+        ]);
+
+        // 9. Store Credit Card (Paid Off - Inactive Plan)
+        $this->accounts['store_card'] = Account::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'Target REDcard',
+            'type' => 'credit card',
+            'current_balance_cents' => 0, // $0 (paid off!)
+            'account_number' => '****' . rand(1000, 9999),
+            'institution' => 'Target',
+            'is_active' => true,
+            'include_in_budget' => true,
+            'exclude_from_total_balance' => false,
+            'balance_updated_at' => now(),
+        ]);
+
         $this->command->info('Created ' . count($this->accounts) . ' accounts');
     }
 
     /**
-     * Create a debt payoff plan with realistic payment schedules
+     * Create multiple debt payoff plans with realistic payment schedules
      */
     private function createPayoffPlans(): void
     {
-        // Create the main payoff plan using the avalanche strategy
-        $payoffPlan = PayoffPlan::create([
+        // PLAN 1: "Aggressive Debt Payoff 2025" (ACTIVE)
+        // Focus on high-interest consumer debt with avalanche strategy
+        $activePlan1 = PayoffPlan::create([
             'budget_id' => $this->budget->id,
             'name' => 'Aggressive Debt Payoff 2025',
-            'description' => 'Focus on paying off high-interest debt first, then tackle the mortgage.',
-            'strategy' => 'avalanche', // Pay highest interest rate first
-            'monthly_extra_payment_cents' => 50000, // $500 extra per month for debt payoff
+            'description' => 'Tackling high-interest consumer debts using the avalanche method. Paying highest interest rates first to minimize total interest paid.',
+            'strategy' => 'avalanche',
+            'monthly_extra_payment_cents' => 80000, // $800 extra per month
             'is_active' => true,
-            'start_date' => Carbon::now()->startOfMonth(),
+            'start_date' => Carbon::now()->subMonths(6)->startOfMonth(), // Started 6 months ago
         ]);
 
-        // Add the credit card as a debt (highest interest, highest priority)
+        // Add Personal Loan to Active Plan 1 (highest interest, nearly paid off)
         PayoffPlanDebt::create([
-            'payoff_plan_id' => $payoffPlan->id,
+            'payoff_plan_id' => $activePlan1->id,
+            'account_id' => $this->accounts['personal_loan']->id,
+            'starting_balance_cents' => 800000, // Started at $8,000
+            'interest_rate' => 11.50, // 11.5% APR
+            'minimum_payment_cents' => 30000, // $300 minimum payment
+            'priority' => 1, // Highest priority (highest interest)
+        ]);
+
+        // Add Credit Card to Active Plan 1
+        PayoffPlanDebt::create([
+            'payoff_plan_id' => $activePlan1->id,
             'account_id' => $this->accounts['credit_card']->id,
-            'starting_balance_cents' => 245000, // $2,450 starting balance
-            'interest_rate' => 18.99, // 18.99% APR (typical credit card rate)
-            'minimum_payment_cents' => 5000, // $50 minimum payment
-            'priority' => 1, // Highest priority
+            'starting_balance_cents' => 350000, // Started at $3,500
+            'interest_rate' => 18.99, // 18.99% APR
+            'minimum_payment_cents' => 7500, // $75 minimum payment
+            'priority' => 2,
         ]);
 
-        // Add the mortgage as a debt (lower interest, lower priority)
+        // Add Car Loan to Active Plan 1
         PayoffPlanDebt::create([
-            'payoff_plan_id' => $payoffPlan->id,
-            'account_id' => $this->accounts['mortgage']->id,
-            'starting_balance_cents' => 28500000, // $285,000 starting balance
-            'interest_rate' => 3.75, // 3.75% APR (typical mortgage rate)
-            'minimum_payment_cents' => 180000, // $1,800 monthly payment (principal + interest)
-            'priority' => 2, // Lower priority (tackled after credit card)
+            'payoff_plan_id' => $activePlan1->id,
+            'account_id' => $this->accounts['car_loan']->id,
+            'starting_balance_cents' => 2800000, // Started at $28,000
+            'interest_rate' => 4.50, // 4.5% APR
+            'minimum_payment_cents' => 52500, // $525 monthly payment
+            'priority' => 3,
         ]);
 
-        $this->command->info('Created payoff plan with 2 debts (Credit Card, Mortgage)');
+        // Add Student Loan to Active Plan 1
+        PayoffPlanDebt::create([
+            'payoff_plan_id' => $activePlan1->id,
+            'account_id' => $this->accounts['student_loan']->id,
+            'starting_balance_cents' => 4500000, // Started at $45,000
+            'interest_rate' => 5.80, // 5.8% APR
+            'minimum_payment_cents' => 45000, // $450 monthly payment
+            'priority' => 4,
+        ]);
+
+        // PLAN 2: "Mortgage Long-term Plan" (ACTIVE)
+        // Separate plan for mortgage with extra principal payments
+        $activePlan2 = PayoffPlan::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'Mortgage Long-term Plan',
+            'description' => 'Long-term mortgage payoff strategy with additional principal payments to reduce interest and pay off early.',
+            'strategy' => 'custom',
+            'monthly_extra_payment_cents' => 20000, // $200 extra per month
+            'is_active' => true,
+            'start_date' => Carbon::now()->subMonths(6)->startOfMonth(),
+        ]);
+
+        // Add Mortgage to Active Plan 2
+        PayoffPlanDebt::create([
+            'payoff_plan_id' => $activePlan2->id,
+            'account_id' => $this->accounts['mortgage']->id,
+            'starting_balance_cents' => 28500000, // Started at $285,000 (no change yet for demo)
+            'interest_rate' => 3.75, // 3.75% APR
+            'minimum_payment_cents' => 180000, // $1,800 monthly payment
+            'priority' => 1,
+        ]);
+
+        // PLAN 3: "High-Interest Elimination 2024" (INACTIVE/COMPLETED)
+        // Completed plan from earlier in the year
+        $completedPlan = PayoffPlan::create([
+            'budget_id' => $this->budget->id,
+            'name' => 'High-Interest Elimination 2024',
+            'description' => 'Successfully paid off high-interest store credit card. Plan completed!',
+            'strategy' => 'avalanche',
+            'monthly_extra_payment_cents' => 50000, // Was $500 extra per month
+            'is_active' => false, // INACTIVE - completed
+            'start_date' => Carbon::now()->subMonths(12)->startOfMonth(), // Started 12 months ago
+        ]);
+
+        // Add Store Card to Completed Plan (now paid off)
+        PayoffPlanDebt::create([
+            'payoff_plan_id' => $completedPlan->id,
+            'account_id' => $this->accounts['store_card']->id,
+            'starting_balance_cents' => 350000, // Started at $3,500
+            'interest_rate' => 23.99, // 23.99% APR (very high)
+            'minimum_payment_cents' => 10000, // Was $100 minimum payment
+            'priority' => 1,
+        ]);
+
+        $this->command->info('Created 3 payoff plans: 2 active (7 debts), 1 completed (1 debt)');
+        $this->command->info('Note: Discover It Card has no payoff plan and will not appear on debt payoff page');
     }
 
     /**

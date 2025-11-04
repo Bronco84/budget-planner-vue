@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 import OverviewTab from './Tabs/OverviewTab.vue';
@@ -27,10 +27,20 @@ const tabs = [
     { name: 'Cash Flow', component: 'cashFlow' },
     { name: 'Budget Performance', component: 'budgetPerformance' },
     { name: 'Spending Patterns', component: 'spendingPatterns' },
-    { name: 'Debt Payoff', component: 'debtPayoff' },
+    // { name: 'Debt Payoff', component: 'debtPayoff' },
 ];
 
 const activeTab = ref('overview');
+
+// Check for tab query parameter on mount
+onMounted(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+
+    if (tabParam && tabs.find(t => t.component === tabParam)) {
+        activeTab.value = tabParam;
+    }
+});
 
 const activeComponent = computed(() => {
     switch (activeTab.value) {

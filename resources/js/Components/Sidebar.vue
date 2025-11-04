@@ -152,14 +152,15 @@ onUnmounted(() => {
                     <span v-if="!isCollapsed || isMobileOpen">{{ item.name }}</span>
                 </Link>
 
-                <!-- Disabled items -->
-                <div
+                <!-- Disabled items - redirect to create budget -->
+                <Link
                     v-else
+                    :href="route('budgets.create')"
                     :class="[
-                        'group flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-not-allowed opacity-50',
-                        'text-gray-400 dark:text-gray-600'
+                        'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                        'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                     ]"
-                    :title="isCollapsed && !isMobileOpen ? `${item.name} (Coming Soon)` : 'Coming Soon'"
+                    :title="isCollapsed && !isMobileOpen ? item.name : ''"
                 >
                     <component
                         :is="item.icon"
@@ -169,8 +170,7 @@ onUnmounted(() => {
                         ]"
                     />
                     <span v-if="!isCollapsed || isMobileOpen">{{ item.name }}</span>
-                    <span v-if="(!isCollapsed || isMobileOpen)" class="ml-auto text-xs">(Soon)</span>
-                </div>
+                </Link>
             </template>
         </nav>
 

@@ -117,9 +117,9 @@ Breadcrumbs::for('budgets.transactions.create', function (BreadcrumbTrail $trail
     $trail->push('Create Transaction', route('budgets.transactions.create', $budget));
 });
 
-Breadcrumbs::for('budgets.transactions.edit', function (BreadcrumbTrail $trail, Budget $budget, $transaction) {
-    $trail->parent('budgets.show', $budget);
-    $trail->push('Edit Transaction', route('budgets.transactions.edit', [$budget, $transaction]));
+Breadcrumbs::for('budget.transaction.edit', function (BreadcrumbTrail $trail, Budget $budget, $transaction) {
+    $trail->parent('budget.transaction.index', $budget);
+    $trail->push('Edit Transaction', route('budget.transaction.edit', [$budget, $transaction]));
 });
 
 // ============================================================

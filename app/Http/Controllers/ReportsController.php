@@ -109,7 +109,7 @@ class ReportsController extends Controller
                 $balance = $this->calculateBalanceAtDate($account, $currentDate);
 
                 if ($account->isLiability()) {
-                    $liabilities += $balance;
+                    $liabilities += abs($balance);
                 } else {
                     $assets += $balance;
                 }
@@ -134,7 +134,7 @@ class ReportsController extends Controller
                 $balance = $this->calculateBalanceAtDate($account, $endDate);
 
                 if ($account->isLiability()) {
-                    $liabilities += $balance;
+                    $liabilities += abs($balance);
                 } else {
                     $assets += $balance;
                 }
@@ -327,23 +327,21 @@ class ReportsController extends Controller
      */
     private function getDebtPayoffData(Budget $budget, Carbon $startDate, Carbon $endDate): array
     {
-        // Get all liability accounts for this budget
-        $debtAccounts = $budget->accounts()->whereIn('type', Account::LIABILITY_TYPES)->get();
-
-        // Get all PayoffPlanDebts for accounts in this budget, with the related PayoffPlan
+        // Get all PayoffPlanDebts for ACTIVE plans in this budget, with the related PayoffPlan and Account
         $payoffPlanDebts = PayoffPlanDebt::whereHas('payoffPlan', function($query) use ($budget) {
-            $query->where('budget_id', $budget->id);
-        })->with('payoffPlan')->get()->keyBy('account_id');
+            $query->where('budget_id', $budget->id)
+                  ->where('is_active', true);
+        })->with(['payoffPlan', 'account'])->get();
 
         $debtSummary = [];
 
-        foreach ($debtAccounts as $account) {
+        // Only loop through accounts that have active payoff plans
+        foreach ($payoffPlanDebts as $payoffPlanDebt) {
+            $account = $payoffPlanDebt->account;
+
             $startBalance = $this->calculateBalanceAtDate($account, $startDate);
             $currentBalance = $account->current_balance_cents;
             $paidOff = $startBalance - $currentBalance;
-
-            // Find associated payoff plan debt for this account
-            $payoffPlanDebt = $payoffPlanDebts->get($account->id);
 
             $debtSummary[] = [
                 'accountName' => $account->name,
@@ -352,12 +350,12 @@ class ReportsController extends Controller
                 'currentBalance' => $currentBalance,
                 'paidOff' => $paidOff,
                 'percentPaidOff' => $startBalance > 0 ? ($paidOff / $startBalance) * 100 : 0,
-                'hasPayoffPlan' => $payoffPlanDebt !== null,
-                'payoffPlan' => $payoffPlanDebt ? [
+                'hasPayoffPlan' => true, // Always true since we're only getting accounts with active plans
+                'payoffPlan' => [
                     'targetDate' => null, // TODO: Calculate estimated payoff date based on payment schedule
                     'monthlyPayment' => $payoffPlanDebt->minimum_payment_cents,
                     'interestRate' => $payoffPlanDebt->interest_rate,
-                ] : null,
+                ],
             ];
         }
 

@@ -450,8 +450,14 @@
                             </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap text-right text-sm relative">
-                            <!-- Projected transaction (no actions) -->
-                            <span v-if="transaction.is_projected" class="text-gray-400">Projected</span>
+                            <!-- Projected transaction with link to edit template -->
+                            <Link
+                              v-if="transaction.is_projected && transaction.recurring_transaction_template_id"
+                              :href="route('recurring-transactions.edit', [budget.id, transaction.recurring_transaction_template_id])"
+                              class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                            >
+                              Edit Template
+                            </Link>
                             <!-- Regular transaction with recurring template -->
                             <template v-else-if="transaction.recurring_transaction_template_id">
                               <button

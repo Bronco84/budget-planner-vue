@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\ProfileController;
@@ -14,29 +16,47 @@ use App\Http\Controllers\PlaidTransactionController;
 use App\Http\Controllers\ProjectionsController;
 use App\Http\Controllers\RecurringTransactionAnalysisController;
 use App\Http\Controllers\PayoffPlanController;
+use App\Http\Controllers\ReportsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    return redirect()->route('login');
 });
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+    // Redirect to the budget index, which will redirect to the active budget
+    return redirect()->route('budgets.index');
 })->middleware(['auth'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    
+
+    // Calendar routes
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+
+    // Transactions redirect route - redirects to active budget's transactions
+    Route::get('/transactions', function () {
+        $activeBudget = auth()->user()->getActiveBudget();
+        if (!$activeBudget) {
+            return redirect()->route('budgets.create');
+        }
+        return redirect()->route('budget.transaction.index', $activeBudget->id);
+    })->name('transactions.index');
+
+    // Recurring transactions redirect route - redirects to active budget's recurring transactions
+    Route::get('/recurring-transactions', function () {
+        $activeBudget = auth()->user()->getActiveBudget();
+        if (!$activeBudget) {
+            return redirect()->route('budgets.create');
+        }
+        return redirect()->route('recurring-transactions.index', $activeBudget->id);
+    })->name('recurring-transactions.redirect');
+
     Route::resource('budgets', BudgetController::class);
 
     // Budget setup routes
@@ -49,9 +69,6 @@ Route::middleware('auth')->group(function () {
     Route::get('budgets/{budget}/setup/manual', [AccountController::class, 'create'])
         ->name('budgets.setup.manual');
 
-    Route::post('budgets/{budget}/filter', [BudgetController::class, 'filter'])
-        ->name('budgets.filter');
-    
     Route::get('budget/{budget}/statistics/yearly', [BudgetController::class, 'yearlyStatistics'])
         ->name('budget.statistics.yearly');
     Route::get('budget/{budget}/statistics/monthly/{month?}/{year?}', [BudgetController::class, 'monthlyStatistics'])
@@ -62,11 +79,17 @@ Route::middleware('auth')->group(function () {
         ->name('budget.account.projections');
     Route::get('budget/{budget}/account/{account}/balance-projection', [ProjectionsController::class, 'showBalanceProjection'])
         ->name('budget.account.balance-projection');
-        
+
+    // Reports route
+    Route::get('budget/{budget}/reports', [ReportsController::class, 'index'])
+        ->name('reports.index');
+
     Route::resource('budgets.accounts', AccountController::class);
     
     Route::resource('budgets.categories', CategoryController::class);
-    
+    Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])
+        ->name('budgets.categories.reorder');
+
     Route::resource('budgets.categories.expenses', ExpenseController::class);
     
     Route::get('budget/{budget}/transactions', [TransactionController::class, 'index'])
@@ -193,10 +216,24 @@ Route::middleware('auth')->group(function () {
         ->name('preferences.account-type-order.get');
     Route::post('/api/preferences/account-type-order', [App\Http\Controllers\Api\UserPreferencesController::class, 'updateAccountTypeOrder'])
         ->name('preferences.account-type-order.update');
+    Route::get('/api/preferences/active-budget', [App\Http\Controllers\Api\UserPreferencesController::class, 'getActiveBudget'])
+        ->name('preferences.active-budget.get');
+    Route::post('/api/preferences/active-budget', [App\Http\Controllers\Api\UserPreferencesController::class, 'setActiveBudget'])
+        ->name('preferences.active-budget.set');
     Route::get('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'show'])
         ->name('preferences.show');
     Route::post('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'update'])
         ->name('preferences.update');
+
+    // Chat routes with rate limiting
+    Route::prefix('chat')->name('chat.')->middleware('throttle:60,1')->group(function () {
+        Route::post('/message', [ChatController::class, 'send'])->middleware('throttle:30,1')->name('send');
+        Route::post('/stream', [ChatController::class, 'stream'])->middleware('throttle:30,1')->name('stream');
+        Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations');
+        Route::get('/conversations/{id}', [ChatController::class, 'show'])->name('conversations.show');
+        Route::delete('/conversations/{id}', [ChatController::class, 'destroy'])->name('conversations.destroy');
+        Route::post('/conversations/bulk-delete', [ChatController::class, 'bulkDestroy'])->name('conversations.bulk-destroy');
+    });
 });
 
 require __DIR__.'/auth.php';

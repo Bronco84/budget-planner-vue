@@ -22,6 +22,7 @@ class Category extends Model
         'description',
         'amount',
         'color',
+        'order',
     ];
 
     /**
@@ -57,6 +58,24 @@ class Category extends Model
     public function expenses(): HasMany
     {
         return $this->hasMany(Expense::class);
+    }
+
+    /**
+     * Scope a query to order categories by their order field.
+     */
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('order');
+    }
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('ordered', function ($query) {
+            $query->orderBy('order');
+        });
     }
 
     /**

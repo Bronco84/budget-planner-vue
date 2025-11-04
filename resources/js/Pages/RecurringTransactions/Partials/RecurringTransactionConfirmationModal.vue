@@ -323,7 +323,7 @@ const props = defineProps({
     },
     account: {
         type: Object,
-        required: true
+        default: null
     }
 })
 
@@ -413,7 +413,7 @@ async function createTemplates() {
 
         await emit('create', templatesData)
     } catch (error) {
-        console.error('Error creating templates:', error)
+        // Error creating templates
     } finally {
         processing.value = false
     }

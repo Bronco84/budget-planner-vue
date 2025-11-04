@@ -3,7 +3,7 @@
     <!-- Action Buttons -->
     <div class="flex justify-between items-center">
       <p class="text-sm text-gray-600">
-        Rules help you automatically identify and link similar transactions. Transactions are evaluated in priority order (lowest number first).
+        Rules help you automatically identify and link similar transactions.
       </p>
       <div class="flex space-x-3">
         <Link
@@ -238,7 +238,7 @@
 import { ref, computed } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } from '@headlessui/vue';
-import RecurringTransactionRuleForm from '@/Components/RecurringTransactionRuleForm.vue';
+import RecurringTransactionRuleForm from './RecurringTransactionRuleForm.vue';
 
 const props = defineProps({
   budget: Object,

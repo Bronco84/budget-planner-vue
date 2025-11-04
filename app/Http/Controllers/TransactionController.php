@@ -15,16 +15,76 @@ class TransactionController extends Controller
     /**
      * Display a listing of the transactions for a budget.
      */
-    public function index(Budget $budget): Response
+    public function index(Request $request, Budget $budget): Response
     {
-        $transactions = $budget->transactions()
-            ->with(['account', 'recurringTemplate'])
-            ->orderByDesc('date')
-            ->paginate(20);
+        $query = $budget->transactions()
+            ->with(['account', 'recurringTemplate']);
+
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply account filter
+        if ($request->filled('account_id')) {
+            $query->where('account_id', $request->input('account_id'));
+        }
+
+        // Apply category filter
+        if ($request->filled('category')) {
+            $query->where('category', $request->input('category'));
+        }
+
+        // Apply timeframe filter
+        if ($request->filled('timeframe')) {
+            $timeframe = $request->input('timeframe');
+
+            switch ($timeframe) {
+                case 'this_month':
+                    $query->whereMonth('date', now()->month)
+                          ->whereYear('date', now()->year);
+                    break;
+
+                case 'last_month':
+                    $lastMonth = now()->subMonth();
+                    $query->whereMonth('date', $lastMonth->month)
+                          ->whereYear('date', $lastMonth->year);
+                    break;
+
+                case 'last_3_months':
+                    $query->where('date', '>=', now()->subMonths(3)->startOfMonth());
+                    break;
+
+                case 'this_year':
+                    $query->whereYear('date', now()->year);
+                    break;
+            }
+        }
+
+        $transactions = $query->orderByDesc('date')->paginate(20);
+
+        $accounts = $budget->accounts()->get();
+        $categories = $budget->transactions()
+            ->select('category')
+            ->distinct()
+            ->whereNotNull('category')
+            ->pluck('category');
 
         return Inertia::render('Transactions/Index', [
             'budget' => $budget,
             'transactions' => $transactions,
+            'accounts' => $accounts,
+            'categories' => $categories,
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'account_id' => $request->filled('account_id') ? (int) $request->input('account_id') : '',
+                'category' => $request->input('category', ''),
+                'timeframe' => $request->input('timeframe', ''),
+            ],
         ]);
     }
 

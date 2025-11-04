@@ -491,11 +491,6 @@ const submit = () => {
   // Update values before submitting
   form.is_dynamic_amount = amountType.value === 'dynamic';
 
-  console.log('Submitting form data:', {
-    ...form.data(),
-    is_dynamic_amount: amountType.value === 'dynamic'
-  });
-
   form.transform((data) => {
     const transformed = {
       ...data,
@@ -518,16 +513,6 @@ const submit = () => {
     }
 
     return transformed;
-  }).post(route('recurring-transactions.store', props.budget.id), {
-    onSuccess: () => {
-      console.log('Form submitted successfully');
-    },
-    onError: (errors) => {
-      console.error('Form submission errors:', errors);
-    },
-    onFinish: () => {
-      console.log('Form submission finished');
-    }
-  });
+  }).post(route('recurring-transactions.store', props.budget.id));
 };
 </script>

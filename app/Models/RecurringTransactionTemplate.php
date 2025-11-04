@@ -56,6 +56,15 @@ class RecurringTransactionTemplate extends Model
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array<int, string>
+     */
+    protected $appends = [
+        'formatted_amount',
+    ];
+
+    /**
      * Frequency options.
      */
     const FREQUENCY_DAILY = 'daily';

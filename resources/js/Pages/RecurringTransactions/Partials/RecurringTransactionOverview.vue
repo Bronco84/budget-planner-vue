@@ -79,8 +79,8 @@
             </div>
           </div>
 
-          <!-- Amount -->
-          <div>
+          <!-- Amount (Static) -->
+          <div v-if="!form.is_dynamic_amount">
             <InputLabel for="amount" value="Amount" />
             <div class="mt-1 relative rounded-md shadow-sm">
               <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -97,6 +97,55 @@
             </div>
             <p class="mt-1 text-sm text-gray-500">Use positive values for income, negative for expenses (e.g., -50.00)</p>
             <InputError class="mt-2" :message="form.errors.amount" />
+          </div>
+
+          <!-- Dynamic Amount Options -->
+          <div v-if="form.is_dynamic_amount" class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <InputLabel for="min_amount" value="Minimum Amount (Optional)" />
+              <div class="mt-1 relative rounded-md shadow-sm">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span class="text-gray-500 sm:text-sm">$</span>
+                </div>
+                <input
+                  id="min_amount"
+                  type="number"
+                  step="0.01"
+                  v-model="form.min_amount"
+                  class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                />
+              </div>
+            </div>
+            <div>
+              <InputLabel for="max_amount" value="Maximum Amount (Optional)" />
+              <div class="mt-1 relative rounded-md shadow-sm">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span class="text-gray-500 sm:text-sm">$</span>
+                </div>
+                <input
+                  id="max_amount"
+                  type="number"
+                  step="0.01"
+                  v-model="form.max_amount"
+                  class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                />
+              </div>
+            </div>
+            <div>
+              <InputLabel for="average_amount" value="Starting Average (Optional)" />
+              <div class="mt-1 relative rounded-md shadow-sm">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span class="text-gray-500 sm:text-sm">$</span>
+                </div>
+                <input
+                  id="average_amount"
+                  type="number"
+                  step="0.01"
+                  v-model="form.average_amount"
+                  class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- Notes -->
@@ -226,32 +275,6 @@
         </div>
       </form>
     </div>
-
-    <!-- Quick Stats -->
-    <div class="border-t border-gray-200 pt-6">
-      <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Stats</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <div class="text-sm text-gray-600">Total Transactions</div>
-          <div class="text-xl font-bold text-gray-900">{{ linkedTransactions.length }}</div>
-          <div v-if="linkedTransactions.length > 0" class="text-xs text-gray-500 mt-1">
-            Last: {{ formatDate(linkedTransactions[0]?.date) }}
-          </div>
-        </div>
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <div class="text-sm text-gray-600">Active Rules</div>
-          <div class="text-xl font-bold text-gray-900">{{ activeRulesCount }}</div>
-          <div class="text-xs text-gray-500 mt-1">{{ rules.length }} total rules</div>
-        </div>
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <div class="text-sm text-gray-600">Total Amount</div>
-          <div class="text-xl font-bold" :class="totalAmount >= 0 ? 'text-green-600' : 'text-red-600'">
-            {{ formatCurrency(totalAmount) }}
-          </div>
-          <div class="text-xs text-gray-500 mt-1">From linked transactions</div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -278,6 +301,9 @@ const form = useForm({
   category: props.recurringTransaction.category,
   amount: props.recurringTransaction.amount_in_cents / 100,
   is_dynamic_amount: props.recurringTransaction.is_dynamic_amount,
+  min_amount: props.recurringTransaction.min_amount ? props.recurringTransaction.min_amount / 100 : '',
+  max_amount: props.recurringTransaction.max_amount ? props.recurringTransaction.max_amount / 100 : '',
+  average_amount: props.recurringTransaction.average_amount ? props.recurringTransaction.average_amount / 100 : '',
   frequency: props.recurringTransaction.frequency,
   day_of_week: props.recurringTransaction.day_of_week,
   day_of_month: props.recurringTransaction.day_of_month,

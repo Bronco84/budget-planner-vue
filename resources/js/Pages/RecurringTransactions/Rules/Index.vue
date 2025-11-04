@@ -274,7 +274,7 @@ import { useForm, Link, Head } from '@inertiajs/vue3';
 import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } from '@headlessui/vue';
 import { ArrowLeftIcon, CheckIcon, ExclamationTriangleIcon as ExclamationIcon } from '@heroicons/vue/24/solid';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import RecurringTransactionRuleForm from '@/Components/RecurringTransactionRuleForm.vue';
+import RecurringTransactionRuleForm from '../Partials/RecurringTransactionRuleForm.vue';
 
 export default {
     components: {

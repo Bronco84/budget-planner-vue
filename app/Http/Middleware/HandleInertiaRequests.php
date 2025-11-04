@@ -36,11 +36,45 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'activeBudget' => $this->getActiveBudget($request),
             'breadcrumbs' => $this->getBreadcrumbs($request),
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+        ];
+    }
+
+    /**
+     * Get the active budget for the current user.
+     */
+    protected function getActiveBudget(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return null;
+        }
+
+        $activeBudget = $user->getActiveBudget();
+
+        if (!$activeBudget) {
+            return null;
+        }
+
+        // Load accounts for the active budget to support quick actions
+        $activeBudget->load('accounts');
+
+        return [
+            'id' => $activeBudget->id,
+            'name' => $activeBudget->name,
+            'description' => $activeBudget->description,
+            'starting_balance' => $activeBudget->starting_balance,
+            'accounts' => $activeBudget->accounts->map(fn($account) => [
+                'id' => $account->id,
+                'name' => $account->name,
+                'type' => $account->type,
+            ])->toArray(),
         ];
     }
 

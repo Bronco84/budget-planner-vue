@@ -32,10 +32,55 @@
                   </div>
                   <div class="ml-3">
                     <p class="text-sm text-blue-700 dark:text-blue-300">
-                      Connect to your bank to discover <strong>all available accounts</strong> including checking, savings, 
-                      credit cards, mortgages, investments, and loans. Select which accounts you'd like to import 
+                      Connect to your bank to discover <strong>all available accounts</strong> including checking, savings,
+                      credit cards, mortgages, investments, and loans. Select which accounts you'd like to import
                       into your budget for automatic transaction syncing.
                     </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Existing Connections -->
+            <div v-if="existingConnections && existingConnections.length > 0" class="mb-8">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">Your Connected Institutions</h3>
+              <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-green-700 dark:text-green-300">
+                      You have <strong>{{ existingConnections.length }}</strong> active bank connection{{ existingConnections.length !== 1 ? 's' : '' }}.
+                      Connecting to a new institution will add it to your list below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div v-for="connection in existingConnections" :key="connection.id"
+                     class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900 dark:text-gray-100">{{ connection.institution_name }}</p>
+                      <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ connection.account_count }} account{{ connection.account_count !== 1 ? 's' : '' }} connected
+                      </p>
+                      <div v-if="connection.accounts && connection.accounts.length" class="mt-2 flex flex-wrap gap-2">
+                        <span v-for="(account, idx) in connection.accounts" :key="idx"
+                              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                          {{ account.name }} ({{ account.type }})
+                        </span>
+                      </div>
+                    </div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                      <svg class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -166,6 +211,7 @@ import { formatCurrency } from '@/utils/format.js';
 const props = defineProps({
   budget: Object,
   linkToken: String,
+  existingConnections: Array,
 });
 
 // State
@@ -189,45 +235,28 @@ onMounted(() => {
 
 const initializePlaid = () => {
   if (!window.Plaid || !props.linkToken) {
-    console.error('Plaid Link script failed to load or no link token');
     return;
   }
 
   linkHandler = window.Plaid.create({
     token: props.linkToken,
     onSuccess: (public_token, metadata) => {
-      console.log('Plaid Link Success:', metadata);
-      
       currentPublicToken = public_token;
       currentMetadata = metadata;
       institutionName.value = metadata.institution?.name || 'Your Bank';
-      
+
       // Store discovered accounts
       if (metadata.accounts && metadata.accounts.length > 0) {
-        console.log('Raw Plaid accounts:', metadata.accounts);
-        console.log('Account count:', metadata.accounts.length);
-
-        // Check for duplicates or type issues - use 'id' field, not 'account_id'
-        const accountIds = metadata.accounts.map(acc => acc.id);
-        console.log('Account IDs:', accountIds);
-        console.log('Account ID types:', accountIds.map(id => typeof id));
-        console.log('Unique account IDs:', [...new Set(accountIds)]);
-
         discoveredAccounts.value = metadata.accounts;
 
         // Pre-select all accounts by default - ensure strings and uniqueness
         selectedAccounts.value = [...new Set(metadata.accounts.map(acc => String(acc.id)))];
-
-        console.log('Discovered accounts set:', discoveredAccounts.value.length);
-        console.log('Selected account IDs:', selectedAccounts.value);
       } else {
         alert('No accounts were found. Please try connecting a different institution.');
       }
     },
     onExit: (err, metadata) => {
       if (err) {
-        console.error('Plaid Link error:', err);
-        
         if (err.error_type === 'INSTITUTION_ERROR' && err.error_code === 'INSTITUTION_REGISTRATION_REQUIRED') {
           alert(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
         } else if (err.error_message) {
@@ -241,8 +270,6 @@ const initializePlaid = () => {
 const openPlaidLink = () => {
   if (linkHandler) {
     linkHandler.open();
-  } else {
-    console.error('Plaid Link not initialized');
   }
 };
 
@@ -269,9 +296,6 @@ const importSelectedAccounts = () => {
   }, {
     onFinish: () => {
       importing.value = false;
-    },
-    onError: (errors) => {
-      console.error('Import errors:', errors);
     }
   });
 };

@@ -2,71 +2,82 @@
   <Head :title="'Transactions'" />
 
   <AuthenticatedLayout>
-    <template #header>
-      <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">Transactions - {{ budget.name }}</h2>
-        <div class="flex space-x-2">
-          <Link 
-            :href="route('budget.transaction.create', budget.id)" 
-            class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-          >
-            Add Transaction
-          </Link>
-          <Link 
-            :href="route('budgets.show', budget.id)" 
-            class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300"
-          >
-            Back to Budget
-          </Link>
-        </div>
-      </div>
-    </template>
-
-    <div class="py-12">
-      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+    <div class="py-4">
+      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
+        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6">
-            <!-- Search and Filter Controls -->
+            <!-- Filters and Action Buttons -->
             <form @submit.prevent="filter">
-              <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                <div class="relative rounded-md shadow-sm flex-grow">
-                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <span class="text-gray-500 sm:text-sm">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                      </svg>
-                    </span>
+              <div class="mb-6 flex flex-col lg:flex-row lg:items-end gap-3">
+                <!-- Filter controls -->
+                <div class="flex flex-col sm:flex-row sm:items-end gap-3 flex-1">
+                  <div class="flex-grow">
+                    <label for="search-filter" class="block text-sm font-medium text-gray-700">Search</label>
+                    <div class="relative rounded-md shadow-sm mt-1">
+                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <span class="text-gray-500 sm:text-sm">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
+                      </div>
+                      <input
+                        id="search-filter"
+                        type="text"
+                        v-model="form.search"
+                        class="pl-10 block w-full py-2 px-3 rounded-md border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        placeholder="Search transactions..."
+                      >
+                    </div>
                   </div>
-                  <input 
-                    type="text" 
-                    v-model="form.search"
-                    class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                    placeholder="Search transactions..."
-                  >
+
+                  <div>
+                    <label for="account-filter" class="block text-sm font-medium text-gray-700">Filter by Account</label>
+                    <select
+                      id="account-filter"
+                      v-model="form.account_id"
+                      class="mt-1 block w-full sm:w-64 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    >
+                      <option value="">All Accounts</option>
+                      <option v-for="account in accounts" :key="account.id" :value="account.id">
+                        {{ account.name }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label for="category-filter" class="block text-sm font-medium text-gray-700">Filter by Category</label>
+                    <select
+                      id="category-filter"
+                      v-model="form.category"
+                      class="mt-1 block w-full sm:w-48 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    >
+                      <option value="">All Categories</option>
+                      <option v-for="category in categories" :key="category" :value="category">
+                        {{ category }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label for="timeframe-filter" class="block text-sm font-medium text-gray-700">Time Period</label>
+                    <select
+                      id="timeframe-filter"
+                      v-model="form.timeframe"
+                      class="mt-1 block w-full sm:w-48 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    >
+                      <option value="">All Time</option>
+                      <option value="this_month">This Month</option>
+                      <option value="last_month">Last Month</option>
+                      <option value="last_3_months">Last 3 Months</option>
+                      <option value="this_year">This Year</option>
+                    </select>
+                  </div>
                 </div>
-                <select v-model="form.account_id" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                  <option value="">All Accounts</option>
-                  <option v-for="account in accounts" :key="account.id" :value="account.id">
-                    {{ account.name }}
-                  </option>
-                </select>
-                <select v-model="form.category" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                  <option value="">All Categories</option>
-                  <option v-for="category in categories" :key="category" :value="category">
-                    {{ category }}
-                  </option>
-                </select>
-                <select v-model="form.timeframe" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                  <option value="">All Time</option>
-                  <option value="this_month">This Month</option>
-                  <option value="last_month">Last Month</option>
-                  <option value="last_3_months">Last 3 Months</option>
-                  <option value="this_year">This Year</option>
-                </select>
-                <button type="submit" class="hidden">Filter</button>
               </div>
+              <button type="submit" class="hidden">Filter</button>
             </form>
-            
+
             <!-- Transactions Table -->
             <div class="border rounded-lg overflow-hidden">
               <table class="min-w-full divide-y divide-gray-200">
@@ -102,7 +113,7 @@
                               </svg>
                               Recurring
                             </div>
-                            <Link 
+                            <Link
                               :href="route('recurring-transactions.edit', [budget.id, transaction.recurring_template.id])"
                               class="inline-flex items-center text-xs text-purple-600 hover:text-purple-800"
                               title="View recurring transaction template"
@@ -128,8 +139,8 @@
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <Link 
-                        :href="route('budget.transaction.edit', [budget.id, transaction.id])" 
+                      <Link
+                        :href="route('budget.transaction.edit', [budget.id, transaction.id])"
                         class="text-indigo-600 hover:text-indigo-900"
                       >
                         Edit
@@ -146,7 +157,7 @@
                 </tbody>
               </table>
             </div>
-            
+
             <!-- Pagination -->
             <div v-if="transactions.data.length > 0" class="mt-4 flex items-center justify-between">
               <div class="flex-1 flex justify-between sm:hidden">
@@ -161,7 +172,7 @@
                 <span v-else class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-300 bg-white cursor-not-allowed">
                   Previous
                 </span>
-                
+
                 <Link
                   v-if="transactions.next_page_url"
                   :href="transactions.next_page_url"
@@ -205,9 +216,9 @@
                         <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
                       </svg>
                     </span>
-                    
+
                     <!-- Page numbers would go here if needed -->
-                    
+
                     <Link
                       v-if="transactions.next_page_url"
                       :href="transactions.next_page_url"
@@ -265,17 +276,17 @@ watch(form, debounce(() => filter(), 300));
 // Filter function
 function filter() {
   router.get(
-    route('budget.transaction.index', props.budget.id), 
-    { 
-      search: form.search, 
+    route('budget.transaction.index', props.budget.id),
+    {
+      search: form.search,
       account_id: form.account_id,
       category: form.category,
       timeframe: form.timeframe
-    }, 
-    { 
+    },
+    {
       preserveState: true,
       preserveScroll: true,
-      replace: true 
+      replace: true
     }
   );
 }
@@ -283,7 +294,7 @@ function filter() {
 // Debounce helper
 function debounce(fn, delay = 300) {
   let timeout;
-  
+
   return (...args) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => fn(...args), delay);
@@ -296,4 +307,4 @@ const formatDate = (dateString) => {
   const date = new Date(dateString);
   return date.toLocaleDateString();
 };
-</script> 
+</script>

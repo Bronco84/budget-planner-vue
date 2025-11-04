@@ -17,23 +17,6 @@
       <p class="mt-1 text-sm text-gray-500">
         No transactions are currently linked to this recurring transaction.
       </p>
-      <div class="mt-6">
-        <p class="text-xs text-gray-500 mb-3">You can link transactions by:</p>
-        <div class="flex flex-col space-y-2 text-sm text-gray-600">
-          <div class="flex items-center justify-center">
-            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-            </svg>
-            <span>Creating rules to automatically match transactions</span>
-          </div>
-          <div class="flex items-center justify-center">
-            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-            </svg>
-            <span>Manually selecting this template when creating transactions</span>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div v-else class="border rounded-lg overflow-hidden">

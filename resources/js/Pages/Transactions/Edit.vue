@@ -267,7 +267,7 @@ const loadAttachments = async () => {
       attachments.value = data.attachments;
     }
   } catch (error) {
-    console.error('Failed to load attachments:', error);
+    // Failed to load attachments
   }
 };
 
@@ -280,7 +280,7 @@ const loadActivities = async () => {
       activities.value = data.activities;
     }
   } catch (error) {
-    console.error('Failed to load activity log:', error);
+    // Failed to load activity log
   } finally {
     loadingActivities.value = false;
   }

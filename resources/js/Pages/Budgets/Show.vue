@@ -2,8 +2,8 @@
   <Head :title="budget.name" />
 
   <AuthenticatedLayout>
-    <div class="py-6">
-      <div class="max-w-full mx-auto px-6">
+    <div class="py-4">
+      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <!-- Left sidebar with Budget Overview and Accounts -->
           <div class="lg:col-span-1">
@@ -13,42 +13,7 @@
                   <!-- Always visible header with Total Balance -->
                   <div class="cursor-pointer" @click="budgetCardExpanded = !budgetCardExpanded">
                     <div class="flex items-center justify-between mb-2">
-                      <div class="flex items-center space-x-3">
-                        <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
-                        <!-- Budget Switcher Dropdown -->
-                        <div v-if="allBudgets.length > 1" class="relative" @click.stop>
-                          <button
-                            @click="toggleBudgetDropdown"
-                            class="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          >
-                            Switch Budget
-                            <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          <div
-                            v-if="showBudgetDropdown"
-                            class="absolute left-0 z-50 mt-1 w-64 bg-white border border-gray-300 rounded-md shadow-lg"
-                            @click.stop
-                          >
-                            <div class="py-1 max-h-60 overflow-y-auto">
-                              <Link
-                                v-for="budgetOption in allBudgets"
-                                :key="budgetOption.id"
-                                :href="route('budgets.show', budgetOption.id)"
-                                class="block px-4 py-2 text-sm hover:bg-gray-50"
-                                :class="{
-                                  'bg-blue-50 text-blue-700 font-medium': budgetOption.id === budget.id,
-                                  'text-gray-700': budgetOption.id !== budget.id
-                                }"
-                              >
-                                <div class="font-medium">{{ budgetOption.name }}</div>
-                                <div v-if="budgetOption.description" class="text-xs text-gray-500 mt-1">{{ budgetOption.description }}</div>
-                              </Link>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
                       <div class="flex items-center space-x-2">
                         <!-- Expand/Collapse Icon -->
                         <svg
@@ -161,13 +126,6 @@
                           >
                             Connect to Bank
                           </Link>
-
-                          <Link
-                            :href="route('recurring-transactions.index', budget.id)"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500"
-                          >
-                            Recurring Transactions
-                          </Link>
                           <Link
                             :href="route('recurring-transactions.analysis', budget.id)"
                             class="w-full inline-flex items-center justify-center px-3 py-2 bg-purple-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-purple-500"
@@ -179,12 +137,6 @@
                             class="w-full inline-flex items-center justify-center px-3 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500"
                           >
                             Debt Payoff Plans
-                          </Link>
-                          <Link
-                            :href="route('budget.transaction.index', budget.id)"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-                          >
-                            Regular Transactions
                           </Link>
                         </div>
 
@@ -222,9 +174,6 @@
                       class="inline-flex items-center px-3 py-1 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500"
                       title="Import accounts from your bank"
                     >
-                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
                       Import
                     </Link>
                     <Link
@@ -282,10 +231,10 @@
                         <div
                           v-for="account in typeGroup.accounts"
                           :key="account.id"
-                          class="bg-gray-50 p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                          class="p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-50 transition-colors"
                           :class="[
                             getBorderColorClass(account),
-                            activeAccountId === account.id ? 'border-l-8 bg-gray-100' : ''
+                            activeAccountId === account.id ? 'border-l-8 bg-gray-50' : ''
                           ]"
                           @click="selectAccount(account.id)"
                       >
@@ -296,7 +245,11 @@
                               <span class="w-2 h-2 rounded-full mr-2"
                                     :class="getLastSyncClass(account.plaid_account)"></span>
                                 <div class="whitespace-nowrap">
-                                    {{ account.plaid_account?.plaid_connection?.last_sync_at ? `Last synced ${formatTimeAgo(account.plaid_account.plaid_connection.last_sync_at)}` : 'Not synced yet' }}
+                                    Last synced <PlaidSyncTimestamp
+                                      :timestamp="account.plaid_account?.plaid_connection?.last_sync_at"
+                                      format="relative"
+                                      never-text="never"
+                                    />
                                 </div>
                             </div>
                           </div>
@@ -328,7 +281,7 @@
                                 <Link
                                   v-if="account.plaid_account"
                                   :href="route('plaid.link', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-blue-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -338,7 +291,7 @@
                                 <Link
                                   v-if="!account.plaid_account"
                                   :href="route('plaid.link', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-blue-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -346,17 +299,8 @@
                                   Connect to Bank
                                 </Link>
                                 <Link
-                                  :href="route('budget.account.projections', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-green-600 hover:bg-gray-50"
-                                >
-                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                  </svg>
-                                  Projections
-                                </Link>
-                                <Link
                                   :href="route('budget.account.balance-projection', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-purple-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-purple-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -365,7 +309,7 @@
                                 </Link>
                                 <Link
                                   :href="route('budgets.accounts.edit', [budget.id, account.id])"
-                                  class="block px-4 py-2 text-xs text-indigo-600 hover:bg-gray-50"
+                                  class="block px-2 py-2 text-xs text-indigo-600 hover:bg-gray-50"
                                 >
                                   <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -393,76 +337,39 @@
           <div class="lg:col-span-3">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
               <div class="p-6">
-
-                <!-- Search and Filter Controls -->
-                <form @submit.prevent="filter">
-                  <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                    <div class="relative rounded-md shadow-sm flex-grow">
-                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <span class="text-gray-500 sm:text-sm">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                          </svg>
-                        </span>
-                      </div>
-                      <input
-                        type="text"
-                        v-model="form.search"
-                        class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        placeholder="Search transactions..."
-                      >
-                    </div>
-                    <select v-model="form.type" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Types</option>
-                      <option value="income">Income</option>
-                      <option value="expense">Expenses</option>
-                      <option value="recurring">Recurring</option>
-                    </select>
-                    <select v-model="form.category" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Categories</option>
-                      <option v-for="category in categories" :key="category" :value="category">
-                        {{ category }}
-                      </option>
-                    </select>
-                    <select v-model="form.pending" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Status</option>
-                      <option value="false">Posted</option>
-                      <option value="true">Pending</option>
-                    </select>
-                    <select v-model="form.timeframe" class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                      <option value="">All Time</option>
-                      <option value="this_month">This Month</option>
-                      <option value="last_month">Last Month</option>
-                      <option value="last_3_months">Last 3 Months</option>
-                      <option value="this_year">This Year</option>
-                    </select>
-                    <button type="submit" class="hidden">Filter</button>
-                  </div>
-                </form>
-
-                <!-- Account Tabs -->
-                <div class="mb-4 border-b border-gray-200">
-                  <div class="overflow-x-auto overflow-y-hidden">
-                    <nav class="flex -mb-px min-w-full whitespace-nowrap">
-                      <a
-                        v-for="account in orderedAccounts"
-                        :key="account.id"
-                        href="#"
-                        @click.prevent="selectAccount(account.id)"
-                        class="whitespace-nowrap py-4 px-4 border-b-2 font-medium text-sm"
-                        :class="[
-                          activeAccountId === parseInt(account.id, 10) ?
-                            'border-indigo-500 text-indigo-600' :
-                            'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        ]"
-                      >
-                        {{ account.name }}
-                      </a>
-                    </nav>
+                <!-- Empty State for No Accounts -->
+                <div v-if="accounts.length === 0" class="text-center py-12">
+                  <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  <h3 class="text-lg font-medium text-gray-900 mb-2">No Accounts Yet</h3>
+                  <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                    Get started by adding your first account. You can connect to your bank automatically or add an account manually.
+                  </p>
+                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Link
+                      :href="route('plaid.discover', budget.id)"
+                      class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-500 transition-colors"
+                    >
+                      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      Connect to Bank
+                    </Link>
+                    <Link
+                      :href="route('budgets.accounts.create', budget.id)"
+                      class="inline-flex items-center justify-center px-6 py-3 bg-gray-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-gray-500 transition-colors"
+                    >
+                      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Add Manually
+                    </Link>
                   </div>
                 </div>
 
                 <!-- Transactions Table -->
+                <div v-else>
                 <div class="border rounded-lg overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
@@ -479,7 +386,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                       <!-- Variable to track if we've shown the today marker -->
-                      <template v-for="(transaction, index) in props.transactions.data" :key="transaction.id || ('proj-' + index)">
+                      <template v-for="(transaction, index) in sortedTransactions" :key="transaction.id || ('proj-' + index)">
                         <!-- Today marker -->
                         <tr v-if="shouldShowTodayMarker(transaction, index)">
                           <td colspan="7" class="px-6 py-3">
@@ -543,8 +450,14 @@
                             </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap text-right text-sm relative">
-                            <!-- Projected transaction (no actions) -->
-                            <span v-if="transaction.is_projected" class="text-gray-400">Projected</span>
+                            <!-- Projected transaction with link to edit template -->
+                            <Link
+                              v-if="transaction.is_projected && transaction.recurring_transaction_template_id"
+                              :href="route('recurring-transactions.edit', [budget.id, transaction.recurring_transaction_template_id])"
+                              class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                            >
+                              Edit Template
+                            </Link>
                             <!-- Regular transaction with recurring template -->
                             <template v-else-if="transaction.recurring_transaction_template_id">
                               <button
@@ -559,15 +472,15 @@
                               </button>
                               <div
                                 v-if="openTransactionDropdown === transaction.id"
-                                class="absolute right-0 top-full z-50 mt-1 w-52 bg-white border border-gray-300 rounded-md shadow-lg"
+                                class="absolute right-0 top-full z-50 mt-1 w-auto bg-white border border-gray-300 rounded-md shadow-lg"
                                 @click.stop
                               >
                                 <div class="py-1">
                                   <Link
                                     :href="route('recurring-transactions.edit', [budget.id, transaction.recurring_transaction_template_id])"
-                                    class="block px-3 py-2 text-xs text-indigo-600 hover:bg-gray-50"
+                                    class="block px-2 py-2 text-xs text-indigo-600 hover:bg-gray-50"
                                   >
-                                    <svg class="w-3 h-3 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                     Edit Recurring Template
@@ -589,15 +502,15 @@
                               </button>
                               <div
                                 v-if="openTransactionDropdown === transaction.id"
-                                class="absolute right-0 top-full z-50 mt-1 w-52 bg-white border border-gray-300 rounded-md shadow-lg"
+                                class="absolute right-0 top-full z-50 mt-1 w-auto bg-white border border-gray-300 rounded-md shadow-lg"
                                 @click.stop
                               >
                                 <div class="py-1">
                                   <Link
                                     :href="route('budget.transaction.edit', [budget.id, transaction.id])"
-                                    class="block px-3 py-2 text-xs text-indigo-600 hover:bg-gray-50"
+                                    class="block px-2 py-2 text-xs text-indigo-600 hover:bg-gray-50"
                                   >
-                                    <svg class="w-3 h-3 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                     Edit Transaction
@@ -607,9 +520,9 @@
                                       budget: budget.id,
                                       from_transaction: transaction.id
                                     })"
-                                    class="block px-3 py-2 text-xs text-green-600 hover:bg-gray-50"
+                                    class="block px-2 py-2 text-xs text-green-600 hover:bg-gray-50"
                                   >
-                                    <svg class="w-3 h-3 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
                                     Make Recurring
@@ -714,6 +627,7 @@
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
           </div>
@@ -764,31 +678,25 @@ import { PencilIcon } from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
+import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable'
 
 // Define props
 const props = defineProps({
   budget: Object,
-  allBudgets: Array,
   accounts: Array,
+  selectedAccountId: Number,
   totalBalance: Number,
   transactions: Object,
   projectionParams: Object,
-  categories: Array,
-  filters: Object,
   userAccountTypeOrder: Array,
   monthlyProjectedCashFlow: Number
 });
 
-// Form state for filters
+// Form state for account selection
 const form = reactive({
-  search: props.filters.search || '',
-  type: props.filters.type || '',
-  category: props.filters.category || '',
-  pending: props.filters.pending || '',
-  timeframe: props.filters.timeframe || '',
-  account_id: props.filters.account_id || (props.accounts.length > 0 ? props.accounts[0].id : null)
+  account_id: props.selectedAccountId || (props.accounts.length > 0 ? props.accounts[0].id : null)
 });
 
 // Computed property to determine the active account tab
@@ -873,9 +781,6 @@ const openTransactionDropdown = ref(null);
 
 // Budget card accordion state (collapsed by default)
 const budgetCardExpanded = ref(false);
-
-// Budget switcher dropdown state
-const showBudgetDropdown = ref(false);
 
 // Selected account tracking is handled by activeAccountId computed property
 
@@ -990,11 +895,7 @@ const orderedAccounts = computed(() => {
 
 // Watch for changes in props and rebuild the draggable array
 watch([() => props.userAccountTypeOrder, () => props.accounts], () => {
-  console.log('DEBUG: Watcher triggered');
-  console.log('DEBUG: accounts.length:', props.accounts?.length);
-  console.log('DEBUG: userAccountTypeOrder:', props.userAccountTypeOrder);
   rebuildDraggableArray();
-  console.log('DEBUG: draggableAccountGroups after rebuild:', draggableAccountGroups.value);
 }, { immediate: true });
 
 // Toggle account dropdown
@@ -1007,16 +908,10 @@ const toggleTransactionDropdown = (transactionId) => {
   openTransactionDropdown.value = openTransactionDropdown.value === transactionId ? null : transactionId;
 };
 
-// Toggle budget dropdown
-const toggleBudgetDropdown = () => {
-  showBudgetDropdown.value = !showBudgetDropdown.value;
-};
-
 // Close dropdown when clicking outside
 const closeDropdown = () => {
   openDropdown.value = null;
   openTransactionDropdown.value = null;
-  showBudgetDropdown.value = false;
 };
 
 // Account selection functionality is handled by the existing selectAccount function
@@ -1042,7 +937,7 @@ const loadBudgetAttachments = async () => {
       budgetAttachments.value = data.attachments;
     }
   } catch (error) {
-    console.error('Failed to load budget attachments:', error);
+    // Failed to load attachments
   }
 };
 
@@ -1056,8 +951,7 @@ const handleFileDeleted = (attachmentId) => {
 };
 
 const handleFileError = (error) => {
-  console.error('File upload error:', error);
-  // You could add toast notifications here
+  // Handle file upload error
 };
 
 // Computed property for displayed projected transactions
@@ -1065,102 +959,30 @@ const displayedProjectedTransactions = computed(() => {
   if (!props.projectedTransactions || projectionForm.months === 0) return [];
 
   // Convert to array if it's an object with numeric keys
-    // Filter projected transactions based on the same criteria as actual transactions
-  let filtered = Array.isArray(props.projectedTransactions)
+  let projected = Array.isArray(props.projectedTransactions)
       ? [...props.projectedTransactions]
       : Object.values(props.projectedTransactions || {});
 
-  if (form.search) {
-    const searchLower = form.search.toLowerCase();
-    filtered = filtered.filter(tx =>
-      tx.description.toLowerCase().includes(searchLower) ||
-      tx.category?.toLowerCase().includes(searchLower)
-    );
-  }
-
-  if (form.category) {
-    filtered = filtered.filter(tx => tx.category === form.category);
-  }
-
   // Sort by date (newest first)
-  return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return projected.sort((a, b) => new Date(b.date) - new Date(a.date));
 });
-
-// Apply debounced filtering when form values change
-watch(form, debounce(() => filter(), 300));
-
-// Filter function
-function filter() {
-  console.log('Filtering with account_id:', form.account_id);
-
-  const params = {
-    search: form.search || undefined,
-    type: form.type || undefined,
-    category: form.category || undefined,
-    pending: form.pending || undefined,
-    timeframe: form.timeframe || undefined,
-    account_id: form.account_id || undefined,
-    projection_months: projectionForm.months || undefined,
-    page: 1 // Reset to first page when filtering
-  };
-
-  // Remove undefined values
-  Object.keys(params).forEach(key => {
-    if (params[key] === undefined) {
-      delete params[key];
-    }
-  });
-
-  console.log('URL params:', params);
-
-  router.visit(route('budgets.show', props.budget.id), {
-    data: params,
-    preserveState: true,
-    preserveScroll: true,
-    replace: true
-  });
-}
 
 // Update projections
 function updateProjections() {
-  const params = {
-    search: form.search || undefined,
-    category: form.category || undefined,
-    timeframe: form.timeframe || undefined,
-    account_id: form.account_id || undefined,
-    projection_months: projectionForm.months,
-    page: 1
-  };
-
-  // Remove undefined values
-  Object.keys(params).forEach(key => {
-    if (params[key] === undefined) {
-      delete params[key];
-    }
-  });
-
   router.visit(route('budgets.show', props.budget.id), {
-    data: params,
+    data: {
+      account_id: form.account_id,
+      projection_months: projectionForm.months
+    },
     preserveState: true,
     preserveScroll: true
   });
-}
-
-// Debounce helper
-function debounce(fn, delay = 300) {
-  let timeout;
-
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), delay);
-  };
 }
 
 // Helper functions for formatting dates
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  console.log(date);
   return date.toString();
 };
 
@@ -1198,25 +1020,6 @@ const getGroupTotalColorClass = (typeGroup) => {
   return typeGroup.total >= 0 ? 'text-green-600' : 'text-red-600';
 };
 
-// Format time ago (e.g., "3 minutes ago", "2 hours ago")
-const formatTimeAgo = (dateTimeString) => {
-  if (!dateTimeString) return 'N/A';
-
-  const date = new Date(dateTimeString);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 60) {
-    return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-  } else {
-    return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-  }
-};
 
 // State for Plaid sync
 const syncingTransactions = ref(false);
@@ -1228,13 +1031,10 @@ const hasPlaidAccounts = computed(() => {
 
 // Import transactions from all Plaid-connected accounts
 const importFromBank = () => {
-  console.log('Import from bank button clicked');
-
   // Get all accounts with Plaid connections
   const plaidAccounts = props.accounts.filter(account => account.plaid_account !== null);
 
   if (plaidAccounts.length === 0) {
-    console.error('No Plaid-connected accounts found');
     alert('No Plaid-connected accounts found. Please connect an account to Plaid first.');
     return;
   }
@@ -1267,7 +1067,6 @@ const importFromBank = () => {
 
   // Use the sync-all route
   const syncAllUrl = route('plaid.sync-all', props.budget.id);
-  console.log('Attempting to sync using URL:', syncAllUrl);
 
   router.post(
     syncAllUrl,
@@ -1275,15 +1074,11 @@ const importFromBank = () => {
     {
       preserveScroll: true,
       onSuccess: (page) => {
-        console.log('Sync all operation succeeded, response:', page);
         syncingTransactions.value = false;
 
         // Show success message to user
         if (page.props.flash && page.props.flash.message) {
-          console.log('Sync message:', page.props.flash.message);
-          alert(page.props.flash.message); // Show an alert for testing
-        } else {
-          console.log('No flash message in response');
+          alert(page.props.flash.message);
         }
 
         // Reload only the necessary components
@@ -1293,7 +1088,6 @@ const importFromBank = () => {
         });
       },
       onError: (errors) => {
-        console.error('Sync all operation failed:', errors);
         syncingTransactions.value = false;
 
         // Show detailed error information
@@ -1305,7 +1099,6 @@ const importFromBank = () => {
           errorMessage = `Server returned error code ${errors.response.status}`;
         }
 
-        console.error('Error details:', errorMessage);
         alert(errorMessage);
       }
     }
@@ -1346,14 +1139,10 @@ onMounted(() => {
 
       // Only auto-sync if we haven't synced in the last 12 hours
       if (diffHours > 12) {
-        console.log('Auto-syncing because last sync was more than 12 hours ago');
         importFromBank();
-      } else {
-        console.log('Skipping auto-sync because already synced within the last 12 hours');
       }
     } else {
       // No sync history, do initial sync
-      console.log('Auto-syncing because no previous sync history');
       importFromBank();
     }
   }
@@ -1385,7 +1174,7 @@ const shouldShowTodayMarker = (transaction, index) => {
 
   // Also check if this is the last transaction before today
   if (index > 0) {
-    const prevTransaction = Object.values(props.transactions.data)[index - 1];
+    const prevTransaction = sortedTransactions.value[index - 1];
     if (prevTransaction) {
       const prevDate = new Date(prevTransaction.date);
       prevDate.setHours(0, 0, 0, 0);
@@ -1402,7 +1191,6 @@ const shouldShowTodayMarker = (transaction, index) => {
 
 // Computed property for sorted transactions
 const sortedTransactions = computed(() => {
-  return props.transactions.data;
   // Reset the today marker flag whenever we recalculate the sorted transactions
   hasShownTodayMarker.value = false;
 
@@ -1423,33 +1211,22 @@ const sortedTransactions = computed(() => {
   }));
 
   const transactions = [...actualTransactions, ...projectedWithFlag];
-  return transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+  return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 });
 
 // Function to select an account
 const selectAccount = (accountId) => {
-  console.log('Selecting account:', accountId);
   form.account_id = accountId;
 
-  // Use Inertia post method instead of get for better parameter handling
-  router.post(route('budgets.filter', props.budget.id), {
-    search: form.search || '',
-    type: form.type || '',
-    category: form.category || '',
-    pending: form.pending || '',
-    timeframe: form.timeframe || '',
-    account_id: accountId,
-    projection_months: projectionForm.months || 1
-  }, {
+  // Navigate to the budget page with the selected account
+  router.visit(route('budgets.show', props.budget.id), {
+    data: {
+      account_id: accountId,
+      projection_months: projectionForm.months || 1
+    },
     preserveState: true,
     preserveScroll: true,
-    replace: true,
-    onSuccess: () => {
-      console.log('Filter success with account_id:', accountId);
-    },
-    onError: (error) => {
-      console.error('Filter error:', error);
-    }
+    replace: true
   });
 };
 
@@ -1488,16 +1265,5 @@ const monthlyCashFlow = computed(() => {
   }
 
   return null;
-});
-
-// Log initial values when mounted
-onMounted(() => {
-  console.log('Initial filters:', props.filters);
-  console.log('Initial account_id:', props.filters.account_id);
-
-  if (props.filters.account_id) {
-    console.log('Setting initial account_id:', props.filters.account_id);
-    form.account_id = props.filters.account_id;
-  }
 });
 </script>

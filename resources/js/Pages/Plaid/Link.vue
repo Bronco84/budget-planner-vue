@@ -44,7 +44,10 @@
                   <div>
                     <p class="font-medium text-blue-800">{{ plaidAccount.institution_name }}</p>
                     <p class="text-sm text-blue-600">
-                      Last synced: {{ formatDateTime(plaidAccount.plaid_connection?.last_sync_at) || 'Never' }}
+                      Last synced: <PlaidSyncTimestamp
+                        :timestamp="plaidAccount.plaid_connection?.last_sync_at"
+                        format="absolute"
+                      />
                     </p>
                   </div>
                   <div class="flex space-x-2">
@@ -83,8 +86,24 @@
 
             <!-- Connect Button -->
             <div v-if="!isLinked" class="text-center py-8">
+              <!-- Show special message if adding to existing connection -->
+              <div v-if="hasExistingConnection" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800 font-medium mb-2">
+                  Adding to Existing Connection
+                </p>
+                <p class="text-sm text-blue-700">
+                  You already have accounts connected to <strong>{{ existingConnectionInstitution }}</strong>.
+                  You can add more accounts from the same institution using your existing connection.
+                </p>
+              </div>
+
               <p class="text-sm text-gray-600 mb-6">
-                Connect this account to your bank to automatically import transactions and update balances.
+                <template v-if="hasExistingConnection">
+                  Select additional accounts to link to your existing {{ existingConnectionInstitution }} connection.
+                </template>
+                <template v-else>
+                  Connect this account to your bank to automatically import transactions and update balances.
+                </template>
                 <br>
                 Your banking credentials are never stored on our servers.
               </p>
@@ -92,7 +111,7 @@
                 @click="openPlaidLink"
                 class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Connect to Bank
+                {{ hasExistingConnection ? 'Add More Accounts' : 'Connect to Bank' }}
               </button>
             </div>
 
@@ -117,6 +136,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import { formatCurrency } from '@/utils/format.js';
 
 // Props
@@ -126,6 +146,8 @@ const props = defineProps({
   linkToken: String,
   isLinked: Boolean,
   plaidAccount: Object,
+  hasExistingConnection: Boolean,
+  existingConnectionInstitution: String,
 });
 
 // Form refs
@@ -152,7 +174,6 @@ onMounted(() => {
 
 const initializePlaid = () => {
   if (!window.Plaid) {
-    console.error('Plaid Link script failed to load');
     return;
   }
 
@@ -178,8 +199,6 @@ const initializePlaid = () => {
     },
     onExit: (err, metadata) => {
       if (err) {
-        console.error('Plaid Link error:', err);
-        
         // Handle specific error cases
         if (err.error_type === 'INSTITUTION_ERROR' && err.error_code === 'INSTITUTION_REGISTRATION_REQUIRED') {
           alert(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
@@ -194,8 +213,6 @@ const initializePlaid = () => {
 const openPlaidLink = () => {
   if (linkHandler) {
     linkHandler.open();
-  } else {
-    console.error('Plaid Link not initialized');
   }
 };
 
@@ -206,26 +223,16 @@ const syncTransactions = () => {
     {},
     {
       onSuccess: (page) => {
-        // Debug: log all flash data
-        console.log('Sync response - Flash data:', page.props.flash);
-        console.log('Sync response - All props:', page.props);
-
         // Show success or error message if available
         if (page.props.flash && page.props.flash.message) {
           alert('Success: ' + page.props.flash.message);
         } else if (page.props.flash && page.props.flash.error) {
           alert('Error: ' + page.props.flash.error);
-        } else {
-          console.log('No flash message found in response');
-          // Let's also check if there's any error in the page props directly
-          if (page.props.error) {
-            alert('Page Error: ' + page.props.error);
-          }
+        } else if (page.props.error) {
+          alert('Page Error: ' + page.props.error);
         }
       },
       onError: (errors) => {
-        console.log('Sync onError called with:', errors);
-        // Show error message if available
         if (errors.message) {
           alert('OnError: ' + errors.message);
         }
@@ -267,18 +274,6 @@ const updateBalance = () => {
 const confirmDisconnect = () => {
   if (confirm('Are you sure you want to disconnect from Plaid? This will not delete any imported transactions.')) {
     router.delete(route('plaid.destroy', [props.budget.id, props.account.id]));
-  }
-};
-
-// Format date helper
-const formatDateTime = (dateTimeString) => {
-  if (!dateTimeString) return null;
-  
-  try {
-    const date = new Date(dateTimeString);
-    return date.toLocaleString();
-  } catch (e) {
-    return dateTimeString;
   }
 };
 </script> 

@@ -6,69 +6,56 @@
       <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
         <div class="bg-white shadow-sm sm:rounded-lg">
           <div class="p-6">
-            <!-- Page Header with Actions -->
-            <div class="flex justify-between items-center mb-6">
-              <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }} - Recurring Transactions</h2>
-              <div class="flex items-center space-x-3">
-                <Link
-                  :href="route('budgets.show', budget.id)"
-                  class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition duration-150 ease-in-out hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
-                >
-                  Back to Budget
-                </Link>
-                <Link
-                  :href="route('budget.transaction.create', budget.id)"
-                  class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition duration-150 ease-in-out hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
-                >
-                  <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                  </svg>
-                  Create Transaction
-                </Link>
-                <Link
-                  :href="route('recurring-transactions.analysis', budget.id)"
-                  class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition duration-150 ease-in-out hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
-                >
-                  <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                  </svg>
-                  Analyze Patterns
-                </Link>
-                <Link
-                  :href="route('recurring-transactions.create', budget.id)"
-                  class="inline-flex items-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition duration-150 ease-in-out hover:bg-gray-700 focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:bg-gray-900"
-                >
-                  Add Recurring Transaction
-                </Link>
-              </div>
-            </div>
-            <!-- Filter selectors -->
-            <div class="mb-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
-              <div>
-                <label for="account-filter" class="block text-sm font-medium text-gray-700">Filter by Account</label>
-                <select
-                  id="account-filter"
-                  v-model="selectedAccountId"
-                  class="mt-1 block w-full sm:w-64 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                >
-                  <option value="all">All Accounts</option>
-                  <option v-for="account in accountsToUse" :key="account.id" :value="account.id">
-                    {{ account.name }}
-                  </option>
-                </select>
-              </div>
+            <!-- Filters and Action Buttons -->
+            <div class="mb-6 flex flex-col lg:flex-row lg:items-end gap-3">
+              <!-- Filter controls -->
+              <div class="flex flex-col sm:flex-row sm:items-end gap-3 flex-1">
+                <div class="flex-grow">
+                  <label for="search-filter" class="block text-sm font-medium text-gray-700">Search</label>
+                  <div class="relative rounded-md shadow-sm mt-1">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                      <span class="text-gray-500 sm:text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                      </span>
+                    </div>
+                    <input
+                      id="search-filter"
+                      type="text"
+                      v-model="searchQuery"
+                      class="pl-10 block w-full py-2 px-3 rounded-md border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="Search transactions..."
+                    >
+                  </div>
+                </div>
 
-              <div>
-                <label for="amount-type-filter" class="block text-sm font-medium text-gray-700">Amount Type</label>
-                <select
-                  id="amount-type-filter"
-                  v-model="selectedAmountType"
-                  class="mt-1 block w-full sm:w-48 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                >
-                  <option value="all">All Types</option>
-                  <option value="fixed">Fixed Amount</option>
-                  <option value="variable">Variable Amount</option>
-                </select>
+                <div>
+                  <label for="account-filter" class="block text-sm font-medium text-gray-700">Filter by Account</label>
+                  <select
+                    id="account-filter"
+                    v-model="selectedAccountId"
+                    class="mt-1 block w-full sm:w-64 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="all">All Accounts</option>
+                    <option v-for="account in accountsToUse" :key="account.id" :value="account.id">
+                      {{ account.name }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="amount-type-filter" class="block text-sm font-medium text-gray-700">Amount Type</label>
+                  <select
+                    id="amount-type-filter"
+                    v-model="selectedAmountType"
+                    class="mt-1 block w-full sm:w-48 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="fixed">Fixed Amount</option>
+                    <option value="variable">Variable Amount</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -100,7 +87,7 @@
               </div>
             </div>
 
-            <div v-if="filteredTransactions.length > 0">
+            <div v-if="filteredTransactions.length > 0" class="overflow-x-auto">
               <div class="border rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
                   <thead class="bg-gray-50 sticky top-0">
@@ -198,14 +185,6 @@
                                 Edit Template
                               </div>
                             </DropdownLink>
-                            <DropdownLink :href="route('recurring-transactions.rules.index', [budget.id, template.id])">
-                              <div class="flex items-center">
-                                <svg class="w-4 h-4 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                                </svg>
-                                Manage Rules
-                              </div>
-                            </DropdownLink>
                             <button @click="duplicate(template)" class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
                               <div class="flex items-center">
                                 <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,12 +244,8 @@ const props = defineProps({
   accounts: Array,
 });
 
-// Debug accounts on mount
 onMounted(() => {
-  console.log('Budget object:', props.budget);
-  console.log('Direct accounts received:', props.accounts);
-  console.log('Budget.accounts:', props.budget.accounts);
-  console.log('Recurring transactions:', props.recurringTransactions);
+  // Component mounted
 });
 
 // Determine which accounts source to use
@@ -292,15 +267,30 @@ const accountSource = computed(() => {
   return 'none';
 });
 
+// Search query
+const searchQuery = ref('');
+
 // Account filtering
 const selectedAccountId = ref('all');
 
 // Amount type filtering
 const selectedAmountType = ref('all');
 
-// Filtered transactions based on selected account and amount type
+// Filtered transactions based on search, account, and amount type
 const filteredTransactions = computed(() => {
   let filtered = props.recurringTransactions;
+
+  // Filter by search query
+  if (searchQuery.value.trim() !== '') {
+    const query = searchQuery.value.toLowerCase();
+    filtered = filtered.filter(transaction => {
+      return (
+        transaction.description?.toLowerCase().includes(query) ||
+        transaction.category?.toLowerCase().includes(query) ||
+        transaction.account?.name?.toLowerCase().includes(query)
+      );
+    });
+  }
 
   // Filter by account
   if (selectedAccountId.value !== 'all') {
@@ -430,14 +420,14 @@ const getNextOccurrence = (template) => {
       // Twice per month (e.g., 1st and 15th)
       const firstDay = template.first_day_of_month || 1;
       const secondDay = template.day_of_month || 15;
-      
+
       // Ensure first day is before second day
       const actualFirstDay = Math.min(firstDay, secondDay);
       const actualSecondDay = Math.max(firstDay, secondDay);
-      
+
       nextDate = new Date();
       const currentDay = today.getDate();
-      
+
       // If we're before the first day of the month, move to the first day
       if (currentDay < actualFirstDay) {
         setSafeDayOfMonth(nextDate, actualFirstDay);
@@ -497,7 +487,7 @@ const getNextOccurrence = (template) => {
 const createTransactionUrl = (template) => {
   const nextDate = getNextOccurrence(template);
   const nextDateString = nextDate ? nextDate.toISOString().split('T')[0] : '';
-  
+
   const params = new URLSearchParams({
     description: template.description || '',
     account_id: template.account_id || '',
@@ -506,7 +496,7 @@ const createTransactionUrl = (template) => {
     recurring_transaction_template_id: template.id,
     amount: Math.abs(template.amount_in_cents / 100).toString() // Convert to positive dollars for easier editing
   });
-  
+
   return route('budget.transaction.create', props.budget.id) + '?' + params.toString();
 };
 </script>

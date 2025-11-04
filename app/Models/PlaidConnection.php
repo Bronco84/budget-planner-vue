@@ -100,4 +100,30 @@ class PlaidConnection extends Model
     {
         $this->update(['last_sync_at' => now()]);
     }
+
+    /**
+     * Scope a query to find connections for a specific institution and budget.
+     */
+    public function scopeForInstitution($query, Budget $budget, string $institutionName)
+    {
+        return $query->where('budget_id', $budget->id)
+                    ->where('institution_name', $institutionName)
+                    ->where('status', self::STATUS_ACTIVE);
+    }
+
+    /**
+     * Check if the connection has any linked accounts.
+     */
+    public function hasAccounts(): bool
+    {
+        return $this->plaidAccounts()->exists();
+    }
+
+    /**
+     * Get the count of linked accounts.
+     */
+    public function getAccountCount(): int
+    {
+        return $this->plaidAccounts()->count();
+    }
 }

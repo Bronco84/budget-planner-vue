@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PlaidAccount;
+use App\Models\PlaidConnection;
 use App\Services\PlaidService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,9 +36,39 @@ class PlaidController extends Controller
             ->where('account_id', $account->id)
             ->first();
 
+        // Check for existing connections to facilitate adding more accounts
+        $existingConnection = null;
+        $hasExistingConnection = false;
+
+        // If account is already linked, we can't use update mode (it's already connected)
+        // But if account is NOT linked, check if there are existing connections to same institution
+        if (!$plaidAccount) {
+            // For simplicity, we'll check if there are ANY active connections for this budget
+            // In a more advanced implementation, you could detect the institution name from the account
+            $existingConnection = PlaidConnection::where('budget_id', $budget->id)
+                ->where('status', PlaidConnection::STATUS_ACTIVE)
+                ->first();
+
+            $hasExistingConnection = $existingConnection !== null;
+        }
+
         $linkToken = null;
         try {
-            $linkToken = $this->plaidService->createLinkToken((string) Auth::id());
+            // Use update mode if there's an existing connection to add accounts to
+            $existingAccessToken = $existingConnection?->access_token;
+            $linkToken = $this->plaidService->createLinkToken(
+                (string) Auth::id(),
+                $existingAccessToken
+            );
+
+            if ($hasExistingConnection) {
+                Log::info('Creating link token in update mode', [
+                    'budget_id' => $budget->id,
+                    'account_id' => $account->id,
+                    'existing_connection_id' => $existingConnection->id,
+                    'institution' => $existingConnection->institution_name
+                ]);
+            }
         } catch (\Exception $e) {
             Log::error('Failed to create link token', [
                 'error' => $e->getMessage()
@@ -50,6 +81,8 @@ class PlaidController extends Controller
             'linkToken' => $linkToken,
             'isLinked' => $plaidAccount !== null,
             'plaidAccount' => $plaidAccount,
+            'hasExistingConnection' => $hasExistingConnection,
+            'existingConnectionInstitution' => $existingConnection?->institution_name,
         ]);
     }
     
@@ -58,6 +91,24 @@ class PlaidController extends Controller
      */
     public function discover(Budget $budget): Response
     {
+        // Get existing connections for this budget to show user what they already have
+        $existingConnections = PlaidConnection::where('budget_id', $budget->id)
+            ->where('status', PlaidConnection::STATUS_ACTIVE)
+            ->with('plaidAccounts.account')
+            ->get()
+            ->map(function ($connection) {
+                return [
+                    'id' => $connection->id,
+                    'institution_name' => $connection->institution_name,
+                    'account_count' => $connection->getAccountCount(),
+                    'last_sync_at' => $connection->last_sync_at,
+                    'accounts' => $connection->plaidAccounts->map(fn($pa) => [
+                        'name' => $pa->account->name ?? $pa->account_name,
+                        'type' => $pa->account->type ?? 'unknown',
+                    ])
+                ];
+            });
+
         $linkToken = null;
         try {
             $linkToken = $this->plaidService->createLinkToken((string) Auth::id());
@@ -66,10 +117,11 @@ class PlaidController extends Controller
                 'error' => $e->getMessage()
             ]);
         }
-        
+
         return Inertia::render('Plaid/Discover', [
             'budget' => $budget,
             'linkToken' => $linkToken,
+            'existingConnections' => $existingConnections,
         ]);
     }
     
@@ -270,13 +322,31 @@ class PlaidController extends Controller
     public function destroy(Budget $budget, Account $account): RedirectResponse
     {
         $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
-        
+
         if (!$plaidAccount) {
             return redirect()->back()->with('error', 'Account is not linked to Plaid.');
         }
-        
+
+        // Get the connection before deleting the account
+        $plaidConnection = $plaidAccount->plaidConnection;
+
+        // Delete the PlaidAccount
         $plaidAccount->delete();
-        
+
+        // Check if the connection has no remaining accounts and clean it up
+        if ($plaidConnection && !$plaidConnection->hasAccounts()) {
+            Log::info('Cleaning up orphaned PlaidConnection', [
+                'connection_id' => $plaidConnection->id,
+                'institution_name' => $plaidConnection->institution_name,
+                'budget_id' => $budget->id
+            ]);
+
+            $plaidConnection->delete();
+
+            return redirect()->back()->with('message',
+                'Account unlinked from Plaid. Connection to ' . $plaidConnection->institution_name . ' was also removed as it had no remaining accounts.');
+        }
+
         return redirect()->back()->with('message', 'Account unlinked from Plaid.');
     }
     

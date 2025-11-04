@@ -32,10 +32,55 @@
                   </div>
                   <div class="ml-3">
                     <p class="text-sm text-blue-700 dark:text-blue-300">
-                      Connect to your bank to discover <strong>all available accounts</strong> including checking, savings, 
-                      credit cards, mortgages, investments, and loans. Select which accounts you'd like to import 
+                      Connect to your bank to discover <strong>all available accounts</strong> including checking, savings,
+                      credit cards, mortgages, investments, and loans. Select which accounts you'd like to import
                       into your budget for automatic transaction syncing.
                     </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Existing Connections -->
+            <div v-if="existingConnections && existingConnections.length > 0" class="mb-8">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">Your Connected Institutions</h3>
+              <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <p class="text-sm text-green-700 dark:text-green-300">
+                      You have <strong>{{ existingConnections.length }}</strong> active bank connection{{ existingConnections.length !== 1 ? 's' : '' }}.
+                      Connecting to a new institution will add it to your list below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div v-for="connection in existingConnections" :key="connection.id"
+                     class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900 dark:text-gray-100">{{ connection.institution_name }}</p>
+                      <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ connection.account_count }} account{{ connection.account_count !== 1 ? 's' : '' }} connected
+                      </p>
+                      <div v-if="connection.accounts && connection.accounts.length" class="mt-2 flex flex-wrap gap-2">
+                        <span v-for="(account, idx) in connection.accounts" :key="idx"
+                              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                          {{ account.name }} ({{ account.type }})
+                        </span>
+                      </div>
+                    </div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                      <svg class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -166,6 +211,7 @@ import { formatCurrency } from '@/utils/format.js';
 const props = defineProps({
   budget: Object,
   linkToken: String,
+  existingConnections: Array,
 });
 
 // State

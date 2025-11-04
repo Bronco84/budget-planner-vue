@@ -86,8 +86,24 @@
 
             <!-- Connect Button -->
             <div v-if="!isLinked" class="text-center py-8">
+              <!-- Show special message if adding to existing connection -->
+              <div v-if="hasExistingConnection" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800 font-medium mb-2">
+                  Adding to Existing Connection
+                </p>
+                <p class="text-sm text-blue-700">
+                  You already have accounts connected to <strong>{{ existingConnectionInstitution }}</strong>.
+                  You can add more accounts from the same institution using your existing connection.
+                </p>
+              </div>
+
               <p class="text-sm text-gray-600 mb-6">
-                Connect this account to your bank to automatically import transactions and update balances.
+                <template v-if="hasExistingConnection">
+                  Select additional accounts to link to your existing {{ existingConnectionInstitution }} connection.
+                </template>
+                <template v-else>
+                  Connect this account to your bank to automatically import transactions and update balances.
+                </template>
                 <br>
                 Your banking credentials are never stored on our servers.
               </p>
@@ -95,7 +111,7 @@
                 @click="openPlaidLink"
                 class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Connect to Bank
+                {{ hasExistingConnection ? 'Add More Accounts' : 'Connect to Bank' }}
               </button>
             </div>
 
@@ -130,6 +146,8 @@ const props = defineProps({
   linkToken: String,
   isLinked: Boolean,
   plaidAccount: Object,
+  hasExistingConnection: Boolean,
+  existingConnectionInstitution: String,
 });
 
 // Form refs

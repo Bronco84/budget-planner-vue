@@ -116,10 +116,9 @@ class BudgetController extends Controller
      */
     public function show(Budget $budget, Request $request): Response|RedirectResponse
     {
-        // TODO: Add authorization check for budget access
         $budgetService = app(BudgetService::class);
         $user = Auth::user();
-        
+
         // Load relationships including plaidAccount with connection
         $budget->load([
             'categories.expenses',

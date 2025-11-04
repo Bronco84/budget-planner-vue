@@ -21,13 +21,10 @@ class CalendarController extends Controller
         $budgets = auth()->user()->budgets;
         $selectedBudgetId = $request->input('budget_id', $budgets->first()?->id);
 
+        // If no budgets exist, redirect to create page
         if (!$selectedBudgetId) {
-            return Inertia::render('Calendar/Index', [
-                'budgets' => $budgets,
-                'selectedBudget' => null,
-                'calendarData' => null,
-                'currentMonth' => now()->format('Y-m'),
-            ]);
+            return redirect()->route('budgets.create')
+                ->with('message', 'Please create a budget to use the calendar.');
         }
 
         $budget = Budget::findOrFail($selectedBudgetId);

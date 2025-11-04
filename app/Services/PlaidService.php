@@ -424,6 +424,18 @@ class PlaidService
     }
 
     /**
+     * Find an existing active PlaidConnection for the given institution.
+     *
+     * @param Budget $budget
+     * @param string $institutionName
+     * @return PlaidConnection|null
+     */
+    public function findConnectionByInstitution(Budget $budget, string $institutionName): ?PlaidConnection
+    {
+        return PlaidConnection::forInstitution($budget, $institutionName)->first();
+    }
+
+    /**
      * Link multiple Plaid accounts to budget accounts under a single connection.
      *
      * @param Budget $budget

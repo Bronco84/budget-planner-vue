@@ -479,6 +479,25 @@
                             >
                               Edit Template
                             </Link>
+                            <!-- Autopay projected transaction (no template) - link to account settings -->
+                            <template v-else-if="transaction.is_projected && transaction.projection_source === 'autopay'">
+                              <Link
+                                v-if="transaction.source_account_id"
+                                :href="route('budgets.accounts.edit', [budget.id, transaction.source_account_id])"
+                                class="text-blue-600 hover:text-blue-900 text-xs font-medium"
+                              >
+                                Autopay Settings
+                              </Link>
+                              <span v-else class="text-gray-400 text-xs">
+                                Autopay
+                              </span>
+                            </template>
+                            <!-- Other projected transactions without template -->
+                            <template v-else-if="transaction.is_projected">
+                              <span class="text-gray-400 text-xs italic">
+                                Projected
+                              </span>
+                            </template>
                             <!-- Regular transaction with recurring template -->
                             <template v-else-if="transaction.recurring_transaction_template_id">
                               <button

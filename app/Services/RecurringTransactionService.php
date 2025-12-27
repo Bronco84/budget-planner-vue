@@ -1387,6 +1387,7 @@ class RecurringTransactionService
             'id' => null, // Not persisted
             'account_id' => $sourceAccount->id,
             'account' => $sourceAccount,
+            'source_account_id' => $creditCard->id, // Credit card account for linking to autopay settings
             'category_id' => $category?->id,
             'category' => $category?->name, // Use category name string for frontend display
             'budget_id' => $sourceAccount->budget_id,

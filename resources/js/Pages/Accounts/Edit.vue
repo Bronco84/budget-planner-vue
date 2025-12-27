@@ -6,168 +6,290 @@
       <h2 class="font-semibold text-xl text-gray-800 leading-tight">Edit Account</h2>
     </template>
 
-    <div class="py-12">
-      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-          <div class="p-6 text-gray-900">
-            <div class="mb-6">
-              <h3 class="text-lg font-medium">Account Details</h3>
-              <p class="mt-1 text-sm text-gray-600">
-                Update the information for this account.
-              </p>
+    <div class="py-8">
+      <div class="max-w-5xl mx-auto sm:px-6 lg:px-8">
+        <form @submit.prevent="submit">
+          <!-- Two-column grid layout -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left Column: Account Details (2/3 width) -->
+            <div class="lg:col-span-2 space-y-6">
+              
+              <!-- Account Information Card -->
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                  <div class="flex items-center gap-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100">
+                      <svg class="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="text-base font-semibold text-gray-900">Account Information</h3>
+                      <p class="text-sm text-gray-500">Basic details about this account</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="p-6 space-y-5">
+                  <!-- Account Name -->
+                  <div>
+                    <InputLabel for="name" value="Account Name" required />
+                    <TextInput
+                      id="name"
+                      type="text"
+                      class="mt-1.5 block w-full"
+                      v-model="form.name"
+                      required
+                      autofocus
+                    />
+                    <InputError class="mt-2" :message="form.errors.name" />
+                  </div>
+                  
+                  <!-- Account Type -->
+                  <div>
+                    <InputLabel for="type" value="Account Type" :required="!isPlaidConnected" />
+                    
+                    <!-- Read-only display for Plaid-connected accounts -->
+                    <div v-if="isPlaidConnected" class="mt-1.5">
+                      <div class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-sm">
+                          <svg v-if="isLiabilityType" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                          </svg>
+                          <svg v-else class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
+                          </svg>
+                        </div>
+                        <div class="flex-1">
+                          <span class="text-base font-medium text-gray-900">{{ getAccountTypeDisplayName(account.type) }}</span>
+                          <p class="text-xs text-gray-500 mt-0.5">Automatically classified by your bank</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Editable select for manual accounts -->
+                    <template v-else>
+                      <SelectInput
+                        id="type"
+                        class="mt-1.5 block w-full"
+                        v-model="form.type"
+                        required
+                      >
+                        <option value="checking">Checking</option>
+                        <option value="savings">Savings</option>
+                        <option value="credit card">Credit Card</option>
+                        <option value="line of credit">Line of Credit</option>
+                        <option value="mortgage">Mortgage</option>
+                        <option value="investment">Investment</option>
+                        <option value="loan">Loan</option>
+                        <option value="other">Other</option>
+                      </SelectInput>
+                      <InputError class="mt-2" :message="form.errors.type" />
+                    </template>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Account Status Card -->
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                  <div class="flex items-center gap-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
+                      <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="text-base font-semibold text-gray-900">Settings</h3>
+                      <p class="text-sm text-gray-500">Control how this account is used</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="p-6">
+                  <div class="space-y-3">
+                    <label 
+                      class="flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all"
+                      :class="accountStatus === 'active' ? 'border-indigo-500 bg-indigo-50/50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                    >
+                      <input
+                        type="radio"
+                        name="status"
+                        value="active"
+                        v-model="accountStatus"
+                        class="mt-0.5 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium text-gray-900">Active</span>
+                          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                            Recommended
+                          </span>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500">
+                          Include in projections and count toward your total balance
+                        </p>
+                      </div>
+                    </label>
+                    
+                    <label 
+                      class="flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all"
+                      :class="accountStatus === 'excluded' ? 'border-indigo-500 bg-indigo-50/50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                    >
+                      <input
+                        type="radio"
+                        name="status"
+                        value="excluded"
+                        v-model="accountStatus"
+                        class="mt-0.5 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div class="flex-1">
+                        <span class="font-medium text-gray-900">Excluded</span>
+                        <p class="mt-1 text-sm text-gray-500">
+                          Track transactions but hide from projections and totals
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
             
-            <form @submit.prevent="submit">
-              <div class="mb-4">
-                <InputLabel for="name" value="Account Name" required />
-                <TextInput
-                  id="name"
-                  type="text"
-                  class="mt-1 block w-full"
-                  v-model="form.name"
-                  required
-                  autofocus
-                />
-                <InputError class="mt-2" :message="form.errors.name" />
-              </div>
+            <!-- Right Column: Bank Connection & Actions (1/3 width) -->
+            <div class="space-y-6">
               
-              <div class="mb-4">
-                <InputLabel for="type" value="Account Type" required />
-                <SelectInput
-                  id="type"
-                  class="mt-1 block w-full"
-                  v-model="form.type"
-                  required
-                >
-                  <option value="checking">Checking</option>
-                  <option value="savings">Savings</option>
-                  <option value="credit">Credit Card</option>
-                  <option value="line of credit">Line of Credit</option>
-                  <option value="mortgage">Mortgage</option>
-                  <option value="investment">Investment</option>
-                  <option value="loan">Loan</option>
-                  <option value="other">Other</option>
-                </SelectInput>
-                <InputError class="mt-2" :message="form.errors.type" />
-              </div>
-              
-              <div class="mb-6">
-                <InputLabel for="status" value="Account Status" />
-                <div class="mt-2">
-                  <div class="flex items-center">
-                    <input
-                      id="status-active"
-                      type="radio"
-                      name="status"
-                      value="active"
-                      v-model="accountStatus"
-                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label for="status-active" class="ml-2 block text-sm text-gray-700">
-                      Active (include in budget calculations)
-                    </label>
+              <!-- Bank Connection Card -->
+              <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                  <div class="flex items-center gap-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg" :class="isPlaidConnected ? 'bg-emerald-100' : 'bg-gray-100'">
+                      <svg v-if="isPlaidConnected" class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                      </svg>
+                      <svg v-else class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.181 8.68a4.503 4.503 0 0 1 1.903 6.405m-9.768-2.782L3.56 14.06a4.5 4.5 0 0 0 6.364 6.365l3.129-3.129m5.614-5.615 1.757-1.757a4.5 4.5 0 0 0-6.364-6.365l-4.5 4.5a4.5 4.5 0 0 0-.264 6.086m8.035-8.036-1.757 1.757" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="text-base font-semibold text-gray-900">Bank Connection</h3>
+                      <p class="text-sm text-gray-500">{{ isPlaidConnected ? 'Connected' : 'Not connected' }}</p>
+                    </div>
                   </div>
-                  <div class="flex items-center mt-2">
-                    <input
-                      id="status-excluded"
-                      type="radio"
-                      name="status"
-                      value="excluded"
-                      v-model="accountStatus"
-                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label for="status-excluded" class="ml-2 block text-sm text-gray-700">
-                      Excluded (don't include in budget calculations)
-                    </label>
-                  </div>
-                  <p class="text-sm text-gray-500 mt-1">
-                    This determines whether this account's balance will be included in your total budget calculations.
-                  </p>
                 </div>
-              </div>
-
-              <div class="mb-6">
-                <InputLabel for="total_balance_setting" value="Total Balance Display" />
-                <div class="mt-2">
-                  <div class="flex items-center">
-                    <input
-                      id="exclude-from-total-balance"
-                      type="checkbox"
-                      v-model="form.exclude_from_total_balance"
-                      class="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500 rounded"
-                    />
-                    <label for="exclude-from-total-balance" class="ml-2 block text-sm text-gray-700">
-                      Exclude from total balance calculation
-                    </label>
-                  </div>
-                  <p class="text-sm text-gray-500 mt-1">
-                    When checked, this account's balance will not be included in the total balance shown at the top of your budget. Useful for accounts you want to track but not include in your net worth calculation.
-                  </p>
-                </div>
-              </div>
-              
-              <div class="flex items-center justify-end mt-6 space-x-4">
-                <Link
-                  :href="route('budgets.show', budget.id)"
-                  class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150"
-                >
-                  Cancel
-                </Link>
                 
-                <button 
-                  type="button" 
-                  @click="confirmAccountDeletion" 
-                  class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500 active:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                >
-                  Delete Account
-                </button>
-                
-                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                  Update Account
-                </PrimaryButton>
-              </div>
-            </form>
-            
-            <!-- Plaid Connection Section -->
-            <div class="mt-10 pt-6 border-t border-gray-200">
-              <h3 class="text-lg font-medium text-gray-900 mb-4">Bank Connection</h3>
-              <p class="text-sm text-gray-600 mb-4">
-                Connect this account to your bank to automatically import transactions and update balances.
-              </p>
-              
-              <div v-if="account.plaid_account" class="bg-blue-50 p-4 rounded-md border border-blue-200 mb-4">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <p class="font-medium text-blue-800">{{ account.plaid_account.institution_name }}</p>
-                    <p class="text-sm text-blue-600 mt-1">
-                      Last synced: <PlaidSyncTimestamp
-                        :timestamp="account.plaid_account?.plaid_connection?.last_sync_at"
-                        format="absolute"
+                <div class="p-6">
+                  <div v-if="isPlaidConnected" class="space-y-4">
+                    <div class="flex items-center gap-3">
+                      <InstitutionLogo
+                        :logo="account.plaid_account?.plaid_connection?.institution_logo"
+                        :name="account.plaid_account?.institution_name || 'Unknown Bank'"
+                        size="lg"
                       />
-                    </p>
-                  </div>
-                  <div>
+                      <div class="flex-1 min-w-0">
+                        <p class="font-medium text-gray-900 truncate">{{ account.plaid_account?.institution_name || 'Unknown Bank' }}</p>
+                        <p class="text-xs text-gray-500">
+                          Last synced: <PlaidSyncTimestamp
+                            :timestamp="account.plaid_account?.plaid_connection?.last_sync_at"
+                            format="absolute"
+                          />
+                        </p>
+                      </div>
+                    </div>
+                    
                     <Link 
                       :href="route('plaid.link', [budget.id, account.id])"
-                      class="inline-flex items-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500"
+                      class="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.204-.107-.397.165-.71.505-.78.929l-.15.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                      </svg>
                       Manage Connection
+                    </Link>
+                  </div>
+                  
+                  <div v-else class="text-center py-4">
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 mb-3">
+                      <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" />
+                      </svg>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">
+                      Connect to automatically import transactions and update balances
+                    </p>
+                    <Link 
+                      :href="route('plaid.link', [budget.id, account.id])"
+                      class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 rounded-lg text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                      </svg>
+                      Connect to Bank
                     </Link>
                   </div>
                 </div>
               </div>
               
-              <div v-else>
-                <Link 
-                  :href="route('plaid.link', [budget.id, account.id])"
-                  class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-                >
-                  Connect to Bank
-                </Link>
+              <!-- Danger Zone Card -->
+              <div class="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-red-100 bg-gradient-to-r from-red-50 to-white">
+                  <div class="flex items-center gap-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100">
+                      <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 class="text-base font-semibold text-red-900">Danger Zone</h3>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="p-6">
+                  <p class="text-sm text-gray-600 mb-4">
+                    Permanently delete this account. This cannot be undone.
+                  </p>
+                  <button 
+                    type="button" 
+                    @click="confirmAccountDeletion" 
+                    class="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-white border border-red-300 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                    Delete Account
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+          
+          <!-- Sticky Action Bar -->
+          <div class="mt-8 flex items-center justify-between gap-4 bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-4">
+            <Link
+              :href="route('budgets.show', budget.id)"
+              class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+              </svg>
+              Back to Budget
+            </Link>
+            
+            <PrimaryButton 
+              class="inline-flex items-center gap-2 px-6 py-2.5"
+              :class="{ 'opacity-25': form.processing }" 
+              :disabled="form.processing"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+              Save Changes
+            </PrimaryButton>
+          </div>
+        </form>
       </div>
     </div>
     
@@ -202,7 +324,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
@@ -214,12 +336,54 @@ import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import Modal from '@/Components/Modal.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
+import InstitutionLogo from '@/Components/InstitutionLogo.vue';
 
 // Define props to receive the budget and account
 const props = defineProps({
   budget: Object,
   account: Object
 });
+
+// Check if this account is connected to Plaid
+const isPlaidConnected = computed(() => !!props.account.plaid_account);
+
+// Check if this account type is a liability (credit card, loan, etc.)
+const liabilityTypes = ['mortgage', 'line of credit', 'credit', 'credit card', 'loan', 'auto loan', 'student loan', 'home equity', 'business loan'];
+const isLiabilityType = computed(() => liabilityTypes.includes(props.account.type?.toLowerCase()));
+
+// Helper function to get display name for account type
+const getAccountTypeDisplayName = (type) => {
+  const typeMap = {
+    'checking': 'Checking',
+    'savings': 'Savings',
+    'money market': 'Money Market',
+    'cd': 'Certificate of Deposit',
+    'certificate of deposit': 'Certificate of Deposit',
+    'investment': 'Investment',
+    'credit card': 'Credit Card',
+    'credit': 'Credit',
+    'loan': 'Loan',
+    'line of credit': 'Line of Credit',
+    'mortgage': 'Mortgage',
+    'auto loan': 'Auto Loan',
+    'student loan': 'Student Loan',
+    'home equity': 'Home Equity',
+    'business loan': 'Business Loan',
+    'brokerage': 'Brokerage',
+    'mutual fund': 'Mutual Fund',
+    '401k': '401(k)',
+    '403b': '403(b)',
+    '457b': '457(b)',
+    'traditional ira': 'Traditional IRA',
+    'roth ira': 'Roth IRA',
+    'health savings account': 'Health Savings Account',
+    'hsa': 'Health Savings Account',
+    'paypal': 'PayPal',
+    'prepaid': 'Prepaid',
+    'other': 'Other'
+  };
+  return typeMap[type?.toLowerCase()] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Unknown');
+};
 
 // Set up account status based on include_in_budget
 const accountStatus = ref(props.account.include_in_budget ? 'active' : 'excluded');
@@ -229,7 +393,6 @@ const form = useForm({
   name: props.account.name,
   type: props.account.type,
   include_in_budget: props.account.include_in_budget,
-  exclude_from_total_balance: props.account.exclude_from_total_balance,
 });
 
 // Watch for changes to account status and update include_in_budget

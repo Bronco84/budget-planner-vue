@@ -38,6 +38,11 @@ class PlaidAccount extends Model
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     */
+    protected $appends = ['institution_name'];
+
+    /**
      * The attributes that should be cast.
      */
     protected $casts = [

@@ -183,14 +183,23 @@ class PlaidController extends Controller
                 $importedCount++;
             }
 
+            // Fetch institution logo if we have an institution ID
+            $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
+            $institutionLogo = null;
+            if ($institutionId) {
+                $institutionDetails = $this->plaidService->getInstitutionDetails($institutionId);
+                $institutionLogo = $institutionDetails['logo'] ?? null;
+            }
+
             // Link all accounts to Plaid under single connection
             $plaidAccounts = $this->plaidService->linkMultipleAccounts(
                 $budget,
                 $accountData,
                 $accessToken,
                 $itemId,
-                $validated['metadata']['institution']['institution_id'] ?? null,
-                $validated['metadata']['institution']['name']
+                $institutionId,
+                $validated['metadata']['institution']['name'],
+                $institutionLogo
             );
 
             // Sync transactions for all linked accounts
@@ -237,6 +246,14 @@ class PlaidController extends Controller
             $itemId = $validated['metadata']['item']['id'] ?? 
                     $validated['metadata']['item_id'] ?? 
                     null;
+
+            // Fetch institution logo if we have an institution ID
+            $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
+            $institutionLogo = null;
+            if ($institutionId) {
+                $institutionDetails = $this->plaidService->getInstitutionDetails($institutionId);
+                $institutionLogo = $institutionDetails['logo'] ?? null;
+            }
                     
             // Link the account
             $plaidAccount = $this->plaidService->linkAccount(
@@ -245,7 +262,9 @@ class PlaidController extends Controller
                 $accessToken,
                 $validated['metadata']['account']['id'],
                 $itemId,
-                $validated['metadata']['institution']['name']
+                $validated['metadata']['institution']['name'],
+                $institutionId,
+                $institutionLogo
             );
             
             // Sync transactions

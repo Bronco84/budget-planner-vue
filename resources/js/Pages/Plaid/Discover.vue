@@ -87,28 +87,45 @@
             </div>
 
             <!-- Account Discovery Section -->
-            <div v-if="!discoveredAccounts.length" class="text-center py-12">
-              <div class="mx-auto max-w-md">
-                <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
-                </svg>
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Connect to Your Bank
-                </h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                  Securely connect to your bank to discover all your accounts. 
-                  Your credentials are encrypted and never stored on our servers.
-                </p>
+            <div v-if="!discoveredAccounts.length">
+              <!-- Compact UI when connections exist -->
+              <div v-if="existingConnections && existingConnections.length > 0" class="text-center py-6">
                 <button
                   @click="openPlaidLink"
                   :disabled="!linkToken"
-                  class="inline-flex items-center px-6 py-3 bg-indigo-600 border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
-                  Connect Bank Account
+                  Add Another Bank
                 </button>
+              </div>
+              
+              <!-- Full UI when no connections exist -->
+              <div v-else class="text-center py-12">
+                <div class="mx-auto max-w-md">
+                  <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                  </svg>
+                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    Connect to Your Bank
+                  </h3>
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    Securely connect to your bank to discover all your accounts. 
+                    Your credentials are encrypted and never stored on our servers.
+                  </p>
+                  <button
+                    @click="openPlaidLink"
+                    :disabled="!linkToken"
+                    class="inline-flex items-center px-6 py-3 bg-indigo-600 border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Connect Bank Account
+                  </button>
+                </div>
               </div>
             </div>
 

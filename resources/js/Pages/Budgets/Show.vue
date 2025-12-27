@@ -2,11 +2,11 @@
   <Head :title="budget.name" />
 
   <AuthenticatedLayout>
-    <div class="py-4">
-      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div class="py-4 md:py-0 md:h-[calc(100vh-7.5rem)]">
+      <div class="max-w-8xl mx-auto sm:px-2 lg:px-4 md:h-full md:py-4">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 md:h-full">
           <!-- Left sidebar with Budget Overview and Accounts -->
-          <div class="lg:col-span-1">
+          <div class="lg:col-span-1 md:overflow-y-auto md:pr-2">
             <!-- Budget Overview Card -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
               <div class="p-4">
@@ -164,26 +164,52 @@
             </div>
 
             <!-- Accounts Card -->
-            <div class="bg-white overflow-visible shadow-sm sm:rounded-lg divide-red-50 divide-x">
+            <div class="bg-white overflow-visible shadow-sm sm:rounded-lg">
               <div class="p-4">
-                <div class="flex justify-between items-center mb-3">
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Accounts</h3>
-                  <div class="flex space-x-2">
-                    <Link
-                      :href="route('plaid.discover', budget.id)"
-                      class="inline-flex items-center px-3 py-1 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500"
-                      title="Import accounts from your bank"
+                <!-- Accordion Header -->
+                <div class="flex justify-between items-center cursor-pointer" @click="accountsExpanded = !accountsExpanded">
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Accounts</h3>
+                    <span class="text-sm text-gray-500">({{ accounts.length }})</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="flex space-x-2" @click.stop>
+                      <Link
+                        :href="route('plaid.discover', budget.id)"
+                        class="inline-flex items-center px-3 py-1 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500"
+                        title="Import accounts from your bank"
+                      >
+                        Import
+                      </Link>
+                      <Link
+                        :href="route('budgets.accounts.create', budget.id)"
+                        class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
+                      >
+                        Add
+                      </Link>
+                    </div>
+                    <svg
+                      class="w-5 h-5 text-gray-500 transition-transform duration-200"
+                      :class="{ 'rotate-180': accountsExpanded }"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      Import
-                    </Link>
-                    <Link
-                      :href="route('budgets.accounts.create', budget.id)"
-                      class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-                    >
-                      Add
-                    </Link>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
                   </div>
                 </div>
+
+                <!-- Accordion Content -->
+                <transition
+                  enter-active-class="transition duration-300 ease-out"
+                  enter-from-class="transform opacity-0 -translate-y-2"
+                  enter-to-class="transform opacity-100 translate-y-0"
+                  leave-active-class="transition duration-200 ease-in"
+                  leave-from-class="transform opacity-100 translate-y-0"
+                  leave-to-class="transform opacity-0 -translate-y-2"
+                >
+                  <div v-show="accountsExpanded" class="mt-3">
                 <draggable
                   v-if="accounts.length > 0"
                   v-model="draggableAccountGroups"
@@ -242,6 +268,18 @@
                           <!-- Account Row -->
                           <div class="px-3 py-2.5">
                             <div class="flex justify-between items-center gap-3">
+                              <!-- Institution Logo or Account Type Icon -->
+                              <InstitutionLogo
+                                v-if="account.plaid_account"
+                                :logo="account.plaid_account?.plaid_connection?.institution_logo"
+                                :name="account.plaid_account?.plaid_connection?.institution_name || account.name"
+                                size="sm"
+                                class="flex-shrink-0"
+                              />
+                              <div v-else class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" :class="getAccountTypeIconBg(account.type)">
+                                <component :is="getAccountTypeIcon(account.type)" class="w-5 h-5" :class="getAccountTypeIconColor(account.type)" />
+                              </div>
+                              
                               <!-- Account Info -->
                               <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
@@ -352,17 +390,122 @@
                   </template>
                 </draggable>
 
-                <div v-else class="bg-gray-50 p-3 text-center rounded-lg">
-                  <p class="text-sm text-gray-500">No accounts found.</p>
+                    <div v-else class="bg-gray-50 p-3 text-center rounded-lg">
+                      <p class="text-sm text-gray-500">No accounts found.</p>
+                    </div>
+                  </div>
+                </transition>
+              </div>
+            </div>
+
+            <!-- Assets Card -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mt-6">
+              <div class="p-4">
+                <!-- Accordion Header -->
+                <div class="flex justify-between items-center cursor-pointer" @click="assetsExpanded = !assetsExpanded">
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Assets</h3>
+                    <span class="text-sm text-gray-500">({{ assets.length }})</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <Link
+                      :href="route('budgets.assets.create', budget.id)"
+                      class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
+                      @click.stop
+                    >
+                      Add
+                    </Link>
+                    <svg
+                      class="w-5 h-5 text-gray-500 transition-transform duration-200"
+                      :class="{ 'rotate-180': assetsExpanded }"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </div>
+
+                <!-- Accordion Content -->
+                <transition
+                  enter-active-class="transition duration-300 ease-out"
+                  enter-from-class="transform opacity-0 -translate-y-2"
+                  enter-to-class="transform opacity-100 translate-y-0"
+                  leave-active-class="transition duration-200 ease-in"
+                  leave-from-class="transform opacity-100 translate-y-0"
+                  leave-to-class="transform opacity-0 -translate-y-2"
+                >
+                  <div v-show="assetsExpanded" class="mt-3">
+                    <!-- Assets List -->
+                    <div v-if="assets.length > 0" class="space-y-2">
+                      <Link
+                        v-for="asset in assets"
+                        :key="asset.id"
+                        :href="route('budgets.assets.edit', [budget.id, asset.id])"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                      >
+                        <!-- Asset Icon -->
+                        <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" :class="getAssetIconBg(asset.type)">
+                          <component :is="getAssetIcon(asset.type)" class="w-5 h-5" :class="getAssetIconColor(asset.type)" />
+                        </div>
+                        
+                        <!-- Asset Info -->
+                        <div class="flex-1 min-w-0">
+                          <div class="font-medium text-sm text-gray-900 truncate">{{ asset.name }}</div>
+                          <div class="text-xs text-gray-500 truncate">
+                            {{ formatCurrency(asset.current_value_cents) }}
+                            <span v-if="asset.linked_accounts && asset.linked_accounts.length > 0" class="text-gray-400">
+                              • Equity: {{ formatCurrency(asset.equity) }}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <!-- Arrow -->
+                        <svg class="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div v-else class="text-center py-6">
+                      <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                      </div>
+                      <p class="text-sm text-gray-500 mb-2">No assets yet</p>
+                      <Link
+                        :href="route('budgets.assets.create', budget.id)"
+                        class="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                      >
+                        Add your first asset
+                      </Link>
+                    </div>
+
+                    <!-- View All Link -->
+                    <div v-if="assets.length > 0" class="pt-3 mt-3 border-t border-gray-200">
+                      <Link
+                        :href="route('budgets.assets.index', budget.id)"
+                        class="flex items-center justify-center text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+                      >
+                        View All Assets
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    </div>
+                  </div>
+                </transition>
               </div>
             </div>
           </div>
 
           <!-- Main Content Area - Transactions -->
-          <div class="lg:col-span-3">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-              <div class="p-6">
+          <div class="lg:col-span-3 md:flex md:flex-col md:min-h-0">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg md:flex-1 md:flex md:flex-col md:min-h-0">
+              <div class="p-6 md:p-4 md:flex-1 md:flex md:flex-col md:min-h-0">
                 <!-- Empty State for No Accounts -->
                 <div v-if="accounts.length === 0" class="text-center py-12">
                   <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -395,9 +538,10 @@
                 </div>
 
                 <!-- Transactions Table -->
-                <div v-else>
-                <div class="border rounded-lg overflow-x-auto">
-                  <table class="min-w-full divide-y divide-gray-200">
+                <div v-else class="md:flex-1 md:flex md:flex-col md:min-h-0">
+                <div class="border rounded-lg md:flex-1 md:flex md:flex-col md:min-h-0">
+                  <div class="md:flex-1 md:overflow-y-auto md:min-h-0" ref="tableContainer">
+                  <table class="min-w-full divide-y divide-gray-200 table-fixed">
                     <thead class="bg-gray-50">
                       <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Date</th>
@@ -588,10 +732,10 @@
                       </tr>
                     </tbody>
                   </table>
-                </div>
+                  </div>
 
                 <!-- Pagination -->
-                <div v-if="transactions.data.length > 0" class="mt-4 flex items-center justify-between">
+                <div v-if="sortedTransactions.length > 0 || transactions.links" class="md:flex-none mt-4 flex items-center justify-between md:border-t md:py-3 md:px-2 md:mt-0">
                   <div class="flex-1 flex justify-between sm:hidden">
                     <Link
                       v-if="transactions.prev_page_url"
@@ -631,46 +775,94 @@
                     </div>
                     <div>
                       <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <!-- First Page -->
+                        <Link
+                          v-if="transactions.current_page > 1"
+                          :href="transactions.first_page_url"
+                          preserve-scroll
+                          class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          title="First page"
+                        >
+                          <span class="sr-only">First</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414zm-6 0a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                          </svg>
+                        </Link>
+                        <span v-else class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                          <span class="sr-only">First</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414zm-6 0a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
+
+                        <!-- Previous Page -->
                         <Link
                           v-if="transactions.prev_page_url"
                           :href="transactions.prev_page_url"
                           preserve-scroll
-                          class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          title="Previous page"
                         >
                           <span class="sr-only">Previous</span>
                           <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
                           </svg>
                         </Link>
-                        <span v-else class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                        <span v-else class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
                           <span class="sr-only">Previous</span>
                           <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
                           </svg>
                         </span>
 
-                        <!-- Page numbers would go here if needed -->
+                        <!-- Current Page Indicator -->
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                          Page {{ transactions.current_page }} of {{ transactions.last_page }}
+                        </span>
 
+                        <!-- Next Page -->
                         <Link
                           v-if="transactions.next_page_url"
                           :href="transactions.next_page_url"
                           preserve-scroll
-                          class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          title="Next page"
                         >
                           <span class="sr-only">Next</span>
                           <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                           </svg>
                         </Link>
-                        <span v-else class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                        <span v-else class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
                           <span class="sr-only">Next</span>
                           <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
+
+                        <!-- Last Page -->
+                        <Link
+                          v-if="transactions.current_page < transactions.last_page"
+                          :href="transactions.last_page_url"
+                          preserve-scroll
+                          class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          title="Last page"
+                        >
+                          <span class="sr-only">Last</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0zm-6 0a1 1 0 010-1.414L8.586 10 4.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                          </svg>
+                        </Link>
+                        <span v-else class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-300 cursor-not-allowed">
+                          <span class="sr-only">Last</span>
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0zm-6 0a1 1 0 010-1.414L8.586 10 4.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                           </svg>
                         </span>
                       </nav>
                     </div>
                   </div>
+                </div>
                 </div>
                 </div>
               </div>
@@ -713,6 +905,40 @@
 .sortable-drag {
   background: #ddd6fe;
 }
+
+/* Custom scrollbar styling */
+@media (min-width: 768px) {
+  .md\:overflow-y-auto::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .md\:overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .md\:overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+
+  .md\:overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  /* Dark mode scrollbar */
+  .dark .md\:overflow-y-auto::-webkit-scrollbar-track {
+    background: #374151;
+  }
+
+  .dark .md\:overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #6b7280;
+  }
+
+  .dark .md\:overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+}
 </style>
 
 <script setup>
@@ -727,13 +953,19 @@ import {
   HomeIcon,
   ChartBarIcon,
   WalletIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  BanknotesIcon as CheckingIcon,
+  CircleStackIcon,
+  TruckIcon,
+  DocumentTextIcon,
+  CubeIcon
 } from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import CreditCardDetails from '@/Components/CreditCardDetails.vue';
+import InstitutionLogo from '@/Components/InstitutionLogo.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable'
 
@@ -741,6 +973,7 @@ import draggable from 'vuedraggable'
 const props = defineProps({
   budget: Object,
   accounts: Array,
+  assets: Array,
   selectedAccountId: Number,
   totalBalance: Number,
   transactions: Object,
@@ -791,7 +1024,8 @@ const accountsByType = computed(() => {
 
   // Sort groups by user's preferred order
   const userOrder = props.userAccountTypeOrder || [
-    'checking', 'savings', 'money market', 'cd', 'investment',
+    'checking', 'savings', 'money market', 'cd', 
+    'brokerage', 'traditional ira', 'roth ira', '401k', '403b', '457b', 'stock plan', 'investment',
     'credit card', 'credit', 'loan', 'line of credit', 'mortgage', 'other'
   ];
 
@@ -816,6 +1050,13 @@ const getAccountTypeDisplayName = (type) => {
     'savings': 'Savings Accounts',
     'money market': 'Money Market Accounts',
     'cd': 'Certificates of Deposit',
+    'brokerage': 'Brokerage Accounts',
+    'traditional ira': 'Traditional IRAs',
+    'roth ira': 'Roth IRAs',
+    '401k': '401(k) Accounts',
+    '403b': '403(b) Accounts',
+    '457b': '457(b) Accounts',
+    'stock plan': 'Stock Plans',
     'investment': 'Investment Accounts',
     'credit card': 'Credit Cards',
     'credit': 'Credit Accounts',
@@ -847,6 +1088,16 @@ const expandedCreditCardAccount = ref(null);
 
 // Budget card accordion state (collapsed by default)
 const budgetCardExpanded = ref(false);
+
+// Accounts and Assets accordion state (expanded by default)
+const accountsExpanded = ref(true);
+const assetsExpanded = ref(true);
+
+// Table container ref for height calculation
+const tableContainer = ref(null);
+
+// Dynamic per-page calculation
+const calculatedPerPage = ref(50); // Default fallback
 
 // Selected account tracking is handled by activeAccountId computed property
 
@@ -920,9 +1171,15 @@ const rebuildDraggableArray = () => {
   // Get account types that exist
   const existingTypes = [...new Set(props.accounts.map(acc => acc.type || 'other'))];
 
-  // Order them according to user preferences
+  // Order them according to user preferences, but include ALL existing types
   const userOrder = props.userAccountTypeOrder || [];
+  
+  // Start with types in user's order that exist
   const orderedTypes = userOrder.filter(type => existingTypes.includes(type));
+  
+  // Add any existing types that aren't in the user's order (append at the end)
+  const typesNotInOrder = existingTypes.filter(type => !userOrder.includes(type));
+  orderedTypes.push(...typesNotInOrder);
 
   // Build the final draggable array
   draggableAccountGroups.value = orderedTypes
@@ -986,17 +1243,67 @@ const closeDropdown = () => {
 
 // Account selection functionality is handled by the existing selectAccount function
 
+// Calculate optimal per-page based on viewport height
+const calculatePerPage = () => {
+  if (!tableContainer.value) return 50;
+  
+  // Only calculate on medium+ screens
+  if (window.innerWidth < 768) return 50;
+  
+  const containerHeight = tableContainer.value.clientHeight;
+  const rowHeight = 65; // Approximate height of each row including padding
+  const bufferRows = 2; // Add extra rows for smooth scrolling
+  
+  const calculatedRows = Math.floor(containerHeight / rowHeight) + bufferRows;
+  
+  // Constrain to reasonable limits
+  return Math.max(10, Math.min(200, calculatedRows));
+};
+
+// Debounced resize handler
+let resizeTimeout = null;
+const handleResize = () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    const newPerPage = calculatePerPage();
+    if (newPerPage !== calculatedPerPage.value && Math.abs(newPerPage - calculatedPerPage.value) > 5) {
+      calculatedPerPage.value = newPerPage;
+      // Reload with new per_page value
+      router.visit(route('budgets.show', props.budget.id), {
+        data: {
+          account_id: form.account_id,
+          projection_months: projectionForm.months || 1,
+          per_page: calculatedPerPage.value
+        },
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+      });
+    }
+  }, 500);
+};
+
 // Load budget attachments on mount
 onMounted(() => {
   loadBudgetAttachments();
 
   // Add click outside listener
   document.addEventListener('click', closeDropdown);
+  
+  // Calculate initial per-page after DOM is ready
+  setTimeout(() => {
+    calculatedPerPage.value = calculatePerPage();
+  }, 100);
+  
+  // Add resize listener
+  window.addEventListener('resize', handleResize);
 });
 
 // Cleanup on unmount
 onUnmounted(() => {
   document.removeEventListener('click', closeDropdown);
+  window.removeEventListener('resize', handleResize);
+  if (resizeTimeout) clearTimeout(resizeTimeout);
 });
 
 const loadBudgetAttachments = async () => {
@@ -1042,7 +1349,8 @@ function updateProjections() {
   router.visit(route('budgets.show', props.budget.id), {
     data: {
       account_id: form.account_id,
-      projection_months: projectionForm.months
+      projection_months: projectionForm.months,
+      per_page: calculatedPerPage.value
     },
     preserveState: true,
     preserveScroll: true
@@ -1098,6 +1406,12 @@ const accountTypeIcons = {
   'credit': CreditCardIcon,
   'investment': ChartBarIcon,
   'brokerage': ChartBarIcon,
+  'traditional ira': ChartBarIcon,
+  'roth ira': ChartBarIcon,
+  '401k': ChartBarIcon,
+  '403b': ChartBarIcon,
+  '457b': ChartBarIcon,
+  'stock plan': ChartBarIcon,
   'mortgage': HomeIcon,
   'loan': BuildingLibraryIcon,
   'line of credit': CurrencyDollarIcon,
@@ -1329,7 +1643,8 @@ const selectAccount = (accountId) => {
   router.visit(route('budgets.show', props.budget.id), {
     data: {
       account_id: accountId,
-      projection_months: projectionForm.months || 1
+      projection_months: projectionForm.months || 1,
+      per_page: calculatedPerPage.value
     },
     preserveState: true,
     preserveScroll: true,
@@ -1373,4 +1688,81 @@ const monthlyCashFlow = computed(() => {
 
   return null;
 });
+
+// Helper functions for account type icon styling
+const getAccountTypeIconBg = (type) => {
+  const bgMap = {
+    'checking': 'bg-blue-100',
+    'savings': 'bg-green-100',
+    'credit card': 'bg-purple-100',
+    'credit': 'bg-purple-100',
+    'mortgage': 'bg-orange-100',
+    'loan': 'bg-yellow-100',
+    'line of credit': 'bg-pink-100',
+    'investment': 'bg-indigo-100',
+    'brokerage': 'bg-indigo-100',
+    'traditional ira': 'bg-indigo-100',
+    'roth ira': 'bg-indigo-100',
+    '401k': 'bg-indigo-100',
+    '403b': 'bg-indigo-100',
+    '457b': 'bg-indigo-100',
+    'stock plan': 'bg-indigo-100',
+    'money market': 'bg-teal-100',
+    'cd': 'bg-cyan-100',
+    'other': 'bg-gray-100'
+  };
+  return bgMap[type?.toLowerCase()] || 'bg-gray-100';
+};
+
+const getAccountTypeIconColor = (type) => {
+  const colorMap = {
+    'checking': 'text-blue-600',
+    'savings': 'text-green-600',
+    'credit card': 'text-purple-600',
+    'credit': 'text-purple-600',
+    'mortgage': 'text-orange-600',
+    'loan': 'text-yellow-600',
+    'line of credit': 'text-pink-600',
+    'investment': 'text-indigo-600',
+    'brokerage': 'text-indigo-600',
+    'traditional ira': 'text-indigo-600',
+    'roth ira': 'text-indigo-600',
+    '401k': 'text-indigo-600',
+    '403b': 'text-indigo-600',
+    '457b': 'text-indigo-600',
+    'stock plan': 'text-indigo-600',
+    'money market': 'text-teal-600',
+    'cd': 'text-cyan-600',
+    'other': 'text-gray-600'
+  };
+  return colorMap[type?.toLowerCase()] || 'text-gray-600';
+};
+
+// Helper functions for asset icons
+const getAssetIcon = (type) => {
+  const iconMap = {
+    'property': HomeIcon,
+    'vehicle': TruckIcon,
+    'other': CubeIcon
+  };
+  return iconMap[type?.toLowerCase()] || CubeIcon;
+};
+
+const getAssetIconBg = (type) => {
+  const bgMap = {
+    'property': 'bg-orange-100',
+    'vehicle': 'bg-blue-100',
+    'other': 'bg-gray-100'
+  };
+  return bgMap[type?.toLowerCase()] || 'bg-gray-100';
+};
+
+const getAssetIconColor = (type) => {
+  const colorMap = {
+    'property': 'text-orange-600',
+    'vehicle': 'text-blue-600',
+    'other': 'text-gray-600'
+  };
+  return colorMap[type?.toLowerCase()] || 'text-gray-600';
+};
 </script>

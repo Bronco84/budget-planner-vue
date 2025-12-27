@@ -35,7 +35,7 @@
                 >
                   <option value="checking">Checking</option>
                   <option value="savings">Savings</option>
-                  <option value="credit">Credit Card</option>
+                  <option value="credit card">Credit Card</option>
                   <option value="line of credit">Line of Credit</option>
                   <option value="mortgage">Mortgage</option>
                   <option value="investment">Investment</option>

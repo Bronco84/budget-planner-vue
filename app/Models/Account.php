@@ -42,6 +42,7 @@ class Account extends Model
         'autopay_enabled',
         'autopay_source_account_id',
         'autopay_amount_override_cents',
+        'asset_id',
     ];
 
     /**
@@ -139,6 +140,14 @@ class Account extends Model
     public function autopayTargetAccounts(): HasMany
     {
         return $this->hasMany(Account::class, 'autopay_source_account_id');
+    }
+
+    /**
+     * Get the asset that this account (loan/mortgage) is linked to.
+     */
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class);
     }
 
     public function scopeActive($query)

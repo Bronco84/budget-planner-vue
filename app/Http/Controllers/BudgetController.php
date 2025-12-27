@@ -130,7 +130,11 @@ class BudgetController extends Controller
         $accountTransactions = null;
         $projectedTransactions = collect();
         $monthlyProjectedCashFlow = 0;
-        $monthsToProject = 1;
+        
+        // Get saved projection months preference for this budget, default to 1
+        $preferenceKey = "budget_{$budget->id}_projection_months";
+        $savedProjectionMonths = (int) $user->getPreference($preferenceKey, 1);
+        $monthsToProject = $savedProjectionMonths;
 
         // Only process account data if budget has accounts
         if ($budget->accounts->count() > 0) {
@@ -146,7 +150,14 @@ class BudgetController extends Controller
             }
 
             // Get projection and date range parameters
-            $monthsToProject = (int) $request->input('projection_months', 1);
+            // If request has projection_months, use it and save as preference
+            if ($request->has('projection_months')) {
+                $monthsToProject = (int) $request->input('projection_months');
+                // Save the preference for next time
+                if ($monthsToProject !== $savedProjectionMonths) {
+                    $user->setPreference($preferenceKey, $monthsToProject);
+                }
+            }
             $dateRange = $request->input('date_range', '90');
             $startDate = $budgetService->parseDateRange($dateRange, $request->input('start_date'));
             $endDate = now()->addMonths($monthsToProject)->endOfMonth();
@@ -171,11 +182,15 @@ class BudgetController extends Controller
                 ->where('account_id', $account->id)
                 ->where('is_projected', true);
 
+            // Get per_page from request, validate and constrain to reasonable limits
+            $perPage = (int) $request->input('per_page', 50);
+            $perPage = max(10, min(200, $perPage)); // Constrain between 10 and 200
+
             // Paginate the transactions
             $accountTransactions = $budgetService->paginateTransactions(
                 $allTransactions,
                 $request->input('page', 1),
-                50,
+                $perPage,
                 $request->url(),
                 $request->query()
             );
@@ -187,10 +202,14 @@ class BudgetController extends Controller
         // Calculate the total balance across all accounts
         $totalBalance = $budgetService->calculateTotalBalance($budget);
 
+        // Load assets with their linked accounts
+        $budget->load('assets.linkedAccounts');
+
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
+            'assets' => $budget->assets,
             'selectedAccountId' => $account?->id,
             'transactions' => $accountTransactions,
             'projectedTransactions' => $projectedTransactions,

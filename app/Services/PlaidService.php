@@ -289,6 +289,102 @@ class PlaidService
     }
 
     /**
+     * Search for institutions by name.
+     *
+     * @param string $query The institution name to search for
+     * @return array|null Array with 'institution_id', 'name', 'logo', or null if not found
+     */
+    public function searchInstitutions(string $query): ?array
+    {
+        if (!$this->isConfigured) {
+            Log::warning('Plaid service not configured, cannot search institutions');
+            return null;
+        }
+
+        try {
+            $response = $this->client->post('/institutions/search', [
+                'json' => [
+                    'query' => $query,
+                    'products' => ['transactions'],
+                    'country_codes' => ['US'],
+                    'options' => [
+                        'include_optional_metadata' => true,
+                    ],
+                ]
+            ]);
+
+            $result = json_decode($response->getBody(), true);
+            $institutions = $result['institutions'] ?? [];
+
+            if (empty($institutions)) {
+                return null;
+            }
+
+            // Return the first match
+            $institution = $institutions[0];
+            return [
+                'institution_id' => $institution['institution_id'] ?? null,
+                'name' => $institution['name'] ?? null,
+                'logo' => $institution['logo'] ?? null,
+                'primary_color' => $institution['primary_color'] ?? null,
+            ];
+        } catch (RequestException $e) {
+            Log::warning('Failed to search institutions from Plaid', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get institution details including logo from Plaid.
+     *
+     * @param string $institutionId The Plaid institution ID (e.g., "ins_3")
+     * @return array|null Array with 'name', 'logo' (base64), 'primary_color', or null on failure
+     */
+    public function getInstitutionDetails(string $institutionId): ?array
+    {
+        if (!$this->isConfigured) {
+            Log::warning('Plaid service not configured, cannot fetch institution details');
+            return null;
+        }
+
+        try {
+            $response = $this->client->post('/institutions/get_by_id', [
+                'json' => [
+                    'institution_id' => $institutionId,
+                    'country_codes' => ['US'],
+                    'options' => [
+                        'include_optional_metadata' => true,
+                    ],
+                ]
+            ]);
+
+            $result = json_decode($response->getBody(), true);
+            $institution = $result['institution'] ?? null;
+
+            if (!$institution) {
+                return null;
+            }
+
+            return [
+                'name' => $institution['name'] ?? null,
+                'logo' => $institution['logo'] ?? null, // base64-encoded logo
+                'primary_color' => $institution['primary_color'] ?? null,
+                'url' => $institution['url'] ?? null,
+            ];
+        } catch (RequestException $e) {
+            Log::warning('Failed to fetch institution details from Plaid', [
+                'institution_id' => $institutionId,
+                'error' => $e->getMessage(),
+                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Get transactions for a specific date range
      * @throws \Exception
      */
@@ -422,6 +518,7 @@ class PlaidService
      * @param string $itemId
      * @param string|null $institutionId
      * @param string|null $institutionName
+     * @param string|null $institutionLogo Base64-encoded logo from Plaid
      * @return PlaidConnection
      */
     public function createOrFindConnection(
@@ -429,21 +526,29 @@ class PlaidService
         string $accessToken,
         string $itemId,
         ?string $institutionId = null,
-        ?string $institutionName = null
+        ?string $institutionName = null,
+        ?string $institutionLogo = null
     ): PlaidConnection {
+        $data = [
+            'institution_id' => $institutionId,
+            'institution_name' => $institutionName ?? 'Unknown Institution',
+            'access_token' => $accessToken,
+            'status' => PlaidConnection::STATUS_ACTIVE,
+            'error_message' => null,
+            'last_sync_at' => null,
+        ];
+
+        // Only update logo if provided (don't overwrite existing logo with null)
+        if ($institutionLogo !== null) {
+            $data['institution_logo'] = $institutionLogo;
+        }
+
         return PlaidConnection::updateOrCreate(
             [
                 'budget_id' => $budget->id,
                 'plaid_item_id' => $itemId,
             ],
-            [
-                'institution_id' => $institutionId,
-                'institution_name' => $institutionName ?? 'Unknown Institution',
-                'access_token' => $accessToken,
-                'status' => PlaidConnection::STATUS_ACTIVE,
-                'error_message' => null,
-                'last_sync_at' => null,
-            ]
+            $data
         );
     }
 
@@ -468,6 +573,7 @@ class PlaidService
      * @param string $itemId
      * @param string|null $institutionId
      * @param string|null $institutionName
+     * @param string|null $institutionLogo Base64-encoded logo from Plaid
      * @return array Array of created PlaidAccount records
      */
     public function linkMultipleAccounts(
@@ -476,7 +582,8 @@ class PlaidService
         string $accessToken,
         string $itemId,
         ?string $institutionId = null,
-        ?string $institutionName = null
+        ?string $institutionName = null,
+        ?string $institutionLogo = null
     ): array {
         // Create or find the PlaidConnection
         $plaidConnection = $this->createOrFindConnection(
@@ -484,7 +591,8 @@ class PlaidService
             $accessToken,
             $itemId,
             $institutionId,
-            $institutionName
+            $institutionName,
+            $institutionLogo
         );
 
         $plaidAccounts = [];
@@ -557,6 +665,8 @@ class PlaidService
      * @param string $plaidAccountId
      * @param string|null $itemId
      * @param string|null $institutionName
+     * @param string|null $institutionId
+     * @param string|null $institutionLogo Base64-encoded logo from Plaid
      * @return PlaidAccount
      */
     public function linkAccount(
@@ -565,7 +675,9 @@ class PlaidService
         string $accessToken,
         string $plaidAccountId,
         ?string $itemId = null,
-        ?string $institutionName = null
+        ?string $institutionName = null,
+        ?string $institutionId = null,
+        ?string $institutionLogo = null
     ): PlaidAccount {
         // Ensure we have a valid item ID
         if ($itemId === null || empty($itemId)) {
@@ -585,8 +697,9 @@ class PlaidService
             $budget,
             $accessToken,
             $itemId,
-            null, // We don't have institution_id in legacy calls
-            $institutionName
+            $institutionId,
+            $institutionName,
+            $institutionLogo
         );
 
         // Link the account to the connection
@@ -642,7 +755,7 @@ class PlaidService
      * @param int $days Number of days in the past to sync
      * @return array
      */
-    public function syncTransactions(PlaidAccount $plaidAccount, int $days = 120): array
+    public function syncTransactions(PlaidAccount $plaidAccount, int $days = 180): array
     {
         $endDate = Carbon::today();
         $startDate = Carbon::today()->subDays($days);

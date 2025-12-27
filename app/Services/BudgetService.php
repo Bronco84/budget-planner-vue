@@ -123,6 +123,12 @@ class BudgetService
             });
 
         // Get autopay projections for the entire budget
+        // Load budget with categories to avoid N+1 in autopay category lookup
+        if (!$account->relationLoaded('budget')) {
+            $account->load('budget.categories');
+        } elseif (!$account->budget->relationLoaded('categories')) {
+            $account->budget->load('categories');
+        }
         $budget = $account->budget;
         $autopayProjections = collect($this->recurringService->generateAutopayProjections($budget, $startDate, $endDate))
             // Filter to only include projections for this specific account
@@ -258,11 +264,23 @@ class BudgetService
      */
     public function calculateTotalBalance(Budget $budget): int
     {
-        // Sum all account balances. Assets are positive, liabilities are negative in DB.
-        // Excluded accounts are ignored.
-        return $budget->accounts
+        // Calculate net worth: assets minus liabilities
+        // Excluded accounts (exclude_from_total_balance = true) are ignored.
+        $accountsBalance = $budget->accounts
             ->filter(fn($account) => !$account->exclude_from_total_balance)
-            ->sum('current_balance_cents');
+            ->sum(function ($account) {
+                // Liabilities (credit cards, mortgages, loans, etc.) are subtracted
+                // Assets (checking, savings, investments, etc.) are added
+                return $account->isLiability()
+                    ? -abs($account->current_balance_cents)
+                    : $account->current_balance_cents;
+            });
+
+        // Add physical assets (property, vehicles) to net worth
+        // Note: Linked loans are already subtracted in the accounts calculation above
+        $assetsValue = $budget->assets->sum('current_value_cents');
+
+        return $accountsBalance + $assetsValue;
     }
 
     /**

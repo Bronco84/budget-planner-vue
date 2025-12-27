@@ -1331,8 +1331,9 @@ class RecurringTransactionService
         $projections = collect();
 
         // Get all accounts with active autopay in this budget
+        // Eager load plaidAccount and autopaySourceAccount to avoid N+1 queries
         $autopayAccounts = $budget->accounts()
-            ->with(['plaidAccount', 'autopaySourceAccount'])
+            ->with(['plaidAccount.plaidConnection', 'autopaySourceAccount'])
             ->where('autopay_enabled', true)
             ->whereNotNull('autopay_source_account_id')
             ->get();
@@ -1442,7 +1443,15 @@ class RecurringTransactionService
      */
     private function getAutopayCategory(Budget $budget): ?Category
     {
-        // Try to find existing category
+        // Try to find existing category from loaded relationship first (avoid N+1)
+        if ($budget->relationLoaded('categories')) {
+            $category = $budget->categories->firstWhere('name', 'Credit Card Payment');
+            if ($category) {
+                return $category;
+            }
+        }
+        
+        // Fallback to query if not loaded
         $category = $budget->categories()
             ->where('name', 'Credit Card Payment')
             ->first();
@@ -1454,6 +1463,11 @@ class RecurringTransactionService
                 'amount' => 0, // Autopay amounts vary based on statement balance
                 'color' => '#EF4444', // Red
             ]);
+            
+            // Add to loaded relationship if it exists
+            if ($budget->relationLoaded('categories')) {
+                $budget->categories->push($category);
+            }
         }
 
         return $category;

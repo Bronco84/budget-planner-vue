@@ -4,6 +4,7 @@ use Diglactic\Breadcrumbs\Breadcrumbs;
 use Diglactic\Breadcrumbs\Generator as BreadcrumbTrail;
 use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Asset;
 
 // ============================================================
 // ROOT LEVEL PAGES
@@ -63,6 +64,30 @@ Breadcrumbs::for('budgets.accounts.create', function (BreadcrumbTrail $trail, Bu
 Breadcrumbs::for('budgets.accounts.edit', function (BreadcrumbTrail $trail, Budget $budget, Account $account) {
     $trail->parent('budgets.show', $budget);
     $trail->push('Edit Account: ' . $account->name, route('budgets.accounts.edit', [$budget, $account]));
+});
+
+// ============================================================
+// ASSETS
+// ============================================================
+
+Breadcrumbs::for('budgets.assets.index', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('budgets.show', $budget);
+    $trail->push('Assets', route('budgets.assets.index', $budget));
+});
+
+Breadcrumbs::for('budgets.assets.create', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('budgets.assets.index', $budget);
+    $trail->push('Add Asset', route('budgets.assets.create', $budget));
+});
+
+Breadcrumbs::for('budgets.assets.edit', function (BreadcrumbTrail $trail, Budget $budget, $asset) {
+    $trail->parent('budgets.assets.index', $budget);
+    $trail->push('Edit: ' . $asset->name, route('budgets.assets.edit', [$budget, $asset]));
+});
+
+Breadcrumbs::for('budgets.assets.show', function (BreadcrumbTrail $trail, Budget $budget, $asset) {
+    $trail->parent('budgets.assets.index', $budget);
+    $trail->push($asset->name, route('budgets.assets.show', [$budget, $asset]));
 });
 
 Breadcrumbs::for('budget.account.projections', function (BreadcrumbTrail $trail, Budget $budget, Account $account) {

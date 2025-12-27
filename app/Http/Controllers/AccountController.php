@@ -31,8 +31,9 @@ class AccountController extends Controller
             'type' => 'required|string|max:50',
             'current_balance' => 'required|numeric',
             'include_in_budget' => 'boolean',
-            'exclude_from_total_balance' => 'boolean',
         ]);
+
+        $includeInBudget = $validated['include_in_budget'] ?? true;
 
         /** @var Account $account */
         $account = $budget->accounts()->create([
@@ -40,8 +41,9 @@ class AccountController extends Controller
             'type' => $validated['type'],
             'current_balance_cents' => $validated['current_balance'] * 100,
             'balance_updated_at' => now(),
-            'include_in_budget' => $validated['include_in_budget'] ?? true,
-            'exclude_from_total_balance' => $validated['exclude_from_total_balance'] ?? false,
+            'include_in_budget' => $includeInBudget,
+            // Auto-sync: excluded accounts are also excluded from total balance
+            'exclude_from_total_balance' => !$includeInBudget,
         ]);
 
         return redirect()->route('budgets.show', $budget)
@@ -71,8 +73,12 @@ class AccountController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:50',
             'include_in_budget' => 'boolean',
-            'exclude_from_total_balance' => 'boolean',
         ]);
+
+        // Auto-sync: excluded accounts are also excluded from total balance
+        if (isset($validated['include_in_budget'])) {
+            $validated['exclude_from_total_balance'] = !$validated['include_in_budget'];
+        }
 
         $account->update($validated);
 

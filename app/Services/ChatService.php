@@ -361,10 +361,14 @@ class ChatService
         // Load relationships
         $activeBudget->load(['accounts', 'transactions', 'recurringTransactionTemplates']);
 
-        // Calculate totals
-        $totalBalance = $activeBudget->accounts->sum(function ($account) {
-            return $account->current_balance_cents / 100;
-        });
+        // Calculate net worth: assets minus liabilities
+        $totalBalance = $activeBudget->accounts
+            ->filter(fn($account) => !$account->exclude_from_total_balance)
+            ->sum(function ($account) {
+                $balanceInDollars = $account->current_balance_cents / 100;
+                // Liabilities (credit cards, mortgages, loans, etc.) are subtracted
+                return $account->isLiability() ? -abs($balanceInDollars) : $balanceInDollars;
+            });
 
         return [
             'user' => [

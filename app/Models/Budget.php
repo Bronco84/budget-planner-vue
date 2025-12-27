@@ -124,6 +124,14 @@ class Budget extends Model
     }
 
     /**
+     * Get the assets for this budget.
+     */
+    public function assets(): HasMany
+    {
+        return $this->hasMany(Asset::class);
+    }
+
+    /**
      * Get all file attachments for this budget.
      */
     public function fileAttachments(): MorphMany

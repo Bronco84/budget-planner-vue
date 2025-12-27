@@ -237,6 +237,15 @@
                           <!-- Account Row -->
                           <div class="px-3 py-2.5">
                             <div class="flex justify-between items-center gap-3">
+                              <!-- Account Icon -->
+                              <div class="flex-shrink-0">
+                                <component 
+                                  :is="getAccountTypeIcon(account.type)" 
+                                  class="w-5 h-5"
+                                  :class="getAccountIconClass(account)"
+                                />
+                              </div>
+                              
                               <!-- Account Info -->
                               <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
@@ -714,7 +723,16 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, watch, computed, ref, onMounted, onUnmounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { PencilIcon } from "@heroicons/vue/24/outline/index.js";
+import { 
+  PencilIcon,
+  CreditCardIcon,
+  BanknotesIcon,
+  BuildingLibraryIcon,
+  HomeIcon,
+  ChartBarIcon,
+  WalletIcon,
+  CurrencyDollarIcon
+} from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
@@ -1074,6 +1092,34 @@ const getGroupTotalColorClass = (typeGroup) => {
   }
 
   return typeGroup.total >= 0 ? 'text-green-600' : 'text-red-600';
+};
+
+// Account type icon mapping
+const accountTypeIcons = {
+  'checking': BanknotesIcon,
+  'savings': WalletIcon,
+  'credit card': CreditCardIcon,
+  'credit': CreditCardIcon,
+  'investment': ChartBarIcon,
+  'brokerage': ChartBarIcon,
+  'mortgage': HomeIcon,
+  'loan': BuildingLibraryIcon,
+  'line of credit': CurrencyDollarIcon,
+};
+
+// Helper function to get the icon component for an account type
+const getAccountTypeIcon = (accountType) => {
+  const normalizedType = accountType?.toLowerCase() || '';
+  return accountTypeIcons[normalizedType] || BanknotesIcon;
+};
+
+// Helper function to get icon color based on account type
+const getAccountIconClass = (account) => {
+  const liabilityAccountTypes = ['mortgage', 'line of credit', 'credit', 'credit card', 'loan'];
+  if (liabilityAccountTypes.includes(account.type?.toLowerCase())) {
+    return 'text-amber-500';
+  }
+  return 'text-emerald-500';
 };
 
 

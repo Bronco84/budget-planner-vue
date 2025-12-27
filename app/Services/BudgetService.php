@@ -147,13 +147,23 @@ class BudgetService
     }
 
     /**
-     * Calculate running balances for all transactions
+     * Calculate running balances for all transactions.
+     * 
+     * For asset accounts (checking, savings): balance += transaction amount
+     * For liability accounts (credit cards, loans): balance -= transaction amount
+     * 
+     * This is because:
+     * - Asset: positive transaction (deposit) increases balance
+     * - Liability: negative transaction (purchase) increases debt (balance)
      */
     public function calculateRunningBalances(
         Collection $allTransactions,
-        int $accountId,
-        int $currentBalanceCents
+        Account $account
     ): Collection {
+        $accountId = $account->id;
+        $currentBalanceCents = $account->current_balance_cents;
+        $isLiability = $account->isLiability();
+        
         // Split transactions into actual, pending, and projected for this account
         $accountTransactions = $allTransactions->where('account_id', $accountId);
 
@@ -180,6 +190,8 @@ class BudgetService
         // Process actual transactions in reverse chronological order
         foreach ($actualTransactions->reverse() as $transaction) {
             $transaction->running_balance = $runningBalance;
+            // For liabilities, subtract the amount (spending increases debt)
+            // For assets, subtract the amount (to go backwards in time)
             $runningBalance = $runningBalance - $transaction->amount_in_cents;
         }
 
@@ -188,13 +200,25 @@ class BudgetService
 
         // Process pending transactions in chronological order
         foreach ($pendingTransactions as $transaction) {
-            $runningBalance += $transaction->amount_in_cents;
+            if ($isLiability) {
+                // For liabilities: spending (negative tx) increases debt, payments (positive tx) decrease debt
+                $runningBalance -= $transaction->amount_in_cents;
+            } else {
+                // For assets: spending (negative tx) decreases balance, deposits (positive tx) increase balance
+                $runningBalance += $transaction->amount_in_cents;
+            }
             $transaction->running_balance = $runningBalance;
         }
 
         // Process projected transactions in chronological order
         foreach ($projectedTransactions as $transaction) {
-            $runningBalance += $transaction->amount_in_cents;
+            if ($isLiability) {
+                // For liabilities: spending (negative tx) increases debt, payments (positive tx) decrease debt
+                $runningBalance -= $transaction->amount_in_cents;
+            } else {
+                // For assets: spending (negative tx) decreases balance, deposits (positive tx) increase balance
+                $runningBalance += $transaction->amount_in_cents;
+            }
             $transaction->running_balance = $runningBalance;
         }
 

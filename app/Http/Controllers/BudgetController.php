@@ -160,10 +160,10 @@ class BudgetController extends Controller
             );
 
             // Calculate running balances for all transactions
+            // Note: Uses different calculation for liabilities vs assets
             $allTransactions = $budgetService->calculateRunningBalances(
                 $allTransactions,
-                $account->id,
-                $account->current_balance_cents
+                $account
             );
 
             // Get projected transactions for passing to view separately

@@ -122,8 +122,15 @@ class ProjectionsController extends Controller
         }
         
         // Project daily balance for the account
+        // Use different calculation for liabilities vs assets
         $initialBalance = $account->current_balance_cents;
-        $balanceProjection = $this->projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead);
+        $balanceProjection = $this->projectDailyBalance(
+            $projectedTransactions, 
+            $initialBalance, 
+            $startDate, 
+            $monthsAhead,
+            $account->isLiability()
+        );
         
         // Ensure balanceProjection has the expected structure
         if (!isset($balanceProjection['days'])) {
@@ -142,13 +149,17 @@ class ProjectionsController extends Controller
     /**
      * Project daily account balance over time based on projected transactions.
      *
+     * For asset accounts: balance += transaction amount
+     * For liability accounts: balance -= transaction amount
+     *
      * @param \Illuminate\Support\Collection $projectedTransactions
      * @param int $initialBalance
      * @param Carbon $startDate
      * @param int $monthsAhead
+     * @param bool $isLiability Whether this is a liability account (credit card, loan, etc.)
      * @return array
      */
-    protected function projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead)
+    protected function projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead, bool $isLiability = false)
     {
         $endDate = $startDate->copy()->addMonths($monthsAhead);
         $dailyProjection = [];
@@ -170,7 +181,14 @@ class ProjectionsController extends Controller
             if ($transactionsByDate->has($dateKey)) {
                 foreach ($transactionsByDate->get($dateKey) as $transaction) {
                     $amount = $transaction['amount_in_cents'];
-                    $runningBalance += $amount;
+                    
+                    // For liabilities, subtract (spending increases debt, payments decrease debt)
+                    // For assets, add (spending decreases balance, deposits increase balance)
+                    if ($isLiability) {
+                        $runningBalance -= $amount;
+                    } else {
+                        $runningBalance += $amount;
+                    }
                     
                     // Track income and expenses separately
                     if ($amount > 0) {
@@ -231,8 +249,15 @@ class ProjectionsController extends Controller
         }
         
         // Project daily balance for the account
+        // Use different calculation for liabilities vs assets
         $initialBalance = $account->current_balance_cents;
-        $balanceProjection = $this->projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead);
+        $balanceProjection = $this->projectDailyBalance(
+            $projectedTransactions, 
+            $initialBalance, 
+            $startDate, 
+            $monthsAhead,
+            $account->isLiability()
+        );
         
         // Ensure balanceProjection has the expected structure
         if (!isset($balanceProjection['days'])) {

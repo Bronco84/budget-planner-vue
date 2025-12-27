@@ -212,6 +212,11 @@
                           <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
                           </svg>
+                          <component 
+                            :is="getAccountTypeIcon(typeGroup.type)" 
+                            class="w-4 h-4"
+                            :class="getGroupIconClass(typeGroup)"
+                          />
                           <span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ typeGroup.displayName }}</span>
                           <span class="text-xs text-gray-400">({{ typeGroup.accounts.length }})</span>
                         </div>
@@ -237,15 +242,6 @@
                           <!-- Account Row -->
                           <div class="px-3 py-2.5">
                             <div class="flex justify-between items-center gap-3">
-                              <!-- Account Icon -->
-                              <div class="flex-shrink-0">
-                                <component 
-                                  :is="getAccountTypeIcon(account.type)" 
-                                  class="w-5 h-5"
-                                  :class="getAccountIconClass(account)"
-                                />
-                              </div>
-                              
                               <!-- Account Info -->
                               <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
@@ -1117,6 +1113,15 @@ const getAccountTypeIcon = (accountType) => {
 const getAccountIconClass = (account) => {
   const liabilityAccountTypes = ['mortgage', 'line of credit', 'credit', 'credit card', 'loan'];
   if (liabilityAccountTypes.includes(account.type?.toLowerCase())) {
+    return 'text-amber-500';
+  }
+  return 'text-emerald-500';
+};
+
+// Helper function to get icon color for a group header
+const getGroupIconClass = (typeGroup) => {
+  const liabilityAccountTypes = ['mortgage', 'line of credit', 'credit', 'credit card', 'loan'];
+  if (liabilityAccountTypes.includes(typeGroup.type?.toLowerCase())) {
     return 'text-amber-500';
   }
   return 'text-emerald-500';

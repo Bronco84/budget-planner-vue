@@ -12,6 +12,7 @@ const props = defineProps({
 
 const isUser = computed(() => props.message.role === 'user');
 const isAssistant = computed(() => props.message.role === 'assistant');
+const isStreaming = computed(() => props.message.streaming === true);
 
 // Configure marked for better formatting
 marked.setOptions({
@@ -22,7 +23,7 @@ marked.setOptions({
 // Render markdown safely
 const renderedContent = computed(() => {
     if (isAssistant.value) {
-        const html = marked(props.message.content);
+        const html = marked(props.message.content || '');
         return DOMPurify.sanitize(html);
     }
     return props.message.content;
@@ -38,10 +39,10 @@ const renderedContent = computed(() => {
     >
         <div
             :class="[
-                'max-w-[80%] rounded-lg px-4 py-2',
+                'max-w-[80%] px-4 py-2',
                 isUser
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                    ? 'bg-blue-600 text-white rounded-lg'
+                    : 'text-gray-900 dark:text-gray-100'
             ]"
         >
             <!-- Message Content -->
@@ -55,9 +56,16 @@ const renderedContent = computed(() => {
                 class="text-sm whitespace-pre-wrap break-words"
             >{{ message.content }}</div>
 
+            <!-- Streaming indicator -->
+            <span
+                v-if="isStreaming"
+                class="inline-block w-2 h-2 ml-1 bg-gray-600 dark:bg-gray-300 rounded-full streaming-pulse"
+                style="vertical-align: middle;"
+            ></span>
+
             <!-- Timestamp -->
             <div
-                v-if="message.created_at"
+                v-if="message.created_at && !isStreaming"
                 :class="[
                     'text-xs mt-1',
                     isUser
@@ -190,5 +198,21 @@ const renderedContent = computed(() => {
 
 :deep(.dark) .markdown-content hr {
     border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Streaming pulse animation */
+.streaming-pulse {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
 }
 </style>

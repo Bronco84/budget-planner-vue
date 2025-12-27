@@ -50,6 +50,22 @@ class ChatController extends Controller
         );
     }
 
+    public function streamComplete(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => 'required|string',
+            'conversation_id' => 'required|integer|exists:chat_conversations,id',
+        ]);
+
+        $result = $this->chatService->saveStreamedMessage(
+            user: $request->user(),
+            conversationId: $validated['conversation_id'],
+            message: $validated['message']
+        );
+
+        return response()->json($result);
+    }
+
     public function conversations(Request $request): JsonResponse
     {
         $conversations = $this->chatService->getConversations(

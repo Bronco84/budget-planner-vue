@@ -126,6 +126,8 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.destroy');
     Route::post('budget/{budget}/recurring-transactions/{recurring_transaction}/duplicate', [RecurringTransactionController::class, 'duplicate'])
         ->name('recurring-transactions.duplicate');
+    Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/diagnostics', [RecurringTransactionController::class, 'diagnostics'])
+        ->name('recurring-transactions.diagnostics');
     
     // Routes for recurring transaction rules
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/rules', [RecurringTransactionRuleController::class, 'index'])

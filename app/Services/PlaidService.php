@@ -709,15 +709,16 @@ class PlaidService
                         'unofficial_currency_code' => $transaction['unofficial_currency_code'] ?? null,
                         'check_number' => $transaction['check_number'] ?? null,
                         'category' => $transaction['category'][0] ?? null,
-                        'counterparties' => isset($transaction['counterparties']) ? json_encode($transaction['counterparties']) : null,
-                        'location' => isset($transaction['location']) ? json_encode($transaction['location']) : null,
-                        'payment_meta' => isset($transaction['payment_meta']) ? json_encode($transaction['payment_meta']) : null,
-                        'personal_finance_category' => isset($transaction['personal_finance_category']) ? json_encode($transaction['personal_finance_category']) : null,
+                        // Pass arrays directly - the model's 'array' casts will handle JSON encoding
+                        'counterparties' => $transaction['counterparties'] ?? null,
+                        'location' => $transaction['location'] ?? null,
+                        'payment_meta' => $transaction['payment_meta'] ?? null,
+                        'personal_finance_category' => $transaction['personal_finance_category'] ?? null,
                         'personal_finance_category_icon_url' => $transaction['personal_finance_category_icon_url'] ?? null,
                         'logo_url' => $transaction['logo_url'] ?? null,
                         'website' => $transaction['website'] ?? null,
-                        'metadata' => isset($transaction['metadata']) ? json_encode($transaction['metadata']) : null,
-                        'original_data' => json_encode($transaction),
+                        'metadata' => $transaction['metadata'] ?? null,
+                        'original_data' => $transaction,
                     ]
                 );
 

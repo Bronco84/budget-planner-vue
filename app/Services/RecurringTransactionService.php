@@ -268,6 +268,13 @@ class RecurringTransactionService
         // Priority 1: If template has a plaid_entity_id, use entity-based matching
         if ($template->plaid_entity_id) {
             $entityId = $template->plaid_entity_id;
+            
+            Log::debug('RecurringTransactionService: Entity-based matching', [
+                'template_id' => $template->id,
+                'template_description' => $template->description,
+                'plaid_entity_id' => $entityId,
+            ]);
+            
             $entityMatches = Transaction::where('budget_id', $budgetId)
                 ->whereHas('plaidTransaction', function ($query) use ($entityId) {
                     // Simple LIKE search - entity_id is unique enough
@@ -276,11 +283,17 @@ class RecurringTransactionService
                 ->with('plaidTransaction')
                 ->get();
             
+            Log::debug('RecurringTransactionService: Entity matching results', [
+                'template_id' => $template->id,
+                'matches_found' => $entityMatches->count(),
+                'matched_transaction_ids' => $entityMatches->pluck('id')->toArray(),
+            ]);
+            
             // If we found matches by entity, return them (rules are optional refinement)
             if ($entityMatches->isNotEmpty()) {
                 // Still apply rules as additional filters if any
                 if ($rules->isNotEmpty()) {
-                    return $entityMatches->filter(function (Transaction $transaction) use ($rules) {
+                    $filteredMatches = $entityMatches->filter(function (Transaction $transaction) use ($rules) {
                         foreach ($rules as $rule) {
                             $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
                             $ruleValue = $rule->value;
@@ -291,12 +304,26 @@ class RecurringTransactionService
                         }
                         return true;
                     });
+                    
+                    Log::debug('RecurringTransactionService: After rule filtering', [
+                        'template_id' => $template->id,
+                        'original_count' => $entityMatches->count(),
+                        'filtered_count' => $filteredMatches->count(),
+                    ]);
+                    
+                    return $filteredMatches;
                 }
                 return $entityMatches;
             }
         }
 
         // Priority 2: Fallback to rule-based matching
+        Log::debug('RecurringTransactionService: Fallback to rule-based matching', [
+            'template_id' => $template->id,
+            'template_description' => $template->description,
+            'rules_count' => $rules->count(),
+        ]);
+        
         $transactions = Transaction::where('budget_id', $budgetId)->get();
 
         // Filter transactions that match all rules
@@ -314,6 +341,12 @@ class RecurringTransactionService
 
             return true;
         });
+        
+        Log::debug('RecurringTransactionService: Rule-based matching results', [
+            'template_id' => $template->id,
+            'total_transactions_scanned' => $transactions->count(),
+            'matches_found' => $matchingTransactions->count(),
+        ]);
 
         return $matchingTransactions;
     }
@@ -329,6 +362,14 @@ class RecurringTransactionService
      */
     public function linkMatchingTransactions(RecurringTransactionTemplate $template)
     {
+        Log::info('RecurringTransactionService: Linking transactions to template', [
+            'template_id' => $template->id,
+            'template_description' => $template->description,
+            'has_plaid_entity_id' => !empty($template->plaid_entity_id),
+            'plaid_entity_id' => $template->plaid_entity_id,
+            'plaid_entity_name' => $template->plaid_entity_name,
+        ]);
+        
         // Find transactions that match the template but aren't linked yet
         $query = Transaction::where('budget_id', $template->budget_id)
             ->where('recurring_transaction_template_id', null)
@@ -336,12 +377,29 @@ class RecurringTransactionService
 
         // Priority 1: Match by Plaid entity_id if available
         if ($template->plaid_entity_id) {
+            Log::debug('RecurringTransactionService: Using Plaid entity matching', [
+                'template_id' => $template->id,
+                'entity_id' => $template->plaid_entity_id,
+            ]);
+            
             $matchingTransactions = $this->findTransactionsByEntityId(
                 $template->budget_id,
                 $template->plaid_entity_id
             );
+            
+            Log::debug('RecurringTransactionService: Entity matching found transactions', [
+                'template_id' => $template->id,
+                'count' => $matchingTransactions->count(),
+                'transaction_ids' => $matchingTransactions->pluck('id')->toArray(),
+            ]);
         } else {
             // Priority 2: Fallback to description matching
+            Log::debug('RecurringTransactionService: Using description-based matching', [
+                'template_id' => $template->id,
+                'description' => $template->description,
+                'category' => $template->category,
+            ]);
+            
             $matchingTransactions = $query->where(function($q) use ($template) {
                 // Match by description (exact match or contains)
                 $q->where('description', $template->description)
@@ -352,15 +410,28 @@ class RecurringTransactionService
                     $q->where('category', $template->category);
                 }
             })->get();
+            
+            Log::debug('RecurringTransactionService: Description matching found transactions', [
+                'template_id' => $template->id,
+                'count' => $matchingTransactions->count(),
+            ]);
         }
 
         // Link the matching transactions to this template
+        $linkedCount = 0;
         foreach ($matchingTransactions as $transaction) {
             if ($transaction->recurring_transaction_template_id === null) {
                 $transaction->recurring_transaction_template_id = $template->id;
                 $transaction->save();
+                $linkedCount++;
             }
         }
+        
+        Log::info('RecurringTransactionService: Finished linking transactions', [
+            'template_id' => $template->id,
+            'transactions_linked' => $linkedCount,
+            'total_candidates' => $matchingTransactions->count(),
+        ]);
 
         return $matchingTransactions->count();
     }
@@ -384,6 +455,96 @@ class RecurringTransactionService
             })
             ->with('plaidTransaction')
             ->get();
+    }
+    
+    /**
+     * Get detailed diagnostics about how a template matches transactions.
+     * Useful for debugging and displaying in the UI.
+     *
+     * @param RecurringTransactionTemplate $template
+     * @return array
+     */
+    public function getMatchingDiagnostics(RecurringTransactionTemplate $template): array
+    {
+        $diagnostics = [
+            'template_id' => $template->id,
+            'description' => $template->description,
+            'matching_method' => null,
+            'plaid_entity_id' => $template->plaid_entity_id,
+            'plaid_entity_name' => $template->plaid_entity_name,
+            'linked_transactions' => [],
+            'potential_matches' => [],
+            'rules_summary' => [],
+            'linked_credit_card' => null,
+        ];
+        
+        // Linked credit card info
+        if ($template->linked_credit_card_account_id) {
+            $creditCard = $template->linkedCreditCard;
+            if ($creditCard) {
+                $diagnostics['linked_credit_card'] = [
+                    'id' => $creditCard->id,
+                    'name' => $creditCard->name,
+                    'autopay_enabled' => $creditCard->autopay_enabled,
+                    'current_balance' => $creditCard->current_balance_cents,
+                    'statement_balance' => $creditCard->plaidAccount?->last_statement_balance_cents,
+                ];
+            }
+        }
+        
+        // Get currently linked transactions
+        $linkedTransactions = Transaction::where('recurring_transaction_template_id', $template->id)
+            ->orderBy('date', 'desc')
+            ->limit(20)
+            ->get();
+            
+        $diagnostics['linked_transactions'] = $linkedTransactions->map(fn($t) => [
+            'id' => $t->id,
+            'date' => $t->date->format('Y-m-d'),
+            'description' => $t->description,
+            'amount' => $t->amount_in_cents / 100,
+            'has_plaid' => !is_null($t->plaid_transaction_id),
+        ])->toArray();
+        
+        // Get rules summary
+        $rules = $template->rules()->get();
+        $diagnostics['rules_summary'] = $rules->map(fn($r) => [
+            'id' => $r->id,
+            'field' => $r->field,
+            'operator' => $r->operator,
+            'value' => $r->value,
+            'is_active' => $r->is_active,
+        ])->toArray();
+        
+        // Determine matching method and find potential matches
+        if ($template->plaid_entity_id) {
+            $diagnostics['matching_method'] = 'plaid_entity_id';
+            
+            // Find all transactions with this entity ID (including already linked ones)
+            $potentialMatches = Transaction::where('budget_id', $template->budget_id)
+                ->whereHas('plaidTransaction', function ($query) use ($template) {
+                    $query->where('counterparties', 'like', '%' . $template->plaid_entity_id . '%');
+                })
+                ->with('plaidTransaction')
+                ->orderBy('date', 'desc')
+                ->limit(30)
+                ->get();
+                
+            $diagnostics['potential_matches'] = $potentialMatches->map(fn($t) => [
+                'id' => $t->id,
+                'date' => $t->date->format('Y-m-d'),
+                'description' => $t->description,
+                'amount' => $t->amount_in_cents / 100,
+                'linked_to_template_id' => $t->recurring_transaction_template_id,
+                'is_linked_here' => $t->recurring_transaction_template_id === $template->id,
+            ])->toArray();
+        } elseif ($rules->isNotEmpty()) {
+            $diagnostics['matching_method'] = 'rules';
+        } else {
+            $diagnostics['matching_method'] = 'description';
+        }
+        
+        return $diagnostics;
     }
 
     /**

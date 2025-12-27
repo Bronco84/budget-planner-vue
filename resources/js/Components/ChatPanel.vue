@@ -103,13 +103,15 @@ const loadConversation = async (conversationId) => {
 };
 
 const sendMessage = async () => {
-    if (!currentMessage.value.trim() || isLoading.value) {
+    if (!currentMessage.value.trim()) {
         return;
     }
 
     const messageText = currentMessage.value;
     currentMessage.value = '';
     error.value = null;
+
+    console.log('🚀 Starting message send:', messageText);
 
     // Add user message to UI immediately
     const userMessage = {
@@ -119,55 +121,118 @@ const sendMessage = async () => {
     };
     messages.value.push(userMessage);
 
-    isLoading.value = true;
+    // Create a placeholder for the assistant message
+    const assistantMessage = {
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString(),
+        streaming: true
+    };
+    messages.value.push(assistantMessage);
 
     try {
-        const response = await fetch(route('chat.stream'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                message: messageText,
-                conversation_id: currentConversationId.value
-            })
+        // Build URL with query params for GET request (EventSource requirement)
+        const url = new URL(route('chat.stream'), window.location.origin);
+        url.searchParams.append('message', messageText);
+        if (currentConversationId.value) {
+            url.searchParams.append('conversation_id', currentConversationId.value);
+        }
+
+        console.log('📡 Connecting to:', url.toString());
+
+        // Create EventSource
+        const eventSource = new EventSource(url.toString());
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        // Handle connection opened
+        eventSource.addEventListener('open', (event) => {
+            console.log('✅ EventSource connection opened');
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Network response was not ok');
-        }
+        // Handle conversation_id event (sent at start)
+        eventSource.addEventListener('conversation_id', (event) => {
+            const data = JSON.parse(event.data);
+            console.log('🆔 Got conversation ID:', data.conversation_id);
+            currentConversationId.value = data.conversation_id;
+        });
 
-        const data = await response.json();
-
-        if (data.success) {
-            // Add the assistant message with the complete response
-            messages.value.push({
-                role: 'assistant',
-                content: data.message,
-                created_at: new Date().toISOString()
-            });
-
-            // Set the conversation ID
-            if (data.conversation_id) {
-                currentConversationId.value = data.conversation_id;
+        // Handle text_delta events
+        eventSource.addEventListener('text_delta', (event) => {
+            const data = JSON.parse(event.data);
+            console.log('📝 Got delta:', data.delta);
+            // Update the message directly in the reactive array
+            const lastMessage = messages.value[messages.value.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.content += data.delta;
             }
+        });
 
-            // Reload conversations
-            await loadConversations();
-        } else {
-            throw new Error(data.error || 'Failed to get response');
-        }
+        // Handle stream_end event
+        eventSource.addEventListener('stream_end', async (event) => {
+            const data = JSON.parse(event.data);
+            console.log('🏁 Stream ended:', data.finish_reason);
+
+            // Mark as no longer streaming
+            const lastMessage = messages.value[messages.value.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.streaming = false;
+            }
+            eventSource.close();
+
+            // Save the complete message to the database
+            try {
+                console.log('💾 Saving message to database...');
+                const saveResponse = await fetch(route('chat.stream.complete'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify({
+                        message: lastMessage ? lastMessage.content : '',
+                        conversation_id: currentConversationId.value
+                    })
+                });
+
+                if (saveResponse.ok) {
+                    console.log('✅ Message saved successfully');
+                    // Reload conversations
+                    await loadConversations();
+                } else {
+                    console.error('❌ Failed to save message:', await saveResponse.text());
+                }
+            } catch (saveErr) {
+                console.error('❌ Save error:', saveErr);
+            }
+        });
+
+        // Handle errors
+        eventSource.addEventListener('error', (event) => {
+            console.error('❌ EventSource error:', event);
+            error.value = 'Connection error. Check console for details.';
+            
+            // Mark as no longer streaming
+            const lastMessage = messages.value[messages.value.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant') {
+                lastMessage.streaming = false;
+            }
+            eventSource.close();
+
+            // Remove the failed messages
+            messages.value.pop(); // assistant
+            messages.value.pop(); // user
+            // Restore the message to input
+            currentMessage.value = messageText;
+        });
+
     } catch (err) {
+        console.error('❌ Send error:', err);
         error.value = err.message || 'Failed to send message. Please try again.';
-        // Remove the user message
-        messages.value.pop();
+        // Remove the failed messages
+        messages.value.pop(); // assistant
+        messages.value.pop(); // user
         // Restore the message to input
         currentMessage.value = messageText;
-    } finally {
-        isLoading.value = false;
     }
 };
 
@@ -490,15 +555,6 @@ watch(isResizing, (newValue) => {
             />
 
             <!-- Loading Indicator -->
-            <div v-if="isLoading" class="flex justify-start mb-4">
-                <div class="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2">
-                    <div class="flex space-x-2">
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Error Message -->
@@ -515,11 +571,10 @@ watch(isResizing, (newValue) => {
                     placeholder="Ask me anything about your finances..."
                     rows="3"
                     class="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    :disabled="isLoading"
                 ></textarea>
                 <button
                     @click="sendMessage"
-                    :disabled="!currentMessage.trim() || isLoading"
+                    :disabled="!currentMessage.trim()"
                     class="flex-shrink-0 p-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
                     title="Send message"
                 >

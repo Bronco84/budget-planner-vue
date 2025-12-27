@@ -444,4 +444,16 @@ class RecurringTransactionController extends Controller
             ->values();
     }
     
+    /**
+     * Get matching diagnostics for a recurring transaction template.
+     * Useful for debugging and understanding how transactions are matched.
+     */
+    public function diagnostics(Budget $budget, RecurringTransactionTemplate $recurring_transaction)
+    {
+        $this->authorize('view', $budget);
+        
+        $diagnostics = $this->recurringTransactionService->getMatchingDiagnostics($recurring_transaction);
+        
+        return response()->json($diagnostics);
+    }
 }

@@ -92,70 +92,63 @@ class ChatService
                 $conversationHistory
             );
 
-            // 12. Use non-streaming response for now
-            // The streaming via asStream() has issues with Laravel's HTTP client
-            // consuming the stream before we can iterate
-            try {
-                Log::info('Generating response for conversation', [
-                    'user_id' => $user->id,
-                    'conversation_id' => $conversation->id,
-                    'message_count' => count($messages),
-                ]);
+            // 12. Use simulated streaming with Prism generate()
+            Log::info('Starting simulated streaming response', [
+                'user_id' => $user->id,
+                'conversation_id' => $conversation->id,
+                'message_count' => count($messages),
+            ]);
 
-                // Generate the complete response (non-streaming)
-                $response = Prism::text()
-                    ->using('openai', 'gpt-4o-mini')
-                    ->withMessages($messages)
-                    ->generate();
+            $conversationId = $conversation->id;
 
-                $assistantMessage = $response->text;
+            // Create a simulated streaming response
+            return response()->stream(function () use ($messages, $conversationId) {
+                // Send conversation_id event first
+                echo "event: conversation_id\n";
+                echo 'data: ' . json_encode(['conversation_id' => $conversationId]) . "\n\n";
+                ob_flush();
+                flush();
 
-                // Validate AI response
-                $responseValidation = $this->moderationService->validateResponse($assistantMessage);
-                if (!$responseValidation['safe']) {
-                    Log::error('AI response failed validation', [
-                        'user_id' => $user->id,
-                        'conversation_id' => $conversation->id,
-                        'error' => $responseValidation['error'],
-                    ]);
+                try {
+                    // Get the full response from Prism
+                    $response = Prism::text()
+                        ->using('openai', 'gpt-4o-mini')
+                        ->withMessages($messages)
+                        ->generate();
 
-                    return response()->json([
-                        'error' => 'Unable to generate a safe response. Please try rephrasing your question.',
-                        'success' => false,
-                    ], 400);
+                    $fullText = $response->text;
+                    
+                    // Simulate streaming by sending chunks
+                    $words = explode(' ', $fullText);
+                    foreach ($words as $i => $word) {
+                        $delta = ($i === 0) ? $word : ' ' . $word;
+                        
+                        echo "event: text_delta\n";
+                        echo 'data: ' . json_encode(['delta' => $delta]) . "\n\n";
+                        ob_flush();
+                        flush();
+                        
+                        // Small delay to simulate real streaming
+                        usleep(50000); // 50ms delay
+                    }
+
+                    // Send completion event
+                    echo "event: stream_end\n";
+                    echo 'data: ' . json_encode(['finish_reason' => 'complete']) . "\n\n";
+                    ob_flush();
+                    flush();
+
+                } catch (\Exception $e) {
+                    echo "event: error\n";
+                    echo 'data: ' . json_encode(['error' => $e->getMessage()]) . "\n\n";
+                    ob_flush();
+                    flush();
                 }
-
-                // Store assistant response
-                $this->storeMessage($conversation, 'assistant', $assistantMessage);
-
-                // Generate title for conversation if it's the first exchange
-                if ($conversation->messages()->count() <= 2 && !$conversation->title) {
-                    $this->generateConversationTitle($conversation, $message);
-                }
-
-                Log::info('Response generated and saved', [
-                    'conversation_id' => $conversation->id,
-                    'response_length' => strlen($assistantMessage),
-                ]);
-
-                // Return as JSON with conversation_id and message
-                return response()->json([
-                    'success' => true,
-                    'conversation_id' => $conversation->id,
-                    'message' => $assistantMessage,
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Prism generation error', [
-                    'conversation_id' => $conversation->id,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-
-                return response()->json([
-                    'error' => 'Failed to generate response. Please try again.',
-                    'success' => false,
-                ], 500);
-            }
+            }, 200, [
+                'Cache-Control' => 'no-cache',
+                'Content-Type' => 'text/event-stream',
+                'X-Accel-Buffering' => 'no',
+            ]);
         } catch (\Exception $e) {
             Log::error('Chat service streaming error', [
                 'user_id' => $user->id,
@@ -516,5 +509,57 @@ class ChatService
         return ChatConversation::where('user_id', $user->id)
             ->whereIn('id', $conversationIds)
             ->delete();
+    }
+
+    public function saveStreamedMessage(User $user, int $conversationId, string $message): array
+    {
+        try {
+            $conversation = ChatConversation::where('user_id', $user->id)
+                ->findOrFail($conversationId);
+
+            // Validate AI response
+            $responseValidation = $this->moderationService->validateResponse($message);
+            if (!$responseValidation['safe']) {
+                Log::error('Streamed AI response failed validation', [
+                    'user_id' => $user->id,
+                    'conversation_id' => $conversationId,
+                    'error' => $responseValidation['error'],
+                ]);
+
+                return [
+                    'success' => false,
+                    'error' => 'Response failed validation',
+                ];
+            }
+
+            // Store assistant response
+            $this->storeMessage($conversation, 'assistant', $message);
+
+            // Generate title for conversation if it's the first exchange
+            if ($conversation->messages()->count() <= 2 && !$conversation->title) {
+                $this->generateConversationTitle($conversation, $conversation->messages()->where('role', 'user')->first()->content);
+            }
+
+            Log::info('Streamed response saved', [
+                'conversation_id' => $conversationId,
+                'response_length' => strlen($message),
+            ]);
+
+            return [
+                'success' => true,
+                'conversation_id' => $conversationId,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to save streamed message', [
+                'user_id' => $user->id,
+                'conversation_id' => $conversationId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Failed to save message',
+            ];
+        }
     }
 }

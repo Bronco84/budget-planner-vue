@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Asset;
+use App\Models\Property;
 use App\Models\Budget;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -10,43 +10,43 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class AssetController extends Controller
+class PropertyController extends Controller
 {
     /**
-     * Display a listing of assets for a budget.
+     * Display a listing of properties for a budget.
      */
     public function index(Budget $budget): Response
     {
         $this->authorize('view', $budget);
 
-        $assets = $budget->assets()
+        $properties = $budget->properties()
             ->with('linkedAccounts')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return Inertia::render('Assets/Index', [
+        return Inertia::render('Properties/Index', [
             'budget' => $budget,
-            'assets' => $assets,
+            'properties' => $properties,
         ]);
     }
 
     /**
-     * Show the form for creating a new asset.
+     * Show the form for creating a new property.
      */
     public function create(Budget $budget): Response
     {
         $this->authorize('view', $budget);
 
-        // Get liability accounts that could be linked to assets
+        // Get liability accounts that could be linked to properties
         $liabilityAccounts = $budget->accounts()
             ->whereIn('type', ['mortgage', 'loan', 'line of credit'])
-            ->whereNull('asset_id')
+            ->whereNull('property_id')
             ->get();
 
-        return Inertia::render('Assets/Create', [
+        return Inertia::render('Properties/Create', [
             'budget' => $budget,
             'liabilityAccounts' => $liabilityAccounts,
-            'propertyTypes' => Asset::PROPERTY_TYPES,
+            'propertyTypes' => Property::PROPERTY_TYPES,
         ]);
     }
 
@@ -79,13 +79,13 @@ class AssetController extends Controller
         $validated['value_updated_at'] = now();
         $validated['api_source'] = 'manual';
 
-        $asset = $budget->assets()->create($validated);
+        $property = $budget->properties()->create($validated);
 
         // Link account to asset if specified
         if ($request->has('linked_account_id') && $request->linked_account_id) {
             $account = $budget->accounts()->find($request->linked_account_id);
             if ($account) {
-                $account->update(['asset_id' => $asset->id]);
+                $account->update(['property_id' => $property->id]);
             }
         }
 
@@ -96,60 +96,60 @@ class AssetController extends Controller
     /**
      * Display the specified asset.
      */
-    public function show(Budget $budget, Asset $asset): Response
+    public function show(Budget $budget, Property $property): Response
     {
         $this->authorize('view', $budget);
 
-        if ($asset->budget_id !== $budget->id) {
+        if ($property->budget_id !== $budget->id) {
             abort(404);
         }
 
-        $asset->load('linkedAccounts');
+        $property->load('linkedAccounts');
 
-        return Inertia::render('Assets/Show', [
+        return Inertia::render('Properties/Show', [
             'budget' => $budget,
-            'asset' => $asset,
+            'property' => $property,
         ]);
     }
 
     /**
      * Show the form for editing the specified asset.
      */
-    public function edit(Budget $budget, Asset $asset): Response
+    public function edit(Budget $budget, Property $property): Response
     {
         $this->authorize('view', $budget);
 
-        if ($asset->budget_id !== $budget->id) {
+        if ($property->budget_id !== $budget->id) {
             abort(404);
         }
 
-        $asset->load('linkedAccounts');
+        $property->load('linkedAccounts');
 
         // Get liability accounts that could be linked to this asset
         $liabilityAccounts = $budget->accounts()
             ->whereIn('type', ['mortgage', 'loan', 'line of credit'])
-            ->where(function($query) use ($asset) {
-                $query->whereNull('asset_id')
-                    ->orWhere('asset_id', $asset->id);
+            ->where(function($query) use ($property) {
+                $query->whereNull('property_id')
+                    ->orWhere('property_id', $property->id);
             })
             ->get();
 
-        return Inertia::render('Assets/Edit', [
+        return Inertia::render('Properties/Edit', [
             'budget' => $budget,
-            'asset' => $asset,
+            'property' => $property,
             'liabilityAccounts' => $liabilityAccounts,
-            'propertyTypes' => Asset::PROPERTY_TYPES,
+            'propertyTypes' => Property::PROPERTY_TYPES,
         ]);
     }
 
     /**
      * Update the specified asset in storage.
      */
-    public function update(Request $request, Budget $budget, Asset $asset): RedirectResponse
+    public function update(Request $request, Budget $budget, Property $property): RedirectResponse
     {
         $this->authorize('view', $budget);
 
-        if ($asset->budget_id !== $budget->id) {
+        if ($property->budget_id !== $budget->id) {
             abort(404);
         }
 
@@ -174,22 +174,22 @@ class AssetController extends Controller
         ]);
 
         // Update value timestamp if value changed
-        if ($validated['current_value_cents'] !== $asset->current_value_cents) {
+        if ($validated['current_value_cents'] !== $property->current_value_cents) {
             $validated['value_updated_at'] = now();
         }
 
-        $asset->update($validated);
+        $property->update($validated);
 
         // Update linked accounts
         if ($request->has('linked_account_ids')) {
             // Clear existing links
-            $budget->accounts()->where('asset_id', $asset->id)->update(['asset_id' => null]);
+            $budget->accounts()->where('property_id', $property->id)->update(['property_id' => null]);
             
             // Set new links
             if (!empty($request->linked_account_ids)) {
                 $budget->accounts()
                     ->whereIn('id', $request->linked_account_ids)
-                    ->update(['asset_id' => $asset->id]);
+                    ->update(['property_id' => $property->id]);
             }
         }
 
@@ -200,18 +200,18 @@ class AssetController extends Controller
     /**
      * Remove the specified asset from storage.
      */
-    public function destroy(Budget $budget, Asset $asset): RedirectResponse
+    public function destroy(Budget $budget, Property $property): RedirectResponse
     {
         $this->authorize('view', $budget);
 
-        if ($asset->budget_id !== $budget->id) {
+        if ($property->budget_id !== $budget->id) {
             abort(404);
         }
 
         // Unlink any accounts before deleting
-        $budget->accounts()->where('asset_id', $asset->id)->update(['asset_id' => null]);
+        $budget->accounts()->where('property_id', $property->id)->update(['property_id' => null]);
 
-        $asset->delete();
+        $property->delete();
 
         return redirect()->route('budgets.assets.index', $budget)
             ->with('message', 'Asset deleted successfully');

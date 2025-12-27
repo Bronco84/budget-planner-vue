@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
-class Asset extends Model
+class Property extends Model
 {
     use HasFactory;
 
     /**
-     * Asset types
+     * Property types (real estate, vehicles, etc.)
      */
     public const TYPE_PROPERTY = 'property';
     public const TYPE_VEHICLE = 'vehicle';
@@ -88,7 +88,7 @@ class Asset extends Model
     ];
 
     /**
-     * Get the budget that owns the asset.
+     * Get the budget that owns the property.
      */
     public function budget(): BelongsTo
     {
@@ -96,11 +96,11 @@ class Asset extends Model
     }
 
     /**
-     * Get the linked accounts (loans/mortgages) for this asset.
+     * Get the linked accounts (loans/mortgages) for this property.
      */
     public function linkedAccounts(): HasMany
     {
-        return $this->hasMany(Account::class, 'asset_id');
+        return $this->hasMany(Account::class, 'property_id');
     }
 
     /**

@@ -90,8 +90,8 @@ Route::middleware('auth')->group(function () {
     Route::post('budgets/{budget}/accounts/{account}/autopay', [AccountController::class, 'updateAutopay'])
         ->name('accounts.updateAutopay');
 
-    // Asset routes
-    Route::resource('budgets.assets', App\Http\Controllers\AssetController::class);
+    // Property routes
+    Route::resource('budgets.properties', App\Http\Controllers\PropertyController::class);
 
     Route::resource('budgets.categories', CategoryController::class);
     Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])

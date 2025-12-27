@@ -276,11 +276,11 @@ class BudgetService
                     : $account->current_balance_cents;
             });
 
-        // Add physical assets (property, vehicles) to net worth
+        // Add physical properties (real estate, vehicles) to net worth
         // Note: Linked loans are already subtracted in the accounts calculation above
-        $assetsValue = $budget->assets->sum('current_value_cents');
+        $propertiesValue = $budget->properties->sum('current_value_cents');
 
-        return $accountsBalance + $assetsValue;
+        return $accountsBalance + $propertiesValue;
     }
 
     /**

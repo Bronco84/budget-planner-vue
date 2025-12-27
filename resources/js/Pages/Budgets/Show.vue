@@ -398,18 +398,18 @@
               </div>
             </div>
 
-            <!-- Assets Card -->
+            <!-- Properties Card -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mt-6">
               <div class="p-4">
                 <!-- Accordion Header -->
-                <div class="flex justify-between items-center cursor-pointer" @click="assetsExpanded = !assetsExpanded">
+                <div class="flex justify-between items-center cursor-pointer" @click="propertiesExpanded = !propertiesExpanded">
                   <div class="flex items-center gap-2">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Assets</h3>
-                    <span class="text-sm text-gray-500">({{ assets.length }})</span>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Properties</h3>
+                    <span class="text-sm text-gray-500">({{ properties.length }})</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <Link
-                      :href="route('budgets.assets.create', budget.id)"
+                      :href="route('budgets.properties.create', budget.id)"
                       class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
                       @click.stop
                     >
@@ -417,7 +417,7 @@
                     </Link>
                     <svg
                       class="w-5 h-5 text-gray-500 transition-transform duration-200"
-                      :class="{ 'rotate-180': assetsExpanded }"
+                      :class="{ 'rotate-180': propertiesExpanded }"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -436,27 +436,27 @@
                   leave-from-class="transform opacity-100 translate-y-0"
                   leave-to-class="transform opacity-0 -translate-y-2"
                 >
-                  <div v-show="assetsExpanded" class="mt-3">
-                    <!-- Assets List -->
-                    <div v-if="assets.length > 0" class="space-y-2">
+                  <div v-show="propertiesExpanded" class="mt-3">
+                    <!-- Properties List -->
+                    <div v-if="properties.length > 0" class="space-y-2">
                       <Link
-                        v-for="asset in assets"
-                        :key="asset.id"
-                        :href="route('budgets.assets.edit', [budget.id, asset.id])"
+                        v-for="property in properties"
+                        :key="property.id"
+                        :href="route('budgets.properties.edit', [budget.id, property.id])"
                         class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
                       >
-                        <!-- Asset Icon -->
-                        <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" :class="getAssetIconBg(asset.type)">
-                          <component :is="getAssetIcon(asset.type)" class="w-5 h-5" :class="getAssetIconColor(asset.type)" />
+                        <!-- Property Icon -->
+                        <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" :class="getPropertyIconBg(property.type)">
+                          <component :is="getPropertyIcon(property.type)" class="w-5 h-5" :class="getPropertyIconColor(property.type)" />
                         </div>
                         
-                        <!-- Asset Info -->
+                        <!-- Property Info -->
                         <div class="flex-1 min-w-0">
-                          <div class="font-medium text-sm text-gray-900 truncate">{{ asset.name }}</div>
+                          <div class="font-medium text-sm text-gray-900 truncate">{{ property.name }}</div>
                           <div class="text-xs text-gray-500 truncate">
-                            {{ formatCurrency(asset.current_value_cents) }}
-                            <span v-if="asset.linked_accounts && asset.linked_accounts.length > 0" class="text-gray-400">
-                              • Equity: {{ formatCurrency(asset.equity) }}
+                            {{ formatCurrency(property.current_value_cents) }}
+                            <span v-if="property.linked_accounts && property.linked_accounts.length > 0" class="text-gray-400">
+                              • Equity: {{ formatCurrency(property.equity) }}
                             </span>
                           </div>
                         </div>
@@ -475,22 +475,22 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                         </svg>
                       </div>
-                      <p class="text-sm text-gray-500 mb-2">No assets yet</p>
+                      <p class="text-sm text-gray-500 mb-2">No properties yet</p>
                       <Link
-                        :href="route('budgets.assets.create', budget.id)"
+                        :href="route('budgets.properties.create', budget.id)"
                         class="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                       >
-                        Add your first asset
+                        Add your first property
                       </Link>
                     </div>
 
                     <!-- View All Link -->
-                    <div v-if="assets.length > 0" class="pt-3 mt-3 border-t border-gray-200">
+                    <div v-if="properties.length > 0" class="pt-3 mt-3 border-t border-gray-200">
                       <Link
-                        :href="route('budgets.assets.index', budget.id)"
+                        :href="route('budgets.properties.index', budget.id)"
                         class="flex items-center justify-center text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
                       >
-                        View All Assets
+                        View All Properties
                         <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                         </svg>
@@ -973,7 +973,7 @@ import draggable from 'vuedraggable'
 const props = defineProps({
   budget: Object,
   accounts: Array,
-  assets: Array,
+  properties: Array,
   selectedAccountId: Number,
   totalBalance: Number,
   transactions: Object,
@@ -1089,9 +1089,9 @@ const expandedCreditCardAccount = ref(null);
 // Budget card accordion state (collapsed by default)
 const budgetCardExpanded = ref(false);
 
-// Accounts and Assets accordion state (expanded by default)
+// Accounts and Properties accordion state (expanded by default)
 const accountsExpanded = ref(true);
-const assetsExpanded = ref(true);
+const propertiesExpanded = ref(true);
 
 // Table container ref for height calculation
 const tableContainer = ref(null);
@@ -1738,8 +1738,8 @@ const getAccountTypeIconColor = (type) => {
   return colorMap[type?.toLowerCase()] || 'text-gray-600';
 };
 
-// Helper functions for asset icons
-const getAssetIcon = (type) => {
+// Helper functions for property icons
+const getPropertyIcon = (type) => {
   const iconMap = {
     'property': HomeIcon,
     'vehicle': TruckIcon,
@@ -1748,7 +1748,7 @@ const getAssetIcon = (type) => {
   return iconMap[type?.toLowerCase()] || CubeIcon;
 };
 
-const getAssetIconBg = (type) => {
+const getPropertyIconBg = (type) => {
   const bgMap = {
     'property': 'bg-orange-100',
     'vehicle': 'bg-blue-100',
@@ -1757,7 +1757,7 @@ const getAssetIconBg = (type) => {
   return bgMap[type?.toLowerCase()] || 'bg-gray-100';
 };
 
-const getAssetIconColor = (type) => {
+const getPropertyIconColor = (type) => {
   const colorMap = {
     'property': 'text-orange-600',
     'vehicle': 'text-blue-600',

@@ -1,10 +1,10 @@
 <template>
-  <Head title="Edit Asset" />
+  <Head title="Edit Property" />
 
   <AuthenticatedLayout>
     <template #header>
       <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-        Edit Asset - {{ budget.name }}
+        Edit Property - {{ budget.name }}
       </h2>
     </template>
 
@@ -35,14 +35,14 @@
               </div>
             </div>
 
-            <!-- Asset Type -->
+            <!-- Property Type -->
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Asset Type
+                Property Type
               </label>
               <div class="grid grid-cols-3 gap-4">
                 <label
-                  v-for="type in assetTypes"
+                  v-for="type in propertyTypes"
                   :key="type.value"
                   class="relative flex cursor-pointer rounded-lg border p-4 focus:outline-none"
                   :class="form.type === type.value ? 'border-indigo-600 ring-2 ring-indigo-600' : 'border-gray-300 dark:border-gray-600'"
@@ -229,7 +229,7 @@
                 </label>
               </div>
               <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Link this asset to mortgage or loan accounts to calculate equity
+                Link this property to mortgage or loan accounts to calculate equity
               </p>
             </div>
 
@@ -249,7 +249,7 @@
             <!-- Actions -->
             <div class="flex justify-end gap-4">
               <Link
-                :href="route('budgets.assets.index', budget.id)"
+                :href="route('budgets.propertys.index', budget.id)"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
                 Cancel
@@ -260,7 +260,7 @@
                 class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
                 :class="{ 'opacity-25': form.processing }"
               >
-                Update Asset
+                Update Property
               </button>
             </div>
           </form>
@@ -278,34 +278,34 @@ import { HomeIcon, TruckIcon, CubeIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
   budget: Object,
-  asset: Object,
+  property: Object,
   liabilityAccounts: Array,
   propertyTypes: Object,
 });
 
-const assetTypes = [
+const propertyTypes = [
   { value: 'property', label: 'Property', icon: HomeIcon },
   { value: 'vehicle', label: 'Vehicle', icon: TruckIcon },
   { value: 'other', label: 'Other', icon: CubeIcon },
 ];
 
 const form = useForm({
-  name: props.asset.name,
-  type: props.asset.type,
-  current_value_cents: props.asset.current_value_cents,
-  address: props.asset.address || '',
-  property_type: props.asset.property_type,
-  bedrooms: props.asset.bedrooms,
-  bathrooms: props.asset.bathrooms,
-  square_feet: props.asset.square_feet,
-  year_built: props.asset.year_built,
-  vehicle_make: props.asset.vehicle_make || '',
-  vehicle_model: props.asset.vehicle_model || '',
-  vehicle_year: props.asset.vehicle_year,
-  vin: props.asset.vin || '',
-  mileage: props.asset.mileage,
-  notes: props.asset.notes || '',
-  linked_account_ids: props.asset.linked_accounts?.map(a => a.id) || [],
+  name: props.property.name,
+  type: props.property.type,
+  current_value_cents: props.property.current_value_cents,
+  address: props.property.address || '',
+  property_type: props.property.property_type,
+  bedrooms: props.property.bedrooms,
+  bathrooms: props.property.bathrooms,
+  square_feet: props.property.square_feet,
+  year_built: props.property.year_built,
+  vehicle_make: props.property.vehicle_make || '',
+  vehicle_model: props.property.vehicle_model || '',
+  vehicle_year: props.property.vehicle_year,
+  vin: props.property.vin || '',
+  mileage: props.property.mileage,
+  notes: props.property.notes || '',
+  linked_account_ids: props.property.linked_accounts?.map(a => a.id) || [],
 });
 
 const currentValueDollars = computed({
@@ -323,7 +323,7 @@ const formatCurrency = (cents) => {
 };
 
 const submit = () => {
-  form.put(route('budgets.assets.update', [props.budget.id, props.asset.id]));
+  form.put(route('budgets.propertys.update', [props.budget.id, props.property.id]));
 };
 </script>
 

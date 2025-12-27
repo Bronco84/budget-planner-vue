@@ -202,14 +202,14 @@ class BudgetController extends Controller
         // Calculate the total balance across all accounts
         $totalBalance = $budgetService->calculateTotalBalance($budget);
 
-        // Load assets with their linked accounts
-        $budget->load('assets.linkedAccounts');
+        // Load properties with their linked accounts
+        $budget->load('properties.linkedAccounts');
 
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,
             'totalBalance' => $totalBalance,
             'accounts' => $budget->accounts,
-            'assets' => $budget->assets,
+            'properties' => $budget->properties,
             'selectedAccountId' => $account?->id,
             'transactions' => $accountTransactions,
             'projectedTransactions' => $projectedTransactions,

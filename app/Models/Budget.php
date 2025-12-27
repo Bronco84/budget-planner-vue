@@ -124,11 +124,11 @@ class Budget extends Model
     }
 
     /**
-     * Get the assets for this budget.
+     * Get the properties for this budget.
      */
-    public function assets(): HasMany
+    public function properties(): HasMany
     {
-        return $this->hasMany(Asset::class);
+        return $this->hasMany(Property::class);
     }
 
     /**

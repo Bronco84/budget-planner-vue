@@ -42,7 +42,7 @@ class Account extends Model
         'autopay_enabled',
         'autopay_source_account_id',
         'autopay_amount_override_cents',
-        'asset_id',
+        'property_id',
     ];
 
     /**
@@ -143,11 +143,11 @@ class Account extends Model
     }
 
     /**
-     * Get the asset that this account (loan/mortgage) is linked to.
+     * Get the property that this account (loan/mortgage) is linked to.
      */
-    public function asset(): BelongsTo
+    public function property(): BelongsTo
     {
-        return $this->belongsTo(Asset::class);
+        return $this->belongsTo(Property::class);
     }
 
     public function scopeActive($query)

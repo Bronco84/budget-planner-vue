@@ -1,10 +1,10 @@
 <template>
-  <Head title="Add Asset" />
+  <Head title="Add Property" />
 
   <AuthenticatedLayout>
     <template #header>
       <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-        Add Asset - {{ budget.name }}
+        Add Property - {{ budget.name }}
       </h2>
     </template>
 
@@ -35,14 +35,14 @@
               </div>
             </div>
 
-            <!-- Asset Type -->
+            <!-- Property Type -->
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Asset Type
+                Property Type
               </label>
               <div class="grid grid-cols-3 gap-4">
                 <label
-                  v-for="type in assetTypes"
+                  v-for="type in propertyTypes"
                   :key="type.value"
                   class="relative flex cursor-pointer rounded-lg border p-4 focus:outline-none"
                   :class="form.type === type.value ? 'border-indigo-600 ring-2 ring-indigo-600' : 'border-gray-300 dark:border-gray-600'"
@@ -226,7 +226,7 @@
                 </option>
               </select>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Link this asset to a mortgage or loan account to calculate equity
+                Link this property to a mortgage or loan account to calculate equity
               </p>
             </div>
 
@@ -246,7 +246,7 @@
             <!-- Actions -->
             <div class="flex justify-end gap-4">
               <Link
-                :href="route('budgets.assets.index', budget.id)"
+                :href="route('budgets.propertys.index', budget.id)"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
                 Cancel
@@ -257,7 +257,7 @@
                 class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
                 :class="{ 'opacity-25': form.processing }"
               >
-                Create Asset
+                Create Property
               </button>
             </div>
           </form>
@@ -279,7 +279,7 @@ const props = defineProps({
   propertyTypes: Object,
 });
 
-const assetTypes = [
+const propertyTypes = [
   { value: 'property', label: 'Property', icon: HomeIcon },
   { value: 'vehicle', label: 'Vehicle', icon: TruckIcon },
   { value: 'other', label: 'Other', icon: CubeIcon },
@@ -319,7 +319,7 @@ const formatCurrency = (cents) => {
 };
 
 const submit = () => {
-  form.post(route('budgets.assets.store', props.budget.id));
+  form.post(route('budgets.propertys.store', props.budget.id));
 };
 </script>
 

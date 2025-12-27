@@ -257,6 +257,16 @@
                             {{ formatCurrency(account.current_balance_cents) }}
                           </div>
                         </div>
+
+                        <!-- Credit Card Details (if applicable) -->
+                        <CreditCardDetails
+                          v-if="account.plaid_account"
+                          :account="account"
+                          :budget-id="budget.id"
+                          :eligible-source-accounts="eligibleSourceAccounts"
+                          class="mt-3"
+                        />
+
                         <div class="flex items-center justify-between mt-2">
                           <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
                             :class="account.status_classes">
@@ -679,6 +689,7 @@ import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
+import CreditCardDetails from '@/Components/CreditCardDetails.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable'
 
@@ -707,6 +718,14 @@ const activeAccountId = computed(() => {
   }
   // Convert to number for consistent comparison
   return form.account_id ? parseInt(form.account_id, 10) : null;
+});
+
+// Filter accounts that can be autopay sources (checking/savings)
+const eligibleSourceAccounts = computed(() => {
+  return props.accounts.filter(account => {
+    return account.plaid_account?.account_type === 'depository' &&
+           ['checking', 'savings'].includes(account.plaid_account?.account_subtype);
+  });
 });
 
 // Group accounts by type with totals
@@ -778,6 +797,9 @@ const openDropdown = ref(null);
 
 // Dropdown state for transaction actions
 const openTransactionDropdown = ref(null);
+
+// Credit card details expansion state
+const expandedCreditCardAccount = ref(null);
 
 // Budget card accordion state (collapsed by default)
 const budgetCardExpanded = ref(false);
@@ -901,6 +923,10 @@ watch([() => props.userAccountTypeOrder, () => props.accounts], () => {
 // Toggle account dropdown
 const toggleAccountDropdown = (accountId) => {
   openDropdown.value = openDropdown.value === accountId ? null : accountId;
+};
+
+const toggleCreditCardDetails = (accountId) => {
+  expandedCreditCardAccount.value = expandedCreditCardAccount.value === accountId ? null : accountId;
 };
 
 // Toggle transaction dropdown

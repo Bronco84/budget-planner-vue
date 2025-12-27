@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AccountStatus;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,6 +39,9 @@ class Account extends Model
         'balance_updated_at',
         'include_in_budget',
         'exclude_from_total_balance',
+        'autopay_enabled',
+        'autopay_source_account_id',
+        'autopay_amount_override_cents',
     ];
 
     /**
@@ -50,6 +54,9 @@ class Account extends Model
         'balance_updated_at' => 'datetime',
         'include_in_budget' => 'boolean',
         'exclude_from_total_balance' => 'boolean',
+        'autopay_enabled' => 'boolean',
+        'autopay_source_account_id' => 'integer',
+        'autopay_amount_override_cents' => 'integer',
     ];
 
     /**
@@ -118,6 +125,22 @@ class Account extends Model
         return $this->bankFeeds()->where('source_type', $sourceType)->first();
     }
 
+    /**
+     * Get the source account that funds autopay for this credit card.
+     */
+    public function autopaySourceAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'autopay_source_account_id');
+    }
+
+    /**
+     * Get credit cards that are funded by this account via autopay.
+     */
+    public function autopayTargetAccounts(): HasMany
+    {
+        return $this->hasMany(Account::class, 'autopay_source_account_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('include_in_budget', true)->where('is_active', true);
@@ -165,5 +188,61 @@ class Account extends Model
     public function isAsset(): bool
     {
         return !$this->isLiability();
+    }
+
+    /**
+     * Check if this account has autopay configured and active.
+     */
+    public function hasActiveAutopay(): bool
+    {
+        return $this->autopay_enabled
+            && $this->autopay_source_account_id !== null
+            && $this->plaidAccount?->hasLiabilityData();
+    }
+
+    /**
+     * Get the autopay payment amount (override or statement balance).
+     */
+    public function getAutopayAmountCents(): ?int
+    {
+        if (!$this->hasActiveAutopay()) {
+            return null;
+        }
+
+        // Use manual override if set, otherwise use statement balance
+        return $this->autopay_amount_override_cents
+            ?? $this->plaidAccount?->last_statement_balance_cents;
+    }
+
+    /**
+     * Get the next autopay payment date.
+     */
+    public function getNextAutopayDate(): ?Carbon
+    {
+        if (!$this->hasActiveAutopay()) {
+            return null;
+        }
+
+        return $this->plaidAccount?->next_payment_due_date
+            ? Carbon::parse($this->plaidAccount->next_payment_due_date)
+            : null;
+    }
+
+    /**
+     * Check if this account can be used as an autopay source.
+     */
+    public function canBeAutopaySource(): bool
+    {
+        return $this->plaidAccount?->account_type === 'depository'
+            && in_array($this->plaidAccount?->account_subtype, ['checking', 'savings']);
+    }
+
+    /**
+     * Check if this is a credit card eligible for autopay.
+     */
+    public function isAutopayEligible(): bool
+    {
+        return $this->plaidAccount?->isCreditCard()
+            && $this->plaidAccount?->hasLiabilityData();
     }
 }

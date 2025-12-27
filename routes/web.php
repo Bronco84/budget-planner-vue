@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Models\Budget;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CategoryController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\RecurringTransactionRuleController;
 use App\Http\Controllers\PlaidController;
+use App\Http\Controllers\PlaidStatementHistoryController;
 use App\Http\Controllers\PlaidTransactionController;
 use App\Http\Controllers\ProjectionsController;
 use App\Http\Controllers\RecurringTransactionAnalysisController;
@@ -85,7 +87,9 @@ Route::middleware('auth')->group(function () {
         ->name('reports.index');
 
     Route::resource('budgets.accounts', AccountController::class);
-    
+    Route::post('budgets/{budget}/accounts/{account}/autopay', [AccountController::class, 'updateAutopay'])
+        ->name('accounts.updateAutopay');
+
     Route::resource('budgets.categories', CategoryController::class);
     Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])
         ->name('budgets.categories.reorder');
@@ -148,8 +152,16 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.analysis');
     Route::post('budget/{budget}/recurring-transactions-analysis/analyze', [RecurringTransactionAnalysisController::class, 'analyze'])
         ->name('recurring-transactions.analysis.analyze');
+    // Fallback GET route for analyze - redirect to main analysis page
+    Route::get('budget/{budget}/recurring-transactions-analysis/analyze', function (Budget $budget) {
+        return redirect()->route('recurring-transactions.analysis', $budget->id);
+    });
     Route::post('budget/{budget}/recurring-transactions-analysis/create-templates', [RecurringTransactionAnalysisController::class, 'createTemplates'])
         ->name('recurring-transactions.analysis.create-templates');
+    // Fallback GET route for create-templates - redirect to main analysis page
+    Route::get('budget/{budget}/recurring-transactions-analysis/create-templates', function (Budget $budget) {
+        return redirect()->route('recurring-transactions.analysis', $budget->id);
+    });
 
     // Routes for payoff plans
     Route::get('budget/{budget}/payoff-plans', [PayoffPlanController::class, 'index'])
@@ -182,6 +194,10 @@ Route::middleware('auth')->group(function () {
         ->name('plaid.sync');
     Route::post('budget/{budget}/account/{account}/plaid/balance', [PlaidController::class, 'updateBalance'])
         ->name('plaid.balance');
+    Route::post('budget/{budget}/account/{account}/plaid/liabilities', [PlaidController::class, 'updateLiabilities'])
+        ->name('plaid.liabilities');
+    Route::get('budget/{budget}/account/{account}/plaid/statement-history', [PlaidStatementHistoryController::class, 'index'])
+        ->name('plaid.statement-history');
     Route::delete('budget/{budget}/account/{account}/plaid', [PlaidController::class, 'destroy'])
         ->name('plaid.destroy');
     
@@ -228,7 +244,8 @@ Route::middleware('auth')->group(function () {
     // Chat routes with rate limiting
     Route::prefix('chat')->name('chat.')->middleware('throttle:60,1')->group(function () {
         Route::post('/message', [ChatController::class, 'send'])->middleware('throttle:30,1')->name('send');
-        Route::post('/stream', [ChatController::class, 'stream'])->middleware('throttle:30,1')->name('stream');
+        Route::get('/stream', [ChatController::class, 'stream'])->middleware('throttle:30,1')->name('stream');
+        Route::post('/stream/complete', [ChatController::class, 'streamComplete'])->name('stream.complete');
         Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations');
         Route::get('/conversations/{id}', [ChatController::class, 'show'])->name('conversations.show');
         Route::delete('/conversations/{id}', [ChatController::class, 'destroy'])->name('conversations.destroy');
@@ -237,6 +254,7 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
 
 // Add the debug route at the end of the file
 Route::get('/debug/rules', function () {
@@ -247,3 +265,4 @@ Route::get('/debug/rules', function () {
         'templates' => DB::table('recurring_transaction_templates')->get(),
     ];
 });
+require __DIR__.'/debug.php';

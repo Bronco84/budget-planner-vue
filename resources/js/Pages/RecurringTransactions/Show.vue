@@ -101,6 +101,7 @@
                 :accounts="accounts"
                 :linked-transactions="linkedTransactions"
                 :rules="rules"
+                :eligible-credit-cards="eligibleCreditCards"
               />
             </div>
 
@@ -148,6 +149,7 @@ const props = defineProps({
   linkedTransactions: Array,
   fieldOptions: Object,
   operatorOptions: Object,
+  eligibleCreditCards: Array,
 });
 
 const activeTab = ref('overview');

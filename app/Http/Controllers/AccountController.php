@@ -96,4 +96,62 @@ class AccountController extends Controller
         return redirect()->route('budgets.show', $budget)
             ->with('message', 'Account deleted successfully');
     }
+
+    /**
+     * Update autopay configuration for an account.
+     */
+    public function updateAutopay(Request $request, Budget $budget, Account $account): RedirectResponse
+    {
+        // Validate the account belongs to this budget
+        if ($account->budget_id !== $budget->id) {
+            abort(403);
+        }
+
+        // Validate account is a credit card
+        if (!$account->isAutopayEligible()) {
+            return redirect()->back()->with('error', 'Autopay is only available for credit card accounts with statement data.');
+        }
+
+        // Validate request
+        $validated = $request->validate([
+            'autopay_enabled' => 'required|boolean',
+            'autopay_source_account_id' => 'nullable|exists:accounts,id',
+            'autopay_amount_override_cents' => 'nullable|integer|min:0',
+        ]);
+
+        // Additional validation: source account must be specified if autopay enabled
+        if ($validated['autopay_enabled'] && !$validated['autopay_source_account_id']) {
+            return redirect()->back()->with('error', 'Please select a source account for autopay.');
+        }
+
+        // Validate source account belongs to same budget and is valid type
+        if ($validated['autopay_source_account_id']) {
+            $sourceAccount = Account::findOrFail($validated['autopay_source_account_id']);
+
+            if ($sourceAccount->budget_id !== $budget->id) {
+                return redirect()->back()->with('error', 'Source account must be in the same budget.');
+            }
+
+            if (!$sourceAccount->canBeAutopaySource()) {
+                return redirect()->back()->with('error', 'Source account must be a checking or savings account.');
+            }
+
+            if ($sourceAccount->id === $account->id) {
+                return redirect()->back()->with('error', 'Source account cannot be the same as the credit card.');
+            }
+        }
+
+        // Update account
+        $account->update([
+            'autopay_enabled' => $validated['autopay_enabled'],
+            'autopay_source_account_id' => $validated['autopay_enabled'] ? $validated['autopay_source_account_id'] : null,
+            'autopay_amount_override_cents' => $validated['autopay_amount_override_cents'],
+        ]);
+
+        $message = $validated['autopay_enabled']
+            ? 'Autopay enabled successfully. Statement balance will be automatically deducted from ' . $sourceAccount->name
+            : 'Autopay disabled successfully.';
+
+        return redirect()->back()->with('message', $message);
+    }
 } 

@@ -222,8 +222,8 @@
                         <div class="text-sm font-medium text-gray-900">
                           {{ getDisplayDescription(pattern) }}
                         </div>
-                        <div v-if="pattern.original_description && pattern.original_description !== pattern.description" class="text-xs text-gray-500 mt-1">
-                          Original: {{ pattern.original_description }}
+                        <div v-if="pattern.description && pattern.description !== pattern.original_description" class="text-xs text-gray-500 mt-1">
+                          {{ pattern.description }}
                         </div>
                         <div v-if="pattern.sample_transactions && pattern.sample_transactions.length > 0" class="text-xs text-gray-500 mt-1">
                           Sample dates: {{ formatSampleDates(pattern.sample_transactions) }}
@@ -429,14 +429,14 @@ const getConfidenceColor = (score) => {
 };
 
 const getDisplayDescription = (pattern) => {
-  // Return the normalized description if it exists and is not empty
-  if (pattern.description && pattern.description.trim() !== '') {
-    return pattern.description;
-  }
-
-  // Fall back to original description
+  // Prefer original description (from Plaid merchant_name or name) as it's more readable
   if (pattern.original_description && pattern.original_description.trim() !== '') {
     return pattern.original_description;
+  }
+
+  // Fall back to normalized description
+  if (pattern.description && pattern.description.trim() !== '') {
+    return pattern.description;
   }
 
   // Final fallback for patterns without descriptions

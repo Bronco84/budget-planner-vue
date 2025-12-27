@@ -161,6 +161,101 @@
           </div>
         </div>
 
+        <!-- Autopay Override Section -->
+        <div v-if="eligibleCreditCards && eligibleCreditCards.length > 0" class="mt-6 border-t border-gray-200 pt-6">
+          <h4 class="text-md font-medium text-gray-900 mb-2">Autopay Override</h4>
+          <p class="text-sm text-gray-600 mb-4">
+            Link this recurring transaction to a credit card with autopay enabled. When the statement balance is available, the autopay projection will override this recurring transaction's projection for that month.
+          </p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <InputLabel for="linked_credit_card_account_id" value="Linked Credit Card" />
+              <SelectInput
+                id="linked_credit_card_account_id"
+                v-model="form.linked_credit_card_account_id"
+                class="mt-1 block w-full"
+              >
+                <option :value="null">None (no autopay override)</option>
+                <option v-for="card in eligibleCreditCards" :key="card.id" :value="card.id">
+                  {{ card.institution_name || 'Unknown' }} (...{{ card.account_mask }}) - {{ card.name }}
+                </option>
+              </SelectInput>
+              <InputError class="mt-2" :message="form.errors.linked_credit_card_account_id" />
+            </div>
+
+            <!-- Show linked card info if selected -->
+            <div v-if="selectedCreditCard" class="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div class="text-sm">
+                <div class="flex justify-between mb-1">
+                  <span class="text-gray-600">Statement Balance:</span>
+                  <span class="font-medium text-gray-900">{{ formatCurrencyAmount(selectedCreditCard.statement_balance_cents) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Next Payment Due:</span>
+                  <span class="font-medium text-gray-900">{{ selectedCreditCard.next_payment_due_date || 'N/A' }}</span>
+                </div>
+              </div>
+              <p class="text-xs text-blue-700 mt-2">
+                This recurring projection will be skipped for the month when autopay uses the actual statement balance.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plaid Entity Matching Section -->
+        <div v-if="recurringTransaction.plaid_entity_id" class="mt-6 border-t border-gray-200 pt-6">
+          <h4 class="text-md font-medium text-gray-900 mb-2">Transaction Matching</h4>
+          <p class="text-sm text-gray-600 mb-4">
+            This recurring transaction is linked to a Plaid entity for reliable matching across all related transactions.
+          </p>
+          
+          <div class="bg-green-50 border border-green-200 rounded-md p-4">
+            <div class="flex items-start">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <h5 class="text-sm font-medium text-green-800">Linked to Plaid Entity</h5>
+                <div class="mt-2 text-sm text-green-700">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium">{{ recurringTransaction.plaid_entity_name || 'Unknown Entity' }}</span>
+                  </div>
+                  <div class="mt-1 text-xs text-green-600 font-mono">
+                    ID: {{ recurringTransaction.plaid_entity_id }}
+                  </div>
+                </div>
+                <p class="mt-2 text-xs text-green-600">
+                  Transactions from this entity will be automatically matched regardless of description variations.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- No Entity Matching (show only if no entity ID) -->
+        <div v-else class="mt-6 border-t border-gray-200 pt-6">
+          <h4 class="text-md font-medium text-gray-900 mb-2">Transaction Matching</h4>
+          <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <div class="flex items-start">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <h5 class="text-sm font-medium text-yellow-800">Using Description-Based Matching</h5>
+                <p class="mt-1 text-sm text-yellow-700">
+                  This template uses description patterns and rules for matching. For more reliable matching, 
+                  consider re-analyzing transactions to capture the Plaid entity ID.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="mt-6 border-t border-gray-200 pt-6">
           <h4 class="text-md font-medium text-gray-900 mb-4">Recurring Options</h4>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -293,16 +388,21 @@ const props = defineProps({
   accounts: Array,
   linkedTransactions: Array,
   rules: Array,
+  eligibleCreditCards: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const form = useForm({
   account_id: props.recurringTransaction.account_id,
+  linked_credit_card_account_id: props.recurringTransaction.linked_credit_card_account_id,
   description: props.recurringTransaction.description,
   category: props.recurringTransaction.category,
   amount: props.recurringTransaction.amount_in_cents / 100,
   is_dynamic_amount: props.recurringTransaction.is_dynamic_amount,
-  min_amount: props.recurringTransaction.min_amount ? props.recurringTransaction.min_amount / 100 : '',
-  max_amount: props.recurringTransaction.max_amount ? props.recurringTransaction.max_amount / 100 : '',
+  min_amount: props.recurringTransaction.min_amount ? Math.abs(props.recurringTransaction.min_amount / 100) : '',
+  max_amount: props.recurringTransaction.max_amount ? Math.abs(props.recurringTransaction.max_amount / 100) : '',
   average_amount: props.recurringTransaction.average_amount ? props.recurringTransaction.average_amount / 100 : '',
   frequency: props.recurringTransaction.frequency,
   day_of_week: props.recurringTransaction.day_of_week,
@@ -310,6 +410,18 @@ const form = useForm({
   start_date: props.recurringTransaction.start_date,
   end_date: props.recurringTransaction.end_date,
   notes: props.recurringTransaction.notes,
+});
+
+// Helper to format currency for the credit card dropdown
+const formatCurrencyAmount = (cents) => {
+  if (!cents) return '';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+};
+
+// Get the selected credit card details
+const selectedCreditCard = computed(() => {
+  if (!form.linked_credit_card_account_id) return null;
+  return props.eligibleCreditCards?.find(c => c.id === form.linked_credit_card_account_id);
 });
 
 const activeRulesCount = computed(() => {

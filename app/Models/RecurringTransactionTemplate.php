@@ -12,6 +12,21 @@ class RecurringTransactionTemplate extends Model
     use HasFactory;
 
     /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // When deleting a template, unlink any associated transactions
+        static::deleting(function (RecurringTransactionTemplate $template) {
+            // Clear the recurring_transaction_template_id on all linked transactions
+            Transaction::where('recurring_transaction_template_id', $template->id)
+                ->update(['recurring_transaction_template_id' => null]);
+        });
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -19,6 +34,9 @@ class RecurringTransactionTemplate extends Model
     protected $fillable = [
         'budget_id',
         'account_id',
+        'linked_credit_card_account_id',
+        'plaid_entity_id',
+        'plaid_entity_name',
         'description',
         'category',
         'amount_in_cents',
@@ -43,6 +61,7 @@ class RecurringTransactionTemplate extends Model
      */
     protected $casts = [
         'amount_in_cents' => 'integer',
+        'linked_credit_card_account_id' => 'integer',
         'start_date' => 'date:Y-m-d',
         'end_date' => 'date:Y-m-d',
         'day_of_week' => 'integer',
@@ -107,6 +126,45 @@ class RecurringTransactionTemplate extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /**
+     * Get the linked credit card account for autopay override.
+     */
+    public function linkedCreditCard(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'linked_credit_card_account_id');
+    }
+
+    /**
+     * Check if autopay should override the projection for a given date.
+     * 
+     * Returns true if:
+     * - This template has a linked credit card
+     * - The linked credit card has active autopay
+     * - The given date falls in the same month as the autopay payment date
+     *
+     * @param \Carbon\Carbon $date
+     * @return bool
+     */
+    public function shouldAutopayOverrideFor(\Carbon\Carbon $date): bool
+    {
+        if (!$this->linked_credit_card_account_id) {
+            return false;
+        }
+
+        $linkedCard = $this->linkedCreditCard;
+        if (!$linkedCard?->hasActiveAutopay()) {
+            return false;
+        }
+
+        $autopayDate = $linkedCard->getNextAutopayDate();
+        if (!$autopayDate) {
+            return false;
+        }
+
+        // If the projection date is in the same month as the autopay, let autopay handle it
+        return $date->isSameMonth($autopayDate);
     }
 
     /**

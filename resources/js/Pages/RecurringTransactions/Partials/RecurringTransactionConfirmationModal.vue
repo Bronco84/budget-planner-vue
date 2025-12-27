@@ -45,7 +45,16 @@
                             <div class="mt-6 max-h-96 overflow-y-auto">
                                 <div v-for="(pattern, index) in editablePatterns" :key="index" class="mb-6 border rounded-lg p-4 bg-gray-50">
                                     <div class="flex justify-between items-start mb-4">
-                                        <h4 class="text-lg font-medium text-gray-900">Pattern {{ index + 1 }}</h4>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-lg font-medium text-gray-900">Pattern {{ index + 1 }}</h4>
+                                            <!-- Entity Matching Badge -->
+                                            <span v-if="pattern.original.plaid_entity_id" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" title="Linked to Plaid entity for reliable matching">
+                                                <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd" d="M16.403 12.652a3 3 0 000-5.304 3 3 0 00-3.75-3.751 3 3 0 00-5.305 0 3 3 0 00-3.751 3.75 3 3 0 000 5.305 3 3 0 003.75 3.751 3 3 0 005.305 0 3 3 0 003.751-3.75zm-2.546-4.46a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                                                </svg>
+                                                {{ pattern.original.plaid_entity_name || 'Entity Match' }}
+                                            </span>
+                                        </div>
                                         <div class="flex items-center">
                                             <input
                                                 :id="`pattern-${index}`"
@@ -336,12 +345,12 @@ const editablePatterns = ref(
         selected: true,
         original: pattern,
         form: {
-            description: pattern.description || pattern.original_description || 'Recurring Transaction',
+            description: pattern.original_description || pattern.description || 'Recurring Transaction',
             category: '',
             amount_type: pattern.standard_deviation > 10 ? 'dynamic' : 'static',
             amount: pattern.last_transaction_amount || Math.round((pattern.average_amount || 0) * 100) / 100,
-            min_amount: pattern.min_amount ? Math.round(pattern.min_amount * 100) / 100 : null,
-            max_amount: pattern.max_amount ? Math.round(pattern.max_amount * 100) / 100 : null,
+            min_amount: pattern.min_amount ? Math.abs(Math.round(pattern.min_amount * 100) / 100) : null,
+            max_amount: pattern.max_amount ? Math.abs(Math.round(pattern.max_amount * 100) / 100) : null,
             frequency: inferFrequency(pattern),
             day_of_week: null,
             day_of_month: inferDayOfMonth(pattern),
@@ -359,12 +368,12 @@ watch(() => props.patterns, (newPatterns) => {
         selected: true,
         original: pattern,
         form: {
-            description: pattern.description || pattern.original_description || 'Recurring Transaction',
+            description: pattern.original_description || pattern.description || 'Recurring Transaction',
             category: '',
             amount_type: pattern.standard_deviation > 10 ? 'dynamic' : 'static',
             amount: pattern.last_transaction_amount || Math.round((pattern.average_amount || 0) * 100) / 100,
-            min_amount: pattern.min_amount ? Math.round(pattern.min_amount * 100) / 100 : null,
-            max_amount: pattern.max_amount ? Math.round(pattern.max_amount * 100) / 100 : null,
+            min_amount: pattern.min_amount ? Math.abs(Math.round(pattern.min_amount * 100) / 100) : null,
+            max_amount: pattern.max_amount ? Math.abs(Math.round(pattern.max_amount * 100) / 100) : null,
             frequency: inferFrequency(pattern),
             day_of_week: null,
             day_of_month: inferDayOfMonth(pattern),
@@ -408,7 +417,10 @@ async function createTemplates() {
     try {
         const templatesData = selected.map(pattern => ({
             ...pattern.form,
-            pattern_id: pattern.original.id || Math.random().toString(36).substr(2, 9)
+            pattern_id: pattern.original.id || Math.random().toString(36).substr(2, 9),
+            // Include Plaid entity information for reliable matching
+            plaid_entity_id: pattern.original.plaid_entity_id || null,
+            plaid_entity_name: pattern.original.plaid_entity_name || null,
         }))
 
         await emit('create', templatesData)

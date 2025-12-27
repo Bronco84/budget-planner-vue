@@ -106,7 +106,8 @@ class BudgetService
         Carbon $endDate,
         int $budgetId
     ): Collection {
-        return collect($this->recurringService->projectTransactions($account, $startDate, $endDate))
+        // Get recurring transaction projections
+        $recurringProjections = collect($this->recurringService->projectTransactions($account, $startDate, $endDate))
             ->map(function ($transaction) use ($budgetId) {
                 $model = new Transaction($transaction);
                 $model->account = $transaction['account'] ?? null;
@@ -120,6 +121,29 @@ class BudgetService
                 $model->amount_in_cents = $transaction['amount_in_cents'] ?? 0;
                 return $model;
             });
+
+        // Get autopay projections for the entire budget
+        $budget = $account->budget;
+        $autopayProjections = collect($this->recurringService->generateAutopayProjections($budget, $startDate, $endDate))
+            // Filter to only include projections for this specific account
+            ->where('account_id', $account->id)
+            ->map(function ($transaction) use ($budgetId) {
+                $model = new Transaction((array) $transaction);
+                $model->account = $transaction->account ?? null;
+                $model->budget_id = $budgetId;
+                $model->is_projected = true;
+                $model->is_recurring = false; // Autopay is not a recurring transaction
+                $model->date = $transaction->date instanceof Carbon ? $transaction->date : Carbon::parse($transaction->date);
+                $model->account_id = $transaction->account_id;
+                $model->category_id = $transaction->category_id ?? null;
+                $model->description = $transaction->description;
+                $model->amount_in_cents = $transaction->amount_in_cents;
+                $model->projection_source = 'autopay';
+                return $model;
+            });
+
+        // Merge both types of projections
+        return $recurringProjections->concat($autopayProjections);
     }
 
     /**

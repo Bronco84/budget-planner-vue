@@ -645,9 +645,9 @@ const form = useForm({
   start_date: formatDateForInput(props.recurringTransaction.start_date),
   end_date: formatDateForInput(props.recurringTransaction.end_date) || '',
   min_amount: props.recurringTransaction.min_amount ?
-    (props.recurringTransaction.min_amount / 100).toFixed(2) : '',
+    Math.abs(props.recurringTransaction.min_amount / 100).toFixed(2) : '',
   max_amount: props.recurringTransaction.max_amount ?
-    (props.recurringTransaction.max_amount / 100).toFixed(2) : '',
+    Math.abs(props.recurringTransaction.max_amount / 100).toFixed(2) : '',
   average_amount: props.recurringTransaction.average_amount ?
     props.recurringTransaction.average_amount.toFixed(2) : '',
   notes: props.recurringTransaction.notes || '',

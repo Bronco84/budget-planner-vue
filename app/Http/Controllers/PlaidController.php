@@ -302,18 +302,43 @@ class PlaidController extends Controller
     public function updateBalance(Budget $budget, Account $account): RedirectResponse
     {
         $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
-        
+
         if (!$plaidAccount) {
             return redirect()->back()->with('error', 'Account is not linked to Plaid.');
         }
-        
+
         $updated = $this->plaidService->updateAccountBalance($plaidAccount);
-        
+
         if ($updated) {
             return redirect()->back()->with('message', 'Account balance updated successfully.');
         }
-        
+
         return redirect()->back()->with('error', 'Failed to update account balance.');
+    }
+
+    /**
+     * Update liability data (statement balance, payment info) for a credit card account.
+     */
+    public function updateLiabilities(Budget $budget, Account $account): RedirectResponse
+    {
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+
+        if (!$plaidAccount) {
+            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+        }
+
+        // Verify this is a credit card account
+        if (!$plaidAccount->isCreditCard()) {
+            return redirect()->back()->with('error', 'Liability data is only available for credit card accounts.');
+        }
+
+        $updated = $this->plaidService->updateLiabilityData($plaidAccount);
+
+        if ($updated) {
+            return redirect()->back()->with('message', 'Statement balance and payment information updated successfully.');
+        }
+
+        return redirect()->back()->with('error', 'Failed to update statement data. This feature may not be available for all credit card providers.');
     }
     
     /**

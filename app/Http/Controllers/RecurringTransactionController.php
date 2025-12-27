@@ -69,10 +69,14 @@ class RecurringTransactionController extends Controller
                 ->first();
         }
 
+        // Get credit cards eligible for autopay linking (have active autopay configured)
+        $eligibleCreditCards = $this->getAutopayEligibleCreditCards($budget);
+
         return Inertia::render('RecurringTransactions/Create', [
             'budget' => $budget,
             'accounts' => $budget->accounts,
             'sourceTransaction' => $sourceTransaction,
+            'eligibleCreditCards' => $eligibleCreditCards,
         ]);
     }
 
@@ -106,6 +110,7 @@ class RecurringTransactionController extends Controller
             'description' => 'required|string|max:255',
             'amount' => 'required_if:is_dynamic_amount,false|nullable|numeric',
             'account_id' => 'required|exists:accounts,id',
+            'linked_credit_card_account_id' => 'nullable|exists:accounts,id',
             'category' => 'required|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'start_date' => 'required|date',
@@ -202,14 +207,18 @@ class RecurringTransactionController extends Controller
             ->orderBy('date', 'desc')
             ->get();
 
+        // Get credit cards eligible for autopay linking (have active autopay configured)
+        $eligibleCreditCards = $this->getAutopayEligibleCreditCards($budget);
+
         return Inertia::render('RecurringTransactions/Show', [
             'budget' => $budget,
             'accounts' => $budget->accounts,
-            'recurringTransaction' => $recurring_transaction->load('account'),
+            'recurringTransaction' => $recurring_transaction->load(['account', 'linkedCreditCard']),
             'rules' => $rules,
             'linkedTransactions' => $linkedTransactions,
             'fieldOptions' => \App\Models\RecurringTransactionRule::getFieldOptions(),
             'operatorOptions' => \App\Models\RecurringTransactionRule::getOperatorOptions(),
+            'eligibleCreditCards' => $eligibleCreditCards,
         ]);
     }
 
@@ -230,6 +239,7 @@ class RecurringTransactionController extends Controller
             'description' => 'required|string|max:255',
             'amount' => 'required_if:is_dynamic_amount,false|nullable|numeric',
             'account_id' => 'required|exists:accounts,id',
+            'linked_credit_card_account_id' => 'nullable|exists:accounts,id',
             'category' => 'required|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'start_date' => 'required|date',
@@ -384,17 +394,54 @@ class RecurringTransactionController extends Controller
         } else {
             $validated['amount_in_cents'] = 0; // Default for dynamic amount transactions
         }
+        
+        // Determine if this is an expense (negative) or income (positive)
+        $isExpense = ($validated['amount_in_cents'] ?? 0) < 0;
+        
         unset($validated['amount']);
 
         // Convert dynamic amount values to cents if provided
+        // Ensure min/max have the same sign as the main amount
         if (isset($validated['min_amount']) && $validated['min_amount'] !== null) {
-            $validated['min_amount'] = (int)($validated['min_amount'] * 100);
+            $minCents = (int)(abs($validated['min_amount']) * 100);
+            $validated['min_amount'] = $isExpense ? -$minCents : $minCents;
         }
 
         if (isset($validated['max_amount']) && $validated['max_amount'] !== null) {
-            $validated['max_amount'] = (int)($validated['max_amount'] * 100);
+            $maxCents = (int)(abs($validated['max_amount']) * 100);
+            $validated['max_amount'] = $isExpense ? -$maxCents : $maxCents;
         }
+        
         return $validated;
+    }
+
+    /**
+     * Get credit cards in the budget that have active autopay configured.
+     *
+     * @param Budget $budget
+     * @return \Illuminate\Support\Collection
+     */
+    protected function getAutopayEligibleCreditCards(Budget $budget)
+    {
+        return $budget->accounts()
+            ->with('plaidAccount')
+            ->where('autopay_enabled', true)
+            ->whereNotNull('autopay_source_account_id')
+            ->get()
+            ->filter(function ($account) {
+                return $account->hasActiveAutopay();
+            })
+            ->map(function ($account) {
+                return [
+                    'id' => $account->id,
+                    'name' => $account->name,
+                    'institution_name' => $account->plaidAccount?->institution_name,
+                    'account_mask' => $account->plaidAccount?->account_mask,
+                    'next_payment_due_date' => $account->getNextAutopayDate()?->format('Y-m-d'),
+                    'statement_balance_cents' => $account->plaidAccount?->last_statement_balance_cents,
+                ];
+            })
+            ->values();
     }
     
 }

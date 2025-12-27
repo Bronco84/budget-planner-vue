@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Carbon\Carbon;
 
 class PlaidAccount extends Model
 {
@@ -24,6 +26,15 @@ class PlaidAccount extends Model
         'current_balance_cents',
         'available_balance_cents',
         'balance_updated_at',
+        'last_statement_balance_cents',
+        'last_statement_issue_date',
+        'last_payment_amount_cents',
+        'last_payment_date',
+        'next_payment_due_date',
+        'minimum_payment_amount_cents',
+        'apr_percentage',
+        'credit_limit_cents',
+        'liability_updated_at',
     ];
 
     /**
@@ -33,6 +44,15 @@ class PlaidAccount extends Model
         'current_balance_cents' => 'integer',
         'available_balance_cents' => 'integer',
         'balance_updated_at' => 'datetime',
+        'last_statement_balance_cents' => 'integer',
+        'last_statement_issue_date' => 'date',
+        'last_payment_amount_cents' => 'integer',
+        'last_payment_date' => 'date',
+        'next_payment_due_date' => 'date',
+        'minimum_payment_amount_cents' => 'integer',
+        'apr_percentage' => 'decimal:2',
+        'credit_limit_cents' => 'integer',
+        'liability_updated_at' => 'datetime',
     ];
 
     /**
@@ -74,5 +94,41 @@ class PlaidAccount extends Model
     public function getAccessTokenAttribute(): string
     {
         return $this->plaidConnection->access_token ?? '';
+    }
+
+    /**
+     * Get the statement history for this Plaid account.
+     */
+    public function statementHistory(): HasMany
+    {
+        return $this->hasMany(PlaidStatementHistory::class);
+    }
+
+    /**
+     * Check if this account is a credit card.
+     */
+    public function isCreditCard(): bool
+    {
+        return $this->account_type === 'credit' && $this->account_subtype === 'credit card';
+    }
+
+    /**
+     * Check if this account has liability data.
+     */
+    public function hasLiabilityData(): bool
+    {
+        return $this->last_statement_balance_cents !== null;
+    }
+
+    /**
+     * Calculate the number of days until the next payment is due.
+     */
+    public function getDaysUntilPaymentDue(): ?int
+    {
+        if (!$this->next_payment_due_date) {
+            return null;
+        }
+
+        return Carbon::now()->diffInDays($this->next_payment_due_date, false);
     }
 } 

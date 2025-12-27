@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
+use App\Models\PlaidStatementHistory;
 use App\Models\PlaidTransaction;
 use App\Models\Transaction;
 use Carbon\Carbon;
@@ -113,13 +114,36 @@ class PlaidService
         }
 
         try {
+            // Start with base products - 'transactions' is always needed
+            // We'll add 'liabilities' conditionally based on the connection
+            $products = ['transactions'];
+
+            // Only request liabilities for update mode (existing connections)
+            // For new connections, liabilities will be requested via update mode if needed
+            if ($existingAccessToken) {
+                // Check if this connection has any credit card accounts that would benefit from liabilities
+                $hasLiabilityAccounts = PlaidAccount::whereHas('plaidConnection', function ($query) use ($existingAccessToken) {
+                    $query->where('access_token', $existingAccessToken);
+                })
+                ->where(function ($query) {
+                    $query->where('account_type', 'credit')
+                          ->orWhere('account_type', 'loan')
+                          ->orWhere('account_type', 'mortgage');
+                })
+                ->exists();
+
+                if ($hasLiabilityAccounts) {
+                    $products[] = 'liabilities';
+                }
+            }
+
             $payload = [
                 'client_name' => config('app.name'),
                 'user' => [
                     'client_user_id' => (string) $userId,
                     'email_address' => null, // Optional: Add user's email if available
                 ],
-                'products' => ['transactions'],
+                'products' => $products,
                 'country_codes' => ['US'],
                 'language' => 'en',
                 // Remove account_filters to allow ALL account types
@@ -814,6 +838,19 @@ class PlaidService
                         ]);
                     }
 
+                    // Update liability data for credit cards (gracefully handle errors)
+                    if ($plaidAccount->isCreditCard()) {
+                        try {
+                            $this->updateLiabilityData($plaidAccount);
+                        } catch (\Exception $liabilityError) {
+                            // Log the error but don't fail the balance update
+                            Log::warning('Failed to update liability data during balance sync', [
+                                'plaid_account_id' => $plaidAccount->id,
+                                'error' => $liabilityError->getMessage()
+                            ]);
+                        }
+                    }
+
                     return true;
                 }
             }
@@ -828,5 +865,184 @@ class PlaidService
 
             return false;
         }
+    }
+
+    /**
+     * Update liability data (statement balance, payment info) for a credit card account.
+     *
+     * @param PlaidAccount $plaidAccount
+     * @return bool
+     */
+    public function updateLiabilityData(PlaidAccount $plaidAccount): bool
+    {
+        // Only process credit card accounts
+        if (!$plaidAccount->isCreditCard()) {
+            Log::debug('Skipping liability update for non-credit card account', [
+                'plaid_account_id' => $plaidAccount->id,
+                'account_type' => $plaidAccount->account_type,
+                'account_subtype' => $plaidAccount->account_subtype
+            ]);
+            return false;
+        }
+
+        $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
+
+        if (!$accessToken) {
+            Log::error('Update liability data failed: Access token is null', [
+                'plaid_account_id' => $plaidAccount->id,
+                'connection_id' => $plaidAccount->plaid_connection_id
+            ]);
+            return false;
+        }
+
+        try {
+            // Get liability data from Plaid (this returns ALL credit cards for the connection)
+            $liabilities = $this->getLiabilities($accessToken);
+
+            if (empty($liabilities)) {
+                Log::info('No liability data returned from Plaid', [
+                    'plaid_account_id' => $plaidAccount->id
+                ]);
+                return false;
+            }
+
+            $creditCards = $liabilities['credit'] ?? [];
+
+            if (empty($creditCards)) {
+                Log::info('No credit cards found in liabilities data', [
+                    'plaid_account_id' => $plaidAccount->id
+                ]);
+                return false;
+            }
+
+            // OPTIMIZATION: Update ALL credit cards from this connection, not just the one passed in
+            // This prevents redundant API calls when multiple cards exist on the same connection
+            $allConnectionCards = PlaidAccount::where('plaid_connection_id', $plaidAccount->plaid_connection_id)
+                ->where('account_type', 'credit')
+                ->where('account_subtype', 'credit card')
+                ->get();
+
+            $updatedCount = 0;
+            $matchingCard = null;
+
+            foreach ($creditCards as $card) {
+                // Find the PlaidAccount that matches this card
+                $matchingPlaidAccount = $allConnectionCards->firstWhere('plaid_account_id', $card['account_id']);
+
+                if (!$matchingPlaidAccount) {
+                    continue;
+                }
+
+                // Track if we updated the card that was originally passed in
+                if ($matchingPlaidAccount->id === $plaidAccount->id) {
+                    $matchingCard = $card;
+                }
+
+                // Update this credit card's liability data
+                $this->updateSingleCardLiabilityData($matchingPlaidAccount, $card);
+                $updatedCount++;
+            }
+
+            Log::info('Updated liability data for multiple credit cards', [
+                'connection_id' => $plaidAccount->plaid_connection_id,
+                'updated_count' => $updatedCount,
+                'total_cards' => count($creditCards)
+            ]);
+
+            if (!$matchingCard) {
+                Log::info('No matching credit card found for the requested account', [
+                    'plaid_account_id' => $plaidAccount->plaid_account_id,
+                    'credit_cards_count' => count($creditCards)
+                ]);
+                return false;
+            }
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('Error updating liability data', [
+                'message' => $e->getMessage(),
+                'plaid_account_id' => $plaidAccount->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Update liability data for a single credit card.
+     *
+     * @param PlaidAccount $plaidAccount
+     * @param array $cardData
+     * @return void
+     */
+    private function updateSingleCardLiabilityData(PlaidAccount $plaidAccount, array $cardData): void
+    {
+        // Extract liability data
+        $statementBalance = $cardData['last_statement_balance'] ?? null;
+        $statementIssueDate = $cardData['last_statement_issue_date'] ?? null;
+        $creditLimit = $cardData['credit_limit'] ?? null;
+
+        // Update PlaidAccount with liability fields
+        $plaidAccount->update([
+            'last_statement_balance_cents' => $statementBalance !== null ? (int) round($statementBalance * 100) : null,
+            'last_statement_issue_date' => $statementIssueDate,
+            'last_payment_amount_cents' => isset($cardData['last_payment_amount'])
+                ? (int) round($cardData['last_payment_amount'] * 100)
+                : null,
+            'last_payment_date' => $cardData['last_payment_date'] ?? null,
+            'next_payment_due_date' => $cardData['next_payment_due_date'] ?? null,
+            'minimum_payment_amount_cents' => isset($cardData['minimum_payment_amount'])
+                ? (int) round($cardData['minimum_payment_amount'] * 100)
+                : null,
+            'apr_percentage' => $cardData['apr'] ?? null,
+            'credit_limit_cents' => $creditLimit !== null ? (int) round($creditLimit * 100) : null,
+            'liability_updated_at' => now(),
+        ]);
+
+        // Create statement history record if we have a new statement
+        if ($statementBalance !== null && $statementIssueDate !== null) {
+            $statementBalanceCents = (int) round($statementBalance * 100);
+            $creditLimitCents = $creditLimit !== null ? (int) round($creditLimit * 100) : null;
+
+            // Calculate credit utilization
+            $creditUtilization = PlaidStatementHistory::calculateCreditUtilization(
+                $statementBalanceCents,
+                $creditLimitCents
+            );
+
+            // Check if we already have this statement in history
+            $existingHistory = PlaidStatementHistory::where('plaid_account_id', $plaidAccount->id)
+                ->where('statement_issue_date', $statementIssueDate)
+                ->first();
+
+            if (!$existingHistory) {
+                PlaidStatementHistory::create([
+                    'plaid_account_id' => $plaidAccount->id,
+                    'statement_balance_cents' => $statementBalanceCents,
+                    'statement_issue_date' => $statementIssueDate,
+                    'payment_due_date' => $cardData['next_payment_due_date'] ?? null,
+                    'minimum_payment_cents' => isset($cardData['minimum_payment_amount'])
+                        ? (int) round($cardData['minimum_payment_amount'] * 100)
+                        : null,
+                    'apr_percentage' => $cardData['apr'] ?? null,
+                    'credit_utilization_percentage' => $creditUtilization,
+                ]);
+
+                Log::info('Created new statement history record', [
+                    'plaid_account_id' => $plaidAccount->id,
+                    'statement_issue_date' => $statementIssueDate,
+                    'credit_utilization' => $creditUtilization
+                ]);
+            }
+        }
+
+        Log::info('Successfully updated liability data for single card', [
+            'plaid_account_id' => $plaidAccount->id,
+            'plaid_account_identifier' => $plaidAccount->plaid_account_id,
+            'statement_balance' => $statementBalance,
+            'statement_date' => $statementIssueDate
+        ]);
     }
 }

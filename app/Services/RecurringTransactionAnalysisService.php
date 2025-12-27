@@ -39,11 +39,12 @@ class RecurringTransactionAnalysisService
             'end_date' => $endDate->toDateString(),
         ]);
 
-        // Get transactions for the analysis period
+        // Get transactions for the analysis period with Plaid data for original descriptions
         $transactions = Transaction::where('budget_id', $account->budget_id)
             ->where('account_id', $account->id)
             ->whereBetween('date', [$startDate, $endDate])
             ->whereNull('recurring_transaction_template_id') // Only unlinked transactions
+            ->with('plaidTransaction')
             ->orderBy('date', 'desc')
             ->get();
 
@@ -181,11 +182,14 @@ class RecurringTransactionAnalysisService
             $normalizedDescription = $this->normalizeDescription($transaction->description);
             $key = $this->generateDescriptionKey($normalizedDescription);
 
+            // Get original description from Plaid if available, otherwise use transaction description
+            $originalDescription = $this->getOriginalDescription($transaction);
+
             if (!isset($groupedTransactions[$key])) {
                 $groupedTransactions[$key] = [
                     'transactions' => collect(),
                     'normalized_description' => $normalizedDescription,
-                    'original_description' => $transaction->description,
+                    'original_description' => $originalDescription,
                 ];
             }
 
@@ -254,6 +258,9 @@ class RecurringTransactionAnalysisService
         $firstOccurrence = $sortedTransactions->first();
         $suggestedStartDate = $firstOccurrence->date;
 
+        // Extract Plaid entity information from the most common counterparty
+        $entityInfo = $this->extractPrimaryEntityFromTransactions($transactions);
+
         return [
             'description' => $group['normalized_description'],
             'original_description' => $group['original_description'],
@@ -265,6 +272,8 @@ class RecurringTransactionAnalysisService
             'amount_in_cents' => (int) $avgAmount,
             'is_dynamic_amount' => $isDynamicAmount,
             'suggested_start_date' => $suggestedStartDate->toDateString(),
+            'plaid_entity_id' => $entityInfo['entity_id'],
+            'plaid_entity_name' => $entityInfo['entity_name'],
             'amount_stats' => [
                 'average' => $avgAmount,
                 'median' => $medianAmount,
@@ -483,12 +492,32 @@ class RecurringTransactionAnalysisService
 
         if ($isConfirmationData) {
             // Handle user-edited confirmation data
+            // Always store the amount - for dynamic amounts, this is the estimated/average amount
+            $amountInCents = intval(($patternData['amount'] ?? 0) * 100);
+            
+            // Determine if this is an expense (negative) based on the main amount
+            $isExpense = $amountInCents < 0;
+            
+            // Ensure min/max have the same sign as the main amount
+            // Frontend sends positive values, we apply the sign here
+            $minAmount = null;
+            if ($patternData['amount_type'] === 'dynamic' && $patternData['min_amount'] !== null) {
+                $minCents = intval(abs($patternData['min_amount']) * 100);
+                $minAmount = $isExpense ? -$minCents : $minCents;
+            }
+            
+            $maxAmount = null;
+            if ($patternData['amount_type'] === 'dynamic' && $patternData['max_amount'] !== null) {
+                $maxCents = intval(abs($patternData['max_amount']) * 100);
+                $maxAmount = $isExpense ? -$maxCents : $maxCents;
+            }
+            
             return [
                 'budget_id' => $budget->id,
                 'account_id' => $account->id,
                 'description' => $patternData['description'],
                 'category' => $patternData['category'] ?? null,
-                'amount_in_cents' => $patternData['amount_type'] === 'static' ? intval($patternData['amount'] * 100) : null,
+                'amount_in_cents' => $amountInCents,
                 'frequency' => $patternData['frequency'],
                 'start_date' => $patternData['start_date'],
                 'end_date' => !empty($patternData['end_date']) ? $patternData['end_date'] : null,
@@ -497,12 +526,11 @@ class RecurringTransactionAnalysisService
                 'bimonthly_first_day' => $patternData['bimonthly_first_day'] ?? null,
                 'bimonthly_second_day' => $patternData['bimonthly_second_day'] ?? null,
                 'is_dynamic_amount' => $patternData['amount_type'] === 'dynamic',
-                'average_amount' => $patternData['amount_type'] === 'dynamic' ?
-                    (isset($patternData['min_amount'], $patternData['max_amount']) ?
-                        ($patternData['min_amount'] + $patternData['max_amount']) / 2 : null) :
-                    ($patternData['amount'] ?? null),
-                'min_amount' => $patternData['amount_type'] === 'dynamic' ? intval(($patternData['min_amount'] ?? 0) * 100) : null,
-                'max_amount' => $patternData['amount_type'] === 'dynamic' ? intval(($patternData['max_amount'] ?? 0) * 100) : null,
+                'average_amount' => $patternData['amount'] ?? null,
+                'min_amount' => $minAmount,
+                'max_amount' => $maxAmount,
+                'plaid_entity_id' => $patternData['plaid_entity_id'] ?? null,
+                'plaid_entity_name' => $patternData['plaid_entity_name'] ?? null,
                 'notes' => 'Generated from recurring pattern analysis and user confirmation.',
             ];
         } else {
@@ -523,6 +551,8 @@ class RecurringTransactionAnalysisService
                 'average_amount' => $patternData['is_dynamic_amount'] ? ($patternData['amount_stats']['average'] / 100) : ($patternData['amount_in_cents'] / 100),
                 'min_amount' => $patternData['is_dynamic_amount'] ? $patternData['amount_stats']['min'] : null,
                 'max_amount' => $patternData['is_dynamic_amount'] ? $patternData['amount_stats']['max'] : null,
+                'plaid_entity_id' => $patternData['plaid_entity_id'] ?? null,
+                'plaid_entity_name' => $patternData['plaid_entity_name'] ?? null,
                 'notes' => 'Generated from pattern analysis. Confidence: ' . number_format($patternData['confidence_score'] * 100, 1) . '%',
             ];
         }
@@ -567,6 +597,84 @@ class RecurringTransactionAnalysisService
     }
 
     // Helper methods
+
+    /**
+     * Get the original description from Plaid transaction or fall back to transaction description.
+     * Prefers merchant_name if available, otherwise uses the raw Plaid name.
+     */
+    protected function getOriginalDescription(Transaction $transaction): string
+    {
+        if ($transaction->plaidTransaction) {
+            // Prefer merchant_name as it's cleaner (e.g., "Amazon" vs "AMAZON MKTPLACE PMTS...")
+            if (!empty($transaction->plaidTransaction->merchant_name)) {
+                return $transaction->plaidTransaction->merchant_name;
+            }
+            // Fall back to the raw Plaid name
+            if (!empty($transaction->plaidTransaction->name)) {
+                return $transaction->plaidTransaction->name;
+            }
+        }
+        
+        // Fall back to the transaction's description
+        return $transaction->description;
+    }
+
+    /**
+     * Extract the primary Plaid entity ID and name from a collection of transactions.
+     * Finds the most common entity across all transactions in the group.
+     *
+     * @param \Illuminate\Support\Collection $transactions
+     * @return array{entity_id: string|null, entity_name: string|null}
+     */
+    protected function extractPrimaryEntityFromTransactions($transactions): array
+    {
+        $entityCounts = [];
+        
+        foreach ($transactions as $transaction) {
+            if (!$transaction->plaidTransaction) {
+                continue;
+            }
+            
+            $counterparties = $transaction->plaidTransaction->counterparties;
+            
+            // Handle JSON string if not auto-decoded by Eloquent cast
+            if (is_string($counterparties)) {
+                $counterparties = json_decode($counterparties, true);
+            }
+            
+            if (empty($counterparties) || !is_array($counterparties)) {
+                continue;
+            }
+            
+            // Get the first counterparty (usually the primary one)
+            $primary = $counterparties[0] ?? null;
+            if (!$primary || empty($primary['entity_id'])) {
+                continue;
+            }
+            
+            $entityId = $primary['entity_id'];
+            if (!isset($entityCounts[$entityId])) {
+                $entityCounts[$entityId] = [
+                    'count' => 0,
+                    'name' => $primary['name'] ?? null,
+                ];
+            }
+            $entityCounts[$entityId]['count']++;
+        }
+        
+        if (empty($entityCounts)) {
+            return ['entity_id' => null, 'entity_name' => null];
+        }
+        
+        // Find the most common entity
+        uasort($entityCounts, fn($a, $b) => $b['count'] <=> $a['count']);
+        $topEntityId = array_key_first($entityCounts);
+        
+        return [
+            'entity_id' => $topEntityId,
+            'entity_name' => $entityCounts[$topEntityId]['name'],
+        ];
+    }
 
     protected function normalizeDescription(string $description): string
     {

@@ -6,6 +6,8 @@ use App\Models\RecurringTransactionTemplate;
 use App\Models\RecurringTransactionRule;
 use App\Models\Transaction;
 use App\Models\Account;
+use App\Models\Budget;
+use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
@@ -16,13 +18,13 @@ class RecurringTransactionService
     {
         $projectedTransactions = collect();
 
-        // Get all active recurring transaction templates with their transactions preloaded
+        // Get all active recurring transaction templates with their transactions and linked credit cards preloaded
         $templates = RecurringTransactionTemplate::where('account_id', $account->id)
             ->where(function ($query) use ($startDate) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', $startDate);
             })
-            ->with('transactions')
+            ->with(['transactions', 'linkedCreditCard.plaidAccount'])
             ->get();
 
         foreach ($templates as $template) {
@@ -44,6 +46,14 @@ class RecurringTransactionService
             while ($date <= $templateEndDate)
             {
                 if ($template->shouldGenerateForDate($date)) {
+                    // Check if autopay should override this projection
+                    // If this template is linked to a credit card with active autopay,
+                    // skip the projection for the month that autopay will handle
+                    if ($template->shouldAutopayOverrideFor($date)) {
+                        $date->addDay();
+                        continue;
+                    }
+
                     // Determine the amount for this transaction
                     $existingTransaction = $this->getTransactionForDate($template, $date);
 
@@ -111,6 +121,8 @@ class RecurringTransactionService
 
     /**
      * Calculate the dynamic amount for a recurring transaction template based on rules.
+     * If the template is linked to a credit card, uses the card's current balance
+     * if it exceeds the calculated average (reflecting current spending trajectory).
      *
      * @param RecurringTransactionTemplate $template
      * @return int|null The calculated amount in cents or null if not calculable
@@ -121,9 +133,10 @@ class RecurringTransactionService
 
         if ($rules->isEmpty()) {
             if ($template->average_amount !== null) {
-                return (int)($template->average_amount * 100);
+                $calculatedAmount = (int)($template->average_amount * 100);
+                return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
             }
-            return $template->amount_in_cents;
+            return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
         }
 
         $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
@@ -134,11 +147,11 @@ class RecurringTransactionService
 
         if ($matchingTransactions->isEmpty()) {
             if ($template->average_amount !== null) {
-                $amount = (int)($template->average_amount * 100);
-                return $amount;
+                $calculatedAmount = (int)($template->average_amount * 100);
+                return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
             }
 
-            return $template->amount_in_cents;
+            return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
         }
 
         // Filter transactions based on min/max logic BEFORE averaging
@@ -168,24 +181,80 @@ class RecurringTransactionService
         if ($filteredTransactions->isEmpty()) {
             // If no transactions left after filtering, fallback
             if ($template->average_amount !== null) {
-                $amount = (int)($template->average_amount * 100);
-                return $amount;
+                $calculatedAmount = (int)($template->average_amount * 100);
+                return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
             }
 
-            return $template->amount_in_cents;
+            return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
         }
 
         // Calculate average of only the valid transactions
         $totalAmount = $filteredTransactions->sum('amount_in_cents');
         $averageAmount = (int)($totalAmount / $filteredTransactions->count());
 
-        return $averageAmount;
+        return $this->applyLinkedCreditCardBalance($template, $averageAmount);
+    }
+
+    /**
+     * If the template is linked to a credit card, check if the card's spending since
+     * the last statement exceeds the calculated amount. If so, use that instead.
+     * 
+     * Logic:
+     * - Current balance includes: statement balance + new spending since statement
+     * - Statement balance will be paid by the upcoming autopay
+     * - New spending = current balance - statement balance
+     * - If new spending > calculated average, use new spending for next month's projection
+     *
+     * @param RecurringTransactionTemplate $template
+     * @param int|null $calculatedAmount
+     * @return int|null
+     */
+    protected function applyLinkedCreditCardBalance(RecurringTransactionTemplate $template, ?int $calculatedAmount): ?int
+    {
+        if ($calculatedAmount === null) {
+            return null;
+        }
+
+        // Only apply if template is linked to a credit card
+        if (!$template->linked_credit_card_account_id) {
+            return $calculatedAmount;
+        }
+
+        // Load the linked credit card with plaidAccount if not already loaded
+        if (!$template->relationLoaded('linkedCreditCard')) {
+            $template->load('linkedCreditCard.plaidAccount');
+        }
+
+        $creditCard = $template->linkedCreditCard;
+        if (!$creditCard) {
+            return $calculatedAmount;
+        }
+
+        $currentBalanceCents = $creditCard->current_balance_cents ?? 0;
+        
+        // Get the statement balance that will be paid by autopay
+        $statementBalanceCents = $creditCard->plaidAccount?->last_statement_balance_cents ?? 0;
+        
+        // Calculate new spending since the statement was generated
+        // New spending = current balance - statement balance
+        $newSpendingSinceStatement = $currentBalanceCents - $statementBalanceCents;
+        
+        // Only use new spending if it's positive (there's actually new spending)
+        // and if it exceeds the calculated average
+        if ($newSpendingSinceStatement > 0 && abs($newSpendingSinceStatement) > abs($calculatedAmount)) {
+            // Return as negative (expense) matching the sign of the calculated amount
+            $sign = $calculatedAmount < 0 ? -1 : 1;
+            return $sign * abs($newSpendingSinceStatement);
+        }
+
+        return $calculatedAmount;
     }
 
 
 
     /**
      * Find transactions that match all the provided rules for a template.
+     * If the template has a plaid_entity_id, use that for matching first.
      *
      * @param RecurringTransactionTemplate $template
      * @param \Illuminate\Support\Collection $rules
@@ -196,7 +265,38 @@ class RecurringTransactionService
         // Get the budget ID from the template
         $budgetId = $template->budget_id;
 
-        // Get transactions for this budget
+        // Priority 1: If template has a plaid_entity_id, use entity-based matching
+        if ($template->plaid_entity_id) {
+            $entityId = $template->plaid_entity_id;
+            $entityMatches = Transaction::where('budget_id', $budgetId)
+                ->whereHas('plaidTransaction', function ($query) use ($entityId) {
+                    // Simple LIKE search - entity_id is unique enough
+                    $query->where('counterparties', 'like', '%' . $entityId . '%');
+                })
+                ->with('plaidTransaction')
+                ->get();
+            
+            // If we found matches by entity, return them (rules are optional refinement)
+            if ($entityMatches->isNotEmpty()) {
+                // Still apply rules as additional filters if any
+                if ($rules->isNotEmpty()) {
+                    return $entityMatches->filter(function (Transaction $transaction) use ($rules) {
+                        foreach ($rules as $rule) {
+                            $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
+                            $ruleValue = $rule->value;
+                            $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue);
+                            if (!$matches) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    });
+                }
+                return $entityMatches;
+            }
+        }
+
+        // Priority 2: Fallback to rule-based matching
         $transactions = Transaction::where('budget_id', $budgetId)->get();
 
         // Filter transactions that match all rules
@@ -222,31 +322,68 @@ class RecurringTransactionService
      * Link existing transactions that match the template
      * This is useful for identifying historical transactions that should be considered
      * when calculating dynamic amounts
+     * 
+     * Matching priority:
+     * 1. Match by Plaid entity_id (most reliable)
+     * 2. Match by description (fallback)
      */
     public function linkMatchingTransactions(RecurringTransactionTemplate $template)
     {
         // Find transactions that match the template but aren't linked yet
-        $matchingTransactions = Transaction::where('budget_id', $template->budget_id)
+        $query = Transaction::where('budget_id', $template->budget_id)
             ->where('recurring_transaction_template_id', null)
-            ->where(function($query) use ($template) {
+            ->with('plaidTransaction');
+
+        // Priority 1: Match by Plaid entity_id if available
+        if ($template->plaid_entity_id) {
+            $matchingTransactions = $this->findTransactionsByEntityId(
+                $template->budget_id,
+                $template->plaid_entity_id
+            );
+        } else {
+            // Priority 2: Fallback to description matching
+            $matchingTransactions = $query->where(function($q) use ($template) {
                 // Match by description (exact match or contains)
-                $query->where('description', $template->description)
+                $q->where('description', $template->description)
                     ->orWhere('description', 'like', '%' . $template->description . '%');
 
                 // If category exists, also match by that
                 if ($template->category) {
-                    $query->where('category', $template->category);
+                    $q->where('category', $template->category);
                 }
-            })
-            ->get();
+            })->get();
+        }
 
         // Link the matching transactions to this template
         foreach ($matchingTransactions as $transaction) {
-            $transaction->recurring_transaction_template_id = $template->id;
-            $transaction->save();
+            if ($transaction->recurring_transaction_template_id === null) {
+                $transaction->recurring_transaction_template_id = $template->id;
+                $transaction->save();
+            }
         }
 
         return $matchingTransactions->count();
+    }
+
+    /**
+     * Find transactions that match a Plaid entity_id.
+     * Searches the counterparties field in the related PlaidTransaction.
+     * Uses simple LIKE search since the entity_id is unique.
+     *
+     * @param int $budgetId
+     * @param string $entityId
+     * @return \Illuminate\Support\Collection
+     */
+    protected function findTransactionsByEntityId(int $budgetId, string $entityId): Collection
+    {
+        return Transaction::where('budget_id', $budgetId)
+            ->where('recurring_transaction_template_id', null)
+            ->whereHas('plaidTransaction', function ($query) use ($entityId) {
+                // Simple LIKE search - entity_id is unique enough
+                $query->where('counterparties', 'like', '%' . $entityId . '%');
+            })
+            ->with('plaidTransaction')
+            ->get();
     }
 
     /**
@@ -1018,6 +1155,146 @@ class RecurringTransactionService
         $netCashFlow = $projectedTransactions->sum('amount_in_cents');
 
         return $netCashFlow;
+    }
+
+    /**
+     * Generate autopay deduction projections for all autopay-enabled credit cards.
+     *
+     * @param Budget $budget
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return Collection Collection of projected transactions (not persisted)
+     */
+    public function generateAutopayProjections(Budget $budget, Carbon $startDate, Carbon $endDate): Collection
+    {
+        $projections = collect();
+
+        // Get all accounts with active autopay in this budget
+        $autopayAccounts = $budget->accounts()
+            ->with(['plaidAccount', 'autopaySourceAccount'])
+            ->where('autopay_enabled', true)
+            ->whereNotNull('autopay_source_account_id')
+            ->get();
+
+        foreach ($autopayAccounts as $creditCard) {
+            if (!$creditCard->hasActiveAutopay()) {
+                continue;
+            }
+
+            $paymentDate = $creditCard->getNextAutopayDate();
+            $paymentAmount = $creditCard->getAutopayAmountCents();
+
+            // Skip if no payment date or amount
+            if (!$paymentDate || !$paymentAmount) {
+                continue;
+            }
+
+            // Only include if payment falls within projection window
+            if ($paymentDate->between($startDate, $endDate)) {
+                // Create deduction from source account
+                $projections->push($this->createAutopayProjection(
+                    $creditCard->autopaySourceAccount,
+                    $creditCard,
+                    $paymentDate,
+                    $paymentAmount
+                ));
+            }
+        }
+
+        return $projections;
+    }
+
+    /**
+     * Create a single autopay projection transaction.
+     *
+     * @param Account $sourceAccount
+     * @param Account $creditCard
+     * @param Carbon $paymentDate
+     * @param int $amountCents
+     * @return object
+     */
+    private function createAutopayProjection(
+        Account $sourceAccount,
+        Account $creditCard,
+        Carbon $paymentDate,
+        int $amountCents
+    ): object {
+        $category = $this->getAutopayCategory($sourceAccount->budget);
+        $description = $this->buildAutopayDescription($creditCard);
+        
+        return (object) [
+            'id' => null, // Not persisted
+            'account_id' => $sourceAccount->id,
+            'account' => $sourceAccount,
+            'category_id' => $category?->id,
+            'category' => $category?->name, // Use category name string for frontend display
+            'budget_id' => $sourceAccount->budget_id,
+            'date' => $paymentDate->copy(),
+            'amount_in_cents' => -abs($amountCents), // Negative for deduction
+            'description' => $description,
+            'type' => 'debit',
+            'is_projected' => true,
+            'is_projection' => true,
+            'projection_source' => 'autopay',
+            'projection_metadata' => [
+                'credit_card_id' => $creditCard->id,
+                'credit_card_name' => $creditCard->name,
+                'statement_balance_cents' => $amountCents,
+                'payment_due_date' => $paymentDate->format('Y-m-d'),
+            ],
+        ];
+    }
+
+    /**
+     * Build a descriptive autopay description using institution and account mask.
+     *
+     * @param Account $creditCard
+     * @return string
+     */
+    private function buildAutopayDescription(Account $creditCard): string
+    {
+        $plaidAccount = $creditCard->plaidAccount;
+        
+        if ($plaidAccount) {
+            $institution = $plaidAccount->institution_name ?? null;
+            $mask = $plaidAccount->account_mask ?? null;
+            
+            if ($institution && $mask) {
+                return "{$institution} (...{$mask}) Autopay";
+            } elseif ($institution) {
+                return "{$institution} Autopay";
+            } elseif ($mask) {
+                return "Card (...{$mask}) Autopay";
+            }
+        }
+        
+        // Fallback to account name if no Plaid data
+        return "Autopay: {$creditCard->name}";
+    }
+
+    /**
+     * Get or create "Credit Card Payment" category for autopay transactions.
+     *
+     * @param Budget $budget
+     * @return Category|null
+     */
+    private function getAutopayCategory(Budget $budget): ?Category
+    {
+        // Try to find existing category
+        $category = $budget->categories()
+            ->where('name', 'Credit Card Payment')
+            ->first();
+
+        if (!$category) {
+            // Create if doesn't exist
+            $category = $budget->categories()->create([
+                'name' => 'Credit Card Payment',
+                'amount' => 0, // Autopay amounts vary based on statement balance
+                'color' => '#EF4444', // Red
+            ]);
+        }
+
+        return $category;
     }
 
 }

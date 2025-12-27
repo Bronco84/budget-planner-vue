@@ -176,6 +176,48 @@
                 </div>
               </div>
 
+              <!-- Autopay Override Section -->
+              <div v-if="eligibleCreditCards && eligibleCreditCards.length > 0" class="border-t border-gray-200 pt-6 mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Autopay Override</h3>
+                <p class="text-sm text-gray-600 mb-4">
+                  Link this recurring transaction to a credit card with autopay enabled. When the statement balance is available, the autopay projection will override this recurring transaction's projection for that month.
+                </p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <InputLabel for="linked_credit_card_account_id" value="Linked Credit Card" />
+                    <SelectInput
+                      id="linked_credit_card_account_id"
+                      v-model="form.linked_credit_card_account_id"
+                      class="mt-1 block w-full"
+                    >
+                      <option :value="null">None (no autopay override)</option>
+                      <option v-for="card in eligibleCreditCards" :key="card.id" :value="card.id">
+                        {{ card.institution_name || 'Unknown' }} (...{{ card.account_mask }}) - {{ card.name }}
+                      </option>
+                    </SelectInput>
+                    <InputError class="mt-2" :message="form.errors.linked_credit_card_account_id" />
+                  </div>
+
+                  <!-- Show linked card info if selected -->
+                  <div v-if="selectedCreditCard" class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                    <div class="text-sm">
+                      <div class="flex justify-between mb-1">
+                        <span class="text-gray-600">Statement Balance:</span>
+                        <span class="font-medium text-gray-900">{{ formatCurrencyAmount(selectedCreditCard.statement_balance_cents) }}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Next Payment Due:</span>
+                        <span class="font-medium text-gray-900">{{ selectedCreditCard.next_payment_due_date || 'N/A' }}</span>
+                      </div>
+                    </div>
+                    <p class="text-xs text-blue-700 mt-2">
+                      This recurring projection will be skipped for the month when autopay uses the actual statement balance.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Recurring Transaction Options -->
               <div class="border-t border-gray-200 pt-6 mb-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-2">Recurring Options</h3>
@@ -446,6 +488,10 @@ const props = defineProps({
   budget: Object,
   accounts: Array,
   sourceTransaction: Object,
+  eligibleCreditCards: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 // UI state
@@ -459,6 +505,7 @@ const form = useForm({
   description: props.sourceTransaction?.description || '',
   amount: props.sourceTransaction ? Math.abs(props.sourceTransaction.amount_in_cents / 100) : '',
   account_id: props.sourceTransaction?.account_id || '',
+  linked_credit_card_account_id: null,
   category: props.sourceTransaction?.category || '',
   frequency: '',
   day_of_month: 1,
@@ -471,6 +518,18 @@ const form = useForm({
   average_amount: '',
   notes: '',
   rules: [],
+});
+
+// Helper to format currency for the credit card dropdown
+const formatCurrencyAmount = (cents) => {
+  if (!cents) return '';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+};
+
+// Get the selected credit card details
+const selectedCreditCard = computed(() => {
+  if (!form.linked_credit_card_account_id) return null;
+  return props.eligibleCreditCards?.find(c => c.id === form.linked_credit_card_account_id);
 });
 
 // Rule management

@@ -187,12 +187,18 @@ class BudgetService
 
         $runningBalance = $currentBalanceCents;
 
-        // Process actual transactions in reverse chronological order
+        // Process actual transactions in reverse chronological order (going backwards in time)
         foreach ($actualTransactions->reverse() as $transaction) {
             $transaction->running_balance = $runningBalance;
-            // For liabilities, subtract the amount (spending increases debt)
-            // For assets, subtract the amount (to go backwards in time)
-            $runningBalance = $runningBalance - $transaction->amount_in_cents;
+            
+            // To find the PREVIOUS balance (going backwards):
+            // Assets: previous = current - transaction (deposit added to get current, so subtract to go back)
+            // Liabilities: previous = current + transaction (purchase subtracted to get current, so add to go back)
+            if ($isLiability) {
+                $runningBalance = $runningBalance + $transaction->amount_in_cents;
+            } else {
+                $runningBalance = $runningBalance - $transaction->amount_in_cents;
+            }
         }
 
         // Reset balance to current for pending and projected transactions

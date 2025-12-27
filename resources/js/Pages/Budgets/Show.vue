@@ -197,139 +197,150 @@
                   @start="onDragStart"
                   @end="onDragEnd"
                   @change="onDragChange"
-                  class="space-y-4"
+                  class="space-y-3"
                   :class="{ 'opacity-75': isDragging }"
                 >
                   <template #item="{ element: typeGroup }">
                     <div
                       :key="typeGroup.type"
-                      class="space-y-2 transition-all duration-200"
+                      class="transition-all duration-200"
                       :class="{ 'transform scale-[1.02] shadow-lg': isDragging }"
                     >
-                      <!-- Type Header - Only this part is draggable -->
-                      <div class="flex justify-between items-center border-b border-gray-200 pb-2 hover:bg-gray-50 rounded px-2 -mx-2 transition-colors cursor-move drag-handle">
-                        <div class="flex items-center">
-                          <svg class="w-4 h-4 mr-2 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <!-- Type Header - Collapsible group header -->
+                      <div class="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-t-lg cursor-move drag-handle border border-gray-200 border-b-0">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
                           </svg>
-                          <div>
-                            <h4 class="text-sm font-medium text-gray-900">{{ typeGroup.displayName }}</h4>
-                            <div class="text-xs text-gray-500">
-                              {{ typeGroup.accounts.length }}
-                              account{{ typeGroup.accounts.length !== 1 ? 's' : '' }}
-                            </div>
-                          </div>
+                          <span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ typeGroup.displayName }}</span>
+                          <span class="text-xs text-gray-400">({{ typeGroup.accounts.length }})</span>
                         </div>
-                        <div class="text-sm font-semibold"
+                        <div class="text-sm font-bold tabular-nums"
                              :class="getGroupTotalColorClass(typeGroup)">
                           {{ formatCurrency(typeGroup.total) }}
                         </div>
                       </div>
 
-                      <!-- Accounts in this group -->
-                      <div class="space-y-2 ml-2">
+                      <!-- Accounts Table -->
+                      <div class="border border-gray-200 rounded-b-lg divide-y divide-gray-100">
                         <div
-                          v-for="account in typeGroup.accounts"
+                          v-for="(account, index) in typeGroup.accounts"
                           :key="account.id"
-                          class="p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          class="cursor-pointer transition-all duration-150"
                           :class="[
-                            getBorderColorClass(account),
-                            activeAccountId === account.id ? 'border-l-8 bg-gray-50' : ''
+                            activeAccountId === account.id 
+                              ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-200' 
+                              : 'bg-white hover:bg-gray-50',
                           ]"
                           @click="selectAccount(account.id)"
-                      >
-                        <div class="flex justify-between items-start">
-                          <div>
-                            <div class="font-medium text-sm capitalize text-gray-900">{{ account.name }}</div>
-                            <div v-if="account.plaid_account" class="text-xs text-blue-600 mt-1 flex items-center">
-                              <span class="w-2 h-2 rounded-full mr-2"
-                                    :class="getLastSyncClass(account.plaid_account)"></span>
-                                <div class="whitespace-nowrap">
-                                    Last synced <PlaidSyncTimestamp
+                        >
+                          <!-- Account Row -->
+                          <div class="px-3 py-2.5">
+                            <div class="flex justify-between items-center gap-3">
+                              <!-- Account Info -->
+                              <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                  <span class="font-medium text-sm text-gray-900 truncate">{{ account.name }}</span>
+                                  <span 
+                                    v-if="activeAccountId === account.id"
+                                    class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-500"
+                                  ></span>
+                                </div>
+                                <div v-if="account.plaid_account" class="flex items-center gap-1.5 mt-0.5">
+                                  <span 
+                                    class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                    :class="getLastSyncClass(account.plaid_account)"
+                                  ></span>
+                                  <span class="text-xs text-gray-500 truncate">
+                                    <PlaidSyncTimestamp
                                       :timestamp="account.plaid_account?.plaid_connection?.last_sync_at"
                                       format="relative"
                                       never-text="never"
                                     />
+                                  </span>
                                 </div>
-                            </div>
-                          </div>
-                          <div class="text-sm font-medium" :class="getBalanceColorClass(account)">
-                            {{ formatCurrency(account.current_balance_cents) }}
-                          </div>
-                        </div>
-
-                        <!-- Credit Card Details (if applicable) -->
-                        <CreditCardDetails
-                          v-if="account.plaid_account"
-                          :account="account"
-                          :budget-id="budget.id"
-                          :eligible-source-accounts="eligibleSourceAccounts"
-                          class="mt-3"
-                        />
-
-                        <div class="flex items-center justify-between mt-2">
-                          <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                            :class="account.status_classes">
-                            {{ account.status_label }}
-                          </span>
-                          <div class="relative" @click.stop>
-                            <button
-                              @click="toggleAccountDropdown(account.id)"
-                              class="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            >
-                              Actions
-                              <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                            <div
-                              v-if="openDropdown === account.id"
-                              class="absolute right-0 z-50 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg"
-                              @click.stop
-                            >
-                              <div class="py-1">
-                                <Link
-                                  v-if="account.plaid_account"
-                                  :href="route('plaid.link', [budget.id, account.id])"
-                                  class="block px-2 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                              </div>
+                              
+                              <!-- Balance -->
+                              <div class="flex-shrink-0 text-right">
+                                <div class="text-sm font-semibold tabular-nums" :class="getBalanceColorClass(account)">
+                                  {{ formatCurrency(account.current_balance_cents) }}
+                                </div>
+                                <span 
+                                  class="text-[10px] font-medium uppercase tracking-wide"
+                                  :class="account.status_classes"
                                 >
-                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                                  Bank Sync
-                                </Link>
-                                <Link
-                                  v-if="!account.plaid_account"
-                                  :href="route('plaid.link', [budget.id, account.id])"
-                                  class="block px-2 py-2 text-xs text-blue-600 hover:bg-gray-50"
+                                  {{ account.status_label }}
+                                </span>
+                              </div>
+                              
+                              <!-- Actions Dropdown -->
+                              <div class="flex-shrink-0 relative" @click.stop>
+                                <button
+                                  @click="toggleAccountDropdown(account.id)"
+                                  class="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                                  title="Actions"
                                 >
-                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                                   </svg>
-                                  Connect to Bank
-                                </Link>
-                                <Link
-                                  :href="route('budget.account.balance-projection', [budget.id, account.id])"
-                                  class="block px-2 py-2 text-xs text-purple-600 hover:bg-gray-50"
+                                </button>
+                                <div
+                                  v-if="openDropdown === account.id"
+                                  class="absolute right-0 z-50 mt-1 w-44 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 py-1"
+                                  @click.stop
                                 >
-                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                  </svg>
-                                  Balance Chart
-                                </Link>
-                                <Link
-                                  :href="route('budgets.accounts.edit', [budget.id, account.id])"
-                                  class="block px-2 py-2 text-xs text-indigo-600 hover:bg-gray-50"
-                                >
-                                  <svg class="w-3 h-3 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                  Edit
-                                </Link>
+                                  <Link
+                                    v-if="account.plaid_account"
+                                    :href="route('plaid.link', [budget.id, account.id])"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Bank Sync
+                                  </Link>
+                                  <Link
+                                    v-if="!account.plaid_account"
+                                    :href="route('plaid.link', [budget.id, account.id])"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                    </svg>
+                                    Connect to Bank
+                                  </Link>
+                                  <Link
+                                    :href="route('budget.account.balance-projection', [budget.id, account.id])"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                    Balance Chart
+                                  </Link>
+                                  <Link
+                                    :href="route('budgets.accounts.edit', [budget.id, account.id])"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit
+                                  </Link>
+                                </div>
                               </div>
                             </div>
+                            
+                            <!-- Credit Card Details (if applicable) - shown below the row -->
+                            <CreditCardDetails
+                              v-if="account.plaid_account && activeAccountId === account.id"
+                              :account="account"
+                              :budget-id="budget.id"
+                              :eligible-source-accounts="eligibleSourceAccounts"
+                              class="mt-3 pt-3 border-t border-gray-100"
+                            />
                           </div>
-                        </div>
                         </div>
                       </div>
                     </div>

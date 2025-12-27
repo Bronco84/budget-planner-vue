@@ -114,7 +114,7 @@
 
     <!-- Apply Rules Modal -->
     <TransitionRoot appear :show="showApplyModal" as="template">
-      <Dialog as="div" @close="showApplyModal = false" class="relative z-10">
+      <Dialog as="div" @close="showApplyModal = false" class="relative z-50">
         <TransitionChild
           as="template"
           enter="duration-300 ease-out"
@@ -174,7 +174,7 @@
 
     <!-- Delete Rule Modal -->
     <TransitionRoot appear :show="showDeleteModal" as="template">
-      <Dialog as="div" @close="showDeleteModal = false" class="relative z-10">
+      <Dialog as="div" @close="showDeleteModal = false" class="relative z-50">
         <TransitionChild
           as="template"
           enter="duration-300 ease-out"

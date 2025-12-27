@@ -147,7 +147,7 @@
 
         <!-- Delete Rule Confirmation Modal -->
         <TransitionRoot appear :show="showDeleteModal" as="template">
-            <Dialog as="div" @close="showDeleteModal = false" class="relative z-10">
+            <Dialog as="div" @close="showDeleteModal = false" class="relative z-50">
                 <TransitionChild
                     as="template"
                     enter="duration-300 ease-out"
@@ -207,7 +207,7 @@
 
         <!-- Apply Rules Confirmation Modal -->
         <TransitionRoot appear :show="showApplyRulesModal" as="template">
-            <Dialog as="div" @close="showApplyRulesModal = false" class="relative z-10">
+            <Dialog as="div" @close="showApplyRulesModal = false" class="relative z-50">
                 <TransitionChild
                     as="template"
                     enter="duration-300 ease-out"

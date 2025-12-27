@@ -100,7 +100,7 @@
 
     <!-- Unlink Confirmation Modal -->
     <TransitionRoot appear :show="showUnlinkModal" as="template">
-      <Dialog as="div" @close="showUnlinkModal = false" class="relative z-10">
+      <Dialog as="div" @close="showUnlinkModal = false" class="relative z-50">
         <TransitionChild
           as="template"
           enter="duration-300 ease-out"

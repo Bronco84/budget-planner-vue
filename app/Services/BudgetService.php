@@ -145,6 +145,7 @@ class BudgetService
                 $model->description = $transaction->description;
                 $model->amount_in_cents = $transaction->amount_in_cents;
                 $model->projection_source = 'autopay';
+                $model->is_first_autopay = $transaction->is_first_autopay ?? true;
                 return $model;
             });
 

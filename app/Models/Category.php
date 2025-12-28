@@ -40,8 +40,8 @@ class Category extends Model
      * @var list<string>
      */
     protected $appends = [
-        'percent_used',
-        'remaining_amount',
+        // Removed percent_used and remaining_amount to prevent N+1 queries
+        // These are calculated in controllers when needed
     ];
 
     /**
@@ -52,13 +52,6 @@ class Category extends Model
         return $this->belongsTo(Budget::class);
     }
 
-    /**
-     * Get the expenses for the category.
-     */
-    public function expenses(): HasMany
-    {
-        return $this->hasMany(Expense::class);
-    }
 
     /**
      * Scope a query to order categories by their order field.
@@ -86,8 +79,13 @@ class Category extends Model
     public function getPercentUsedAttribute(): float
     {
         if ($this->amount > 0) {
-            $spent = $this->expenses()->sum('amount');
-            return ($spent / $this->amount) * 100;
+            // Calculate spent from transactions (negative amounts are expenses)
+            $spent = $this->budget->transactions()
+                ->where('category', $this->name)
+                ->where('amount_in_cents', '<', 0)
+                ->sum('amount_in_cents');
+            $spentDollars = abs($spent) / 100; // Convert cents to dollars
+            return ($spentDollars / $this->amount) * 100;
         }
         return 0;
     }
@@ -99,7 +97,12 @@ class Category extends Model
      */
     public function getRemainingAmountAttribute(): float
     {
-        $spent = $this->expenses()->sum('amount');
-        return $this->amount - $spent;
+        // Calculate spent from transactions (negative amounts are expenses)
+        $spent = $this->budget->transactions()
+            ->where('category', $this->name)
+            ->where('amount_in_cents', '<', 0)
+            ->sum('amount_in_cents');
+        $spentDollars = abs($spent) / 100; // Convert cents to dollars
+        return $this->amount - $spentDollars;
     }
 }

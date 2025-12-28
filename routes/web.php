@@ -4,9 +4,9 @@ use App\Http\Controllers\AccountController;
 use App\Models\Budget;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\CalendarConnectionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChatController;
-use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
@@ -40,6 +40,16 @@ Route::middleware('auth')->group(function () {
 
     // Calendar routes
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+    
+    // Calendar connection routes
+    Route::prefix('calendar')->name('calendar.')->group(function () {
+        Route::get('/connections', [CalendarConnectionController::class, 'index'])->name('connections.index');
+        Route::get('/connect/google', [CalendarConnectionController::class, 'connect'])->name('connect.google');
+        Route::get('/google/callback', [CalendarConnectionController::class, 'callback'])->name('google.callback');
+        Route::post('/connections/{calendarConnection}/sync', [CalendarConnectionController::class, 'sync'])->name('connections.sync');
+        Route::post('/connections/{calendarConnection}/toggle', [CalendarConnectionController::class, 'toggle'])->name('connections.toggle');
+        Route::delete('/connections/{calendarConnection}', [CalendarConnectionController::class, 'destroy'])->name('connections.destroy');
+    });
 
     // Transactions redirect route - redirects to active budget's transactions
     Route::get('/transactions', function () {
@@ -96,8 +106,6 @@ Route::middleware('auth')->group(function () {
     Route::resource('budgets.categories', CategoryController::class);
     Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])
         ->name('budgets.categories.reorder');
-
-    Route::resource('budgets.categories.expenses', ExpenseController::class);
     
     Route::get('budget/{budget}/transactions', [TransactionController::class, 'index'])
         ->name('budget.transaction.index');

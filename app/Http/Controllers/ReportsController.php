@@ -29,23 +29,41 @@ class ReportsController extends Controller
             'payoffPlans'
         ]);
 
+        // Get selected account ID from request (null = all accounts)
+        $selectedAccountId = $request->input('account_id');
+        $selectedAccount = null;
+        
+        if ($selectedAccountId) {
+            $selectedAccount = $budget->accounts()->find($selectedAccountId);
+            if (!$selectedAccount) {
+                // Invalid account ID, reset to all accounts
+                $selectedAccountId = null;
+            }
+        }
+
         // Get date range from request or use defaults
         $dateRange = $request->input('date_range', '6months');
         $startDate = $this->getStartDate($dateRange, $request->input('start_date'));
         $endDate = $request->input('end_date') ? Carbon::parse($request->input('end_date')) : now();
 
-        // Get all reports data
-        $netWorthData = $this->getNetWorthData($budget, $startDate, $endDate);
-        $cashFlowData = $this->getCashFlowData($budget, $startDate, $endDate);
-        $budgetPerformanceData = $this->getBudgetPerformanceData($budget, $startDate, $endDate);
-        $spendingPatternsData = $this->getSpendingPatternsData($budget, $startDate, $endDate);
-        $debtPayoffData = $this->getDebtPayoffData($budget, $startDate, $endDate);
+        // Get all reports data (pass selected account)
+        $netWorthData = $this->getNetWorthData($budget, $startDate, $endDate, $selectedAccount);
+        $cashFlowData = $this->getCashFlowData($budget, $startDate, $endDate, $selectedAccount);
+        $budgetPerformanceData = $this->getBudgetPerformanceData($budget, $startDate, $endDate, $selectedAccount);
+        $spendingPatternsData = $this->getSpendingPatternsData($budget, $startDate, $endDate, $selectedAccount);
+        $debtPayoffData = $this->getDebtPayoffData($budget, $startDate, $endDate, $selectedAccount);
 
         // Get overview stats
         $overviewStats = $this->getOverviewStats($budget, $netWorthData, $cashFlowData);
 
         return Inertia::render('Reports/Index', [
             'budget' => $budget,
+            'accounts' => $budget->accounts->map(fn($account) => [
+                'id' => $account->id,
+                'name' => $account->name,
+                'type' => $account->type,
+            ]),
+            'selectedAccountId' => $selectedAccountId,
             'dateRange' => [
                 'start' => $startDate->format('Y-m-d'),
                 'end' => $endDate->format('Y-m-d'),
@@ -83,9 +101,12 @@ class ReportsController extends Controller
     /**
      * Get net worth data (assets - liabilities over time)
      */
-    private function getNetWorthData(Budget $budget, Carbon $startDate, Carbon $endDate): array
+    private function getNetWorthData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
-        $accounts = $budget->accounts()->with('transactions')->get();
+        // If a specific account is selected, only use that account
+        $accounts = $selectedAccount 
+            ? collect([$selectedAccount->load('transactions')])
+            : $budget->accounts()->with('transactions')->get();
 
         // Calculate net worth at various points in time
         $dataPoints = [];
@@ -183,14 +204,19 @@ class ReportsController extends Controller
     /**
      * Get cash flow data (income vs expenses over time)
      */
-    private function getCashFlowData(Budget $budget, Carbon $startDate, Carbon $endDate): array
+    private function getCashFlowData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
         // Get monthly cash flow
-        $transactions = $budget->transactions()
+        $transactionsQuery = $budget->transactions()
             ->where('date', '>=', $startDate->format('Y-m-d'))
-            ->where('date', '<=', $endDate->format('Y-m-d'))
-            ->orderBy('date')
-            ->get();
+            ->where('date', '<=', $endDate->format('Y-m-d'));
+        
+        // Filter by account if selected
+        if ($selectedAccount) {
+            $transactionsQuery->where('account_id', $selectedAccount->id);
+        }
+        
+        $transactions = $transactionsQuery->orderBy('date')->get();
 
         // Group by month
         $monthlyData = [];
@@ -237,13 +263,19 @@ class ReportsController extends Controller
     /**
      * Get budget performance data (categories vs actual spending)
      */
-    private function getBudgetPerformanceData(Budget $budget, Carbon $startDate, Carbon $endDate): array
+    private function getBudgetPerformanceData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
         $categories = $budget->categories;
-        $transactions = $budget->transactions()
+        $transactionsQuery = $budget->transactions()
             ->where('date', '>=', $startDate->format('Y-m-d'))
-            ->where('date', '<=', $endDate->format('Y-m-d'))
-            ->get();
+            ->where('date', '<=', $endDate->format('Y-m-d'));
+        
+        // Filter by account if selected
+        if ($selectedAccount) {
+            $transactionsQuery->where('account_id', $selectedAccount->id);
+        }
+        
+        $transactions = $transactionsQuery->get();
 
         $categoryPerformance = [];
 
@@ -280,14 +312,20 @@ class ReportsController extends Controller
     /**
      * Get spending patterns data (by category and merchant)
      */
-    private function getSpendingPatternsData(Budget $budget, Carbon $startDate, Carbon $endDate): array
+    private function getSpendingPatternsData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
-        $transactions = $budget->transactions()
+        $transactionsQuery = $budget->transactions()
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'))
             ->where('amount_in_cents', '<', 0)
-            ->with('plaidTransaction')
-            ->get();
+            ->with('plaidTransaction');
+        
+        // Filter by account if selected
+        if ($selectedAccount) {
+            $transactionsQuery->where('account_id', $selectedAccount->id);
+        }
+        
+        $transactions = $transactionsQuery->get();
 
         // Group by category
         $byCategory = $transactions->groupBy('category')->map(function($categoryTransactions, $category) {
@@ -325,13 +363,20 @@ class ReportsController extends Controller
     /**
      * Get debt payoff data
      */
-    private function getDebtPayoffData(Budget $budget, Carbon $startDate, Carbon $endDate): array
+    private function getDebtPayoffData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
         // Get all PayoffPlanDebts for ACTIVE plans in this budget, with the related PayoffPlan and Account
-        $payoffPlanDebts = PayoffPlanDebt::whereHas('payoffPlan', function($query) use ($budget) {
+        $payoffPlanDebtsQuery = PayoffPlanDebt::whereHas('payoffPlan', function($query) use ($budget) {
             $query->where('budget_id', $budget->id)
                   ->where('is_active', true);
-        })->with(['payoffPlan', 'account'])->get();
+        })->with(['payoffPlan', 'account']);
+        
+        // Filter by account if selected
+        if ($selectedAccount) {
+            $payoffPlanDebtsQuery->where('account_id', $selectedAccount->id);
+        }
+        
+        $payoffPlanDebts = $payoffPlanDebtsQuery->get();
 
         $debtSummary = [];
 

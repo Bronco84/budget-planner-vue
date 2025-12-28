@@ -32,10 +32,36 @@ class CalendarController extends Controller
         // Generate calendar data
         $calendarData = $this->generateCalendarData($budget, $year, $month);
 
+        // Get calendar events for this month
+        $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
+        $endOfMonth = $startOfMonth->copy()->endOfMonth()->endOfDay();
+        
+        $calendarEvents = auth()->user()->calendarEvents()
+            ->with('calendarConnection')
+            ->whereHas('calendarConnection', function ($query) {
+                $query->where('is_active', true);
+            })
+            ->inDateRange($startOfMonth, $endOfMonth)
+            ->orderBy('start_date')
+            ->get()
+            ->map(function ($event) {
+                return [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'description' => $event->description,
+                    'start_date' => $event->start_date->format('Y-m-d'),
+                    'end_date' => $event->end_date?->format('Y-m-d'),
+                    'all_day' => $event->all_day,
+                    'calendar_name' => $event->calendarConnection->calendar_name,
+                    'days_until' => $event->daysUntil(),
+                ];
+            });
+
         return Inertia::render('Calendar/Index', [
             'budgets' => $budgets,
             'selectedBudget' => $budget,
             'calendarData' => $calendarData,
+            'calendarEvents' => $calendarEvents,
             'currentMonth' => Carbon::create($year, $month, 1)->format('Y-m'),
             'filters' => [
                 'budget_id' => $selectedBudgetId,

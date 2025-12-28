@@ -12,6 +12,8 @@ import DateRangePicker from '@/Components/DateRangePicker.vue';
 
 const props = defineProps({
     budget: Object,
+    accounts: Array,
+    selectedAccountId: [Number, String, null],
     dateRange: Object,
     overview: Object,
     netWorth: Object,
@@ -62,7 +64,23 @@ const activeComponent = computed(() => {
 });
 
 const handleDateRangeChange = (dateRangeData) => {
-    router.get(route('reports.index', props.budget.id), dateRangeData, {
+    router.get(route('reports.index', props.budget.id), {
+        ...dateRangeData,
+        account_id: props.selectedAccountId,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
+};
+
+const handleAccountChange = (event) => {
+    const accountId = event.target.value === '' ? null : event.target.value;
+    router.get(route('reports.index', props.budget.id), {
+        account_id: accountId,
+        date_range: props.dateRange.preset,
+        start_date: props.dateRange.start,
+        end_date: props.dateRange.end,
+    }, {
         preserveState: true,
         preserveScroll: true,
     });
@@ -97,8 +115,25 @@ const handleDateRangeChange = (dateRangeData) => {
                                 </button>
                             </nav>
 
-                            <!-- Date Range Picker (right side) -->
-                            <div class="">
+                            <!-- Account Selector and Date Range Picker (right side) -->
+                            <div class="flex items-center space-x-3">
+                                <!-- Account Selector -->
+                                <select
+                                    :value="selectedAccountId || ''"
+                                    @change="handleAccountChange"
+                                    class="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                                >
+                                    <option value="">All Accounts</option>
+                                    <option
+                                        v-for="account in accounts"
+                                        :key="account.id"
+                                        :value="account.id"
+                                    >
+                                        {{ account.name }}
+                                    </option>
+                                </select>
+
+                                <!-- Date Range Picker -->
                                 <DateRangePicker
                                     :start-date="dateRange.start"
                                     :end-date="dateRange.end"

@@ -121,7 +121,7 @@ class BudgetController extends Controller
 
         // Load relationships including plaidAccount with connection
         $budget->load([
-            'categories.expenses',
+            'categories',
             'accounts.plaidAccount.plaidConnection'
         ]);
 

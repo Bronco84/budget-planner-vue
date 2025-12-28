@@ -97,6 +97,22 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Get the user's calendar connections.
+     */
+    public function calendarConnections(): HasMany
+    {
+        return $this->hasMany(CalendarConnection::class);
+    }
+
+    /**
+     * Get the user's calendar events.
+     */
+    public function calendarEvents(): HasMany
+    {
+        return $this->hasMany(CalendarEvent::class);
+    }
+
+    /**
      * Get a user preference value.
      */
     public function getPreference(string $key, $default = null)

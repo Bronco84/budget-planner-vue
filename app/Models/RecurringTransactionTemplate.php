@@ -142,7 +142,7 @@ class RecurringTransactionTemplate extends Model
      * Returns true if:
      * - This template has a linked credit card
      * - The linked credit card has active autopay
-     * - The given date falls in the same month as the autopay payment date
+     * - The projection date is in the future (autopay will handle all future payments)
      *
      * @param \Carbon\Carbon $date
      * @return bool
@@ -158,13 +158,9 @@ class RecurringTransactionTemplate extends Model
             return false;
         }
 
-        $autopayDate = $linkedCard->getNextAutopayDate();
-        if (!$autopayDate) {
-            return false;
-        }
-
-        // If the projection date is in the same month as the autopay, let autopay handle it
-        return $date->isSameMonth($autopayDate);
+        // If autopay is active, it should handle ALL future projections
+        // Only generate recurring projections for past dates (historical tracking)
+        return $date->isFuture() || $date->isToday();
     }
 
     /**

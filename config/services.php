@@ -47,4 +47,12 @@ return [
         'api_key' => env('AIRTABLE_API_KEY'),
         'base_url' => env('AIRTABLE_BASE_URL', 'https://api.airtable.com/v0'),
     ],
+
+    'google' => [
+        'calendar' => [
+            'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID'),
+            'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET'),
+            'redirect_uri' => env('GOOGLE_CALENDAR_REDIRECT_URI', env('APP_URL') . '/calendar/google/callback'),
+        ],
+    ],
 ];

@@ -621,6 +621,21 @@
                                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                       </svg>
                                   </template>
+                                  <template v-if="transaction.is_projected && transaction.projection_source === 'autopay'">
+                                      <div 
+                                        class="text-xs text-green-800 bg-green-100 px-2 py-1 rounded-full inline-block ml-2 cursor-help" 
+                                        title="This payment will be automatically deducted via autopay"
+                                      >
+                                        Autopay
+                                      </div>
+                                      <div 
+                                        v-if="!transaction.is_first_autopay" 
+                                        class="text-xs text-purple-800 bg-purple-100 px-2 py-1 rounded-full inline-block ml-2 cursor-help"
+                                        title="Estimated amount based on current statement balance. Actual amount may vary based on future spending."
+                                      >
+                                        Estimated
+                                      </div>
+                                  </template>
                               </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">

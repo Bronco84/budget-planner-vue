@@ -10,9 +10,11 @@
         "aws/aws-sdk-php": "^3.349",
         "diglactic/laravel-breadcrumbs": "^10.0",
         "echolabsdev/prism": "^0.97.1",
+        "google/apiclient": "^2.0",
         "guzzlehttp/guzzle": "^7.9",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
+        "laravel/nova": "^5.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.29",
@@ -24,6 +26,7 @@
         "beyondcode/laravel-dump-server": "^2.1",
         "fakerphp/faker": "^1.23",
         "laravel/breeze": "^2.3",
+        "laravel/nova-devtool": "^1.8",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.13",
         "laravel/sail": "^1.41",
@@ -90,6 +93,13 @@
             "php-http/discovery": true
         }
     },
+    "repositories": [
+        {
+            "name": "nova",
+            "type": "composer",
+            "url": "https://nova.laravel.com"
+        }
+    ],
     "minimum-stability": "stable",
     "prefer-stable": true
 }

@@ -1343,23 +1343,34 @@ class RecurringTransactionService
                 continue;
             }
 
-            $paymentDate = $creditCard->getNextAutopayDate();
+            $firstPaymentDate = $creditCard->getNextAutopayDate();
             $paymentAmount = $creditCard->getAutopayAmountCents();
 
             // Skip if no payment date or amount
-            if (!$paymentDate || !$paymentAmount) {
+            if (!$firstPaymentDate || !$paymentAmount) {
                 continue;
             }
 
-            // Only include if payment falls within projection window
-            if ($paymentDate->between($startDate, $endDate)) {
-                // Create deduction from source account
-                $projections->push($this->createAutopayProjection(
-                    $creditCard->autopaySourceAccount,
-                    $creditCard,
-                    $paymentDate,
-                    $paymentAmount
-                ));
+            // Generate autopay projections for all future months within the date range
+            $currentPaymentDate = $firstPaymentDate->copy();
+            $isFirstPayment = true;
+            
+            while ($currentPaymentDate <= $endDate) {
+                // Only include if payment falls within projection window
+                if ($currentPaymentDate >= $startDate) {
+                    // Create deduction from source account
+                    $projections->push($this->createAutopayProjection(
+                        $creditCard->autopaySourceAccount,
+                        $creditCard,
+                        $currentPaymentDate->copy(),
+                        $paymentAmount,
+                        $isFirstPayment
+                    ));
+                }
+                
+                // Move to next month's payment date
+                $currentPaymentDate->addMonth();
+                $isFirstPayment = false;
             }
         }
 
@@ -1373,13 +1384,15 @@ class RecurringTransactionService
      * @param Account $creditCard
      * @param Carbon $paymentDate
      * @param int $amountCents
+     * @param bool $isFirstPayment
      * @return object
      */
     private function createAutopayProjection(
         Account $sourceAccount,
         Account $creditCard,
         Carbon $paymentDate,
-        int $amountCents
+        int $amountCents,
+        bool $isFirstPayment = true
     ): object {
         $category = $this->getAutopayCategory($sourceAccount->budget);
         $description = $this->buildAutopayDescription($creditCard);
@@ -1399,6 +1412,7 @@ class RecurringTransactionService
             'is_projected' => true,
             'is_projection' => true,
             'projection_source' => 'autopay',
+            'is_first_autopay' => $isFirstPayment, // First autopay is based on actual statement balance, subsequent are estimates
             'projection_metadata' => [
                 'credit_card_id' => $creditCard->id,
                 'credit_card_name' => $creditCard->name,
@@ -1416,23 +1430,8 @@ class RecurringTransactionService
      */
     private function buildAutopayDescription(Account $creditCard): string
     {
-        $plaidAccount = $creditCard->plaidAccount;
-        
-        if ($plaidAccount) {
-            $institution = $plaidAccount->institution_name ?? null;
-            $mask = $plaidAccount->account_mask ?? null;
-            
-            if ($institution && $mask) {
-                return "{$institution} (...{$mask}) Autopay";
-            } elseif ($institution) {
-                return "{$institution} Autopay";
-            } elseif ($mask) {
-                return "Card (...{$mask}) Autopay";
-            }
-        }
-        
-        // Fallback to account name if no Plaid data
-        return "Autopay: {$creditCard->name}";
+        // Use just the account name - the UI will show an "Autopay" badge
+        return $creditCard->name;
     }
 
     /**

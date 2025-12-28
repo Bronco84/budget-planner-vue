@@ -862,19 +862,78 @@ class PlaidService
 
                     $updated++;
                 } else {
-                    // Create new transaction
-                    Transaction::create([
-                        'budget_id' => $plaidAccount->account->budget_id,
-                        'account_id' => $plaidAccount->account_id,
-                        'description' => $transaction['name'],
-                        'category' => $transaction['category'][0] ?? 'Uncategorized',
-                        'amount_in_cents' => -1 * $transaction['amount'] * 100, // Negate amount as Plaid uses positive for expenses
-                        'date' => $transaction['date'],
-                        'plaid_transaction_id' => $transaction['transaction_id'],
-                        'is_plaid_imported' => true,
-                    ]);
+                    // If transaction is pending and no exact match found, check for pending duplicates
+                    // This handles cases where Plaid assigns a new ID to an updated pending transaction
+                    $pendingDuplicate = null;
+                    if ($transaction['pending'] ?? false) {
+                        $amountInCents = -1 * $transaction['amount'] * 100;
+                        $transactionDate = Carbon::parse($transaction['date']);
+                        
+                        // Search for potential duplicate pending transactions
+                        $pendingDuplicate = Transaction::where('account_id', $plaidAccount->account_id)
+                            ->where('is_plaid_imported', true)
+                            ->whereNotNull('plaid_transaction_id')
+                            // Match amount within $1 tolerance (for rounding differences)
+                            ->whereBetween('amount_in_cents', [$amountInCents - 100, $amountInCents + 100])
+                            // Match date within ±3 days (pending transactions can shift dates)
+                            ->whereBetween('date', [
+                                $transactionDate->copy()->subDays(3),
+                                $transactionDate->copy()->addDays(3)
+                            ])
+                            // Match description similarity (extract key identifiers)
+                            ->where(function ($query) use ($transaction) {
+                                $description = $transaction['name'];
+                                // Extract numeric identifiers (like account numbers, reference numbers)
+                                preg_match_all('/\d{4,}/', $description, $matches);
+                                if (!empty($matches[0])) {
+                                    foreach ($matches[0] as $identifier) {
+                                        $query->orWhere('description', 'LIKE', "%{$identifier}%");
+                                    }
+                                } else {
+                                    // Fallback: match first 20 characters
+                                    $prefix = substr($description, 0, 20);
+                                    $query->where('description', 'LIKE', "{$prefix}%");
+                                }
+                            })
+                            ->orderByRaw('ABS(DATEDIFF(date, ?)) ASC', [$transaction['date']])
+                            ->first();
+                    }
 
-                    $imported++;
+                    if ($pendingDuplicate) {
+                        // Update the existing pending transaction with the new Plaid ID
+                        $pendingDuplicate->update([
+                            'plaid_transaction_id' => $transaction['transaction_id'],
+                            'description' => $transaction['name'],
+                            'category' => $transaction['category'][0] ?? 'Uncategorized',
+                            'amount_in_cents' => -1 * $transaction['amount'] * 100,
+                            'date' => $transaction['date'],
+                        ]);
+
+                        Log::info('Updated pending transaction with new Plaid ID (duplicate prevented)', [
+                            'transaction_id' => $pendingDuplicate->id,
+                            'old_plaid_id' => $pendingDuplicate->getOriginal('plaid_transaction_id'),
+                            'new_plaid_id' => $transaction['transaction_id'],
+                            'old_date' => $pendingDuplicate->getOriginal('date'),
+                            'new_date' => $transaction['date'],
+                            'amount' => $transaction['amount'],
+                        ]);
+
+                        $updated++;
+                    } else {
+                        // Create new transaction
+                        Transaction::create([
+                            'budget_id' => $plaidAccount->account->budget_id,
+                            'account_id' => $plaidAccount->account_id,
+                            'description' => $transaction['name'],
+                            'category' => $transaction['category'][0] ?? 'Uncategorized',
+                            'amount_in_cents' => -1 * $transaction['amount'] * 100, // Negate amount as Plaid uses positive for expenses
+                            'date' => $transaction['date'],
+                            'plaid_transaction_id' => $transaction['transaction_id'],
+                            'is_plaid_imported' => true,
+                        ]);
+
+                        $imported++;
+                    }
                 }
 
                 // Check if this transaction was previously pending and handle accordingly

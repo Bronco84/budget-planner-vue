@@ -14,7 +14,7 @@ class CategoryController extends Controller
      */
     public function index(Budget $budget)
     {
-        $categories = $budget->categories()->with('expenses')->get();
+        $categories = $budget->categories()->get();
 
         // Calculate total allocated
         $totalAllocated = $categories->sum('amount');

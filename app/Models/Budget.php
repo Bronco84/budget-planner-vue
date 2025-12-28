@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Collection;
-use App\Models\Expense;
 
 class Budget extends Model
 {
@@ -322,13 +321,17 @@ class Budget extends Model
         // Calculate based on actual columns
         $totalAllocated = $this->categories()->sum('amount');
         
-        // For expenses, we need to calculate the sum manually from the relationships
+        // Calculate spent from transactions (negative amounts are expenses)
         $totalSpent = 0;
         foreach ($this->categories as $category) {
-            $totalSpent += $category->expenses()->sum('amount');
+            $spent = $this->transactions()
+                ->where('category', $category->name)
+                ->where('amount_in_cents', '<', 0)
+                ->sum('amount_in_cents');
+            $totalSpent += abs($spent);
         }
         
-        return $totalAllocated - $totalSpent;
+        return $totalAllocated - ($totalSpent / 100); // Convert cents to dollars
     }
 
     /**
@@ -344,13 +347,18 @@ class Budget extends Model
             return 0;
         }
         
-        // For expenses, we need to calculate the sum manually from the relationships
+        // Calculate spent from transactions (negative amounts are expenses)
         $totalSpent = 0;
         foreach ($this->categories as $category) {
-            $totalSpent += $category->expenses()->sum('amount');
+            $spent = $this->transactions()
+                ->where('category', $category->name)
+                ->where('amount_in_cents', '<', 0)
+                ->sum('amount_in_cents');
+            $totalSpent += abs($spent);
         }
         
-        $percentUsed = ($totalSpent / $totalAllocated) * 100;
+        $totalSpentDollars = $totalSpent / 100; // Convert cents to dollars
+        $percentUsed = ($totalSpentDollars / $totalAllocated) * 100;
         
         return min($percentUsed, 100);
     }
@@ -375,11 +383,4 @@ class Budget extends Model
         return now()->endOfMonth()->format('Y-m-d');
     }
 
-    /**
-     * Get the expenses for this budget through categories.
-     */
-    public function expenses()
-    {
-        return $this->hasManyThrough(Expense::class, Category::class);
-    }
 }

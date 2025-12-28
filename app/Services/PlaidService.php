@@ -519,6 +519,7 @@ class PlaidService
      * @param string|null $institutionId
      * @param string|null $institutionName
      * @param string|null $institutionLogo Base64-encoded logo from Plaid
+     * @param string|null $institutionUrl Institution website URL
      * @return PlaidConnection
      */
     public function createOrFindConnection(
@@ -527,7 +528,8 @@ class PlaidService
         string $itemId,
         ?string $institutionId = null,
         ?string $institutionName = null,
-        ?string $institutionLogo = null
+        ?string $institutionLogo = null,
+        ?string $institutionUrl = null
     ): PlaidConnection {
         $data = [
             'institution_id' => $institutionId,
@@ -541,6 +543,11 @@ class PlaidService
         // Only update logo if provided (don't overwrite existing logo with null)
         if ($institutionLogo !== null) {
             $data['institution_logo'] = $institutionLogo;
+        }
+
+        // Only update URL if provided (don't overwrite existing URL with null)
+        if ($institutionUrl !== null) {
+            $data['institution_url'] = $institutionUrl;
         }
 
         return PlaidConnection::updateOrCreate(
@@ -574,6 +581,7 @@ class PlaidService
      * @param string|null $institutionId
      * @param string|null $institutionName
      * @param string|null $institutionLogo Base64-encoded logo from Plaid
+     * @param string|null $institutionUrl Institution website URL
      * @return array Array of created PlaidAccount records
      */
     public function linkMultipleAccounts(
@@ -583,7 +591,8 @@ class PlaidService
         string $itemId,
         ?string $institutionId = null,
         ?string $institutionName = null,
-        ?string $institutionLogo = null
+        ?string $institutionLogo = null,
+        ?string $institutionUrl = null
     ): array {
         // Create or find the PlaidConnection
         $plaidConnection = $this->createOrFindConnection(
@@ -592,7 +601,8 @@ class PlaidService
             $itemId,
             $institutionId,
             $institutionName,
-            $institutionLogo
+            $institutionLogo,
+            $institutionUrl
         );
 
         $plaidAccounts = [];
@@ -667,6 +677,7 @@ class PlaidService
      * @param string|null $institutionName
      * @param string|null $institutionId
      * @param string|null $institutionLogo Base64-encoded logo from Plaid
+     * @param string|null $institutionUrl Institution website URL
      * @return PlaidAccount
      */
     public function linkAccount(
@@ -677,7 +688,8 @@ class PlaidService
         ?string $itemId = null,
         ?string $institutionName = null,
         ?string $institutionId = null,
-        ?string $institutionLogo = null
+        ?string $institutionLogo = null,
+        ?string $institutionUrl = null
     ): PlaidAccount {
         // Ensure we have a valid item ID
         if ($itemId === null || empty($itemId)) {
@@ -699,7 +711,8 @@ class PlaidService
             $itemId,
             $institutionId,
             $institutionName,
-            $institutionLogo
+            $institutionLogo,
+            $institutionUrl
         );
 
         // Link the account to the connection

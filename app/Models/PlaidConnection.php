@@ -20,6 +20,7 @@ class PlaidConnection extends Model
         'institution_id',
         'institution_name',
         'institution_logo',
+        'institution_url',
         'access_token',
         'status',
         'error_message',

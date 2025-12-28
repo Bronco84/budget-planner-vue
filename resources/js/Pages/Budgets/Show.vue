@@ -6,9 +6,11 @@
       <div class="max-w-8xl mx-auto sm:px-2 lg:px-4 md:h-full md:py-4">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 md:h-full">
           <!-- Left sidebar with Budget Overview and Accounts -->
-          <div class="lg:col-span-1 md:overflow-y-auto md:pr-2">
-            <!-- Budget Overview Card -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+          <div class="lg:col-span-1 md:flex md:flex-col md:min-h-0">
+            <!-- Unified Navigation Card -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg md:flex md:flex-col md:flex-1 md:min-h-0">
+              <!-- Fixed Budget Overview Section -->
+              <div class="flex-none border-b border-gray-200 dark:border-gray-700">
               <div class="p-4">
                   <!-- Always visible header with Total Balance -->
                   <div class="cursor-pointer" @click="budgetCardExpanded = !budgetCardExpanded">
@@ -161,13 +163,13 @@
                     </div>
                   </transition>
               </div>
-            </div>
 
-            <!-- Accounts Card -->
-            <div class="bg-white overflow-visible shadow-sm sm:rounded-lg">
-              <div class="p-4">
-                <!-- Accordion Header -->
-                <div class="flex justify-between items-center cursor-pointer" @click="accountsExpanded = !accountsExpanded">
+              <!-- Scrollable Accounts and Properties Section -->
+              <div class="flex-1 overflow-y-auto md:min-h-0">
+                <!-- Accounts Section -->
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <!-- Accordion Header -->
+                  <div class="flex justify-between items-center cursor-pointer" @click="accountsExpanded = !accountsExpanded">
                   <div class="flex items-center gap-2">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Accounts</h3>
                     <span class="text-sm text-gray-500">({{ accounts.length }})</span>
@@ -333,6 +335,18 @@
                                   class="absolute right-0 z-50 mt-1 w-44 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 py-1"
                                   @click.stop
                                 >
+                                  <a
+                                    v-if="account.plaid_account?.plaid_connection?.institution_url"
+                                    :href="account.plaid_account.plaid_connection.institution_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                    Visit Bank Website
+                                  </a>
                                   <Link
                                     v-if="account.plaid_account"
                                     :href="route('plaid.link', [budget.id, account.id])"
@@ -395,12 +409,10 @@
                     </div>
                   </div>
                 </transition>
-              </div>
-            </div>
+                </div>
 
-            <!-- Properties Card -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mt-6">
-              <div class="p-4">
+                <!-- Properties Section -->
+                <div class="p-4">
                 <!-- Accordion Header -->
                 <div class="flex justify-between items-center cursor-pointer" @click="propertiesExpanded = !propertiesExpanded">
                   <div class="flex items-center gap-2">
@@ -498,6 +510,7 @@
                     </div>
                   </div>
                 </transition>
+                </div>
               </div>
             </div>
           </div>

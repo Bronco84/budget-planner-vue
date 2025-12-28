@@ -163,6 +163,7 @@
                     </div>
                   </transition>
               </div>
+              </div>
 
               <!-- Scrollable Accounts and Properties Section -->
               <div class="flex-1 overflow-y-auto md:min-h-0">

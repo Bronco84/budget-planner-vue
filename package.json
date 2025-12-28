@@ -30,6 +30,7 @@
         "dompurify": "^3.3.0",
         "marked": "^15.0.12",
         "vue-chartjs": "^5.3.2",
+        "vue3-virtual-scroller": "^0.2.3",
         "vuedraggable": "^4.1.0"
     }
 }

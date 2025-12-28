@@ -539,22 +539,29 @@
 
                 <!-- Transactions Table -->
                 <div v-else class="md:flex-1 md:flex md:flex-col md:min-h-0">
-                <div class="border rounded-lg md:flex-1 md:flex md:flex-col md:min-h-0">
-                  <div class="md:flex-1 md:overflow-y-auto md:min-h-0" ref="tableContainer">
-                  <table class="min-w-full divide-y divide-gray-200 table-fixed">
-                    <thead class="bg-gray-50">
-                      <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Date</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-64">Description</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">Category</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Amount</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Balance</th>
-                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                <div class="border rounded-lg md:flex-1 md:flex md:flex-col md:min-h-0 overflow-hidden">
+                  <!-- Fixed Header -->
+                  <div class="flex-none overflow-x-auto" ref="headerContainer">
+                    <table class="min-w-full table-fixed">
+                      <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-36">Date</th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-64">Description</th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-48">Category</th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-36">Amount</th>
+                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-36">Balance</th>
+                          <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+
+                  <!-- Scrollable Body -->
+                  <div class="md:flex-1 md:overflow-y-auto md:overflow-x-auto md:min-h-0" ref="tableContainer" @scroll="syncHeaderScroll">
+                    <table class="min-w-full table-fixed">
+                      <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       <!-- Variable to track if we've shown the today marker -->
                       <template v-for="(transaction, index) in sortedTransactions" :key="transaction.id || ('proj-' + index)">
                         <!-- Today marker -->
@@ -725,7 +732,7 @@
 
                       <!-- Empty state -->
                       <tr v-if="!sortedTransactions.length">
-                        <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">
+                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
                           <p>No transactions found.</p>
                           <p class="mt-1">Add a transaction to get started tracking your finances.</p>
                         </td>
@@ -906,7 +913,17 @@
   background: #ddd6fe;
 }
 
-/* Custom scrollbar styling */
+/* Hide scrollbar on header */
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+
+.overflow-x-auto {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar styling for table body */
 @media (min-width: 768px) {
   .md\:overflow-y-auto::-webkit-scrollbar {
     width: 8px;
@@ -1093,8 +1110,16 @@ const budgetCardExpanded = ref(false);
 const accountsExpanded = ref(true);
 const propertiesExpanded = ref(true);
 
-// Table container ref for height calculation
+// Table container refs for height calculation and scroll sync
 const tableContainer = ref(null);
+const headerContainer = ref(null);
+
+// Sync header scroll with body scroll
+const syncHeaderScroll = () => {
+  if (headerContainer.value && tableContainer.value) {
+    headerContainer.value.scrollLeft = tableContainer.value.scrollLeft;
+  }
+};
 
 // Dynamic per-page calculation
 const calculatedPerPage = ref(50); // Default fallback

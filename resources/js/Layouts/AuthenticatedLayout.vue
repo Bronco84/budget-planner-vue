@@ -48,13 +48,21 @@ const handleCreateRecurring = () => {
 const handleConnectAccount = () => {
     const activeBudget = page.props.activeBudget;
     if (activeBudget) {
-        router.visit(route('plaid.discover', activeBudget.id));
+        router.visit(route('budgets.accounts.create', activeBudget.id));
+    }
+};
+
+const handleCreateProperty = () => {
+    const activeBudget = page.props.activeBudget;
+    if (activeBudget) {
+        router.visit(route('budgets.properties.create', activeBudget.id));
     }
 };
 
 const handleToggleChat = () => {
     showChatPanel.value = !showChatPanel.value;
 };
+
 </script>
 
 <template>
@@ -69,6 +77,7 @@ const handleToggleChat = () => {
             @create-transaction="handleCreateTransaction"
             @create-recurring="handleCreateRecurring"
             @connect-account="handleConnectAccount"
+            @create-property="handleCreateProperty"
             @toggle-chat="handleToggleChat"
         />
 

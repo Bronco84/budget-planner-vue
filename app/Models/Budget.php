@@ -131,11 +131,34 @@ class Budget extends Model
     }
 
     /**
+     * Get the scenarios for this budget.
+     */
+    public function scenarios(): HasMany
+    {
+        return $this->hasMany(Scenario::class);
+    }
+
+    /**
      * Get all file attachments for this budget.
      */
     public function fileAttachments(): MorphMany
     {
         return $this->morphMany(FileAttachment::class, 'attachable');
+    }
+
+    /**
+     * Get all files for this budget through file attachments.
+     */
+    public function files()
+    {
+        return $this->hasManyThrough(
+            File::class,
+            FileAttachment::class,
+            'attachable_id', // Foreign key on file_attachments table
+            'id', // Foreign key on files table
+            'id', // Local key on budgets table
+            'file_id' // Local key on file_attachments table
+        )->where('file_attachments.attachable_type', Budget::class);
     }
 
     /**

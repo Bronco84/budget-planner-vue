@@ -216,6 +216,20 @@ Breadcrumbs::for('budget.projections', function (BreadcrumbTrail $trail, Budget 
     $trail->push('Budget Projections', route('budget.projections', $budget));
 });
 
+Breadcrumbs::for('budget.projections.multi-account', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('budgets.show', $budget);
+    $trail->push('Scenarios', route('budget.projections.multi-account', $budget));
+});
+
+// ============================================================
+// FILES
+// ============================================================
+
+Breadcrumbs::for('budgets.files.index', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('budgets.show', $budget);
+    $trail->push('Files', route('budgets.files.index', $budget));
+});
+
 // ============================================================
 // PAYOFF PLANS
 // ============================================================

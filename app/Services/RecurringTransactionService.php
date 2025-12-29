@@ -1344,11 +1344,21 @@ class RecurringTransactionService
             }
 
             $firstPaymentDate = $creditCard->getNextAutopayDate();
-            $paymentAmount = $creditCard->getAutopayAmountCents();
+            $firstPaymentAmount = $creditCard->getAutopayAmountCents();
 
             // Skip if no payment date or amount
-            if (!$firstPaymentDate || !$paymentAmount) {
+            if (!$firstPaymentDate || !$firstPaymentAmount) {
                 continue;
+            }
+
+            // Calculate estimated monthly spending (difference between current balance and statement)
+            $statementBalance = $creditCard->plaidAccount?->last_statement_balance_cents ?? 0;
+            $currentBalance = $creditCard->current_balance_cents ?? 0;
+            $estimatedMonthlySpending = abs($currentBalance - $statementBalance);
+            
+            // If no difference, use statement balance as estimate
+            if ($estimatedMonthlySpending === 0) {
+                $estimatedMonthlySpending = $statementBalance;
             }
 
             // Generate autopay projections for all future months within the date range
@@ -1358,6 +1368,9 @@ class RecurringTransactionService
             while ($currentPaymentDate <= $endDate) {
                 // Only include if payment falls within projection window
                 if ($currentPaymentDate >= $startDate) {
+                    // First payment uses actual statement balance, subsequent use estimated monthly spending
+                    $paymentAmount = $isFirstPayment ? $firstPaymentAmount : $estimatedMonthlySpending;
+                    
                     // Create deduction from source account
                     $projections->push($this->createAutopayProjection(
                         $creditCard->autopaySourceAccount,

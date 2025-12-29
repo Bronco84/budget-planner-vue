@@ -8,6 +8,7 @@ use App\Http\Controllers\CalendarConnectionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\BudgetFilesController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\RecurringTransactionController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\ProjectionsController;
 use App\Http\Controllers\RecurringTransactionAnalysisController;
 use App\Http\Controllers\PayoffPlanController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\ScenarioController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -91,6 +93,24 @@ Route::middleware('auth')->group(function () {
         ->name('budget.account.projections');
     Route::get('budget/{budget}/account/{account}/balance-projection', [ProjectionsController::class, 'showBalanceProjection'])
         ->name('budget.account.balance-projection');
+    
+    // Multi-account projection with scenarios
+    Route::get('budget/{budget}/projections/multi-account', [ProjectionsController::class, 'showMultiAccountProjection'])
+        ->name('budget.projections.multi-account');
+    
+    // Scenario management routes
+    Route::get('budgets/{budget}/scenarios', [ScenarioController::class, 'index'])
+        ->name('budgets.scenarios.index');
+    Route::post('budgets/{budget}/scenarios', [ScenarioController::class, 'store'])
+        ->name('budgets.scenarios.store');
+    Route::get('budgets/{budget}/scenarios/{scenario}', [ScenarioController::class, 'show'])
+        ->name('budgets.scenarios.show');
+    Route::patch('budgets/{budget}/scenarios/{scenario}', [ScenarioController::class, 'update'])
+        ->name('budgets.scenarios.update');
+    Route::delete('budgets/{budget}/scenarios/{scenario}', [ScenarioController::class, 'destroy'])
+        ->name('budgets.scenarios.destroy');
+    Route::post('budgets/{budget}/scenarios/{scenario}/toggle', [ScenarioController::class, 'toggle'])
+        ->name('budgets.scenarios.toggle');
 
     // Reports route
     Route::get('budget/{budget}/reports', [ReportsController::class, 'index'])
@@ -231,10 +251,18 @@ Route::middleware('auth')->group(function () {
         ->name('transactions.files.upload');
     Route::get('transactions/{transaction}/files', [FileController::class, 'getTransactionAttachments'])
         ->name('transactions.files.index');
+    
+    // Budget files routes
+    Route::get('budgets/{budget}/files', [BudgetFilesController::class, 'index'])
+        ->name('budgets.files.index');
     Route::post('budgets/{budget}/files', [FileController::class, 'uploadToBudget'])
         ->name('budgets.files.upload');
-    Route::get('budgets/{budget}/files', [FileController::class, 'getBudgetAttachments'])
-        ->name('budgets.files.index');
+    Route::get('budgets/{budget}/files/{fileAttachment}/download', [BudgetFilesController::class, 'download'])
+        ->name('budgets.files.download');
+    Route::delete('budgets/{budget}/files/{fileAttachment}', [BudgetFilesController::class, 'destroy'])
+        ->name('budgets.files.destroy');
+    
+    // Legacy file routes
     Route::get('files/{attachment}/download', [FileController::class, 'download'])
         ->name('files.download');
     Route::delete('files/{attachment}', [FileController::class, 'delete'])

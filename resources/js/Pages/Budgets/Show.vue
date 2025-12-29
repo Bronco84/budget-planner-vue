@@ -12,25 +12,70 @@
               <!-- Fixed Budget Overview Section -->
               <div class="flex-none border-b border-gray-200 dark:border-gray-700">
               <div class="p-4">
-                  <!-- Always visible header with Total Balance -->
-                  <div class="cursor-pointer" @click="budgetCardExpanded = !budgetCardExpanded">
+                  <!-- Budget Header and Balance -->
+                  <div>
                     <div class="flex items-center justify-between mb-2">
-                      <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }}</h2>
-                      <div class="flex items-center space-x-2">
-                        <!-- Expand/Collapse Icon -->
-                        <svg
-                          class="w-5 h-5 text-gray-500 transition-transform duration-200"
-                          :class="{ 'rotate-180': budgetCardExpanded }"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                      <h2 class="font-semibold text-xl text-gray-800 leading-tight truncate flex-1 min-w-0">{{ budget.name }}</h2>
+                      
+                      <!-- Icon Action Buttons (Right Aligned) -->
+                      <div class="flex items-center gap-1.5 flex-shrink-0">
+                        <!-- Projections Icon -->
+                        <button
+                          @click="handleShowProjections"
+                          class="inline-flex items-center justify-center p-1.5 bg-teal-100 hover:bg-teal-200 rounded-md transition-colors"
+                          title="Budget Projections"
                         >
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
+                          <svg class="w-4 h-4 text-teal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                          </svg>
+                        </button>
+
+                        <!-- Edit Budget Icon -->
+                        <Link
+                          :href="route('budgets.edit', budget.id)"
+                          class="inline-flex items-center justify-center p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                          title="Edit Budget"
+                        >
+                          <PencilIcon class="w-4 h-4 text-gray-700" />
+                        </Link>
+
+                        <!-- Refresh Plaid Feed Icon (only if has Plaid accounts) -->
+                        <button
+                          v-if="hasPlaidAccounts"
+                          @click="importFromBank"
+                          class="inline-flex items-center justify-center p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors"
+                          :disabled="syncingTransactions"
+                          title="Refresh Plaid Feed"
+                        >
+                          <ArrowPathIcon 
+                            class="w-4 h-4 text-blue-700"
+                            :class="{ 'animate-spin': syncingTransactions }"
+                          />
+                        </button>
+
+                        <!-- Connect to Bank Icon (only if no Plaid accounts) -->
+                        <Link
+                          v-else
+                          :href="accounts.length > 0
+                            ? route('budgets.accounts.edit', [budget.id, accounts[0].id])
+                            : route('budgets.accounts.create', budget.id)"
+                          class="inline-flex items-center justify-center p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors"
+                          title="Connect to Bank"
+                        >
+                          <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                        </Link>
                       </div>
                     </div>
 
-                    <!-- Always visible Total Balance -->
+                    <!-- Budget Description (if exists) -->
+                    <div v-if="budget.description" class="mb-3 text-sm text-gray-600">
+                      {{ budget.description }}
+                    </div>
+
+                    <!-- Total Balance Card -->
                     <div class="bg-gray-50 p-3 rounded-lg">
                       <div class="text-sm font-medium text-gray-500">Total Balance</div>
                       <div class="text-xl font-semibold mt-1">{{ formatCurrency(totalBalance) }}</div>
@@ -54,114 +99,6 @@
                       </div>
                     </div>
                   </div>
-
-                  <!-- Collapsible content -->
-                  <transition
-                    enter-active-class="transition duration-300 ease-out"
-                    enter-from-class="transform opacity-0 -translate-y-2"
-                    enter-to-class="transform opacity-100 translate-y-0"
-                    leave-active-class="transition duration-200 ease-in"
-                    leave-from-class="transform opacity-100 translate-y-0"
-                    leave-to-class="transform opacity-0 -translate-y-2"
-                  >
-                    <div v-show="budgetCardExpanded" class="space-y-3 mt-3">
-                      <div class="bg-gray-50 p-3 rounded-lg" v-if="budget.description">
-                        <div class="text-sm font-medium text-gray-500">Description</div>
-                        <div class="text-sm mt-1">{{ budget.description || 'No description provided' }}</div>
-                      </div>
-
-                      <!-- Projections Section -->
-                      <div class="space-y-3">
-                          <div>
-                              <label for="projection_months" class="block text-sm font-medium text-gray-700">
-                                  Project Future Transactions
-                              </label>
-                              <select
-                                  id="projection_months"
-                                  v-model="projectionForm.months"
-                                  @change="updateProjections"
-                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                              >
-                                  <option value="0">No projections</option>
-                                  <option value="1">1 month</option>
-                                  <option value="2">2 months</option>
-                                  <option value="3">3 months</option>
-                                  <option value="6">6 months</option>
-                                  <option value="12">12 months</option>
-                              </select>
-                          </div>
-
-                          <div v-if="projectionForm.months > 0" class="space-y-3">
-                              <div v-if="displayedProjectedTransactions.length > 0" class="mt-2 text-sm text-blue-600">
-                                  Showing {{ displayedProjectedTransactions.length }} projected transaction{{ displayedProjectedTransactions.length === 1 ? '' : 's' }}
-                              </div>
-                          </div>
-                      </div>
-                      <div class="space-y-2">
-                          <Link
-                              :href="route('budgets.edit', budget.id)"
-                              class="w-full inline-flex items-center justify-center px-3 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-500"
-                          >
-                              <PencilIcon class="w-3 h-3 mr-2" />
-                              Edit Budget
-                          </Link>
-                          <button
-                            v-if="hasPlaidAccounts"
-                            @click="importFromBank"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500"
-                            :disabled="syncingTransactions"
-                          >
-                            <svg v-if="syncingTransactions" class="animate-spin -ml-1 mr-2 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            {{ syncingTransactions ? 'Importing...' : 'Import from Bank' }}
-                          </button>
-
-                          <!-- Separate button for connecting to bank when no connections exist -->
-                          <Link
-                            v-else
-                            :href="accounts.length > 0
-                              ? route('budgets.accounts.edit', [budget.id, accounts[0].id])
-                              : route('budgets.accounts.create', budget.id)"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500"
-                          >
-                            Connect to Bank
-                          </Link>
-                          <Link
-                            :href="route('recurring-transactions.analysis', budget.id)"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-purple-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-purple-500"
-                          >
-                            Analyze Recurring
-                          </Link>
-                          <Link
-                            :href="route('payoff-plans.index', budget.id)"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500"
-                          >
-                            Debt Payoff Plans
-                          </Link>
-                        </div>
-
-                        <!-- File Attachments Section -->
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <div class="text-sm font-medium text-gray-500 mb-2">File Attachments</div>
-                            <div class="space-y-2">
-                                <div v-if="budgetAttachments.length === 0" class="text-xs text-gray-500 text-center py-2">
-                                    No files attached
-                                </div>
-                                <div v-else>
-                                    <FileAttachmentList
-                                        :attachments="budgetAttachments"
-                                        @deleted="handleFileDeleted"
-                                    />
-                                </div>
-                                <button @click="showFileUploadModal = true" class="w-full mt-2 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-300 rounded px-2 py-1">
-                                    Attach File
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                  </transition>
               </div>
               </div>
 
@@ -171,25 +108,9 @@
                 <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                   <!-- Accordion Header -->
                   <div class="flex justify-between items-center cursor-pointer" @click="accountsExpanded = !accountsExpanded">
-                  <div class="flex items-center gap-2">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Accounts</h3>
-                    <span class="text-sm text-gray-500">({{ accounts.length }})</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <div class="flex space-x-2" @click.stop>
-                      <Link
-                        :href="route('plaid.discover', budget.id)"
-                        class="inline-flex items-center px-3 py-1 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500"
-                        title="Import accounts from your bank"
-                      >
-                        Import
-                      </Link>
-                      <Link
-                        :href="route('budgets.accounts.create', budget.id)"
-                        class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-                      >
-                        Add
-                      </Link>
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Accounts</h3>
+                      <span class="text-sm text-gray-500">({{ accounts.length }})</span>
                     </div>
                     <svg
                       class="w-5 h-5 text-gray-500 transition-transform duration-200"
@@ -201,7 +122,6 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
-                </div>
 
                 <!-- Accordion Content -->
                 <transition
@@ -420,24 +340,15 @@
                     <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Properties</h3>
                     <span class="text-sm text-gray-500">({{ properties.length }})</span>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <Link
-                      :href="route('budgets.properties.create', budget.id)"
-                      class="inline-flex items-center px-3 py-1 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500"
-                      @click.stop
-                    >
-                      Add
-                    </Link>
-                    <svg
-                      class="w-5 h-5 text-gray-500 transition-transform duration-200"
-                      :class="{ 'rotate-180': propertiesExpanded }"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
+                  <svg
+                    class="w-5 h-5 text-gray-500 transition-transform duration-200"
+                    :class="{ 'rotate-180': propertiesExpanded }"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
 
                 <!-- Accordion Content -->
@@ -451,62 +362,83 @@
                 >
                   <div v-show="propertiesExpanded" class="mt-3">
                     <!-- Properties List -->
-                    <div v-if="properties.length > 0" class="space-y-2">
-                      <Link
-                        v-for="property in properties"
-                        :key="property.id"
-                        :href="route('budgets.properties.edit', [budget.id, property.id])"
-                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                    <div v-if="properties.length > 0" class="space-y-3">
+                      <div
+                        v-for="typeGroup in propertiesByType"
+                        :key="typeGroup.type"
+                        class="transition-all duration-200"
                       >
-                        <!-- Property Icon -->
-                        <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" :class="getPropertyIconBg(property.type)">
-                          <component :is="getPropertyIcon(property.type)" class="w-5 h-5" :class="getPropertyIconColor(property.type)" />
-                        </div>
-                        
-                        <!-- Property Info -->
-                        <div class="flex-1 min-w-0">
-                          <div class="font-medium text-sm text-gray-900 truncate">{{ property.name }}</div>
-                          <div class="text-xs text-gray-500 truncate">
-                            {{ formatCurrency(property.current_value_cents) }}
-                            <span v-if="property.linked_accounts && property.linked_accounts.length > 0" class="text-gray-400">
-                              • Equity: {{ formatCurrency(property.equity) }}
-                            </span>
+                        <!-- Type Header -->
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg border border-gray-200 dark:border-gray-600 border-b-0">
+                          <div class="flex items-center gap-2">
+                            <component 
+                              :is="getPropertyIcon(typeGroup.type)" 
+                              class="w-4 h-4"
+                              :class="getPropertyIconColor(typeGroup.type)"
+                            />
+                            <span class="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">{{ typeGroup.displayName }}</span>
+                            <span class="text-xs text-gray-400">({{ typeGroup.properties.length }})</span>
+                          </div>
+                          <div class="text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                            {{ formatCurrency(typeGroup.total) }}
                           </div>
                         </div>
-                        
-                        <!-- Arrow -->
-                        <svg class="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
+
+                        <!-- Properties Table -->
+                        <div class="border border-gray-200 dark:border-gray-600 rounded-b-lg divide-y divide-gray-100 dark:divide-gray-700">
+                          <Link
+                            v-for="property in typeGroup.properties"
+                            :key="property.id"
+                            :href="route('budgets.properties.edit', [budget.id, property.id])"
+                            class="block cursor-pointer transition-all duration-150 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
+                            <!-- Property Row -->
+                            <div class="px-3 py-2.5">
+                              <div class="flex justify-between items-center gap-3">
+                                <!-- Property Icon -->
+                                <div class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" :class="getPropertyIconBg(property.type)">
+                                  <component :is="getPropertyIcon(property.type)" class="w-5 h-5" :class="getPropertyIconColor(property.type)" />
+                                </div>
+                                
+                                <!-- Property Info -->
+                                <div class="flex-1 min-w-0">
+                                  <div class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{{ property.name }}</div>
+                                  <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                    <span v-if="property.linked_accounts && property.linked_accounts.length > 0" class="text-gray-400">
+                                      Equity: {{ formatCurrency(property.equity) }}
+                                    </span>
+                                    <span v-else>
+                                      {{ formatCurrency(property.current_value_cents) }}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                <!-- Value -->
+                                <div class="flex-shrink-0 text-right">
+                                  <div class="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                                    {{ formatCurrency(property.current_value_cents) }}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                        </div>
+                      </div>
                     </div>
 
                     <!-- Empty State -->
                     <div v-else class="text-center py-6">
-                      <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <div class="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-3">
                         <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                         </svg>
                       </div>
-                      <p class="text-sm text-gray-500 mb-2">No properties yet</p>
+                      <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">No properties yet</p>
                       <Link
                         :href="route('budgets.properties.create', budget.id)"
                         class="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                       >
                         Add your first property
-                      </Link>
-                    </div>
-
-                    <!-- View All Link -->
-                    <div v-if="properties.length > 0" class="pt-3 mt-3 border-t border-gray-200">
-                      <Link
-                        :href="route('budgets.properties.index', budget.id)"
-                        class="flex items-center justify-center text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
-                      >
-                        View All Properties
-                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                        </svg>
                       </Link>
                     </div>
                   </div>
@@ -529,24 +461,15 @@
                   <p class="text-gray-600 mb-6 max-w-md mx-auto">
                     Get started by adding your first account. You can connect to your bank automatically or add an account manually.
                   </p>
-                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Link
-                      :href="route('plaid.discover', budget.id)"
-                      class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-500 transition-colors"
-                    >
-                      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      Connect to Bank
-                    </Link>
+                  <div class="flex justify-center">
                     <Link
                       :href="route('budgets.accounts.create', budget.id)"
-                      class="inline-flex items-center justify-center px-6 py-3 bg-gray-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-gray-500 transition-colors"
+                      class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-500 transition-colors"
                     >
                       <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
-                      Add Manually
+                      Add Account
                     </Link>
                   </div>
                 </div>
@@ -909,6 +832,15 @@
     </div>
   </AuthenticatedLayout>
 
+  <!-- Budget Projection Modal -->
+  <BudgetProjectionModal
+    :show="showProjectionModal"
+    :months="projectionForm.months"
+    :projected-count="displayedProjectedTransactions.length"
+    @close="showProjectionModal = false"
+    @update="updateProjections"
+  />
+
   <!-- File Upload Modal -->
   <Modal :show="showFileUploadModal" @close="showFileUploadModal = false">
     <div class="p-6">
@@ -1004,7 +936,8 @@ import {
   CircleStackIcon,
   TruckIcon,
   DocumentTextIcon,
-  CubeIcon
+  CubeIcon,
+  ArrowPathIcon
 } from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
@@ -1012,6 +945,7 @@ import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import CreditCardDetails from '@/Components/CreditCardDetails.vue';
 import InstitutionLogo from '@/Components/InstitutionLogo.vue';
+import BudgetProjectionModal from '@/Components/BudgetProjectionModal.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable'
 
@@ -1114,6 +1048,48 @@ const getAccountTypeDisplayName = (type) => {
   return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1) + ' Accounts';
 };
 
+// Group properties by type
+const propertiesByType = computed(() => {
+  const groups = {};
+
+  props.properties.forEach(property => {
+    const type = property.type || 'other';
+    if (!groups[type]) {
+      groups[type] = {
+        properties: [],
+        total: 0,
+        displayName: getPropertyTypeDisplayName(type)
+      };
+    }
+    groups[type].properties.push(property);
+    groups[type].total += property.current_value_cents || 0;
+  });
+
+  // Sort groups by preferred order
+  const propertyOrder = ['property', 'vehicle', 'other'];
+  const orderMap = {};
+  propertyOrder.forEach((type, index) => {
+    orderMap[type] = index;
+  });
+
+  return Object.keys(groups)
+    .sort((a, b) => (orderMap[a] ?? 999) - (orderMap[b] ?? 999))
+    .map(type => ({
+      type,
+      ...groups[type]
+    }));
+});
+
+// Helper function to get display name for property type
+const getPropertyTypeDisplayName = (type) => {
+  const typeMap = {
+    'property': 'Real Estate',
+    'vehicle': 'Vehicles',
+    'other': 'Other Assets'
+  };
+  return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1);
+};
+
 // Form state for projections
 const projectionForm = reactive({
   months: props.projectionParams?.months || 1,
@@ -1123,6 +1099,9 @@ const projectionForm = reactive({
 const budgetAttachments = ref([]);
 const showFileUploadModal = ref(false);
 
+// Projection modal state
+const showProjectionModal = ref(false);
+
 // Dropdown state for account actions
 const openDropdown = ref(null);
 
@@ -1131,9 +1110,6 @@ const openTransactionDropdown = ref(null);
 
 // Credit card details expansion state
 const expandedCreditCardAccount = ref(null);
-
-// Budget card accordion state (collapsed by default)
-const budgetCardExpanded = ref(false);
 
 // Accounts and Properties accordion state (expanded by default)
 const accountsExpanded = ref(true);
@@ -1399,7 +1375,10 @@ const displayedProjectedTransactions = computed(() => {
 });
 
 // Update projections
-function updateProjections() {
+function updateProjections(months) {
+  if (months !== undefined) {
+    projectionForm.months = months;
+  }
   router.visit(route('budgets.show', props.budget.id), {
     data: {
       account_id: form.account_id,
@@ -1410,6 +1389,11 @@ function updateProjections() {
     preserveScroll: true
   });
 }
+
+// Handle sidebar events
+const handleShowProjections = () => {
+  showProjectionModal.value = true;
+};
 
 // Helper functions for formatting dates
 const formatDate = (dateString) => {

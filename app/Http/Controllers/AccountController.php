@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\PlaidConnection;
 use App\Models\Transaction;
+use App\Services\PlaidService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Http\RedirectResponse;
@@ -16,8 +18,32 @@ class AccountController extends Controller
      */
     public function create(Budget $budget)
     {
-        return Inertia::render('Accounts/Create', [
-            'budget' => $budget
+        // Get existing connections for this budget to show user what they already have
+        $existingConnections = PlaidConnection::where('budget_id', $budget->id)
+            ->where('status', PlaidConnection::STATUS_ACTIVE)
+            ->with('plaidAccounts.account')
+            ->get()
+            ->map(function ($connection) {
+                return [
+                    'id' => $connection->id,
+                    'institution_name' => $connection->institution_name,
+                    'accounts_count' => $connection->getAccountCount(),
+                    'last_sync_at' => $connection->last_sync_at,
+                ];
+            });
+
+        $linkToken = null;
+        try {
+            $plaidService = app(PlaidService::class);
+            $linkToken = $plaidService->createLinkToken($budget);
+        } catch (\Exception $e) {
+            \Log::error('Failed to create Plaid link token: ' . $e->getMessage());
+        }
+
+        return Inertia::render('Accounts/CreateOrImport', [
+            'budget' => $budget,
+            'linkToken' => $linkToken,
+            'existingConnections' => $existingConnections,
         ]);
     }
 

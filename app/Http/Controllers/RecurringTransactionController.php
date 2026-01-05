@@ -108,7 +108,7 @@ class RecurringTransactionController extends Controller
 
         $validated = $request->validate([
             'description' => 'required|string|max:255',
-            'amount' => 'required_if:is_dynamic_amount,false|nullable|numeric',
+            'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
             'account_id' => 'required|exists:accounts,id',
             'linked_credit_card_account_id' => 'nullable|exists:accounts,id',
             'category' => 'required|string|max:255',
@@ -132,9 +132,18 @@ class RecurringTransactionController extends Controller
 
         // Additional validation for bimonthly frequency
         if ($validated['frequency'] === 'bimonthly') {
-            if ($validated['first_day_of_month'] === $validated['day_of_month']) {
+            // Check if both fields are present and equal
+            if (isset($validated['first_day_of_month']) && isset($validated['day_of_month']) 
+                && $validated['first_day_of_month'] === $validated['day_of_month']) {
                 return back()->withErrors([
                     'first_day_of_month' => 'The first day of month must be different from the day of month for bimonthly frequency.',
+                ]);
+            }
+            
+            // Ensure first_day_of_month is present for bimonthly
+            if (!isset($validated['first_day_of_month'])) {
+                return back()->withErrors([
+                    'first_day_of_month' => 'The first day of month is required for bimonthly frequency.',
                 ]);
             }
         }
@@ -237,7 +246,7 @@ class RecurringTransactionController extends Controller
 
         $validated = $request->validate([
             'description' => 'required|string|max:255',
-            'amount' => 'required_if:is_dynamic_amount,false|nullable|numeric',
+            'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
             'account_id' => 'required|exists:accounts,id',
             'linked_credit_card_account_id' => 'nullable|exists:accounts,id',
             'category' => 'required|string|max:255',
@@ -262,9 +271,18 @@ class RecurringTransactionController extends Controller
 
         // Additional validation for bimonthly frequency
         if ($validated['frequency'] === 'bimonthly') {
-            if ($validated['first_day_of_month'] === $validated['day_of_month']) {
+            // Check if both fields are present and equal
+            if (isset($validated['first_day_of_month']) && isset($validated['day_of_month']) 
+                && $validated['first_day_of_month'] === $validated['day_of_month']) {
                 return back()->withErrors([
                     'first_day_of_month' => 'The first day of month must be different from the day of month for bimonthly frequency.',
+                ]);
+            }
+            
+            // Ensure first_day_of_month is present for bimonthly
+            if (!isset($validated['first_day_of_month'])) {
+                return back()->withErrors([
+                    'first_day_of_month' => 'The first day of month is required for bimonthly frequency.',
                 ]);
             }
         }
@@ -272,11 +290,18 @@ class RecurringTransactionController extends Controller
         // Log validated data for debugging
         Log::debug('Validated recurring transaction data:', [
             'is_dynamic_amount' => $validated['is_dynamic_amount'],
+            'amount' => $validated['amount'] ?? null,
             'rules' => $validated['rules'] ?? [],
         ]);
 
         // Convert amount to cents
         $validated = $this->getArr($validated);
+
+        // Log after conversion
+        Log::debug('After getArr conversion:', [
+            'amount_in_cents' => $validated['amount_in_cents'] ?? null,
+            'all_validated' => $validated,
+        ]);
 
         // Extract rules from validated data
         $rules = $validated['rules'] ?? [];
@@ -284,6 +309,13 @@ class RecurringTransactionController extends Controller
 
         // Update the recurring transaction
         $recurring_transaction->update($validated);
+
+        // Log after update
+        Log::debug('After update:', [
+            'id' => $recurring_transaction->id,
+            'amount_in_cents' => $recurring_transaction->amount_in_cents,
+            'is_dynamic_amount' => $recurring_transaction->is_dynamic_amount,
+        ]);
 
         // Handle rules if this is a dynamic amount transaction
         if ($request->input('is_dynamic_amount')) {
@@ -388,11 +420,18 @@ class RecurringTransactionController extends Controller
      */
     public function getArr(array $validated): array
     {
+        Log::debug('getArr - Input:', ['validated' => $validated]);
+        
         // Handle amount conversion - set to 0 for dynamic amount transactions
         if (isset($validated['amount']) && $validated['amount'] !== null) {
             $validated['amount_in_cents'] = (int)($validated['amount'] * 100);
+            Log::debug('getArr - Converted amount:', [
+                'original' => $validated['amount'],
+                'converted' => $validated['amount_in_cents']
+            ]);
         } else {
             $validated['amount_in_cents'] = 0; // Default for dynamic amount transactions
+            Log::debug('getArr - No amount provided, setting to 0');
         }
         
         // Determine if this is an expense (negative) or income (positive)
@@ -411,6 +450,8 @@ class RecurringTransactionController extends Controller
             $maxCents = (int)(abs($validated['max_amount']) * 100);
             $validated['max_amount'] = $isExpense ? -$maxCents : $maxCents;
         }
+        
+        Log::debug('getArr - Output:', ['validated' => $validated]);
         
         return $validated;
     }

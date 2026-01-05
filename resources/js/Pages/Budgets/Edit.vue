@@ -34,6 +34,52 @@
                 />
                 <InputError class="mt-2" :message="form.errors.description" />
               </div>
+
+              <!-- Color Picker -->
+              <div class="mb-4">
+                <InputLabel for="color" value="Budget Color" />
+                <div class="mt-2 flex items-center gap-4">
+                  <!-- Color Input -->
+                  <div class="relative">
+                    <input
+                      id="color"
+                      type="color"
+                      v-model="form.color"
+                      class="h-10 w-20 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                    />
+                  </div>
+                  
+                  <!-- Preview with Initials -->
+                  <div class="flex items-center gap-3">
+                    <div 
+                      class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm select-none"
+                      :style="{ backgroundColor: form.color || '#6366f1', lineHeight: 1 }"
+                    >
+                      {{ getInitials(form.name) }}
+                    </div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                      Preview
+                    </div>
+                  </div>
+
+                  <!-- Preset Colors -->
+                  <div class="flex gap-2 flex-wrap">
+                    <button
+                      v-for="presetColor in presetColors"
+                      :key="presetColor"
+                      type="button"
+                      @click="form.color = presetColor"
+                      :class="[
+                        'w-8 h-8 rounded-full border-2 transition-all',
+                        form.color === presetColor ? 'border-gray-900 dark:border-white scale-110' : 'border-gray-300 dark:border-gray-600'
+                      ]"
+                      :style="{ backgroundColor: presetColor }"
+                      :title="presetColor"
+                    ></button>
+                  </div>
+                </div>
+                <InputError class="mt-2" :message="form.errors.color" />
+              </div>
               
               
               <div class="flex items-center justify-between mt-6">
@@ -108,10 +154,38 @@ const props = defineProps({
   budget: Object,
 });
 
+// Preset color options
+const presetColors = [
+  '#3b82f6', // blue
+  '#8b5cf6', // purple
+  '#ec4899', // pink
+  '#6366f1', // indigo
+  '#06b6d4', // cyan
+  '#14b8a6', // teal
+  '#10b981', // emerald
+  '#22c55e', // green
+  '#f59e0b', // amber
+  '#f97316', // orange
+  '#ef4444', // red
+  '#f43f5e', // rose
+];
+
+// Generate initials from budget name
+const getInitials = (name) => {
+  if (!name) return '?';
+  
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) {
+    return words[0].substring(0, 2).toUpperCase();
+  }
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
 // Initialize form with budget data
 const form = useForm({
   name: props.budget.name,
   description: props.budget.description || '',
+  color: props.budget.color || '#6366f1',
 });
 
 // Submit form handler

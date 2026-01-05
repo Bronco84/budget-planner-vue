@@ -34,6 +34,44 @@
                 />
                 <InputError class="mt-2" :message="form.errors.description" />
               </div>
+
+              <!-- Color Picker -->
+              <div class="mb-4">
+                <InputLabel for="color" value="Budget Color" />
+                <div class="mt-2 flex items-center gap-4">
+                  <input
+                    id="color"
+                    type="color"
+                    v-model="form.color"
+                    class="h-10 w-20 rounded border border-gray-300 cursor-pointer"
+                  />
+                  
+                  <div class="flex items-center gap-3">
+                    <div 
+                      class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm select-none"
+                      :style="{ backgroundColor: form.color, lineHeight: 1 }"
+                    >
+                      {{ getInitials(form.name) }}
+                    </div>
+                    <div class="text-sm text-gray-600">Preview</div>
+                  </div>
+
+                  <div class="flex gap-2 flex-wrap">
+                    <button
+                      v-for="presetColor in presetColors"
+                      :key="presetColor"
+                      type="button"
+                      @click="form.color = presetColor"
+                      :class="[
+                        'w-8 h-8 rounded-full border-2 transition-all',
+                        form.color === presetColor ? 'border-gray-900 scale-110' : 'border-gray-300'
+                      ]"
+                      :style="{ backgroundColor: presetColor }"
+                    ></button>
+                  </div>
+                </div>
+                <InputError class="mt-2" :message="form.errors.color" />
+              </div>
               
               <div class="mb-8">
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -82,10 +120,25 @@ import TextArea from '@/Components/TextArea.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 
+const presetColors = [
+  '#3b82f6', '#8b5cf6', '#ec4899', '#6366f1', '#06b6d4', '#14b8a6',
+  '#10b981', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#f43f5e',
+];
+
+const getInitials = (name) => {
+  if (!name) return '?';
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) {
+    return words[0].substring(0, 2).toUpperCase();
+  }
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
 // Initialize form with default values
 const form = useForm({
   name: '',
-  description: ''
+  description: '',
+  color: '#6366f1',
 });
 
 // Submit form handler

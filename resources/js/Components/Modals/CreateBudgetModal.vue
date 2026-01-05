@@ -18,9 +18,24 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 
+const presetColors = [
+    '#3b82f6', '#8b5cf6', '#ec4899', '#6366f1', '#06b6d4', '#14b8a6',
+    '#10b981', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#f43f5e',
+];
+
+const getInitials = (name) => {
+    if (!name) return '?';
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) {
+        return words[0].substring(0, 2).toUpperCase();
+    }
+    return (words[0][0] + words[1][0]).toUpperCase();
+};
+
 const form = useForm({
     name: '',
     description: '',
+    color: '#6366f1',
 });
 
 const closeModal = () => {
@@ -74,6 +89,40 @@ const submit = () => {
                         placeholder="What is this budget for?"
                     />
                     <InputError :message="form.errors.description" class="mt-2" />
+                </div>
+
+                <div class="mt-4">
+                    <InputLabel for="budget_color" value="Budget Color" />
+                    <div class="mt-2 flex items-center gap-3">
+                        <input
+                            id="budget_color"
+                            type="color"
+                            v-model="form.color"
+                            class="h-10 w-16 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                        />
+                        
+                        <div 
+                            class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs select-none"
+                            :style="{ backgroundColor: form.color, lineHeight: 1 }"
+                        >
+                            {{ getInitials(form.name) }}
+                        </div>
+
+                        <div class="flex gap-1.5 flex-wrap flex-1">
+                            <button
+                                v-for="presetColor in presetColors"
+                                :key="presetColor"
+                                type="button"
+                                @click="form.color = presetColor"
+                                :class="[
+                                    'w-6 h-6 rounded-full border-2 transition-all',
+                                    form.color === presetColor ? 'border-gray-900 dark:border-white scale-110' : 'border-gray-300 dark:border-gray-600'
+                                ]"
+                                :style="{ backgroundColor: presetColor }"
+                            ></button>
+                        </div>
+                    </div>
+                    <InputError :message="form.errors.color" class="mt-2" />
                 </div>
 
                 <div class="mt-6 flex justify-end gap-3">

@@ -6,7 +6,7 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
         "aws/aws-sdk-php": "^3.349",
         "diglactic/laravel-breadcrumbs": "^10.0",
         "echolabsdev/prism": "^0.97.1",

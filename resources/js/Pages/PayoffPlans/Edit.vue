@@ -138,6 +138,9 @@
 import { ref, watch } from 'vue';
 import { useForm, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 const props = defineProps({
   budget: Object,
@@ -162,8 +165,16 @@ const submit = () => {
   form.patch(route('payoff-plans.update', [props.budget.id, props.plan.id]));
 };
 
-const confirmDelete = () => {
-  if (confirm(`Are you sure you want to delete the payoff plan "${props.plan.name}"? This cannot be undone.`)) {
+const confirmDelete = async () => {
+  const confirmed = await toast.confirm({
+    title: 'Delete Payoff Plan',
+    message: `Are you sure you want to delete the payoff plan "${props.plan.name}"? This cannot be undone.`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    type: 'danger'
+  });
+  
+  if (confirmed) {
     router.delete(route('payoff-plans.destroy', [props.budget.id, props.plan.id]));
   }
 };

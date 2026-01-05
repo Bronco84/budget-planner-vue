@@ -116,6 +116,9 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 defineProps({
   connections: {
@@ -136,8 +139,16 @@ function syncConnection(connection) {
   });
 }
 
-function deleteConnection(connection) {
-  if (confirm(`Are you sure you want to remove the connection to "${connection.calendar_name}"?`)) {
+async function deleteConnection(connection) {
+  const confirmed = await toast.confirm({
+    title: 'Remove Calendar Connection',
+    message: `Are you sure you want to remove the connection to "${connection.calendar_name}"?`,
+    confirmText: 'Remove',
+    cancelText: 'Cancel',
+    type: 'danger'
+  });
+  
+  if (confirmed) {
     router.delete(route('calendar.connections.destroy', connection.id), {
       preserveScroll: true,
     });

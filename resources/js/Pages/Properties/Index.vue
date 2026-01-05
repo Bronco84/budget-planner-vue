@@ -151,6 +151,9 @@ import { computed } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { HomeIcon, TruckIcon, CubeIcon } from '@heroicons/vue/24/outline';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 const props = defineProps({
   budget: Object,
@@ -195,8 +198,16 @@ const getAssetIcon = (type) => {
   }
 };
 
-const confirmDelete = (property) => {
-  if (confirm(`Are you sure you want to delete ${property.name}? This will unlink any associated loan accounts.`)) {
+const confirmDelete = async (property) => {
+  const confirmed = await toast.confirm({
+    title: 'Delete Property',
+    message: `Are you sure you want to delete ${property.name}? This will unlink any associated loan accounts.`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    type: 'danger'
+  });
+  
+  if (confirmed) {
     router.delete(route('budgets.properties.destroy', [props.budget.id, property.id]));
   }
 };

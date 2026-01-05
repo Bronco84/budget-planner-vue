@@ -141,7 +141,7 @@
                   <template #item="{ element: typeGroup }">
                     <div
                       :key="typeGroup.type"
-                      class="transition-all duration-200 border border-gray-200 rounded-lg overflow-hidden"
+                      class="transition-all duration-200 border border-gray-200 rounded-lg"
                       :class="{ 'transform scale-[1.02] shadow-lg': isDragging }"
                     >
                       <!-- Type Header - Collapsible group header -->

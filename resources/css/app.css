@@ -123,3 +123,136 @@
     @apply text-orange-300;
   }
 }
+
+/* Vue Toastification Styling - Light & Dark Mode */
+
+/* Light Mode Base */
+.Vue-Toastification__toast {
+  @apply bg-white border border-gray-200 shadow-lg;
+}
+
+.Vue-Toastification__toast--success {
+  @apply bg-emerald-50 border-emerald-200;
+}
+
+.Vue-Toastification__toast--error {
+  @apply bg-rose-50 border-rose-200;
+}
+
+.Vue-Toastification__toast--warning {
+  @apply bg-amber-50 border-amber-200;
+}
+
+.Vue-Toastification__toast--info {
+  @apply bg-sky-50 border-sky-200;
+}
+
+.Vue-Toastification__toast-body {
+  @apply text-gray-900;
+}
+
+.Vue-Toastification__progress-bar {
+  @apply bg-gray-300;
+}
+
+.Vue-Toastification__toast--success .Vue-Toastification__progress-bar {
+  @apply bg-emerald-400;
+}
+
+.Vue-Toastification__toast--error .Vue-Toastification__progress-bar {
+  @apply bg-rose-400;
+}
+
+.Vue-Toastification__toast--warning .Vue-Toastification__progress-bar {
+  @apply bg-amber-400;
+}
+
+.Vue-Toastification__toast--info .Vue-Toastification__progress-bar {
+  @apply bg-sky-400;
+}
+
+.Vue-Toastification__close-button {
+  @apply text-gray-500 hover:text-gray-700;
+}
+
+/* Dark Mode Overrides */
+.dark .Vue-Toastification__toast {
+  @apply bg-gray-800 border-gray-700 shadow-xl;
+}
+
+.dark .Vue-Toastification__toast--success {
+  @apply bg-gray-800 border-emerald-800/50;
+}
+
+.dark .Vue-Toastification__toast--error {
+  @apply bg-gray-800 border-rose-800/50;
+}
+
+.dark .Vue-Toastification__toast--warning {
+  @apply bg-gray-800 border-amber-800/50;
+}
+
+.dark .Vue-Toastification__toast--info {
+  @apply bg-gray-800 border-sky-800/50;
+}
+
+.dark .Vue-Toastification__toast-body {
+  @apply text-gray-100;
+}
+
+.dark .Vue-Toastification__progress-bar {
+  @apply bg-gray-700;
+}
+
+.dark .Vue-Toastification__toast--success .Vue-Toastification__progress-bar {
+  @apply bg-emerald-500/60;
+}
+
+.dark .Vue-Toastification__toast--error .Vue-Toastification__progress-bar {
+  @apply bg-rose-500/60;
+}
+
+.dark .Vue-Toastification__toast--warning .Vue-Toastification__progress-bar {
+  @apply bg-amber-500/60;
+}
+
+.dark .Vue-Toastification__toast--info .Vue-Toastification__progress-bar {
+  @apply bg-sky-500/60;
+}
+
+.dark .Vue-Toastification__close-button {
+  @apply text-gray-400 hover:text-gray-200;
+}
+
+/* Toast Icon Colors */
+.Vue-Toastification__toast--success .Vue-Toastification__icon {
+  @apply text-emerald-600;
+}
+
+.Vue-Toastification__toast--error .Vue-Toastification__icon {
+  @apply text-rose-600;
+}
+
+.Vue-Toastification__toast--warning .Vue-Toastification__icon {
+  @apply text-amber-600;
+}
+
+.Vue-Toastification__toast--info .Vue-Toastification__icon {
+  @apply text-sky-600;
+}
+
+.dark .Vue-Toastification__toast--success .Vue-Toastification__icon {
+  @apply text-emerald-400;
+}
+
+.dark .Vue-Toastification__toast--error .Vue-Toastification__icon {
+  @apply text-rose-400;
+}
+
+.dark .Vue-Toastification__toast--warning .Vue-Toastification__icon {
+  @apply text-amber-400;
+}
+
+.dark .Vue-Toastification__toast--info .Vue-Toastification__icon {
+  @apply text-sky-400;
+}

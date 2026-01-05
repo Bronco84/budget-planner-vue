@@ -301,8 +301,8 @@
               <InputError class="mt-2" :message="form.errors.day_of_week" />
             </div>
 
-            <!-- Day of Month (for monthly) -->
-            <div v-if="form.frequency === 'monthly'">
+            <!-- Day of Month (for monthly/quarterly) -->
+            <div v-if="form.frequency === 'monthly' || form.frequency === 'quarterly'">
               <InputLabel for="day_of_month" value="Day of Month" />
               <input
                 id="day_of_month"
@@ -314,6 +314,49 @@
               />
               <p class="mt-1 text-sm text-gray-500">The day of the month when the transaction occurs (1-31)</p>
               <InputError class="mt-2" :message="form.errors.day_of_month" />
+            </div>
+
+            <!-- Bimonthly frequency fields -->
+            <div v-if="form.frequency === 'bimonthly'" class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- First occurrence -->
+              <div>
+                <InputLabel for="first_day_of_month" value="First Occurrence" />
+                <input
+                  id="first_day_of_month"
+                  type="number"
+                  min="1"
+                  max="31"
+                  v-model.number="form.first_day_of_month"
+                  class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                  required
+                />
+                <p class="mt-1 text-sm text-gray-500">First day of the month (e.g., 1 for 1st)</p>
+                <InputError class="mt-2" :message="form.errors.first_day_of_month" />
+              </div>
+
+              <!-- Second occurrence -->
+              <div>
+                <InputLabel for="day_of_month" value="Second Occurrence" />
+                <input
+                  id="day_of_month"
+                  type="number"
+                  min="1"
+                  max="31"
+                  v-model.number="form.day_of_month"
+                  class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                  required
+                />
+                <p class="mt-1 text-sm text-gray-500">Second day of the month (e.g., 15 for 15th)</p>
+                <InputError class="mt-2" :message="form.errors.day_of_month" />
+              </div>
+            </div>
+
+            <!-- Helper text for bimonthly -->
+            <div v-if="form.frequency === 'bimonthly'" class="md:col-span-2 bg-blue-50 p-3 rounded-md">
+              <p class="text-sm text-blue-700">
+                <strong>Example:</strong> For transactions on the 1st and 15th of every month, enter 1 and 15.
+                The transaction will occur twice per month on these specific days.
+              </p>
             </div>
 
             <!-- Start Date -->
@@ -381,6 +424,9 @@ import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import InputError from '@/Components/InputError.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 const props = defineProps({
   budget: Object,
@@ -407,6 +453,7 @@ const form = useForm({
   frequency: props.recurringTransaction.frequency,
   day_of_week: props.recurringTransaction.day_of_week,
   day_of_month: props.recurringTransaction.day_of_month,
+  first_day_of_month: props.recurringTransaction.first_day_of_month,
   start_date: props.recurringTransaction.start_date,
   end_date: props.recurringTransaction.end_date,
   notes: props.recurringTransaction.notes,
@@ -442,11 +489,32 @@ const submit = () => {
   form.patch(route('recurring-transactions.update', {
     budget: props.budget.id,
     recurring_transaction: props.recurringTransaction.id
-  }));
+  }), {
+    onSuccess: () => {
+      toast.success('Recurring transaction updated successfully');
+    },
+    onError: (errors) => {
+      // Show the first error message
+      const firstError = Object.values(errors)[0];
+      if (firstError) {
+        toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
+      } else {
+        toast.error('Failed to update recurring transaction');
+      }
+    }
+  });
 };
 
-const confirmDelete = () => {
-  if (confirm(`Are you sure you want to delete the recurring transaction "${props.recurringTransaction.description}"?`)) {
+const confirmDelete = async () => {
+  const confirmed = await toast.confirm({
+    title: 'Delete Recurring Transaction',
+    message: `Are you sure you want to delete the recurring transaction "${props.recurringTransaction.description}"?`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    type: 'danger'
+  });
+  
+  if (confirmed) {
     router.delete(route('recurring-transactions.destroy', [props.budget.id, props.recurringTransaction.id]));
   }
 };

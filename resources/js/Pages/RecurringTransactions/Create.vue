@@ -513,6 +513,7 @@ const form = useForm({
   first_day_of_month: 1,
   start_date: props.sourceTransaction?.date || today,
   end_date: '',
+  is_dynamic_amount: false,
   min_amount: '',
   max_amount: '',
   average_amount: '',
@@ -547,14 +548,11 @@ const removeRule = (index) => {
 };
 
 const submit = () => {
-  // Update values before submitting
+  // Update is_dynamic_amount based on the current amountType
   form.is_dynamic_amount = amountType.value === 'dynamic';
 
   form.transform((data) => {
-    const transformed = {
-      ...data,
-      is_dynamic_amount: amountType.value === 'dynamic'
-    };
+    const transformed = { ...data };
 
     // Remove fields not needed for the selected frequency
     if (form.frequency === 'biweekly' || form.frequency === 'weekly') {

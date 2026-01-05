@@ -644,6 +644,7 @@ const form = useForm({
   first_day_of_month: props.recurringTransaction.first_day_of_month || 1,
   start_date: formatDateForInput(props.recurringTransaction.start_date),
   end_date: formatDateForInput(props.recurringTransaction.end_date) || '',
+  is_dynamic_amount: props.recurringTransaction.is_dynamic_amount || false,
   min_amount: props.recurringTransaction.min_amount ?
     Math.abs(props.recurringTransaction.min_amount / 100).toFixed(2) : '',
   max_amount: props.recurringTransaction.max_amount ?
@@ -678,12 +679,17 @@ const removeRule = (index) => {
 
 // Submit form
 const submit = () => {
-  // Update values before submitting
+  // Update is_dynamic_amount based on the current amountType
   form.is_dynamic_amount = amountType.value === 'dynamic';
 
-  form.transform((form) => ({
-      ...form,
-      is_dynamic_amount: amountType.value === 'dynamic'
-  })).patch(route('recurring-transactions.update', [props.budget.id, props.recurringTransaction.id]));
+  console.log('Submitting form with data:', {
+    frequency: form.frequency,
+    day_of_month: form.day_of_month,
+    first_day_of_month: form.first_day_of_month,
+    amount: form.amount,
+    is_dynamic_amount: form.is_dynamic_amount,
+  });
+
+  form.patch(route('recurring-transactions.update', [props.budget.id, props.recurringTransaction.id]));
 };
 </script>

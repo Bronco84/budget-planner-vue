@@ -259,6 +259,9 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 const props = defineProps({
   budget: Object,
@@ -344,14 +347,30 @@ const fixedTransactionsCount = computed(() => {
   return props.recurringTransactions.filter(t => !t.is_dynamic_amount).length;
 });
 
-const confirmDelete = (template) => {
-  if (confirm(`Are you sure you want to delete the recurring transaction "${template.description}"?`)) {
+const confirmDelete = async (template) => {
+  const confirmed = await toast.confirm({
+    title: 'Delete Recurring Transaction',
+    message: `Are you sure you want to delete the recurring transaction "${template.description}"?`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    type: 'danger'
+  });
+  
+  if (confirmed) {
     router.delete(route('recurring-transactions.destroy', [props.budget.id, template.id]));
   }
 };
 
-const duplicate = (template) => {
-  if (confirm(`Do you want to duplicate the recurring transaction "${template.description}"?`)) {
+const duplicate = async (template) => {
+  const confirmed = await toast.confirm({
+    title: 'Duplicate Recurring Transaction',
+    message: `Do you want to duplicate the recurring transaction "${template.description}"?`,
+    confirmText: 'Duplicate',
+    cancelText: 'Cancel',
+    type: 'info'
+  });
+  
+  if (confirmed) {
     router.post(route('recurring-transactions.duplicate', [props.budget.id, template.id]));
   }
 };

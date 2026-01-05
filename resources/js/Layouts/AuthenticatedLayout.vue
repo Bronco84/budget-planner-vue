@@ -13,6 +13,7 @@ import ChatPanel from '@/Components/ChatPanel.vue';
 import CreateBudgetModal from '@/Components/Modals/CreateBudgetModal.vue';
 import QuickAddTransactionModal from '@/Components/Modals/QuickAddTransactionModal.vue';
 import QuickAddRecurringModal from '@/Components/Modals/QuickAddRecurringModal.vue';
+import ConfirmDialog from '@/Components/ConfirmDialog.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { useTheme } from '@/composables/useTheme';
 import { useSidebar } from '@/composables/useSidebar';
@@ -229,6 +230,9 @@ const handleToggleChat = () => {
             :show="showQuickAddRecurringModal"
             @close="showQuickAddRecurringModal = false"
         />
+
+        <!-- Global Confirm Dialog -->
+        <ConfirmDialog />
     </div>
 </template>
 

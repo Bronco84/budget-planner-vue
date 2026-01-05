@@ -37,6 +37,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'activeBudget' => $this->getActiveBudget($request),
+            'userBudgets' => $this->getUserBudgets($request),
             'breadcrumbs' => $this->getBreadcrumbs($request),
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
@@ -69,6 +70,7 @@ class HandleInertiaRequests extends Middleware
             'id' => $activeBudget->id,
             'name' => $activeBudget->name,
             'description' => $activeBudget->description,
+            'color' => $activeBudget->color,
             'starting_balance' => $activeBudget->starting_balance,
             'accounts' => $activeBudget->accounts->map(fn($account) => [
                 'id' => $account->id,
@@ -76,6 +78,27 @@ class HandleInertiaRequests extends Middleware
                 'type' => $account->type,
             ])->toArray(),
         ];
+    }
+
+    /**
+     * Get all accessible budgets for the current user.
+     */
+    protected function getUserBudgets(Request $request): array
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return [];
+        }
+
+        $budgets = $user->accessibleBudgets();
+
+        return $budgets->map(fn($budget) => [
+            'id' => $budget->id,
+            'name' => $budget->name,
+            'description' => $budget->description,
+            'color' => $budget->color,
+        ])->toArray();
     }
 
     /**

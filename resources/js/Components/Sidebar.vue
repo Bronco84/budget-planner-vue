@@ -17,6 +17,7 @@ import {
     DocumentTextIcon,
     ChartPieIcon
 } from '@heroicons/vue/24/outline';
+import BudgetSwitcher from '@/Components/BudgetSwitcher.vue';
 
 const props = defineProps({
     isCollapsed: {
@@ -136,6 +137,14 @@ onUnmounted(() => {
             </button>
         </div>
 
+        <!-- Budget Switcher -->
+        <div class="flex justify-center pt-4 pb-2 border-b border-gray-200 dark:border-gray-800">
+            <BudgetSwitcher 
+                :is-collapsed="isCollapsed" 
+                :is-mobile-open="isMobileOpen" 
+            />
+        </div>
+
         <!-- Navigation items -->
         <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
             <!-- Regular Navigation Items -->
@@ -180,8 +189,8 @@ onUnmounted(() => {
                         :class="[
                             'flex-shrink-0 transition-all duration-200',
                             isCollapsed && !isMobileOpen ? 'w-6 h-6' : 'w-5 h-5 mr-3',
-                            item.color,
-                            item.hoverColor,
+                            route().current(item.route) ? item.color : 'text-gray-400 dark:text-gray-500',
+                            route().current(item.route) ? '' : 'group-hover:text-gray-600 dark:group-hover:text-gray-400',
                             'group-hover:scale-110'
                         ]"
                     />
@@ -203,8 +212,7 @@ onUnmounted(() => {
                         :class="[
                             'flex-shrink-0 transition-all duration-200',
                             isCollapsed && !isMobileOpen ? 'w-6 h-6' : 'w-5 h-5 mr-3',
-                            item.color,
-                            item.hoverColor,
+                            'text-gray-400 dark:text-gray-500',
                             'group-hover:scale-110'
                         ]"
                     />
@@ -225,7 +233,7 @@ onUnmounted(() => {
                         :is="item.icon"
                         :class="[
                             'flex-shrink-0',
-                            item.color,
+                            'text-gray-400 dark:text-gray-500',
                             isCollapsed && !isMobileOpen ? 'w-6 h-6' : 'w-5 h-5 mr-3'
                         ]"
                     />

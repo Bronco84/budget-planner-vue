@@ -238,6 +238,9 @@ import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import ActivityLog from '@/Components/ActivityLog.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 // Props
 const props = defineProps({
@@ -308,8 +311,16 @@ const submit = () => {
 };
 
 // Delete confirmation
-const confirmDelete = () => {
-  if (confirm('Are you sure you want to delete this transaction?')) {
+const confirmDelete = async () => {
+  const confirmed = await toast.confirm({
+    title: 'Delete Transaction',
+    message: 'Are you sure you want to delete this transaction?',
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    type: 'danger'
+  });
+  
+  if (confirmed) {
     router.delete(route('budget.transaction.destroy', [props.budget.id, props.transaction.id]));
   }
 };

@@ -138,6 +138,10 @@ import { onMounted, ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
+
+// Initialize toast
+const toast = useToast();
 
 // Props
 const props = defineProps({
@@ -201,9 +205,9 @@ const initializePlaid = () => {
       if (err) {
         // Handle specific error cases
         if (err.error_type === 'INSTITUTION_ERROR' && err.error_code === 'INSTITUTION_REGISTRATION_REQUIRED') {
-          alert(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
+          toast.error(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
         } else if (err.error_message) {
-          alert(`Connection Error: ${err.error_message}`);
+          toast.error(`Connection Error: ${err.error_message}`);
         }
       }
     },
@@ -225,16 +229,16 @@ const syncTransactions = () => {
       onSuccess: (page) => {
         // Show success or error message if available
         if (page.props.flash && page.props.flash.message) {
-          alert('Success: ' + page.props.flash.message);
+          toast.success(page.props.flash.message);
         } else if (page.props.flash && page.props.flash.error) {
-          alert('Error: ' + page.props.flash.error);
+          toast.error(page.props.flash.error);
         } else if (page.props.error) {
-          alert('Page Error: ' + page.props.error);
+          toast.error(page.props.error);
         }
       },
       onError: (errors) => {
         if (errors.message) {
-          alert('OnError: ' + errors.message);
+          toast.error(errors.message);
         }
       },
       onFinish: () => {
@@ -253,15 +257,15 @@ const updateBalance = () => {
       onSuccess: (page) => {
         // Show success or error message if available
         if (page.props.flash && page.props.flash.message) {
-          alert(page.props.flash.message);
+          toast.success(page.props.flash.message);
         } else if (page.props.flash && page.props.flash.error) {
-          alert(page.props.flash.error);
+          toast.error(page.props.flash.error);
         }
       },
       onError: (errors) => {
         // Show error message if available
         if (errors.message) {
-          alert(errors.message);
+          toast.error(errors.message);
         }
       },
       onFinish: () => {
@@ -271,8 +275,16 @@ const updateBalance = () => {
   );
 };
 
-const confirmDisconnect = () => {
-  if (confirm('Are you sure you want to disconnect from Plaid? This will not delete any imported transactions.')) {
+const confirmDisconnect = async () => {
+  const confirmed = await toast.confirm({
+    title: 'Disconnect from Plaid',
+    message: 'Are you sure you want to disconnect from Plaid? This will not delete any imported transactions.',
+    confirmText: 'Disconnect',
+    cancelText: 'Cancel',
+    type: 'warning'
+  });
+  
+  if (confirmed) {
     router.delete(route('plaid.destroy', [props.budget.id, props.account.id]));
   }
 };

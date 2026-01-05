@@ -223,6 +223,10 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
+
+// Initialize toast
+const toast = useToast();
 
 // Props
 const props = defineProps({
@@ -269,15 +273,15 @@ const initializePlaid = () => {
         // Pre-select all accounts by default - ensure strings and uniqueness
         selectedAccounts.value = [...new Set(metadata.accounts.map(acc => String(acc.id)))];
       } else {
-        alert('No accounts were found. Please try connecting a different institution.');
+        toast.warning('No accounts were found. Please try connecting a different institution.');
       }
     },
     onExit: (err, metadata) => {
       if (err) {
         if (err.error_type === 'INSTITUTION_ERROR' && err.error_code === 'INSTITUTION_REGISTRATION_REQUIRED') {
-          alert(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
+          toast.error(`Institution Registration Required: ${err.display_message || 'This institution requires special registration. Please contact support for assistance connecting this account.'}`);
         } else if (err.error_message) {
-          alert(`Connection Error: ${err.error_message}`);
+          toast.error(`Connection Error: ${err.error_message}`);
         }
       }
     },
@@ -300,7 +304,7 @@ const resetDiscovery = () => {
 
 const importSelectedAccounts = () => {
   if (!currentPublicToken || !currentMetadata || !selectedAccounts.value.length) {
-    alert('Please select at least one account to import.');
+    toast.warning('Please select at least one account to import.');
     return;
   }
   

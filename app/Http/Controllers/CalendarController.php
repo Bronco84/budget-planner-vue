@@ -17,17 +17,21 @@ class CalendarController extends Controller
         $year = $request->input('year', now()->year);
         $month = $request->input('month', now()->month);
 
-        // Get user's budgets
-        $budgets = auth()->user()->budgets;
-        $selectedBudgetId = $request->input('budget_id', $budgets->first()?->id);
-
+        // Get user's active budget
+        $activeBudget = auth()->user()->getActiveBudget();
+        
         // If no budgets exist, redirect to create page
-        if (!$selectedBudgetId) {
+        if (!$activeBudget) {
             return redirect()->route('budgets.create')
                 ->with('message', 'Please create a budget to use the calendar.');
         }
 
+        // Use active budget (can be overridden by query param for future multi-budget support)
+        $selectedBudgetId = $request->input('budget_id', $activeBudget->id);
         $budget = Budget::findOrFail($selectedBudgetId);
+        
+        // Get all user's budgets for potential budget switcher in calendar
+        $budgets = auth()->user()->accessibleBudgets();
 
         // Generate calendar data
         $calendarData = $this->generateCalendarData($budget, $year, $month);

@@ -88,7 +88,7 @@ class BudgetService
         // Get projected transactions
         $projectedTransactions = $this->getProjectedTransactions(
             $account,
-            now()->addDay(),
+            now()->addDay()->startOfDay(),
             now()->addMonths($monthsToProject)->endOfMonth(),
             $account->budget_id
         );

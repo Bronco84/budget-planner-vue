@@ -332,6 +332,30 @@ class ProjectionsController extends Controller
             $activeScenarios = $allScenarios->where('is_active', true);
         }
 
+        // Generate autopay projections for the entire budget
+        $autopayProjections = $this->recurringTransactionService->generateAutopayProjections(
+            $budget,
+            $startDate,
+            $endDate
+        );
+
+        \Log::info('Autopay projections generated', [
+            'count' => $autopayProjections->count(),
+            'projections' => $autopayProjections->map(fn($p) => [
+                'account_id' => $p->account_id,
+                'date' => $p->date->format('Y-m-d'),
+                'amount' => $p->amount_in_cents,
+            ])->toArray(),
+        ]);
+
+        // Convert autopay projections from objects to arrays for consistency
+        $autopayProjections = $autopayProjections->map(function ($projection) {
+            return (array) $projection;
+        });
+
+        // Group autopay projections by account
+        $autopayByAccount = $autopayProjections->groupBy('account_id');
+
         // Calculate base projections for each account
         $baseProjections = [];
         foreach ($accounts as $account) {
@@ -343,6 +367,11 @@ class ProjectionsController extends Controller
 
             if (!$projectedTransactions instanceof Collection) {
                 $projectedTransactions = collect($projectedTransactions);
+            }
+
+            // Add autopay projections for this account
+            if ($autopayByAccount->has($account->id)) {
+                $projectedTransactions = $projectedTransactions->merge($autopayByAccount->get($account->id));
             }
 
             $balanceProjection = $this->projectDailyBalance(
@@ -371,6 +400,11 @@ class ProjectionsController extends Controller
 
                 if (!$projectedTransactions instanceof Collection) {
                     $projectedTransactions = collect($projectedTransactions);
+                }
+
+                // Add autopay projections for this account
+                if ($autopayByAccount->has($account->id)) {
+                    $projectedTransactions = $projectedTransactions->merge($autopayByAccount->get($account->id));
                 }
 
                 // Apply scenario adjustments

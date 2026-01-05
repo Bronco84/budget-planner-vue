@@ -61,6 +61,7 @@ class BudgetController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
         $user = Auth::user();
@@ -70,6 +71,7 @@ class BudgetController extends Controller
         $budget = $user->budgets()->create([
             'name' => $validated['name'],
             'description' => $validated['description'],
+            'color' => $validated['color'] ?? '#6366f1',
         ]);
 
         // Set as active budget if user has no active budget
@@ -239,6 +241,7 @@ class BudgetController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
         $budget->update($validated);

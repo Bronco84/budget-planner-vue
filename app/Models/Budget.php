@@ -26,6 +26,7 @@ class Budget extends Model
         'user_id',
         'name',
         'description',
+        'color',
         'starting_balance_account_id',
     ];
 

@@ -55,18 +55,7 @@
                         </button>
 
                         <!-- Connect to Bank Icon (only if no Plaid accounts) -->
-                        <Link
-                          v-else
-                          :href="accounts.length > 0
-                            ? route('budgets.accounts.edit', [budget.id, accounts[0].id])
-                            : route('budgets.accounts.create', budget.id)"
-                          class="inline-flex items-center justify-center p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors"
-                          title="Connect to Bank"
-                        >
-                          <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                          </svg>
-                        </Link>
+                        
                       </div>
                     </div>
 
@@ -75,9 +64,9 @@
                       {{ budget.description }}
                     </div>
 
-                    <!-- Total Balance Card -->
+                    <!-- Net Worth Card -->
                     <div class="bg-gray-50 p-3 rounded-lg">
-                      <div class="text-sm font-medium text-gray-500">Total Balance</div>
+                      <div class="text-sm font-medium text-gray-500">Net Worth</div>
                       <div class="text-xl font-semibold mt-1">{{ formatCurrency(totalBalance) }}</div>
 
                       <!-- Projected Monthly Cash Flow Indicator -->
@@ -99,7 +88,7 @@
                       </div>
                     </div>
                   </div>
-              </div>
+                </div>
               </div>
 
               <!-- Scrollable Accounts and Properties Section -->
@@ -152,11 +141,11 @@
                   <template #item="{ element: typeGroup }">
                     <div
                       :key="typeGroup.type"
-                      class="transition-all duration-200"
+                      class="transition-all duration-200 border border-gray-200 rounded-lg overflow-hidden"
                       :class="{ 'transform scale-[1.02] shadow-lg': isDragging }"
                     >
                       <!-- Type Header - Collapsible group header -->
-                      <div class="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-t-lg cursor-move drag-handle border border-gray-200 border-b-0">
+                      <div class="flex justify-between items-center py-2 px-3 bg-gray-50 cursor-move drag-handle border-b border-gray-200">
                         <div class="flex items-center gap-2">
                           <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
@@ -176,15 +165,16 @@
                       </div>
 
                       <!-- Accounts Table -->
-                      <div class="border border-gray-200 rounded-b-lg divide-y divide-gray-100">
+                      <div class="divide-y divide-gray-100">
                         <div
                           v-for="(account, index) in typeGroup.accounts"
                           :key="account.id"
                           class="cursor-pointer transition-all duration-150"
                           :class="[
                             activeAccountId === account.id 
-                              ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-200' 
-                              : 'bg-white hover:bg-gray-50',
+                              ? 'bg-indigo-50 dark:bg-gray-700 ring-1 ring-inset ring-indigo-200 dark:ring-gray-600' 
+                              : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700',
+                            index === typeGroup.accounts.length - 1 ? 'rounded-b-lg' : ''
                           ]"
                           @click="selectAccount(account.id)"
                         >
@@ -366,10 +356,10 @@
                       <div
                         v-for="typeGroup in propertiesByType"
                         :key="typeGroup.type"
-                        class="transition-all duration-200"
+                        class="transition-all duration-200 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden mb-3 last:mb-0"
                       >
                         <!-- Type Header -->
-                        <div class="flex justify-between items-center py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg border border-gray-200 dark:border-gray-600 border-b-0">
+                        <div class="flex justify-between items-center py-2 px-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                           <div class="flex items-center gap-2">
                             <component 
                               :is="getPropertyIcon(typeGroup.type)" 
@@ -385,7 +375,7 @@
                         </div>
 
                         <!-- Properties Table -->
-                        <div class="border border-gray-200 dark:border-gray-600 rounded-b-lg divide-y divide-gray-100 dark:divide-gray-700">
+                        <div class="divide-y divide-gray-100 dark:divide-gray-700">
                           <Link
                             v-for="property in typeGroup.properties"
                             :key="property.id"
@@ -947,7 +937,8 @@ import CreditCardDetails from '@/Components/CreditCardDetails.vue';
 import InstitutionLogo from '@/Components/InstitutionLogo.vue';
 import BudgetProjectionModal from '@/Components/BudgetProjectionModal.vue';
 import { formatCurrency } from '@/utils/format.js';
-import draggable from 'vuedraggable'
+import draggable from 'vuedraggable';
+import { useToast } from '@/composables/useToast';
 
 // Define props
 const props = defineProps({
@@ -961,6 +952,9 @@ const props = defineProps({
   userAccountTypeOrder: Array,
   monthlyProjectedCashFlow: Number
 });
+
+// Initialize toast
+const toast = useToast();
 
 // Form state for account selection
 const form = reactive({
@@ -1489,12 +1483,12 @@ const hasPlaidAccounts = computed(() => {
 });
 
 // Import transactions from all Plaid-connected accounts
-const importFromBank = () => {
+const importFromBank = async () => {
   // Get all accounts with Plaid connections
   const plaidAccounts = props.accounts.filter(account => account.plaid_account !== null);
 
   if (plaidAccounts.length === 0) {
-    alert('No Plaid-connected accounts found. Please connect an account to Plaid first.');
+    toast.warning('No Plaid-connected accounts found. Please connect an account to Plaid first.');
     return;
   }
 
@@ -1512,9 +1506,13 @@ const importFromBank = () => {
         mostRecentSync.getMonth() === now.getMonth() &&
         mostRecentSync.getFullYear() === now.getFullYear()) {
 
-      const confirmSync = confirm(
-        'You have already synced with Plaid today. Each sync uses a Plaid API call that costs money. Are you sure you want to sync again?'
-      );
+      const confirmSync = await toast.confirm({
+        title: 'Sync Again Today?',
+        message: 'You have already synced with Plaid today. Each sync uses a Plaid API call that costs money. Are you sure you want to sync again?',
+        confirmText: 'Yes, Sync Again',
+        cancelText: 'Cancel',
+        type: 'warning'
+      });
 
       if (!confirmSync) {
         return;
@@ -1537,7 +1535,7 @@ const importFromBank = () => {
 
         // Show success message to user
         if (page.props.flash && page.props.flash.message) {
-          alert(page.props.flash.message);
+          toast.success(page.props.flash.message);
         }
 
         // Reload only the necessary components
@@ -1558,7 +1556,7 @@ const importFromBank = () => {
           errorMessage = `Server returned error code ${errors.response.status}`;
         }
 
-        alert(errorMessage);
+        toast.error(errorMessage);
       }
     }
   );

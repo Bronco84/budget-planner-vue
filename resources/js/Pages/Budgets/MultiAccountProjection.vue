@@ -283,6 +283,7 @@ import ScenarioForm from '@/Components/ScenarioForm.vue';
 import MultiAccountBalanceChart from '@/Components/MultiAccountBalanceChart.vue';
 import { formatCurrency } from '@/utils/format.js';
 import { useScenarios } from '@/composables/useScenarios.js';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps({
   budget: Object,
@@ -295,6 +296,9 @@ const props = defineProps({
 });
 
 const { createScenario, updateScenario, deleteScenario, toggleScenario } = useScenarios(props.budget.id);
+
+// Initialize toast
+const toast = useToast();
 
 // Local state
 const selectedAccountIds = ref([]);
@@ -444,12 +448,20 @@ const handleSaveScenario = async (scenarioData) => {
     refreshProjections();
   } catch (error) {
     console.error('Error saving scenario:', error);
-    alert('Failed to save scenario. Please try again.');
+    toast.error('Failed to save scenario. Please try again.');
   }
 };
 
 const handleDeleteScenario = async (scenarioId) => {
-  if (!confirm('Are you sure you want to delete this scenario?')) {
+  const confirmed = await toast.confirm({
+    title: 'Delete Scenario',
+    message: 'Are you sure you want to delete this scenario?',
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    type: 'danger'
+  });
+  
+  if (!confirmed) {
     return;
   }
   
@@ -460,7 +472,7 @@ const handleDeleteScenario = async (scenarioId) => {
     refreshProjections();
   } catch (error) {
     console.error('Error deleting scenario:', error);
-    alert('Failed to delete scenario. Please try again.');
+    toast.error('Failed to delete scenario. Please try again.');
   }
 };
 
@@ -472,7 +484,7 @@ const handleToggleScenario = async (scenarioId) => {
     refreshProjections();
   } catch (error) {
     console.error('Error toggling scenario:', error);
-    alert('Failed to toggle scenario. Please try again.');
+    toast.error('Failed to toggle scenario. Please try again.');
   }
 };
 </script>

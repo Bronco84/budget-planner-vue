@@ -321,3 +321,5 @@ test('scenario adjustment generates correct recurring transactions', function ()
     expect($transactions[0]['amount_in_cents'])->toBe(-100000);
 });
 
+
+

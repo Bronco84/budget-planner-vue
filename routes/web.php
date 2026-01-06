@@ -224,10 +224,13 @@ Route::middleware('auth')->group(function () {
     Route::post('budget/{budget}/account/{account}/plaid/store', [PlaidController::class, 'store'])
         ->name('plaid.store');
     Route::post('budget/{budget}/account/{account}/plaid/sync', [PlaidController::class, 'syncTransactions'])
+        ->middleware('throttle:5,1')
         ->name('plaid.sync');
     Route::post('budget/{budget}/account/{account}/plaid/balance', [PlaidController::class, 'updateBalance'])
+        ->middleware('throttle:10,1')
         ->name('plaid.balance');
     Route::post('budget/{budget}/account/{account}/plaid/liabilities', [PlaidController::class, 'updateLiabilities'])
+        ->middleware('throttle:10,1')
         ->name('plaid.liabilities');
     Route::get('budget/{budget}/account/{account}/plaid/statement-history', [PlaidStatementHistoryController::class, 'index'])
         ->name('plaid.statement-history');
@@ -236,6 +239,7 @@ Route::middleware('auth')->group(function () {
     
     // New route for syncing all Plaid accounts in a budget
     Route::post('budget/{budget}/plaid/sync-all', [PlaidController::class, 'syncAllTransactions'])
+        ->middleware('throttle:3,1')
         ->name('plaid.sync-all');
     
     // Plaid transactions routes
@@ -248,6 +252,7 @@ Route::middleware('auth')->group(function () {
     
     // File attachment routes
     Route::post('transactions/{transaction}/files', [FileController::class, 'uploadToTransaction'])
+        ->middleware('throttle:10,1')
         ->name('transactions.files.upload');
     Route::get('transactions/{transaction}/files', [FileController::class, 'getTransactionAttachments'])
         ->name('transactions.files.index');
@@ -256,6 +261,7 @@ Route::middleware('auth')->group(function () {
     Route::get('budgets/{budget}/files', [BudgetFilesController::class, 'index'])
         ->name('budgets.files.index');
     Route::post('budgets/{budget}/files', [FileController::class, 'uploadToBudget'])
+        ->middleware('throttle:10,1')
         ->name('budgets.files.upload');
     Route::get('budgets/{budget}/files/{fileAttachment}/download', [BudgetFilesController::class, 'download'])
         ->name('budgets.files.download');
@@ -295,15 +301,3 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
-
-
-// Add the debug route at the end of the file
-Route::get('/debug/rules', function () {
-    return [
-        'rules_count' => DB::table('recurring_transaction_rules')->count(),
-        'rules' => DB::table('recurring_transaction_rules')->get(),
-        'templates_count' => DB::table('recurring_transaction_templates')->count(),
-        'templates' => DB::table('recurring_transaction_templates')->get(),
-    ];
-});
-require __DIR__.'/debug.php';

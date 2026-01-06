@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('scenarios', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('budget_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->string('color')->default('#3b82f6');
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }

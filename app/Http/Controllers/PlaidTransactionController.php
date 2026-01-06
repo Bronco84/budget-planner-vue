@@ -13,6 +13,21 @@ use Illuminate\Http\JsonResponse;
 class PlaidTransactionController extends Controller
 {
     /**
+     * Create the controller instance.
+     */
+    public function __construct()
+    {
+        // Authorize all actions through budget ownership
+        $this->middleware(function ($request, $next) {
+            $budget = $request->route('budget');
+            if ($budget) {
+                $this->authorize('view', $budget);
+            }
+            return $next($request);
+        });
+    }
+
+    /**
      * Display a listing of plaid transactions for an account.
      */
     public function index(Budget $budget, Account $account): Response
@@ -21,6 +36,8 @@ class PlaidTransactionController extends Controller
         if ($account->budget_id !== $budget->id) {
             abort(404);
         }
+
+        $this->authorize('view', $account);
 
         $plaidTransactions = PlaidTransaction::where('account_id', $account->id)
             ->orderByDesc('date')
@@ -40,8 +57,10 @@ class PlaidTransactionController extends Controller
     {
         // Ensure the account belongs to the budget
         if ($account->budget_id !== $budget->id) {
-            return response()->json(['error' => 'Account not found in this budget'], 404);
+            abort(404);
         }
+
+        $this->authorize('view', $account);
 
         $validated = $request->validate([
             'page' => 'nullable|integer|min:1',
@@ -94,6 +113,8 @@ class PlaidTransactionController extends Controller
         if ($account->budget_id !== $budget->id) {
             return response()->json(['error' => 'Account not found in this budget'], 404);
         }
+
+        $this->authorize('view', $account);
 
         $plaidTransaction = PlaidTransaction::where('account_id', $account->id)
             ->where('plaid_transaction_id', $plaidTransactionId)

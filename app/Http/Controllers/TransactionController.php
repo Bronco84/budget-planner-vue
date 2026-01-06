@@ -13,6 +13,21 @@ use Inertia\Response;
 class TransactionController extends Controller
 {
     /**
+     * Create the controller instance.
+     */
+    public function __construct()
+    {
+        // Authorize all actions through budget ownership
+        $this->middleware(function ($request, $next) {
+            $budget = $request->route('budget');
+            if ($budget) {
+                $this->authorize('view', $budget);
+            }
+            return $next($request);
+        });
+    }
+
+    /**
      * Display a listing of the transactions for a budget.
      */
     public function index(Request $request, Budget $budget): Response
@@ -154,6 +169,13 @@ class TransactionController extends Controller
      */
     public function edit(Budget $budget, Transaction $transaction): Response
     {
+        // Verify transaction belongs to budget
+        if ($transaction->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('update', $transaction);
+
         $accounts = $budget->accounts()->get();
         $recurringTemplates = $budget->recurringTransactionTemplates()
             ->with('account')
@@ -184,6 +206,13 @@ class TransactionController extends Controller
      */
     public function update(Request $request, Budget $budget, Transaction $transaction): RedirectResponse
     {
+        // Verify transaction belongs to budget
+        if ($transaction->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('update', $transaction);
+
         $validated = $request->validate([
             'account_id' => 'required|exists:accounts,id',
             'description' => 'required|string|max:255',
@@ -214,6 +243,13 @@ class TransactionController extends Controller
      */
     public function destroy(Budget $budget, Transaction $transaction): RedirectResponse
     {
+        // Verify transaction belongs to budget
+        if ($transaction->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('delete', $transaction);
+
         $transaction->delete();
 
         return redirect()->route('budget.transaction.index', $budget)
@@ -225,6 +261,13 @@ class TransactionController extends Controller
      */
     public function getActivityLog(Budget $budget, Transaction $transaction)
     {
+        // Verify transaction belongs to budget
+        if ($transaction->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('view', $transaction);
+
         $activityLog = $transaction->getActivityLogFormatted();
 
         return response()->json([

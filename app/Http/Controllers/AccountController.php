@@ -14,6 +14,21 @@ use Illuminate\Http\RedirectResponse;
 class AccountController extends Controller
 {
     /**
+     * Create the controller instance.
+     */
+    public function __construct()
+    {
+        // Authorize all resource actions for accounts
+        $this->middleware(function ($request, $next) {
+            $budget = $request->route('budget');
+            if ($budget) {
+                $this->authorize('view', $budget);
+            }
+            return $next($request);
+        });
+    }
+
+    /**
      * Show the form for creating a new account for a budget.
      */
     public function create(Budget $budget)
@@ -81,6 +96,13 @@ class AccountController extends Controller
      */
     public function edit(Budget $budget, Account $account)
     {
+        // Verify account belongs to budget
+        if ($account->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('update', $account);
+
         // Load the Plaid account and connection relationships
         $account->load('plaidAccount.plaidConnection');
         
@@ -95,6 +117,13 @@ class AccountController extends Controller
      */
     public function update(Request $request, Budget $budget, Account $account): RedirectResponse
     {
+        // Verify account belongs to budget
+        if ($account->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('update', $account);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:50',
@@ -117,6 +146,13 @@ class AccountController extends Controller
      */
     public function destroy(Budget $budget, Account $account): RedirectResponse
     {
+        // Verify account belongs to budget
+        if ($account->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('delete', $account);
+
         // Don't allow deletion if there are transactions
         if ($account->transactions()->count() > 0) {
             return back()->with('error', 'Cannot delete account with existing transactions.');

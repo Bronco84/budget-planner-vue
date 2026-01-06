@@ -171,9 +171,9 @@ return [
     //     ]
     // ],
 
-    'brand' => [
-        'logo' => resource_path('/images/logo.png'),
-    ],
+    // 'brand' => [
+    //     'logo' => public_path('/images/logo.png'),
+    // ],
     /*
     |--------------------------------------------------------------------------
     | Nova Action Resource Class

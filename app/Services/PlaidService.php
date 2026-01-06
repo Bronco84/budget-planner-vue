@@ -74,9 +74,16 @@ class PlaidService
             'http_errors' => true, // Enable detailed HTTP error responses
         ];
 
-        // Only disable SSL verification in local environment if explicitly configured
-        if (app()->environment('local') && config('services.plaid.disable_ssl_verification', false)) {
+        // Only allow SSL bypass in local environment with debug mode enabled
+        // This is a triple-check to prevent accidental production bypass
+        if (app()->environment('local') 
+            && config('app.debug') === true 
+            && config('services.plaid.disable_ssl_verification', false) === true) {
             $options['verify'] = false;
+            Log::warning('SSL verification disabled for Plaid - DEVELOPMENT ONLY', [
+                'environment' => app()->environment(),
+                'debug' => config('app.debug')
+            ]);
         }
 
         // Add proxy configuration if set

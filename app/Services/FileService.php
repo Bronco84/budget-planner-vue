@@ -312,8 +312,31 @@ class FileService
             'text/csv',
         ];
 
-        if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
+        $mimeType = $file->getMimeType();
+        if (!in_array($mimeType, $allowedMimeTypes)) {
             throw new \Exception('File type not allowed');
+        }
+
+        // Validate extension matches MIME type (additional security layer)
+        $extension = strtolower($file->getClientOriginalExtension());
+        $mimeToExtension = [
+            'application/pdf' => ['pdf'],
+            'image/jpeg' => ['jpg', 'jpeg'],
+            'image/png' => ['png'],
+            'image/gif' => ['gif'],
+            'image/webp' => ['webp'],
+            'text/plain' => ['txt'],
+            'application/msword' => ['doc'],
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => ['docx'],
+            'application/vnd.ms-excel' => ['xls'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => ['xlsx'],
+            'application/json' => ['json'],
+            'text/csv' => ['csv'],
+        ];
+
+        $allowedExtensions = $mimeToExtension[$mimeType] ?? [];
+        if (!in_array($extension, $allowedExtensions)) {
+            throw new \Exception('File extension does not match file type. Expected: ' . implode(', ', $allowedExtensions));
         }
     }
 

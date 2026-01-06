@@ -252,20 +252,36 @@ const registerPasskey = async () => {
       body: JSON.stringify(credentialData),
     });
 
+    console.log('Register response status:', registerResponse.status);
+    console.log('Register response ok:', registerResponse.ok);
+
     if (registerResponse.ok) {
       success.value = 'Passkey registered successfully! Redirecting...';
       passkeyName.value = '';
       
-      console.log('Passkey registration successful, redirecting to /budgets');
+      console.log('Passkey registration successful, redirecting to /budgets in 2 seconds');
       
-      // Always redirect after successful registration
+      // Force redirect after successful registration
       setTimeout(() => {
-        console.log('Executing redirect now...');
-        window.location.href = '/budgets';
-      }, 1500);
+        console.log('Executing redirect now to:', window.location.origin + '/budgets');
+        // Try multiple redirect methods for better compatibility
+        try {
+          window.location.href = '/budgets';
+        } catch (e) {
+          console.error('window.location.href failed:', e);
+          try {
+            window.location.replace('/budgets');
+          } catch (e2) {
+            console.error('window.location.replace failed:', e2);
+            // Last resort - use router
+            router.visit('/budgets', { method: 'get', replace: true });
+          }
+        }
+      }, 2000);
     } else {
-      const errorData = await registerResponse.json();
-      console.error('Registration failed:', errorData);
+      console.error('Registration response not OK. Status:', registerResponse.status);
+      const errorData = await registerResponse.json().catch(() => ({ message: 'Unknown error' }));
+      console.error('Registration failed with data:', errorData);
       throw new Error(errorData.message || 'Registration failed');
     }
   } catch (err) {

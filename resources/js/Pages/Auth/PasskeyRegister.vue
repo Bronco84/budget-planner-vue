@@ -205,7 +205,8 @@ const registerPasskey = async () => {
     if (!optionsResponse.ok) {
       const errorText = await optionsResponse.text();
       console.error('Registration options error:', errorText);
-      throw new Error('Failed to get registration options');
+      console.error('Response status:', optionsResponse.status);
+      throw new Error(`Failed to get registration options: ${optionsResponse.status}`);
     }
 
     const options = await optionsResponse.json();
@@ -263,17 +264,19 @@ const registerPasskey = async () => {
     });
 
     if (registerResponse.ok) {
-      success.value = 'Passkey registered successfully!';
+      success.value = 'Passkey registered successfully! Redirecting...';
       passkeyName.value = '';
       
-      // If this is a new user, redirect to budgets after a short delay
-      if (props.isNewUser) {
-        setTimeout(() => {
-          window.location.href = '/budgets';
-        }, 1500);
-      }
+      console.log('Passkey registration successful, redirecting to /budgets');
+      
+      // Always redirect after successful registration
+      setTimeout(() => {
+        console.log('Executing redirect now...');
+        window.location.href = '/budgets';
+      }, 1500);
     } else {
       const errorData = await registerResponse.json();
+      console.error('Registration failed:', errorData);
       throw new Error(errorData.message || 'Registration failed');
     }
   } catch (err) {

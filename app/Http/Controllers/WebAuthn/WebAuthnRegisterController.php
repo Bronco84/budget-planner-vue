@@ -39,6 +39,13 @@ class WebAuthnRegisterController
 
         $request->save();
 
+        // Refresh the user to ensure the relationship is loaded
+        $user = Auth::user();
+        $user->refresh();
+        
+        // Clear any cached relationship data
+        $user->unsetRelation('webAuthnCredentials');
+
         return response()->noContent();
     }
 }

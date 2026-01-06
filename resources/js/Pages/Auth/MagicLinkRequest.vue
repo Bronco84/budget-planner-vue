@@ -2,28 +2,30 @@
   <Head title="Magic Link Login" />
 
   <GuestLayout>
-    <div>
-      <!-- Logo -->
-      <div class="mx-auto h-20 w-auto flex justify-center mb-6">
-        <img src="/images/logo.png" alt="Budget Planner Logo" class="h-20 w-auto drop-shadow-lg" />
+    <!-- Card with glass morphism effect -->
+    <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-8">
+      <div>
+        <!-- Logo -->
+        <div class="mx-auto h-20 w-auto flex justify-center mb-6">
+          <img src="/images/logo.png" alt="Budget Planner Logo" class="h-20 w-auto drop-shadow-lg" />
+        </div>
+
+        <!-- Header with gradient -->
+        <div class="flex items-center justify-center mb-4">
+          <svg class="h-10 w-10 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <h2 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            Get a Magic Link
+          </h2>
+        </div>
+
+        <p class="text-center text-sm text-gray-600 mb-6">
+          We'll send you a secure login link via email
+        </p>
       </div>
 
-      <!-- Header with gradient -->
-      <div class="flex items-center justify-center mb-4">
-        <svg class="h-10 w-10 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-        <h2 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-          Get a Magic Link
-        </h2>
-      </div>
-
-      <p class="text-center text-sm text-gray-600 mb-6">
-        We'll send you a secure login link via email
-      </p>
-    </div>
-
-    <div class="space-y-6">
+      <div class="space-y-6">
       <!-- Success Message -->
       <div v-if="status || linkSent" class="rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 p-4 border border-green-200">
         <div class="flex">
@@ -127,6 +129,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </GuestLayout>

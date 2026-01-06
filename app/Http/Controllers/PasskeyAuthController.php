@@ -34,12 +34,27 @@ class PasskeyAuthController extends Controller
     }
 
     /**
-     * Display the passkey registration view (for new users).
+     * Display the initial registration form (for new users to enter name/email).
      */
-    public function registerCreate(): Response
+    public function showRegistrationForm(): Response
     {
+        return Inertia::render('Auth/Register');
+    }
+
+    /**
+     * Display the passkey registration view.
+     * Can be used by both new users (after account creation) and authenticated users adding additional passkeys.
+     */
+    public function registerCreate(Request $request): Response
+    {
+        $user = Auth::user();
+        $hasExistingPasskeys = $user ? $user->webAuthnCredentials()->exists() : false;
+        // Check if this is a new user from query param or if they have no passkeys
+        $isNewUser = $request->query('new_user', false) || ($user && !$hasExistingPasskeys);
+        
         return Inertia::render('Auth/PasskeyRegister', [
-            'hasExistingPasskeys' => false,
+            'hasExistingPasskeys' => $hasExistingPasskeys,
+            'isNewUser' => $isNewUser,
         ])->with('breadcrumbs', function () {
             return Breadcrumbs::generate('passkey.register');
         });
@@ -62,8 +77,8 @@ class PasskeyAuthController extends Controller
 
         Auth::login($user);
 
-        // Redirect to passkey registration page
-        return redirect()->route('passkey.register')->with('status', 'Account created! Now register your passkey.');
+        // Redirect to passkey registration page with new_user flag
+        return redirect()->route('passkey.register', ['new_user' => true])->with('status', 'Account created! Now register your passkey.');
     }
 
     /**

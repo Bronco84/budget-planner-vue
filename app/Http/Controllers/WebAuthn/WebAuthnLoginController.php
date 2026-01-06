@@ -36,10 +36,10 @@ class WebAuthnLoginController
         $success = $request->login();
 
         if ($success) {
-            // Create and set remember device cookie
+            // Create or update trusted device and set cookie
             $user = $request->user();
-            $rememberToken = $this->deviceTokenService->createTrustedDevice($user, $request);
-            Cookie::queue('remember_device', $rememberToken, config('auth.device_remember_days', 90) * 1440); // 1440 minutes in a day
+            $device = $this->deviceTokenService->createTrustedDevice($user, $request);
+            Cookie::queue($this->deviceTokenService->createCookie($device));
 
             return response()->noContent(204);
         }

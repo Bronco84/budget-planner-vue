@@ -16,12 +16,32 @@ class DeviceTokenService
     ) {}
 
     /**
-     * Create a trusted device for the user.
+     * Create or update a trusted device for the user.
      */
     public function createTrustedDevice(User $user, Request $request): TrustedDevice
     {
         $fingerprint = $this->fingerprintService->generate($request);
         $deviceName = $this->fingerprintService->generateDeviceName($request);
+        
+        // Check if a device with this fingerprint already exists for this user
+        $device = $user->trustedDevices()
+            ->where('device_fingerprint', $fingerprint)
+            ->first();
+        
+        if ($device) {
+            // Update existing device
+            $device->update([
+                'device_name' => $deviceName,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'last_used_at' => now(),
+                'expires_at' => now()->addDays((int) config('auth.device_remember_days', 90)),
+            ]);
+            
+            return $device;
+        }
+        
+        // Create new device
         $token = Str::random(64);
         
         $device = $user->trustedDevices()->create([

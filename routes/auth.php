@@ -30,7 +30,7 @@ Route::middleware('guest')->group(function () {
         ->name('magic-link.authenticate');
 
     // Registration
-    Route::get('register', [PasskeyAuthController::class, 'registerCreate'])
+    Route::get('register', [PasskeyAuthController::class, 'showRegistrationForm'])
         ->name('register');
 
     Route::post('register', [PasskeyAuthController::class, 'registerStore']);

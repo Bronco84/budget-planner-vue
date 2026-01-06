@@ -1,7 +1,7 @@
 <template>
   <Head title="Register Passkey" />
 
-  <AuthenticatedLayout>
+  <component :is="layoutComponent">
     <div class="py-12">
       <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
@@ -14,8 +14,24 @@
             </div>
 
             <p class="text-gray-600 mb-6">
+              <span v-if="isNewUser" class="font-semibold text-gray-900">Welcome! To complete your registration, you must set up a passkey. </span>
               Passkeys let you sign in using Face ID, Touch ID, Windows Hello, or a security key. They're more secure than passwords and much easier to use.
             </p>
+            
+            <div v-if="isNewUser" class="mb-6 rounded-md bg-yellow-50 border border-yellow-200 p-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-sm font-medium text-yellow-800">
+                    Passkey Required: This app uses passkeys for secure, passwordless authentication. You cannot proceed without registering a passkey.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <!-- Success Message -->
             <div v-if="success" class="mb-6 rounded-md bg-green-50 p-4">
@@ -76,7 +92,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span v-if="!loading">Register Passkey</span>
+                  <span v-if="!loading">{{ isNewUser ? 'Complete Registration' : 'Register Passkey' }}</span>
                   <span v-else>Registering...</span>
                 </button>
               </div>
@@ -110,7 +126,7 @@
                   You can register multiple passkeys for different devices.
                 </p>
                 <Link
-                  :href="route('settings.devices')"
+                  :href="route('trusted-devices.index')"
                   class="text-sm text-indigo-600 hover:text-indigo-500"
                 >
                   Manage all devices →
@@ -121,22 +137,29 @@
         </div>
       </div>
     </div>
-  </AuthenticatedLayout>
+  </component>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import GuestLayout from '@/Layouts/GuestLayout.vue';
 
 const props = defineProps({
   hasExistingPasskeys: Boolean,
+  isNewUser: Boolean,
 });
 
 const loading = ref(false);
 const error = ref('');
 const success = ref('');
 const passkeyName = ref('');
+
+// Use computed to determine which layout to use
+const layoutComponent = computed(() => {
+  return props.isNewUser ? GuestLayout : AuthenticatedLayout;
+});
 
 const registerPasskey = async () => {
   loading.value = true;
@@ -218,8 +241,15 @@ const registerPasskey = async () => {
     });
 
     if (registerResponse.ok) {
-      success.value = 'Passkey registered successfully! You can now use it to sign in.';
+      success.value = 'Passkey registered successfully!';
       passkeyName.value = '';
+      
+      // If this is a new user, redirect to budgets after a short delay
+      if (props.isNewUser) {
+        setTimeout(() => {
+          window.location.href = '/budgets';
+        }, 1500);
+      }
     } else {
       const errorData = await registerResponse.json();
       throw new Error(errorData.message || 'Registration failed');
@@ -259,4 +289,3 @@ function bufferToBase64url(buffer) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 </script>
-

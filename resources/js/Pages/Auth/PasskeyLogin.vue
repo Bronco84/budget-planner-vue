@@ -56,6 +56,24 @@
             </div>
           </div>
 
+          <!-- Email Field (Optional) -->
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+              Email (optional)
+            </label>
+            <input
+              id="email"
+              v-model="email"
+              type="email"
+              autocomplete="email webauthn"
+              placeholder="your@email.com"
+              class="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            />
+            <p class="mt-2 text-xs text-gray-500">
+              Providing your email helps us find your passkey and offer better alternatives if needed.
+            </p>
+          </div>
+
           <!-- Passkey Login Button -->
           <div>
             <button
@@ -156,6 +174,7 @@ const props = defineProps({
 
 const loading = ref(false);
 const error = ref('');
+const email = ref('');
 const isWebAuthnSupported = ref(true);
 
 onMounted(() => {
@@ -175,8 +194,11 @@ const loginWithPasskey = async () => {
   try {
     console.log('Starting passkey login...');
 
+    // Prepare request body with optional email
+    const requestBody = email.value ? { email: email.value } : {};
+
     // Use Axios instead of fetch for better CSRF handling
-    const optionsResponse = await window.axios.post('/webauthn/login/options', {}, {
+    const optionsResponse = await window.axios.post('/webauthn/login/options', requestBody, {
       headers: {
         'Accept': 'application/json',
       },
@@ -248,21 +270,21 @@ const loginWithPasskey = async () => {
     if (err.name === 'NotAllowedError') {
       error.value = 'Authentication was cancelled or timed out.';
     } else if (err.name === 'InvalidStateError') {
-      error.value = 'No passkey found. Please register a passkey first.';
+      error.value = 'No passkey found for this device. Please use the magic link option below to sign in, then you can add a passkey for this device.';
     } else if (err.name === 'NotSupportedError') {
-      error.value = 'Passkeys are not supported on this device.';
+      error.value = 'Passkeys are not supported on this device. Please use the magic link option below.';
     } 
     // Handle Axios errors
     else if (err.response) {
       if (err.response.status === 419) {
         error.value = 'Session expired. Please refresh the page and try again.';
       } else if (err.response.status === 422) {
-        error.value = 'Authentication failed. Please try again.';
+        error.value = 'Authentication failed. Your passkey may not be registered. Try using the magic link option below.';
       } else {
-        error.value = err.response.data?.message || 'Could not authenticate with passkey. Please try again.';
+        error.value = err.response.data?.message || 'Could not authenticate with passkey. Try using the magic link option below.';
       }
     } else {
-      error.value = err.message || 'Could not authenticate with passkey. Please try again.';
+      error.value = err.message || 'Could not authenticate with passkey. Try using the magic link option below.';
     }
   }
 };

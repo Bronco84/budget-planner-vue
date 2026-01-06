@@ -30,6 +30,22 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// WebAuthn routes (passkey authentication)
+// Use our custom controllers instead of the package's automatic registration
+Route::middleware('guest')->group(function () {
+    Route::post('webauthn/login/options', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'options'])
+        ->name('webauthn.login.options');
+    Route::post('webauthn/login', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'login'])
+        ->name('webauthn.login');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('webauthn/register/options', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'options'])
+        ->name('webauthn.register.options');
+    Route::post('webauthn/register', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'register'])
+        ->name('webauthn.register');
+});
+
 Route::get('/dashboard', function () {
     // Redirect to the budget index, which will redirect to the active budget
     return redirect()->route('budgets.index');
@@ -301,3 +317,12 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+// Temporary debug route
+Route::get('/debug-auth', function () {
+    return response()->json([
+        'authenticated' => auth()->check(),
+        'user_id' => auth()->id(),
+        'user' => auth()->user(),
+    ]);
+})->middleware('web');

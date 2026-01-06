@@ -9,33 +9,49 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\PasskeyAuthController;
+use App\Http\Controllers\MagicLinkController;
+use App\Http\Controllers\TrustedDeviceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
+    // Passkey Authentication (Primary)
+    Route::get('login', [PasskeyAuthController::class, 'create'])
+        ->name('login');
+    
+    // Magic Link Fallback
+    Route::get('magic-link', [MagicLinkController::class, 'create'])
+        ->name('magic-link.request');
+    
+    Route::post('magic-link', [MagicLinkController::class, 'store'])
+        ->name('magic-link.store');
+    
+    Route::get('magic-link/authenticate', [MagicLinkController::class, 'authenticate'])
+        ->name('magic-link.authenticate');
+
+    // Registration
+    Route::get('register', [PasskeyAuthController::class, 'registerCreate'])
         ->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
-
-    Route::get('login', [AuthenticatedSessionController::class, 'create'])
-        ->name('login');
-
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
-
-    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-
-    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->name('password.email');
-
-    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-
-    Route::post('reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.store');
+    Route::post('register', [PasskeyAuthController::class, 'registerStore']);
 });
 
 Route::middleware('auth')->group(function () {
+    // Passkey Management
+    Route::get('passkey/register', [PasskeyAuthController::class, 'registerCreate'])
+        ->name('passkey.register');
+    
+    // Trusted Devices Management
+    Route::get('settings/trusted-devices', [TrustedDeviceController::class, 'index'])
+        ->name('trusted-devices.index');
+    
+    Route::delete('settings/trusted-devices/{device}', [TrustedDeviceController::class, 'revoke'])
+        ->name('trusted-devices.revoke');
+    
+    Route::post('settings/trusted-devices/revoke-all', [TrustedDeviceController::class, 'revokeAll'])
+        ->name('trusted-devices.revoke-all');
+
+    // Email Verification
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 
@@ -47,13 +63,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:6,1')
         ->name('verification.send');
 
-    Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
-        ->name('password.confirm');
-
-    Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
-
-    Route::put('password', [PasswordController::class, 'update'])->name('password.update');
-
-    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
+    // Logout
+    Route::post('logout', [PasskeyAuthController::class, 'destroy'])
         ->name('logout');
 });

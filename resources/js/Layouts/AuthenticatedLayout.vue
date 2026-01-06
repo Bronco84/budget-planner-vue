@@ -64,6 +64,26 @@ const handleToggleChat = () => {
     showChatPanel.value = !showChatPanel.value;
 };
 
+const logout = () => {
+    // Create a form and submit it to force a full page reload
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/logout';
+    
+    // Add CSRF token
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '_token';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+};
+
 </script>
 
 <template>
@@ -175,12 +195,23 @@ const handleToggleChat = () => {
                                                 Profile
                                             </DropdownLink>
                                             <DropdownLink
-                                                :href="route('logout')"
-                                                method="post"
-                                                as="button"
+                                                :href="route('trusted-devices.index')"
                                             >
-                                                Log Out
+                                                Trusted Devices
                                             </DropdownLink>
+                                            <DropdownLink
+                                                :href="route('passkey.register')"
+                                            >
+                                                Register Passkey
+                                            </DropdownLink>
+                                            <form @submit.prevent="logout" method="POST" action="/logout">
+                                                <button
+                                                    type="submit"
+                                                    class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 dark:text-gray-300 transition duration-150 ease-in-out hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700 focus:outline-none"
+                                                >
+                                                    Log Out
+                                                </button>
+                                            </form>
                                         </template>
                                     </Dropdown>
                                 </div>

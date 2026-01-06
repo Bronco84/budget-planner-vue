@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\RecurringTransactionService;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +23,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Allow all authenticated users to register WebAuthn credentials
+        Gate::define('webauthn.register', function ($user) {
+            return true; // All authenticated users can register passkeys
+        });
+
+        // Allow all authenticated users to use WebAuthn for login
+        Gate::define('webauthn.login', function ($user = null) {
+            return true; // Anyone can attempt to login with passkeys
+        });
     }
 }

@@ -20,6 +20,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Device Remembering
+    |--------------------------------------------------------------------------
+    |
+    | Number of days to remember a trusted device.
+    |
+    */
+
+    'device_remember_days' => env('DEVICE_REMEMBER_DAYS', 90),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Magic Link Expiry
+    |--------------------------------------------------------------------------
+    |
+    | Number of minutes before a magic link expires.
+    |
+    */
+
+    'magic_link_expiry_minutes' => env('MAGIC_LINK_EXPIRY_MINUTES', 15),
+
+    /*
+    |--------------------------------------------------------------------------
     | Authentication Guards
     |--------------------------------------------------------------------------
     |
@@ -61,7 +83,7 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'eloquent-webauthn',
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
 

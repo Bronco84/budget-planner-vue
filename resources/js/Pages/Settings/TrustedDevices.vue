@@ -14,7 +14,7 @@
             <div class="mb-6">
               <h3 class="text-lg font-medium text-gray-900">Manage Your Devices</h3>
               <p class="mt-1 text-sm text-gray-600">
-                These devices are remembered and can automatically log you in. Remove any devices you don't recognize.
+                These devices are remembered and can automatically log you in. Devices authenticated with passkeys provide the highest security. Remove any devices you don't recognize.
               </p>
             </div>
 
@@ -78,9 +78,29 @@
                       
                       <!-- Device Info -->
                       <div class="ml-4">
-                        <h4 class="text-base font-medium text-gray-900">
-                          {{ device.device_name || 'Unknown Device' }}
-                        </h4>
+                        <div class="flex items-center gap-2">
+                          <h4 class="text-base font-medium text-gray-900">
+                            {{ device.device_name || 'Unknown Device' }}
+                          </h4>
+                          <span 
+                            v-if="device.auth_method === 'passkey'"
+                            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800"
+                          >
+                            <svg class="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                            Passkey
+                          </span>
+                          <span 
+                            v-else-if="device.auth_method === 'magic_link'"
+                            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"
+                          >
+                            <svg class="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Magic Link
+                          </span>
+                        </div>
                         <div class="mt-1 space-y-1">
                           <p class="text-sm text-gray-500">
                             <span class="font-medium">IP Address:</span> {{ device.ip_address || 'Unknown' }}
@@ -149,8 +169,9 @@
                   <h3 class="text-sm font-medium text-blue-800">About Trusted Devices</h3>
                   <div class="mt-2 text-sm text-blue-700">
                     <ul class="list-disc pl-5 space-y-1">
-                      <li>Trusted devices can automatically log you in without requiring your passkey</li>
-                      <li>Each device is remembered for 90 days</li>
+                      <li><strong>Passkey devices</strong> are authenticated using biometric security (Face ID, Touch ID, etc.)</li>
+                      <li><strong>Magic Link devices</strong> are authenticated via email link</li>
+                      <li>Trusted devices can automatically log you in for 90 days</li>
                       <li>You'll receive an email notification when a new device is added</li>
                       <li>Revoke any device you don't recognize immediately</li>
                     </ul>

@@ -38,6 +38,7 @@ class TrustedDeviceController extends Controller
                     'expires_at' => $device->expires_at,
                     'created_at' => $device->created_at,
                     'is_current' => $device->isCurrentDevice($currentFingerprint),
+                    'auth_method' => $device->auth_method,
                 ];
             });
 

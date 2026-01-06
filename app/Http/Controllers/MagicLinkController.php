@@ -68,8 +68,8 @@ class MagicLinkController extends Controller
             Auth::login($user);
             $request->session()->regenerate();
 
-            // Create and set remember device cookie
-            $trustedDevice = $this->deviceTokenService->createTrustedDevice(Auth::user(), $request);
+            // Create and set remember device cookie with 'magic_link' auth method
+            $trustedDevice = $this->deviceTokenService->createTrustedDevice(Auth::user(), $request, 'magic_link');
             $cookie = $this->deviceTokenService->createCookie($trustedDevice);
             \Illuminate\Support\Facades\Cookie::queue($cookie);
 

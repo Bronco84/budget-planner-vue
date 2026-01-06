@@ -18,7 +18,7 @@ class DeviceTokenService
     /**
      * Create or update a trusted device for the user.
      */
-    public function createTrustedDevice(User $user, Request $request): TrustedDevice
+    public function createTrustedDevice(User $user, Request $request, string $authMethod = 'passkey'): TrustedDevice
     {
         $fingerprint = $this->fingerprintService->generate($request);
         $deviceName = $this->fingerprintService->generateDeviceName($request);
@@ -36,6 +36,7 @@ class DeviceTokenService
                 'user_agent' => $request->userAgent(),
                 'last_used_at' => now(),
                 'expires_at' => now()->addDays((int) config('auth.device_remember_days', 90)),
+                'auth_method' => $authMethod, // Update auth method
             ]);
             
             return $device;
@@ -52,6 +53,7 @@ class DeviceTokenService
             'user_agent' => $request->userAgent(),
             'last_used_at' => now(),
             'expires_at' => now()->addDays((int) config('auth.device_remember_days', 90)),
+            'auth_method' => $authMethod,
         ]);
         
         return $device;

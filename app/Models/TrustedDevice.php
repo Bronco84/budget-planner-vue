@@ -17,6 +17,7 @@ class TrustedDevice extends Model
         'user_agent',
         'last_used_at',
         'expires_at',
+        'auth_method',
     ];
 
     protected $casts = [

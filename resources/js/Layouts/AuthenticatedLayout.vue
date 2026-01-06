@@ -240,10 +240,39 @@ const logout = () => {
 
             <!-- Scrollable Page Content -->
             <main class="flex-1 overflow-y-auto">
-
-                    <div :key="$page.url">
-                        <slot />
+                <!-- Passkey Registration Prompt -->
+                <div 
+                    v-if="$page.props.flash.show_passkey_prompt" 
+                    class="bg-gradient-to-r from-indigo-600 to-purple-600 border-b border-indigo-700"
+                >
+                    <div class="mx-auto max-w-full px-4 py-3 sm:px-6 lg:px-8">
+                        <div class="flex items-center justify-between flex-wrap">
+                            <div class="flex items-center flex-1">
+                                <span class="flex rounded-lg bg-white/20 p-2">
+                                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                    </svg>
+                                </span>
+                                <p class="ml-3 font-medium text-white">
+                                    <span class="md:hidden">Add a passkey for easier access!</span>
+                                    <span class="hidden md:inline">Add a passkey to this device for faster, more secure sign-in.</span>
+                                </p>
+                            </div>
+                            <div class="order-3 mt-2 w-full flex-shrink-0 sm:order-2 sm:mt-0 sm:w-auto">
+                                <Link
+                                    :href="route('passkey.register')"
+                                    class="flex items-center justify-center rounded-md border border-transparent bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow-sm hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600"
+                                >
+                                    Register Passkey
+                                </Link>
+                            </div>
+                        </div>
                     </div>
+                </div>
+
+                <div :key="$page.url">
+                    <slot />
+                </div>
 
             </main>
         </div>

@@ -68,12 +68,21 @@ class MagicLinkController extends Controller
             Auth::login($user);
             $request->session()->regenerate();
 
-            // Create and set remember device cookie with 'magic_link' auth method
-            $trustedDevice = $this->deviceTokenService->createTrustedDevice(Auth::user(), $request, 'magic_link');
-            $cookie = $this->deviceTokenService->createCookie($trustedDevice);
-            \Illuminate\Support\Facades\Cookie::queue($cookie);
+            // Mark session as magic link authenticated (ephemeral, no device trust)
+            $request->session()->put('auth_method', 'magic_link');
 
-            return redirect()->intended(route('budgets.index'))->with('status', 'Logged in successfully via magic link!');
+            // Check if user has any passkeys registered
+            $hasPasskeys = $user->webAuthnCredentials()->exists();
+
+            // Redirect with appropriate message
+            if (!$hasPasskeys) {
+                return redirect()->route('passkey.register')
+                    ->with('status', 'Welcome! Please register a passkey for secure access to your account.');
+            }
+
+            return redirect()->intended(route('budgets.index'))
+                ->with('status', 'Logged in successfully! Consider adding a passkey to this device for easier access.')
+                ->with('show_passkey_prompt', true);
         }
 
         return redirect()->route('login')->withErrors(['magic_link' => 'Invalid or expired magic link.']);

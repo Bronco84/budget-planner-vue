@@ -42,6 +42,8 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
                 'error' => fn () => $request->session()->get('error'),
+                'status' => fn () => $request->session()->get('status'),
+                'show_passkey_prompt' => fn () => $request->session()->get('show_passkey_prompt'),
             ],
         ];
     }

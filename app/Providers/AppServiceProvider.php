@@ -23,6 +23,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force HTTPS in production
+        if ($this->app->environment('production')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // Allow all authenticated users to register WebAuthn credentials
         Gate::define('webauthn.register', function ($user) {
             return true; // All authenticated users can register passkeys

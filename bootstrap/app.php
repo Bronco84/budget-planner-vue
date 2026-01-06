@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\RememberDevice::class,
+            \App\Http\Middleware\EnsureUserHasPasskey::class,
         ]);
 
         //

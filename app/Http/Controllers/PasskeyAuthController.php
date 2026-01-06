@@ -70,6 +70,13 @@ class PasskeyAuthController extends Controller
             'email' => 'required|string|email|max:255|unique:' . User::class,
         ]);
 
+        // Restrict registration to specific email only
+        if ($request->email !== 'bamccoley@gmail.com') {
+            return back()->withErrors([
+                'email' => 'Registration is currently restricted. Please contact the administrator.',
+            ])->withInput();
+        }
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,

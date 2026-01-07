@@ -30,6 +30,13 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// CSRF token refresh endpoint for auto-retry functionality
+Route::get('/csrf-token', function () {
+    return response()->json([
+        'csrf_token' => csrf_token()
+    ]);
+})->middleware('web');
+
 // WebAuthn routes (passkey authentication)
 // Use our custom controllers instead of the package's automatic registration
 Route::middleware('guest')->group(function () {

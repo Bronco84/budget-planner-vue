@@ -1,33 +1,31 @@
-import { useToast as useToastification } from 'vue-toastification';
+import { toast } from 'vue-sonner';
 
 export function useToast() {
-    const toast = useToastification();
-
     return {
         success(message, options = {}) {
             toast.success(message, {
-                timeout: 4000,
+                duration: 4000,
                 ...options
             });
         },
 
         error(message, options = {}) {
             toast.error(message, {
-                timeout: 6000,
+                duration: 6000,
                 ...options
             });
         },
 
         warning(message, options = {}) {
             toast.warning(message, {
-                timeout: 5000,
+                duration: 5000,
                 ...options
             });
         },
 
         info(message, options = {}) {
             toast.info(message, {
-                timeout: 4000,
+                duration: 4000,
                 ...options
             });
         },

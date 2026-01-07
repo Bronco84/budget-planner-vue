@@ -17,6 +17,13 @@ import ConfirmDialog from '@/Components/ConfirmDialog.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { useTheme } from '@/composables/useTheme';
 import { useSidebar } from '@/composables/useSidebar';
+import { Toaster } from 'vue-sonner';
+import { 
+    CheckCircleIcon, 
+    XCircleIcon, 
+    ExclamationTriangleIcon, 
+    InformationCircleIcon 
+} from '@heroicons/vue/24/outline';
 
 const showingNavigationDropdown = ref(false);
 const { initializeTheme } = useTheme();
@@ -192,17 +199,7 @@ const logout = () => {
                                             <DropdownLink
                                                 :href="route('profile.edit')"
                                             >
-                                                Profile
-                                            </DropdownLink>
-                                            <DropdownLink
-                                                :href="route('trusted-devices.index')"
-                                            >
-                                                Trusted Devices
-                                            </DropdownLink>
-                                            <DropdownLink
-                                                :href="route('passkey.register')"
-                                            >
-                                                Register Passkey
+                                                Profile & Security
                                             </DropdownLink>
                                             <form @submit.prevent="logout" method="POST" action="/logout">
                                                 <button
@@ -293,6 +290,22 @@ const logout = () => {
 
         <!-- Global Confirm Dialog -->
         <ConfirmDialog />
+
+        <!-- Toast Notifications -->
+        <Toaster>
+            <template #success-icon>
+                <CheckCircleIcon class="w-5 h-5" />
+            </template>
+            <template #error-icon>
+                <XCircleIcon class="w-5 h-5" />
+            </template>
+            <template #warning-icon>
+                <ExclamationTriangleIcon class="w-5 h-5" />
+            </template>
+            <template #info-icon>
+                <InformationCircleIcon class="w-5 h-5" />
+            </template>
+        </Toaster>
     </div>
 </template>
 

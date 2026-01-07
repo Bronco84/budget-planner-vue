@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Services\RecurringTransactionService;
+use App\Observers\WebAuthnCredentialObserver;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Laragear\WebAuthn\Models\WebAuthnCredential;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register observers
+        WebAuthnCredential::observe(WebAuthnCredentialObserver::class);
+
         // Force HTTPS in production
         if ($this->app->environment('production')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');

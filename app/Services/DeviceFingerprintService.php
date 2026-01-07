@@ -20,7 +20,7 @@ class DeviceFingerprintService
         ];
 
         $fingerprint = implode('|', $components);
-        
+
         return hash('sha256', $fingerprint);
     }
 
@@ -30,13 +30,13 @@ class DeviceFingerprintService
     public function generateDeviceName(Request $request): string
     {
         $userAgent = $request->userAgent() ?? 'Unknown Device';
-        
+
         // Extract browser name
         $browser = $this->extractBrowser($userAgent);
-        
+
         // Extract OS
         $os = $this->extractOS($userAgent);
-        
+
         return "{$browser} on {$os}";
     }
 
@@ -60,7 +60,7 @@ class DeviceFingerprintService
         if (str_contains($userAgent, 'Opera') || str_contains($userAgent, 'OPR')) {
             return 'Opera';
         }
-        
+
         return 'Unknown Browser';
     }
 
@@ -87,7 +87,7 @@ class DeviceFingerprintService
         if (str_contains($userAgent, 'Linux')) {
             return 'Linux';
         }
-        
+
         return 'Unknown OS';
     }
 
@@ -97,7 +97,7 @@ class DeviceFingerprintService
     public function verify(Request $request, string $storedFingerprint): bool
     {
         $currentFingerprint = $this->generate($request);
-        
+
         return $currentFingerprint === $storedFingerprint;
     }
 
@@ -110,7 +110,7 @@ class DeviceFingerprintService
         if ($ipAddress === '127.0.0.1' || $ipAddress === '::1') {
             return 'Local';
         }
-        
+
         // In production, you could integrate with a GeoIP service
         // For now, just return null
         return null;

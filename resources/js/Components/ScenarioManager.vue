@@ -40,7 +40,7 @@
               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
             />
           </div>
-          
+
           <div class="ml-3 flex-1 min-w-0">
             <label :for="`scenario-${scenario.id}`" class="flex items-center cursor-pointer">
               <div
@@ -49,11 +49,11 @@
               ></div>
               <span class="text-sm font-medium text-gray-900">{{ scenario.name }}</span>
             </label>
-            
+
             <p v-if="scenario.description" class="mt-1 text-xs text-gray-500">
               {{ scenario.description }}
             </p>
-            
+
             <div v-if="scenario.adjustments && scenario.adjustments.length > 0" class="mt-2 flex flex-wrap gap-1">
               <span
                 v-for="(account, index) in getAffectedAccounts(scenario)"
@@ -107,14 +107,14 @@ const getAffectedAccounts = (scenario) => {
   if (!scenario.adjustments || scenario.adjustments.length === 0) {
     return [];
   }
-  
+
   const accountNames = new Set();
   scenario.adjustments.forEach(adjustment => {
     if (adjustment.account && adjustment.account.name) {
       accountNames.add(adjustment.account.name);
     }
   });
-  
+
   return Array.from(accountNames);
 };
 </script>

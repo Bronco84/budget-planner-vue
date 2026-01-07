@@ -8,7 +8,7 @@ test.describe('Budget Page Viewport Layout', () => {
     await page.fill('input[name="password"]', 'password');
     await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard');
-    
+
     // Navigate to budget page
     await page.goto('https://budget-planner-vue.test/budgets/1');
     await page.waitForLoadState('networkidle');
@@ -25,10 +25,10 @@ test.describe('Budget Page Viewport Layout', () => {
     // Check that main container doesn't exceed viewport height
     const mainContainer = await page.locator('.py-4').first();
     const containerBox = await mainContainer.boundingBox();
-    
+
     console.log('Main container height:', containerBox?.height);
     console.log('Viewport height:', 1080);
-    
+
     // Container should not exceed viewport height
     expect(containerBox?.height).toBeLessThanOrEqual(1080);
 
@@ -77,7 +77,7 @@ test.describe('Budget Page Viewport Layout', () => {
 
     // Find the scrollable container
     const scrollContainer = await page.locator('.md\\:overflow-y-auto').first();
-    
+
     // Get initial scroll position
     const initialScrollTop = await scrollContainer.evaluate(el => el.scrollTop);
     console.log('Initial scroll position:', initialScrollTop);
@@ -103,18 +103,18 @@ test.describe('Budget Page Viewport Layout', () => {
 
     // Find the sidebar scrollable container
     const sidebar = await page.locator('.lg\\:col-span-1').first();
-    
+
     // Check if sidebar has overflow
     const hasOverflow = await sidebar.evaluate(el => {
       return el.scrollHeight > el.clientHeight;
     });
-    
+
     console.log('Sidebar has overflow:', hasOverflow);
 
     if (hasOverflow) {
       // Get initial scroll position
       const initialScrollTop = await sidebar.evaluate(el => el.scrollTop);
-      
+
       // Scroll down
       await sidebar.evaluate(el => {
         el.scrollTop = 200;
@@ -122,7 +122,7 @@ test.describe('Budget Page Viewport Layout', () => {
       await page.waitForTimeout(300);
 
       const newScrollTop = await sidebar.evaluate(el => el.scrollTop);
-      
+
       // Verify scrolling worked
       expect(newScrollTop).toBeGreaterThan(initialScrollTop);
     }
@@ -139,10 +139,10 @@ test.describe('Budget Page Viewport Layout', () => {
 
     const mainContainer = await page.locator('.py-4').first();
     const containerBox = await mainContainer.boundingBox();
-    
+
     console.log('Container height at 1366x768:', containerBox?.height);
     console.log('Viewport height:', 768);
-    
+
     // Should still fit within viewport
     expect(containerBox?.height).toBeLessThanOrEqual(768);
   });
@@ -158,9 +158,9 @@ test.describe('Budget Page Viewport Layout', () => {
     // The page should scroll naturally
     const mainContainer = await page.locator('.py-4').first();
     const containerBox = await mainContainer.boundingBox();
-    
+
     console.log('Container height on mobile:', containerBox?.height);
-    
+
     // Mobile should allow natural content flow (can exceed viewport)
     // This is expected behavior
   });
@@ -186,7 +186,7 @@ test.describe('Budget Page Viewport Layout', () => {
     }
 
     console.log('Visible rows in viewport:', visibleRows);
-    
+
     // Should have at least some rows visible
     expect(visibleRows).toBeGreaterThan(0);
 
@@ -199,7 +199,6 @@ test.describe('Budget Page Viewport Layout', () => {
     await page.screenshot({ path: 'tests/playwright/screenshots/table-visibility.png', fullPage: false });
   });
 });
-
 
 
 

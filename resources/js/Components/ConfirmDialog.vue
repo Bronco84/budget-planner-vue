@@ -113,8 +113,8 @@ const getConfirmButtonClass = () => {
                             <div class="sm:flex sm:items-start">
                                 <div :class="[
                                     'mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full sm:mx-0 sm:h-10 sm:w-10',
-                                    dialogOptions.type === 'danger' ? 'bg-red-100 dark:bg-red-900/30' : 
-                                    dialogOptions.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 
+                                    dialogOptions.type === 'danger' ? 'bg-red-100 dark:bg-red-900/30' :
+                                    dialogOptions.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
                                     'bg-blue-100 dark:bg-blue-900/30'
                                 ]">
                                     <component :is="getIconComponent()" :class="['h-6 w-6', getIconColorClass()]" aria-hidden="true" />

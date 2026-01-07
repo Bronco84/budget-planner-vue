@@ -9,7 +9,7 @@
           <div class="mx-auto h-20 w-auto flex justify-center mb-6">
             <img src="/images/logo.png" alt="Budget Planner Logo" class="h-20 w-auto drop-shadow-lg" />
           </div>
-          
+
           <!-- Welcome text with gradient -->
           <h2 class="text-center text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
             Welcome Back
@@ -103,8 +103,8 @@
               :href="route('magic-link.request')"
               :class="[
                 'group relative w-full flex justify-center py-3.5 px-6 border text-base font-medium rounded-xl transition-all duration-200',
-                loading 
-                  ? 'text-gray-400 bg-gray-50 border-gray-200 cursor-not-allowed pointer-events-none' 
+                loading
+                  ? 'text-gray-400 bg-gray-50 border-gray-200 cursor-not-allowed pointer-events-none'
                   : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm hover:shadow'
               ]"
             >
@@ -121,12 +121,12 @@
           <div class="text-center pt-4 border-t border-gray-100">
             <p class="text-sm text-gray-600">
               Don't have an account?
-              <Link 
-                :href="route('register')" 
+              <Link
+                :href="route('register')"
                 :class="[
                   'font-semibold ml-1',
-                  loading 
-                    ? 'text-gray-400 cursor-not-allowed pointer-events-none' 
+                  loading
+                    ? 'text-gray-400 cursor-not-allowed pointer-events-none'
                     : 'text-indigo-600 hover:text-purple-600 transition-colors'
                 ]"
               >
@@ -201,6 +201,11 @@ const loginWithPasskey = async () => {
     const options = optionsResponse.data;
     console.log('WebAuthn options received:', options);
 
+    // Validate response structure
+    if (!options || !options.challenge) {
+      console.error('Invalid WebAuthn options response:', options);
+    }
+
     // The Laragear package returns the data directly, not nested in publicKey
     // Convert base64url strings to ArrayBuffers
     const publicKey = {
@@ -250,16 +255,24 @@ const loginWithPasskey = async () => {
 
     console.log('Login response:', loginResponse);
 
-    // Success! Do a full page reload to ensure session is properly established
-    // This ensures CSRF tokens and Inertia state are fresh
-    console.log('Login successful, redirecting to budgets...');
-    window.location.href = '/budgets';
+    // Success! Use Inertia router for proper SPA navigation
+    console.log('Login successful, redirecting...');
+
+    // Use Inertia's router.visit with replace to redirect after login
+    // This is the Inertia best practice - it maintains SPA behavior
+    // and properly handles the redirect with fresh data
+    router.visit(route('budgets.index'), {
+      method: 'get',
+      replace: true, // Replace history so back button doesn't go to login
+      preserveState: false, // Get fresh state from server
+      preserveScroll: false, // Reset scroll position
+    });
   } catch (err) {
     console.error('Passkey login error:', err);
-    
+
     // Only reset loading state on error
     loading.value = false;
-    
+
     // Handle WebAuthn errors
     if (err.name === 'NotAllowedError') {
       error.value = 'Authentication was cancelled or timed out.';
@@ -267,11 +280,13 @@ const loginWithPasskey = async () => {
       error.value = 'No passkey found for this device. Please use the magic link option below to sign in, then you can add a passkey for this device.';
     } else if (err.name === 'NotSupportedError') {
       error.value = 'Passkeys are not supported on this device. Please use the magic link option below.';
-    } 
+    }
     // Handle Axios errors
     else if (err.response) {
+      // Note: 419 errors are now handled automatically by axios interceptor in bootstrap.js
+      // If we see a 419 here, it means the auto-retry also failed (session completely dead)
       if (err.response.status === 419) {
-        error.value = 'Session expired. Please refresh the page and try again.';
+        error.value = 'Your session has completely expired. Please refresh the page and try again.';
       } else if (err.response.status === 422) {
         error.value = 'Authentication failed. Your passkey may not be registered. Try using the magic link option below.';
       } else {
@@ -285,6 +300,10 @@ const loginWithPasskey = async () => {
 
 // Helper functions for base64url encoding/decoding
 function base64urlToBuffer(base64url) {
+  if (!base64url) {
+    console.error('base64urlToBuffer received undefined or null value');
+    throw new Error('Invalid base64url value');
+  }
   const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);

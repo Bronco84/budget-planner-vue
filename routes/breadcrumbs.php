@@ -38,11 +38,6 @@ Breadcrumbs::for('passkey.register', function (BreadcrumbTrail $trail) {
     $trail->push('Register Passkey', route('passkey.register'));
 });
 
-Breadcrumbs::for('trusted-devices.index', function (BreadcrumbTrail $trail) {
-    $trail->parent('profile.edit');
-    $trail->push('Trusted Devices', route('trusted-devices.index'));
-});
-
 // ============================================================
 // BUDGET MANAGEMENT
 // ============================================================

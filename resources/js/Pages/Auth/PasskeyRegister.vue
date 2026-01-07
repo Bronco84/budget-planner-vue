@@ -239,16 +239,16 @@
             </div>
 
             <!-- Existing Passkeys -->
-            <div v-if="hasExistingPasskeys" class="pt-6 border-t border-gray-200">
-              <h3 class="text-lg font-medium text-gray-900 mb-4">Your Passkeys</h3>
-              <p class="text-sm text-gray-600 mb-4">
+            <div v-if="hasExistingPasskeys" class="pt-6 border-t border-gray-200 dark:border-gray-700">
+              <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Your Passkeys</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 You can register multiple passkeys for different devices.
               </p>
               <Link
-                :href="route('trusted-devices.index')"
-                class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                :href="route('profile.edit')"
+                class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
               >
-                Manage all devices
+                Manage your passkeys and devices
                 <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>

@@ -41,10 +41,13 @@ Route::middleware('auth')->group(function () {
     Route::get('passkey/register', [PasskeyAuthController::class, 'registerCreate'])
         ->name('passkey.register');
     
-    // Trusted Devices Management
-    Route::get('settings/trusted-devices', [TrustedDeviceController::class, 'index'])
-        ->name('trusted-devices.index');
+    Route::patch('settings/passkeys/{credential}', [\App\Http\Controllers\PasskeyManagementController::class, 'update'])
+        ->name('passkeys.update');
     
+    Route::delete('settings/passkeys/{credential}', [\App\Http\Controllers\PasskeyManagementController::class, 'destroy'])
+        ->name('passkeys.destroy');
+    
+    // Trusted Devices Management
     Route::delete('settings/trusted-devices/{device}', [TrustedDeviceController::class, 'revoke'])
         ->name('trusted-devices.revoke');
     

@@ -5,13 +5,13 @@ Hello {{ $user->name }},
 
 We detected a login to your Budget Planner account from a new device:
 
-**Device:** {{ $device->device_name }}  
-**IP Address:** {{ $device->ip_address }}  
+**Device:** {{ $device->device_name }}
+**IP Address:** {{ $device->ip_address }}
 **Time:** {{ $device->created_at->format('F j, Y g:i A') }}
 
 This device will be remembered for 90 days. If this wasn't you, please secure your account immediately.
 
-<x-mail::button :url="route('settings.devices')">
+<x-mail::button :url="route('trusted-devices.index')">
 Manage Devices
 </x-mail::button>
 

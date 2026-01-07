@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\TrustedDevice;
+use App\Mail\NewDeviceLogin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -55,6 +57,9 @@ class DeviceTokenService
             'expires_at' => now()->addDays((int) config('auth.device_remember_days', 90)),
             'auth_method' => $authMethod,
         ]);
+        
+        // Send new device login notification email (queued for performance)
+        Mail::to($user->email)->queue(new NewDeviceLogin($user, $device));
         
         return $device;
     }

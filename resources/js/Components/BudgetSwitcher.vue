@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { ChevronDownIcon, CheckIcon } from '@heroicons/vue/24/outline';
 import axios from 'axios';
-import { useToast } from 'vue-toastification';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps({
     isCollapsed: {

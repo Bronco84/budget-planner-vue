@@ -14,6 +14,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\RecurringTransactionRuleController;
 use App\Http\Controllers\PlaidController;
+use App\Http\Controllers\PlaidLiabilitiesController;
 use App\Http\Controllers\PlaidStatementHistoryController;
 use App\Http\Controllers\PlaidTransactionController;
 use App\Http\Controllers\ProjectionsController;
@@ -38,19 +39,21 @@ Route::get('/csrf-token', function () {
 })->middleware('web');
 
 // WebAuthn routes (passkey authentication)
-// Use our custom controllers instead of the package's automatic registration
-Route::middleware('guest')->group(function () {
+// These routes need to bypass Inertia middleware to return pure JSON
+// We use withoutMiddleware to exclude HandleInertiaRequests
+Route::withoutMiddleware([\App\Http\Middleware\HandleInertiaRequests::class])->group(function () {
     Route::post('webauthn/login/options', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'options'])
         ->name('webauthn.login.options');
-    Route::post('webauthn/login', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'login'])
+    
+    Route::middleware('guest')->post('webauthn/login', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'login'])
         ->name('webauthn.login');
-});
-
-Route::middleware('auth')->group(function () {
-    Route::post('webauthn/register/options', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'options'])
-        ->name('webauthn.register.options');
-    Route::post('webauthn/register', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'register'])
-        ->name('webauthn.register');
+    
+    Route::middleware('auth')->group(function () {
+        Route::post('webauthn/register/options', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'options'])
+            ->name('webauthn.register.options');
+        Route::post('webauthn/register', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'register'])
+            ->name('webauthn.register');
+    });
 });
 
 Route::get('/dashboard', function () {
@@ -255,6 +258,9 @@ Route::middleware('auth')->group(function () {
     Route::post('budget/{budget}/account/{account}/plaid/liabilities', [PlaidController::class, 'updateLiabilities'])
         ->middleware('throttle:10,1')
         ->name('plaid.liabilities');
+    Route::post('budget/{budget}/account/{account}/plaid/upgrade-link-token', [PlaidController::class, 'upgradeLinkToken'])
+        ->middleware('throttle:10,1')
+        ->name('plaid.upgrade-link-token');
     Route::get('budget/{budget}/account/{account}/plaid/statement-history', [PlaidStatementHistoryController::class, 'index'])
         ->name('plaid.statement-history');
     Route::delete('budget/{budget}/account/{account}/plaid', [PlaidController::class, 'destroy'])
@@ -320,6 +326,18 @@ Route::middleware('auth')->group(function () {
         Route::get('/conversations/{id}', [ChatController::class, 'show'])->name('conversations.show');
         Route::delete('/conversations/{id}', [ChatController::class, 'destroy'])->name('conversations.destroy');
         Route::post('/conversations/bulk-delete', [ChatController::class, 'bulkDestroy'])->name('conversations.bulk-destroy');
+    });
+
+    // Admin routes for Plaid Liabilities Management
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('/plaid-liabilities', [PlaidLiabilitiesController::class, 'index'])
+            ->name('plaid-liabilities.index');
+        Route::post('/plaid-liabilities/connections/{connection}/update', [PlaidLiabilitiesController::class, 'updateConnection'])
+            ->middleware('throttle:10,1')
+            ->name('plaid-liabilities.update-connection');
+        Route::post('/plaid-liabilities/update-all', [PlaidLiabilitiesController::class, 'updateAll'])
+            ->middleware('throttle:3,1')
+            ->name('plaid-liabilities.update-all');
     });
 });
 

@@ -195,15 +195,42 @@ const loginWithPasskey = async () => {
     const optionsResponse = await window.axios.post('/webauthn/login/options', requestBody, {
       headers: {
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
     });
 
     const options = optionsResponse.data;
     console.log('WebAuthn options received:', options);
 
+    // Check if we received HTML instead of JSON (indicates a server-side issue)
+    if (typeof options === 'string' && options.trim().startsWith('<!DOCTYPE')) {
+      console.error('Received HTML instead of JSON from server');
+      throw new Error('Server configuration error. Please contact support.');
+    }
+
     // Validate response structure
     if (!options || !options.challenge) {
       console.error('Invalid WebAuthn options response:', options);
+      throw new Error('Invalid response from server. Please try again or use the magic link option.');
+    }
+
+    // Validate and filter allowCredentials
+    let validCredentials = [];
+    if (options.allowCredentials && Array.isArray(options.allowCredentials)) {
+      // Filter out any credentials with missing or invalid IDs
+      validCredentials = options.allowCredentials.filter(cred => {
+        if (!cred || !cred.id || typeof cred.id !== 'string' || cred.id.trim() === '') {
+          console.warn('Skipping invalid credential:', cred);
+          return false;
+        }
+        return true;
+      });
+
+      // If all credentials were invalid, show a helpful error
+      if (options.allowCredentials.length > 0 && validCredentials.length === 0) {
+        console.error('All credentials were invalid. Original data:', options.allowCredentials);
+        throw new Error('Your passkey data appears to be corrupted. Please use the magic link option to sign in, then remove and re-add your passkey in Settings.');
+      }
     }
 
     // The Laragear package returns the data directly, not nested in publicKey
@@ -212,11 +239,11 @@ const loginWithPasskey = async () => {
       challenge: base64urlToBuffer(options.challenge),
       timeout: options.timeout,
       rpId: options.rpId,
-      allowCredentials: options.allowCredentials?.map(cred => ({
+      allowCredentials: validCredentials.map(cred => ({
         type: cred.type,
         id: base64urlToBuffer(cred.id),
         transports: cred.transports,
-      })) || [],
+      })),
       userVerification: options.userVerification || 'preferred',
     };
 

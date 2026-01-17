@@ -155,8 +155,19 @@ class AccountController extends Controller
 
         $this->authorize('update', $account);
 
+        // Load the Plaid relationship if not already loaded
+        $account->load('plaidAccount.plaidConnection');
+
         // Get institution name from Plaid connection or account name
         $institutionName = $account->plaidAccount?->plaidConnection?->institution_name ?? $account->name;
+        
+        \Log::info('Fetching logo for account', [
+            'account_id' => $account->id,
+            'account_name' => $account->name,
+            'institution_name' => $institutionName,
+            'has_plaid_account' => $account->plaidAccount !== null,
+            'plaid_institution_name' => $account->plaidAccount?->plaidConnection?->institution_name,
+        ]);
         
         // Try to find a matching domain for the institution
         $logoUrl = $this->getLogoUrlForInstitution($institutionName);
@@ -166,6 +177,11 @@ class AccountController extends Controller
             $account->update([
                 'logo_url' => $logoUrl,
                 'custom_logo' => null,
+            ]);
+
+            \Log::info('Logo URL saved', [
+                'account_id' => $account->id,
+                'logo_url' => $logoUrl,
             ]);
 
             return redirect()->back()->with('message', 'Logo fetched successfully!');
@@ -195,8 +211,8 @@ class AccountController extends Controller
     }
 
     /**
-     * Get logo URL for an institution name using external providers.
-     * Tries Clearbit first (higher quality), falls back to Google S2.
+     * Get logo URL for an institution name using Google's S2 favicon service.
+     * This service is highly reliable and provides high-quality favicons.
      */
     private function getLogoUrlForInstitution(string $institutionName): ?string
     {
@@ -272,12 +288,19 @@ class AccountController extends Controller
         }
 
         if (!$domain) {
+            \Log::info('Could not find domain mapping for institution', [
+                'institution_name' => $institutionName,
+            ]);
             return null;
         }
 
-        // Use Clearbit Logo API (high quality, 200x200)
-        // Falls back gracefully if logo not found
-        return "https://logo.clearbit.com/{$domain}";
+        \Log::info('Found domain for institution', [
+            'institution_name' => $institutionName,
+            'domain' => $domain,
+        ]);
+
+        // Use Google's S2 favicon service (highly reliable, max 256px)
+        return "https://www.google.com/s2/favicons?domain={$domain}&sz=128";
     }
 
     /**

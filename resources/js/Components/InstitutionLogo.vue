@@ -12,13 +12,13 @@
       @error="handlePrimaryError"
     />
     
-    <!-- Fallback: Clearbit logo -->
+    <!-- Fallback: Google S2 favicon -->
     <img 
-      v-else-if="clearbitUrl && !clearbitError"
-      :src="clearbitUrl"
+      v-else-if="fallbackUrl && !fallbackError"
+      :src="fallbackUrl"
       :alt="name || 'Institution logo'"
       class="w-full h-full object-contain bg-white"
-      @error="handleClearbitError"
+      @error="handleFallbackError"
     />
     
     <!-- Final fallback: Colored initials circle -->
@@ -65,9 +65,9 @@ const props = defineProps({
 });
 
 const imageError = ref(false);
-const clearbitError = ref(false);
+const fallbackError = ref(false);
 
-// Known institution name to domain mappings for Clearbit fallback
+// Known institution name to domain mappings for Google S2 fallback
 const institutionDomains = {
   'chase': 'chase.com',
   'bank of america': 'bankofamerica.com',
@@ -147,8 +147,8 @@ const logoSrc = computed(() => {
 });
 
 // Get fallback logo URL based on institution name
-// Uses Google's favicon service as primary fallback (more reliable)
-const clearbitUrl = computed(() => {
+// Uses Google's S2 favicon service as fallback (highly reliable)
+const fallbackUrl = computed(() => {
   if (!props.name) return null;
   
   const nameLower = props.name.toLowerCase();
@@ -156,7 +156,7 @@ const clearbitUrl = computed(() => {
   // Check for exact or partial match in our domain mapping
   for (const [key, domain] of Object.entries(institutionDomains)) {
     if (nameLower.includes(key)) {
-      // Google's S2 favicon service - more reliable, gives high-res icons
+      // Google's S2 favicon service - highly reliable, gives high-res icons
       const size = props.size === 'xl' ? 128 : props.size === 'lg' ? 64 : 32;
       return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`;
     }
@@ -170,8 +170,8 @@ const handlePrimaryError = () => {
   imageError.value = true;
 };
 
-const handleClearbitError = () => {
-  clearbitError.value = true;
+const handleFallbackError = () => {
+  fallbackError.value = true;
 };
 
 // Generate initials from name (first 2 letters of first 2 words, or first 2 letters)

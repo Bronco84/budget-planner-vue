@@ -553,12 +553,7 @@ const fetchLogo = () => {
   
   router.post(route('accounts.fetchLogo', [props.budget.id, props.account.id]), {}, {
     preserveScroll: true,
-    onSuccess: () => {
-      // Clear local form values since the server updated them
-      form.custom_logo = null;
-      form.logo_url = null;
-      // The page will reload with updated data
-    },
+    preserveState: false, // Force full page refresh to get updated account data
     onFinish: () => {
       fetchingLogo.value = false;
     },
@@ -569,9 +564,8 @@ const fetchLogo = () => {
 const clearLogo = () => {
   router.delete(route('accounts.clearLogo', [props.budget.id, props.account.id]), {
     preserveScroll: true,
-    onSuccess: () => {
-      form.custom_logo = null;
-      form.logo_url = null;
+    preserveState: false, // Force full page refresh to get updated account data
+    onFinish: () => {
       if (logoInput.value) {
         logoInput.value.value = '';
       }

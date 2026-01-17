@@ -393,6 +393,46 @@ class PlaidController extends Controller
     }
     
     /**
+     * Generate an upgrade link token for re-authenticating a Plaid connection.
+     * Used when ITEM_LOGIN_REQUIRED error occurs.
+     */
+    public function upgradeLinkToken(Budget $budget, Account $account)
+    {
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+
+        if (!$plaidAccount) {
+            return response()->json(['error' => 'Account is not linked to Plaid.'], 404);
+        }
+
+        $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
+
+        if (!$accessToken) {
+            return response()->json(['error' => 'No access token found for this connection.'], 400);
+        }
+
+        try {
+            // Create a link token in update mode for re-authentication
+            $linkToken = $this->plaidService->createLinkToken(
+                (string) Auth::id(),
+                $accessToken
+            );
+
+            return response()->json([
+                'link_token' => $linkToken,
+                'institution_name' => $plaidAccount->plaidConnection->institution_name,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to create upgrade link token', [
+                'error' => $e->getMessage(),
+                'account_id' => $account->id,
+                'plaid_account_id' => $plaidAccount->id,
+            ]);
+
+            return response()->json(['error' => 'Failed to create re-authentication link: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Unlink a Plaid account.
      */
     public function destroy(Budget $budget, Account $account): RedirectResponse

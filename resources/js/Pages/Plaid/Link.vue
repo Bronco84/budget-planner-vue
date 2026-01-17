@@ -146,6 +146,7 @@
 <script setup>
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { onMounted, ref } from 'vue';
+import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import { formatCurrency } from '@/utils/format.js';
@@ -291,26 +292,11 @@ const updateConnection = async () => {
   updateConnectionInProgress.value = true;
   
   try {
-    // Get XSRF token from cookie (Laravel sets this automatically)
-    const xsrfToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('XSRF-TOKEN='))
-      ?.split('=')[1];
+    // Fetch the upgrade link token from the API using axios (already configured with CSRF token)
+    const response = await axios.post(route('plaid.upgrade-link-token', [props.budget.id, props.account.id]));
+    const data = response.data;
     
-    // Fetch the upgrade link token from the API
-    const response = await fetch(route('plaid.upgrade-link-token', [props.budget.id, props.account.id]), {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-XSRF-TOKEN': xsrfToken ? decodeURIComponent(xsrfToken) : '',
-        'Accept': 'application/json',
-      },
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
+    if (!data.link_token) {
       toast.error(data.error || 'Failed to get re-authentication link');
       return;
     }
@@ -334,7 +320,8 @@ const updateConnection = async () => {
     updateHandler.open();
     
   } catch (error) {
-    toast.error('Failed to start re-authentication: ' + error.message);
+    const message = error.response?.data?.error || error.message || 'Unknown error';
+    toast.error('Failed to start re-authentication: ' + message);
   } finally {
     updateConnectionInProgress.value = false;
   }

@@ -121,6 +121,8 @@ class PlaidAccount extends Resource
                 ->hideFromIndex(),
 
             HasMany::make('Statement History', 'statementHistory', PlaidStatementHistory::class),
+
+            HasMany::make('Holdings', 'holdings', PlaidHolding::class),
         ];
     }
 

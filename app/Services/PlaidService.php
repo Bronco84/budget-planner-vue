@@ -123,10 +123,11 @@ class PlaidService
         }
 
         try {
-            // Start with base products - 'transactions' is always needed
-            // Include 'investments' for investment accounts and 'liabilities' for credit/loan accounts
-            // Liabilities must be requested upfront to get statement balance, APR, payment due dates, etc.
-            $products = ['transactions', 'investments', 'liabilities'];
+            // 'transactions' is the core required product
+            // 'investments' and 'liabilities' are optional - enabled if the institution supports them
+            // This allows connecting any bank type without requiring all product types
+            $requiredProducts = ['transactions'];
+            $optionalProducts = ['investments', 'liabilities'];
 
             $payload = [
                 'client_name' => config('app.name'),
@@ -134,7 +135,8 @@ class PlaidService
                     'client_user_id' => (string) $userId,
                     'email_address' => null, // Optional: Add user's email if available
                 ],
-                'products' => $products,
+                'products' => $requiredProducts,
+                'optional_products' => $optionalProducts,
                 'country_codes' => ['US'],
                 'language' => 'en',
                 // Remove account_filters to allow ALL account types
@@ -156,6 +158,7 @@ class PlaidService
                 'user_id' => $userId,
                 'mode' => $existingAccessToken ? 'update' : 'create',
                 'products' => $payload['products'],
+                'optional_products' => $payload['optional_products'],
                 'account_filters_removed' => true
             ]);
 

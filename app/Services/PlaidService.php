@@ -125,25 +125,8 @@ class PlaidService
         try {
             // Start with base products - 'transactions' is always needed
             // Include 'investments' for investment accounts and 'liabilities' for credit/loan accounts
-            $products = ['transactions', 'investments'];
-
-            // Add liabilities for update mode if there are credit/loan accounts
-            if ($existingAccessToken) {
-                // Check if this connection has any credit card accounts that would benefit from liabilities
-                $hasLiabilityAccounts = PlaidAccount::whereHas('plaidConnection', function ($query) use ($existingAccessToken) {
-                    $query->where('access_token', $existingAccessToken);
-                })
-                ->where(function ($query) {
-                    $query->where('account_type', 'credit')
-                          ->orWhere('account_type', 'loan')
-                          ->orWhere('account_type', 'mortgage');
-                })
-                ->exists();
-
-                if ($hasLiabilityAccounts) {
-                    $products[] = 'liabilities';
-                }
-            }
+            // Liabilities must be requested upfront to get statement balance, APR, payment due dates, etc.
+            $products = ['transactions', 'investments', 'liabilities'];
 
             $payload = [
                 'client_name' => config('app.name'),
@@ -1457,6 +1440,9 @@ class PlaidService
                 'holdings_updated' => $holdingsUpdated,
                 'total_securities' => count($securitiesMap),
             ]);
+
+            // Mark the connection as synced
+            $plaidAccount->plaidConnection->markSynced();
 
             return true;
 

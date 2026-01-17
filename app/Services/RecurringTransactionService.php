@@ -1319,6 +1319,165 @@ class RecurringTransactionService
     }
 
     /**
+     * Calculate the projected statement balance for the second autopay.
+     * Uses current spending trajectory to project end-of-cycle balance.
+     *
+     * Formula: spending_since_statement + (per_day_average * remaining_days)
+     *
+     * @param Account $creditCard
+     * @return array{amount: int, metadata: array}
+     */
+    protected function calculateProjectedStatementBalance(Account $creditCard): array
+    {
+        $plaidAccount = $creditCard->plaidAccount;
+        
+        if (!$plaidAccount) {
+            return [
+                'amount' => $creditCard->current_balance_cents ?? 0,
+                'metadata' => ['projection_method' => 'fallback_current_balance'],
+            ];
+        }
+
+        $currentBalance = $creditCard->current_balance_cents ?? 0;
+        $statementBalance = $plaidAccount->last_statement_balance_cents ?? 0;
+        $spendingSinceStatement = $currentBalance - $statementBalance;
+
+        // Get cycle timing
+        $daysSinceStatement = $plaidAccount->getDaysSinceStatement() ?? 0;
+        $daysRemainingInCycle = $plaidAccount->getDaysRemainingInCycle() ?? 0;
+        $cycleLength = $plaidAccount->getStatementCycleLength();
+
+        // Handle edge cases
+        if ($daysSinceStatement <= 0) {
+            // Statement just closed, use historical average instead
+            $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
+            return [
+                'amount' => $historicalResult['amount'],
+                'metadata' => array_merge($historicalResult['metadata'], [
+                    'projection_method' => 'historical_average_early_cycle',
+                ]),
+            ];
+        }
+
+        // Calculate per-day average spending
+        $perDayAverage = $spendingSinceStatement / $daysSinceStatement;
+
+        // Handle negative spending (payments/credits exceed new charges)
+        if ($spendingSinceStatement <= 0) {
+            // Use historical average when no net spending
+            $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
+            return [
+                'amount' => $historicalResult['amount'],
+                'metadata' => array_merge($historicalResult['metadata'], [
+                    'projection_method' => 'historical_average_negative_spending',
+                    'actual_spending_since_statement_cents' => $spendingSinceStatement,
+                ]),
+            ];
+        }
+
+        // Project end-of-cycle balance
+        $projectedBalance = $spendingSinceStatement + (int) round($perDayAverage * $daysRemainingInCycle);
+
+        // Ensure projection is at least as much as current new spending
+        $projectedBalance = max($projectedBalance, $spendingSinceStatement);
+
+        return [
+            'amount' => $projectedBalance,
+            'metadata' => [
+                'projection_method' => 'trajectory',
+                'current_balance_cents' => $currentBalance,
+                'statement_balance_cents' => $statementBalance,
+                'spending_since_statement_cents' => $spendingSinceStatement,
+                'days_since_statement' => $daysSinceStatement,
+                'days_remaining_in_cycle' => $daysRemainingInCycle,
+                'cycle_length_days' => $cycleLength,
+                'per_day_average_cents' => (int) round($perDayAverage),
+            ],
+        ];
+    }
+
+    /**
+     * Calculate weighted historical average from statement history.
+     * Uses exponential decay weighting (more recent = higher weight).
+     *
+     * @param Account $creditCard
+     * @param float $decayFactor Weight decay per month (default 0.7)
+     * @param int $maxMonths Maximum months of history to consider
+     * @return array{amount: int, metadata: array}
+     */
+    protected function calculateWeightedHistoricalAverage(
+        Account $creditCard, 
+        float $decayFactor = 0.7, 
+        int $maxMonths = 6
+    ): array {
+        $plaidAccount = $creditCard->plaidAccount;
+        
+        if (!$plaidAccount) {
+            // Fallback to current statement balance or balance
+            $fallbackAmount = $plaidAccount?->last_statement_balance_cents 
+                ?? $creditCard->current_balance_cents 
+                ?? 0;
+            return [
+                'amount' => $fallbackAmount,
+                'metadata' => [
+                    'projection_method' => 'fallback_no_plaid_account',
+                    'historical_months_used' => 0,
+                ],
+            ];
+        }
+
+        // Load statement history (most recent first)
+        $statements = $plaidAccount->statementHistory()
+            ->orderBy('statement_issue_date', 'desc')
+            ->limit($maxMonths)
+            ->get();
+
+        if ($statements->isEmpty()) {
+            // No history, use current statement balance
+            $fallbackAmount = $plaidAccount->last_statement_balance_cents 
+                ?? $creditCard->current_balance_cents 
+                ?? 0;
+            return [
+                'amount' => $fallbackAmount,
+                'metadata' => [
+                    'projection_method' => 'fallback_no_history',
+                    'historical_months_used' => 0,
+                ],
+            ];
+        }
+
+        // Calculate weighted average with exponential decay
+        $weightedSum = 0;
+        $totalWeight = 0;
+        $weights = [];
+
+        foreach ($statements as $index => $statement) {
+            $weight = pow($decayFactor, $index); // 1.0, 0.7, 0.49, 0.34, ...
+            $balance = $statement->statement_balance_cents ?? 0;
+            
+            $weightedSum += $balance * $weight;
+            $totalWeight += $weight;
+            $weights[] = [
+                'month' => $statement->statement_issue_date->format('Y-m'),
+                'balance_cents' => $balance,
+                'weight' => round($weight, 3),
+            ];
+        }
+
+        $weightedAverage = $totalWeight > 0 ? (int) round($weightedSum / $totalWeight) : 0;
+
+        return [
+            'amount' => $weightedAverage,
+            'metadata' => [
+                'projection_method' => 'historical_weighted_average',
+                'historical_months_used' => $statements->count(),
+                'decay_factor' => $decayFactor,
+                'weighted_breakdown' => $weights,
+            ],
+        ];
+    }
+
+    /**
      * Generate autopay deduction projections for all autopay-enabled credit cards.
      *
      * @param Budget $budget
@@ -1331,9 +1490,9 @@ class RecurringTransactionService
         $projections = collect();
 
         // Get all accounts with active autopay in this budget
-        // Eager load plaidAccount and autopaySourceAccount to avoid N+1 queries
+        // Eager load plaidAccount with statement history and autopaySourceAccount to avoid N+1 queries
         $autopayAccounts = $budget->accounts()
-            ->with(['plaidAccount.plaidConnection', 'autopaySourceAccount'])
+            ->with(['plaidAccount.plaidConnection', 'plaidAccount.statementHistory', 'autopaySourceAccount'])
             ->where('autopay_enabled', true)
             ->whereNotNull('autopay_source_account_id')
             ->get();
@@ -1351,25 +1510,33 @@ class RecurringTransactionService
                 continue;
             }
 
-            // Calculate estimated monthly spending (difference between current balance and statement)
-            $statementBalance = $creditCard->plaidAccount?->last_statement_balance_cents ?? 0;
-            $currentBalance = $creditCard->current_balance_cents ?? 0;
-            $estimatedMonthlySpending = abs($currentBalance - $statementBalance);
-            
-            // If no difference, use statement balance as estimate
-            if ($estimatedMonthlySpending === 0) {
-                $estimatedMonthlySpending = $statementBalance;
-            }
+            // Pre-calculate projection amounts for second and third+ payments
+            $secondPaymentProjection = $this->calculateProjectedStatementBalance($creditCard);
+            $futurePaymentProjection = $this->calculateWeightedHistoricalAverage($creditCard);
 
             // Generate autopay projections for all future months within the date range
             $currentPaymentDate = $firstPaymentDate->copy();
-            $isFirstPayment = true;
+            $paymentNumber = 1;
             
             while ($currentPaymentDate <= $endDate) {
                 // Only include if payment falls within projection window
                 if ($currentPaymentDate >= $startDate) {
-                    // First payment uses actual statement balance, subsequent use estimated monthly spending
-                    $paymentAmount = $isFirstPayment ? $firstPaymentAmount : $estimatedMonthlySpending;
+                    // Determine payment amount and metadata based on payment sequence
+                    if ($paymentNumber === 1) {
+                        // First payment: actual statement balance
+                        $paymentAmount = $firstPaymentAmount;
+                        $projectionMetadata = [
+                            'projection_method' => 'actual_statement_balance',
+                        ];
+                    } elseif ($paymentNumber === 2) {
+                        // Second payment: projected balance based on spending trajectory
+                        $paymentAmount = $secondPaymentProjection['amount'];
+                        $projectionMetadata = $secondPaymentProjection['metadata'];
+                    } else {
+                        // Third+ payments: weighted historical average
+                        $paymentAmount = $futurePaymentProjection['amount'];
+                        $projectionMetadata = $futurePaymentProjection['metadata'];
+                    }
                     
                     // Create deduction from source account
                     $projections->push($this->createAutopayProjection(
@@ -1377,13 +1544,15 @@ class RecurringTransactionService
                         $creditCard,
                         $currentPaymentDate->copy(),
                         $paymentAmount,
-                        $isFirstPayment
+                        $paymentNumber === 1,
+                        $paymentNumber,
+                        $projectionMetadata
                     ));
                 }
                 
                 // Move to next month's payment date
                 $currentPaymentDate->addMonth();
-                $isFirstPayment = false;
+                $paymentNumber++;
             }
         }
 
@@ -1398,6 +1567,8 @@ class RecurringTransactionService
      * @param Carbon $paymentDate
      * @param int $amountCents
      * @param bool $isFirstPayment
+     * @param int $paymentNumber The sequence number of this payment (1 = first, 2 = second, etc.)
+     * @param array $projectionMetadata Additional metadata about how the amount was calculated
      * @return object
      */
     private function createAutopayProjection(
@@ -1405,10 +1576,21 @@ class RecurringTransactionService
         Account $creditCard,
         Carbon $paymentDate,
         int $amountCents,
-        bool $isFirstPayment = true
+        bool $isFirstPayment = true,
+        int $paymentNumber = 1,
+        array $projectionMetadata = []
     ): object {
         $category = $this->getAutopayCategory($sourceAccount->budget);
         $description = $this->buildAutopayDescription($creditCard);
+        
+        // Build comprehensive metadata
+        $metadata = array_merge([
+            'credit_card_id' => $creditCard->id,
+            'credit_card_name' => $creditCard->name,
+            'projected_amount_cents' => $amountCents,
+            'payment_due_date' => $paymentDate->format('Y-m-d'),
+            'payment_number' => $paymentNumber,
+        ], $projectionMetadata);
         
         return (object) [
             'id' => null, // Not persisted
@@ -1426,12 +1608,7 @@ class RecurringTransactionService
             'is_projection' => true,
             'projection_source' => 'autopay',
             'is_first_autopay' => $isFirstPayment, // First autopay is based on actual statement balance, subsequent are estimates
-            'projection_metadata' => [
-                'credit_card_id' => $creditCard->id,
-                'credit_card_name' => $creditCard->name,
-                'statement_balance_cents' => $amountCents,
-                'payment_due_date' => $paymentDate->format('Y-m-d'),
-            ],
+            'projection_metadata' => $metadata,
         ];
     }
 

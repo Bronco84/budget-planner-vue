@@ -229,4 +229,93 @@ class PlaidAccount extends Model
 
         return Carbon::now()->diffInDays($this->next_payment_due_date, false);
     }
+
+    /**
+     * Get the statement cycle length in days.
+     * Infers from statement history if available, otherwise defaults to 30 days.
+     *
+     * @return int Number of days in a typical statement cycle
+     */
+    public function getStatementCycleLength(): int
+    {
+        // Try to infer from statement history
+        $statements = $this->statementHistory()
+            ->orderBy('statement_issue_date', 'desc')
+            ->limit(6)
+            ->get();
+
+        if ($statements->count() >= 2) {
+            // Calculate average days between consecutive statements
+            $totalDays = 0;
+            $intervals = 0;
+
+            for ($i = 0; $i < $statements->count() - 1; $i++) {
+                $current = Carbon::parse($statements[$i]->statement_issue_date);
+                $previous = Carbon::parse($statements[$i + 1]->statement_issue_date);
+                $daysBetween = $previous->diffInDays($current);
+                
+                // Only count reasonable intervals (20-40 days)
+                if ($daysBetween >= 20 && $daysBetween <= 40) {
+                    $totalDays += $daysBetween;
+                    $intervals++;
+                }
+            }
+
+            if ($intervals > 0) {
+                return (int) round($totalDays / $intervals);
+            }
+        }
+
+        // Default to 30 days
+        return 30;
+    }
+
+    /**
+     * Get the number of days since the last statement was issued.
+     *
+     * @return int|null Number of days since statement, or null if no statement date
+     */
+    public function getDaysSinceStatement(): ?int
+    {
+        if (!$this->last_statement_issue_date) {
+            return null;
+        }
+
+        return Carbon::parse($this->last_statement_issue_date)->diffInDays(Carbon::now());
+    }
+
+    /**
+     * Get the estimated number of days remaining in the current statement cycle.
+     *
+     * @return int|null Days remaining, or null if no statement date
+     */
+    public function getDaysRemainingInCycle(): ?int
+    {
+        $daysSince = $this->getDaysSinceStatement();
+        
+        if ($daysSince === null) {
+            return null;
+        }
+
+        $cycleLength = $this->getStatementCycleLength();
+        $remaining = $cycleLength - $daysSince;
+
+        // If we're past the cycle length, the next statement should be imminent
+        return max(0, $remaining);
+    }
+
+    /**
+     * Get the estimated next statement close date.
+     *
+     * @return Carbon|null
+     */
+    public function getEstimatedNextStatementDate(): ?Carbon
+    {
+        if (!$this->last_statement_issue_date) {
+            return null;
+        }
+
+        $cycleLength = $this->getStatementCycleLength();
+        return Carbon::parse($this->last_statement_issue_date)->addDays($cycleLength);
+    }
 } 

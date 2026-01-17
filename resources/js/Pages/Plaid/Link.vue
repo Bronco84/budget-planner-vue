@@ -50,7 +50,7 @@
                       />
                     </p>
                   </div>
-                  <div class="flex space-x-2">
+                  <div class="flex flex-wrap gap-2">
                     <button
                       @click="syncTransactions"
                       class="inline-flex items-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -72,6 +72,17 @@
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       <span>{{ balanceUpdateInProgress ? 'Updating...' : 'Update Balance' }}</span>
+                    </button>
+                    <button
+                      @click="updateConnection"
+                      class="inline-flex items-center px-3 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                      :disabled="updateConnectionInProgress"
+                    >
+                      <svg v-if="updateConnectionInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>{{ updateConnectionInProgress ? 'Loading...' : 'Re-authenticate' }}</span>
                     </button>
                     <button
                       @click="confirmDisconnect"
@@ -162,6 +173,7 @@ const metadataInput = ref(null);
 // State
 const syncInProgress = ref(false);
 const balanceUpdateInProgress = ref(false);
+const updateConnectionInProgress = ref(false);
 const csrf = usePage().props.csrf || '';
 
 // Plaid Link handler
@@ -273,6 +285,52 @@ const updateBalance = () => {
       }
     }
   );
+};
+
+const updateConnection = async () => {
+  updateConnectionInProgress.value = true;
+  
+  try {
+    // Fetch the upgrade link token from the API
+    const response = await fetch(route('plaid.upgrade-link-token', [props.budget.id, props.account.id]), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrf,
+        'Accept': 'application/json',
+      },
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      toast.error(data.error || 'Failed to get re-authentication link');
+      return;
+    }
+    
+    // Create a new Plaid Link handler with the update token
+    const updateHandler = window.Plaid.create({
+      token: data.link_token,
+      onSuccess: (public_token, metadata) => {
+        toast.success('Connection re-authenticated successfully!');
+        // Reload the page to refresh the connection status
+        router.reload();
+      },
+      onExit: (err, metadata) => {
+        if (err) {
+          toast.error(`Re-authentication failed: ${err.error_message || 'Unknown error'}`);
+        }
+      },
+    });
+    
+    // Open Plaid Link in update mode
+    updateHandler.open();
+    
+  } catch (error) {
+    toast.error('Failed to start re-authentication: ' + error.message);
+  } finally {
+    updateConnectionInProgress.value = false;
+  }
 };
 
 const confirmDisconnect = async () => {

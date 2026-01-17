@@ -713,7 +713,7 @@
                     </span>
                   </div>
                   <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
+                    <div class="flex items-center gap-4">
                       <p class="text-sm text-gray-700">
                         Showing
                         <span class="font-medium">{{ transactions.from }}</span>
@@ -723,6 +723,19 @@
                         <span class="font-medium">{{ transactions.total }}</span>
                         results
                       </p>
+                      <div class="flex items-center gap-2">
+                        <label for="perPage" class="text-sm text-gray-700">Per page:</label>
+                        <select
+                          id="perPage"
+                          v-model="perPage"
+                          @change="handlePerPageChange"
+                          class="block w-20 rounded-md border-gray-300 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                          <option v-for="option in perPageOptions" :key="option" :value="option">
+                            {{ option }}
+                          </option>
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
@@ -1125,6 +1138,25 @@ const syncHeaderScroll = () => {
 
 // Dynamic per-page calculation
 const calculatedPerPage = ref(50); // Default fallback
+
+// Per-page selection
+const perPageOptions = [10, 25, 50, 100, 200];
+const perPage = ref(props.transactions?.per_page || 50);
+
+// Handle per-page change
+const handlePerPageChange = () => {
+  calculatedPerPage.value = perPage.value;
+  router.visit(route('budgets.show', props.budget.id), {
+    data: {
+      account_id: form.account_id,
+      projection_months: projectionForm.months || 1,
+      per_page: perPage.value
+    },
+    preserveState: true,
+    preserveScroll: true,
+    replace: true
+  });
+};
 
 // Selected account tracking is handled by activeAccountId computed property
 

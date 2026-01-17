@@ -264,6 +264,9 @@ Route::middleware('auth')->group(function () {
     Route::post('budget/{budget}/account/{account}/plaid/upgrade-link-token', [PlaidController::class, 'upgradeLinkToken'])
         ->middleware('throttle:10,1')
         ->name('plaid.upgrade-link-token');
+    Route::post('budget/{budget}/account/{account}/plaid/update-connection', [PlaidController::class, 'updateConnection'])
+        ->middleware('throttle:10,1')
+        ->name('plaid.update-connection');
     Route::get('budget/{budget}/account/{account}/plaid/statement-history', [PlaidStatementHistoryController::class, 'index'])
         ->name('plaid.statement-history');
     Route::delete('budget/{budget}/account/{account}/plaid', [PlaidController::class, 'destroy'])

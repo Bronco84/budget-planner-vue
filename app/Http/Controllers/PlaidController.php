@@ -428,6 +428,54 @@ class PlaidController extends Controller
     }
 
     /**
+     * Update an existing Plaid connection with a new access token from re-authentication.
+     */
+    public function updateConnection(Request $request, Budget $budget, Account $account): RedirectResponse
+    {
+        $validated = $request->validate([
+            'public_token' => 'required|string',
+            'metadata' => 'required|array',
+        ]);
+        
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        
+        if (!$plaidAccount || !$plaidAccount->plaidConnection) {
+            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+        }
+        
+        try {
+            // Exchange public token for new access token
+            $newAccessToken = $this->plaidService->exchangePublicToken($validated['public_token']);
+            
+            if (!$newAccessToken) {
+                return redirect()->back()->with('error', 'Failed to update connection.');
+            }
+            
+            // Update the EXISTING connection with new access token
+            $plaidAccount->plaidConnection->update([
+                'access_token' => $newAccessToken,
+                'status' => PlaidConnection::STATUS_ACTIVE,
+                'error_message' => null,
+            ]);
+            
+            Log::info('Plaid connection re-authenticated successfully', [
+                'connection_id' => $plaidAccount->plaidConnection->id,
+                'institution' => $plaidAccount->plaidConnection->institution_name,
+                'accounts_count' => $plaidAccount->plaidConnection->plaidAccounts()->count(),
+            ]);
+            
+            return redirect()->back()->with('message', 'Connection re-authenticated successfully. All accounts under this connection have been updated.');
+        } catch (\Exception $e) {
+            Log::error('Re-authentication failed', [
+                'error' => $e->getMessage(),
+                'account_id' => $account->id,
+            ]);
+            
+            return redirect()->back()->with('error', 'Failed to re-authenticate: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Unlink a Plaid account.
      */
     public function destroy(Budget $budget, Account $account): RedirectResponse

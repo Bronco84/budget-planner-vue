@@ -538,9 +538,28 @@ const updateConnection = async () => {
     const updateHandler = window.Plaid.create({
       token: data.link_token,
       onSuccess: (public_token, metadata) => {
-        toast.success('Connection re-authenticated successfully!');
-        // Reload the page to refresh the connection status
-        router.reload();
+        // Send the new token to server to update the connection
+        router.post(
+          route('plaid.update-connection', [props.budget.id, props.account.id]),
+          {
+            public_token: public_token,
+            metadata: metadata
+          },
+          {
+            onSuccess: (page) => {
+              if (page.props.flash?.message) {
+                toast.success(page.props.flash.message);
+              } else {
+                toast.success('Connection re-authenticated successfully!');
+              }
+              // Reload to get fresh data
+              router.reload();
+            },
+            onError: (errors) => {
+              toast.error(errors.message || 'Failed to update connection');
+            }
+          }
+        );
       },
       onExit: (err, metadata) => {
         if (err) {

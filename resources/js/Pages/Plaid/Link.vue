@@ -291,12 +291,19 @@ const updateConnection = async () => {
   updateConnectionInProgress.value = true;
   
   try {
+    // Get XSRF token from cookie (Laravel sets this automatically)
+    const xsrfToken = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('XSRF-TOKEN='))
+      ?.split('=')[1];
+    
     // Fetch the upgrade link token from the API
     const response = await fetch(route('plaid.upgrade-link-token', [props.budget.id, props.account.id]), {
       method: 'POST',
+      credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': csrf,
+        'X-XSRF-TOKEN': xsrfToken ? decodeURIComponent(xsrfToken) : '',
         'Accept': 'application/json',
       },
     });

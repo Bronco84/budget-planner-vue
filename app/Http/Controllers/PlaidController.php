@@ -242,6 +242,9 @@ class PlaidController extends Controller
             
             $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
             $institutionName = $validated['metadata']['institution']['name'];
+            $itemId = $validated['metadata']['item']['id'] ?? 
+                    $validated['metadata']['item_id'] ?? 
+                    null;
             
             // CHECK: Does this account already have a PlaidAccount?
             $existingPlaidAccount = PlaidAccount::where('account_id', $account->id)->first();
@@ -257,11 +260,23 @@ class PlaidController extends Controller
                 );
             }
             
-            // CHECK: Do we already have an active connection to this institution?
-            $existingConnection = PlaidConnection::where('budget_id', $budget->id)
-                ->where('institution_id', $institutionId)
-                ->where('status', PlaidConnection::STATUS_ACTIVE)
-                ->first();
+            // CHECK: Do we already have a connection for this Plaid Item?
+            // Use plaid_item_id (unique per Plaid connection) instead of institution_id
+            $existingConnection = null;
+            if ($itemId) {
+                $existingConnection = PlaidConnection::where('budget_id', $budget->id)
+                    ->where('plaid_item_id', $itemId)
+                    ->where('status', PlaidConnection::STATUS_ACTIVE)
+                    ->first();
+            }
+            
+            // If no match by item_id, check by institution_id (but only if institution_id is not null)
+            if (!$existingConnection && $institutionId) {
+                $existingConnection = PlaidConnection::where('budget_id', $budget->id)
+                    ->where('institution_id', $institutionId)
+                    ->where('status', PlaidConnection::STATUS_ACTIVE)
+                    ->first();
+            }
             
             if ($existingConnection) {
                 // Reuse existing connection instead of creating new one
@@ -294,10 +309,6 @@ class PlaidController extends Controller
             }
             
             // No existing connection - create new one (original logic)
-            $itemId = $validated['metadata']['item']['id'] ?? 
-                    $validated['metadata']['item_id'] ?? 
-                    null;
-
             // Fetch institution logo and URL if we have an institution ID
             $institutionLogo = null;
             $institutionUrl = null;
@@ -350,11 +361,26 @@ class PlaidController extends Controller
             // Find if we have an active connection for this institution
             $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
             $institutionName = $validated['metadata']['institution']['name'];
+            $itemId = $validated['metadata']['item']['id'] ?? 
+                    $validated['metadata']['item_id'] ?? 
+                    null;
             
-            $existingConnection = PlaidConnection::where('budget_id', $budget->id)
-                ->where('institution_id', $institutionId)
-                ->where('status', PlaidConnection::STATUS_ACTIVE)
-                ->first();
+            // Check for existing connection by Item ID first (most reliable)
+            $existingConnection = null;
+            if ($itemId) {
+                $existingConnection = PlaidConnection::where('budget_id', $budget->id)
+                    ->where('plaid_item_id', $itemId)
+                    ->where('status', PlaidConnection::STATUS_ACTIVE)
+                    ->first();
+            }
+            
+            // Fallback to institution_id only if not null
+            if (!$existingConnection && $institutionId) {
+                $existingConnection = PlaidConnection::where('budget_id', $budget->id)
+                    ->where('institution_id', $institutionId)
+                    ->where('status', PlaidConnection::STATUS_ACTIVE)
+                    ->first();
+            }
             
             if ($existingConnection) {
                 // Reuse existing connection

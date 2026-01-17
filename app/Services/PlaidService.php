@@ -1380,8 +1380,12 @@ class PlaidService
             ]);
 
             // Get all PlaidAccounts in this connection for batch update
+            // Include accounts where type is 'investment' OR subtype is an investment subtype
             $allConnectionAccounts = PlaidAccount::where('plaid_connection_id', $plaidAccount->plaid_connection_id)
-                ->where('account_type', 'investment')
+                ->where(function ($query) {
+                    $query->where('account_type', 'investment')
+                          ->orWhereIn('account_subtype', PlaidAccount::INVESTMENT_SUBTYPES);
+                })
                 ->get()
                 ->keyBy('plaid_account_id');
 

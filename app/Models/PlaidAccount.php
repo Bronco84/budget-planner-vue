@@ -126,11 +126,72 @@ class PlaidAccount extends Model
     }
 
     /**
+     * Investment account subtypes from Plaid.
+     */
+    public const INVESTMENT_SUBTYPES = [
+        'brokerage',
+        '401a',
+        '401k',
+        '403b',
+        '457b',
+        '529',
+        'cash isa',
+        'crypto exchange',
+        'education savings account',
+        'fixed annuity',
+        'gic',
+        'health reimbursement arrangement',
+        'hsa',
+        'ira',
+        'isa',
+        'keogh',
+        'lif',
+        'life insurance',
+        'lira',
+        'lrif',
+        'lrsp',
+        'mutual fund',
+        'non-custodial wallet',
+        'non-taxable brokerage account',
+        'other',
+        'other annuity',
+        'other insurance',
+        'pension',
+        'prif',
+        'profit sharing plan',
+        'qshr',
+        'rdsp',
+        'resp',
+        'retirement',
+        'rlif',
+        'roth',
+        'roth 401k',
+        'rrif',
+        'rrsp',
+        'sarsep',
+        'sep ira',
+        'simple ira',
+        'sipp',
+        'stock plan',
+        'tfsa',
+        'trust',
+        'ugma',
+        'utma',
+        'variable annuity',
+    ];
+
+    /**
      * Check if this account is an investment account.
      */
     public function isInvestmentAccount(): bool
     {
-        return $this->account_type === 'investment';
+        // Check main type first
+        if ($this->account_type === 'investment') {
+            return true;
+        }
+
+        // Also check if subtype is an investment subtype (in case type wasn't set correctly)
+        return in_array(strtolower($this->account_subtype ?? ''), self::INVESTMENT_SUBTYPES);
     }
 
     /**

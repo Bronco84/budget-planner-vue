@@ -3,7 +3,7 @@
 
   <GuestLayout>
     <!-- Card with glass morphism effect -->
-    <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-8">
+    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/50 p-8">
         <div>
           <!-- Logo -->
           <div class="mx-auto h-20 w-auto flex justify-center mb-6">
@@ -11,46 +11,46 @@
           </div>
 
           <!-- Welcome text with gradient -->
-          <h2 class="text-center text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          <h2 class="text-center text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent mb-2">
             Welcome Back
           </h2>
-          <p class="text-center text-sm text-gray-600 mb-8">
+          <p class="text-center text-sm text-gray-600 dark:text-gray-400 mb-8">
             Sign in securely with your passkey
           </p>
         </div>
 
         <div class="space-y-6">
           <!-- Success Message -->
-          <div v-if="status" class="rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 p-4 border border-green-200">
+          <div v-if="status" class="rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 p-4 border border-green-200 dark:border-green-800/50">
             <div class="flex">
               <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                <svg class="h-5 w-5 text-green-500 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm font-medium text-green-800">{{ status }}</p>
+                <p class="text-sm font-medium text-green-800 dark:text-green-300">{{ status }}</p>
               </div>
             </div>
           </div>
 
           <!-- Error Message -->
-          <div v-if="error" class="rounded-xl bg-gradient-to-r from-red-50 to-pink-50 p-4 border border-red-200">
+          <div v-if="error" class="rounded-xl bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/30 dark:to-pink-900/30 p-4 border border-red-200 dark:border-red-800/50">
             <div class="flex">
               <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <svg class="h-5 w-5 text-red-500 dark:text-red-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm font-medium text-red-800">{{ error }}</p>
+                <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ error }}</p>
               </div>
             </div>
           </div>
 
           <!-- Email Field (Optional) -->
           <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email (optional)
             </label>
             <input
@@ -59,9 +59,9 @@
               type="email"
               autocomplete="email webauthn"
               placeholder="your@email.com"
-              class="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              class="block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
             />
-            <p class="mt-2 text-xs text-gray-500">
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               Providing your email helps us find your passkey and offer better alternatives if needed.
             </p>
           </div>
@@ -90,10 +90,10 @@
           <!-- Divider -->
           <div class="relative">
             <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-gray-200"></div>
+              <div class="w-full border-t border-gray-200 dark:border-gray-700"></div>
             </div>
             <div class="relative flex justify-center text-sm">
-              <span class="px-4 bg-white/80 text-gray-500 font-medium">Or continue with</span>
+              <span class="px-4 bg-white/80 dark:bg-gray-800/80 text-gray-500 dark:text-gray-400 font-medium">Or continue with</span>
             </div>
           </div>
 
@@ -104,12 +104,12 @@
               :class="[
                 'group relative w-full flex justify-center py-3.5 px-6 border text-base font-medium rounded-xl transition-all duration-200',
                 loading
-                  ? 'text-gray-400 bg-gray-50 border-gray-200 cursor-not-allowed pointer-events-none'
-                  : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm hover:shadow'
+                  ? 'text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 cursor-not-allowed pointer-events-none'
+                  : 'text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-indigo-500 shadow-sm hover:shadow'
               ]"
             >
               <span class="absolute left-0 inset-y-0 flex items-center pl-4">
-                <svg :class="loading ? 'text-gray-300' : 'text-gray-400 group-hover:text-gray-600'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg :class="loading ? 'text-gray-300 dark:text-gray-500' : 'text-gray-400 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </span>
@@ -118,16 +118,16 @@
           </div>
 
           <!-- Register Link -->
-          <div class="text-center pt-4 border-t border-gray-100">
-            <p class="text-sm text-gray-600">
+          <div class="text-center pt-4 border-t border-gray-100 dark:border-gray-700">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?
               <Link
                 :href="route('register')"
                 :class="[
                   'font-semibold ml-1',
                   loading
-                    ? 'text-gray-400 cursor-not-allowed pointer-events-none'
-                    : 'text-indigo-600 hover:text-purple-600 transition-colors'
+                    ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed pointer-events-none'
+                    : 'text-indigo-600 dark:text-indigo-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors'
                 ]"
               >
                 Sign up
@@ -138,15 +138,15 @@
       </div>
 
       <!-- Browser Support Notice -->
-      <div v-if="!isWebAuthnSupported" class="mt-6 rounded-xl bg-gradient-to-r from-yellow-50 to-orange-50 p-4 border border-yellow-200 shadow-sm">
+      <div v-if="!isWebAuthnSupported" class="mt-6 rounded-xl bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/30 dark:to-orange-900/30 p-4 border border-yellow-200 dark:border-yellow-800/50 shadow-sm">
         <div class="flex">
           <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+            <svg class="h-5 w-5 text-yellow-500 dark:text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="ml-3">
-            <p class="text-sm font-medium text-yellow-800">
+            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">
               Your browser doesn't support passkeys. Please use the magic link option or update your browser.
             </p>
           </div>

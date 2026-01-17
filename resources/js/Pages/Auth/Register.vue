@@ -3,7 +3,7 @@
 
   <GuestLayout>
     <!-- Card with glass morphism effect -->
-    <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-8">
+    <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/50 p-8">
         <div>
           <!-- Logo -->
           <div class="mx-auto h-20 w-auto flex justify-center mb-6">
@@ -11,10 +11,10 @@
           </div>
           
           <!-- Welcome text with gradient -->
-          <h2 class="text-center text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          <h2 class="text-center text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent mb-2">
             Create Your Account
           </h2>
-          <p class="text-center text-sm text-gray-600 mb-8">
+          <p class="text-center text-sm text-gray-600 dark:text-gray-400 mb-8">
             Start your journey with secure, passwordless authentication
           </p>
         </div>
@@ -22,7 +22,7 @@
         <form @submit.prevent="submit" class="space-y-6">
           <!-- Name Field -->
           <div>
-            <InputLabel for="name" value="Name" class="text-sm font-medium text-gray-700" />
+            <InputLabel for="name" value="Name" class="text-sm font-medium text-gray-700 dark:text-gray-300" />
             <TextInput
               id="name"
               type="text"
@@ -30,7 +30,7 @@
               required
               autofocus
               autocomplete="name"
-              class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              class="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
               placeholder="John Doe"
             />
             <InputError class="mt-2" :message="form.errors.name" />
@@ -38,30 +38,30 @@
 
           <!-- Email Field -->
           <div>
-            <InputLabel for="email" value="Email" class="text-sm font-medium text-gray-700" />
+            <InputLabel for="email" value="Email" class="text-sm font-medium text-gray-700 dark:text-gray-300" />
             <TextInput
               id="email"
               type="email"
               v-model="form.email"
               required
               autocomplete="username"
-              class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              class="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
               placeholder="your@email.com"
             />
             <InputError class="mt-2" :message="form.errors.email" />
           </div>
 
           <!-- Info Box -->
-          <div class="rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-200">
+          <div class="rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 p-4 border border-blue-200 dark:border-blue-800/50">
             <div class="flex">
               <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                <svg class="h-5 w-5 text-blue-500 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="ml-3 flex-1">
-                <h3 class="text-sm font-medium text-blue-800">What's a passkey?</h3>
-                <div class="mt-2 text-sm text-blue-700">
+                <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300">What's a passkey?</h3>
+                <div class="mt-2 text-sm text-blue-700 dark:text-blue-400">
                   <p>After creating your account, you'll set up a passkey using your device's biometric authentication (Face ID, Touch ID, Windows Hello). No passwords needed!</p>
                 </div>
               </div>
@@ -90,16 +90,16 @@
           </div>
 
           <!-- Login Link -->
-          <div class="text-center pt-4 border-t border-gray-100">
-            <p class="text-sm text-gray-600">
+          <div class="text-center pt-4 border-t border-gray-100 dark:border-gray-700">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
               Already have an account?
               <Link 
                 :href="route('login')" 
                 :class="[
                   'font-semibold ml-1',
                   form.processing 
-                    ? 'text-gray-400 cursor-not-allowed pointer-events-none' 
-                    : 'text-indigo-600 hover:text-purple-600 transition-colors'
+                    ? 'text-gray-400 dark:text-gray-500 cursor-not-allowed pointer-events-none' 
+                    : 'text-indigo-600 dark:text-indigo-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors'
                 ]"
               >
                 Sign in

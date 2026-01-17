@@ -495,13 +495,19 @@ class PlaidController extends Controller
     
     /**
      * Sync transactions for a specific Plaid-linked account.
+     * 
+     * This is the primary sync method that handles all data updates:
+     * - Transactions sync
+     * - Balance update
+     * - Liability data (for credit cards)
+     * - Investment data (for investment accounts)
      */
     public function syncTransactions(Budget $budget, Account $account): RedirectResponse
     {
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (!$plaidAccount) {
-            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+            return $this->notLinkedToPlaidResponse();
         }
 
         try {
@@ -510,31 +516,22 @@ class PlaidController extends Controller
             return redirect()->back()->with('message',
                 'Synced ' . $result['imported'] . ' new and updated ' . $result['updated'] . ' transactions.');
         } catch (\Exception $e) {
-            // Handle PRODUCT_NOT_READY error specifically
-            if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY')) {
-                return redirect()->back()->with('error',
-                    'Transaction data for this account is still being processed by Plaid. This can take 1-3 days for credit cards after initial connection. Please try again later.');
-            }
-
-            Log::error('Single account sync error', [
-                'account_id' => $account->id,
-                'plaid_account_id' => $plaidAccount->id,
-                'error' => $e->getMessage()
-            ]);
-
-            return redirect()->back()->with('error', 'Failed to sync transactions: ' . $e->getMessage());
+            return $this->handleSyncException($e, $account, $plaidAccount);
         }
     }
     
     /**
      * Update the account balance from Plaid.
+     * 
+     * Note: This is also done automatically by syncTransactions().
+     * Use this endpoint for a quick balance-only refresh.
      */
     public function updateBalance(Budget $budget, Account $account): RedirectResponse
     {
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (!$plaidAccount) {
-            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+            return $this->notLinkedToPlaidResponse();
         }
 
         $updated = $this->plaidService->updateAccountBalance($plaidAccount);
@@ -548,13 +545,16 @@ class PlaidController extends Controller
 
     /**
      * Update liability data (statement balance, payment info) for a credit card account.
+     * 
+     * Note: This is also done automatically by syncTransactions() for credit cards.
+     * Use this endpoint for a quick liability-only refresh.
      */
     public function updateLiabilities(Budget $budget, Account $account): RedirectResponse
     {
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (!$plaidAccount) {
-            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+            return $this->notLinkedToPlaidResponse();
         }
 
         // Verify this is a credit card account
@@ -573,13 +573,16 @@ class PlaidController extends Controller
 
     /**
      * Update investment data (holdings, securities) for an investment account.
+     * 
+     * Note: This is also done automatically by syncTransactions() for investment accounts.
+     * Use this endpoint for a quick investment-only refresh.
      */
     public function updateInvestments(Budget $budget, Account $account): RedirectResponse
     {
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (!$plaidAccount) {
-            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+            return $this->notLinkedToPlaidResponse();
         }
 
         // Verify this is an investment account
@@ -596,6 +599,31 @@ class PlaidController extends Controller
 
         return redirect()->back()->with('error', 'Failed to update investment data. This feature may not be available for all institutions.');
     }
+
+    /**
+     * Handle exceptions from sync operations with consistent error messaging.
+     * 
+     * @param \Exception $e
+     * @param Account $account
+     * @param PlaidAccount $plaidAccount
+     * @return RedirectResponse
+     */
+    private function handleSyncException(\Exception $e, Account $account, PlaidAccount $plaidAccount): RedirectResponse
+    {
+        // Handle PRODUCT_NOT_READY error specifically
+        if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY')) {
+            return redirect()->back()->with('error',
+                'Transaction data for this account is still being processed by Plaid. This can take 1-3 days for credit cards after initial connection. Please try again later.');
+        }
+
+        Log::error('Account sync error', [
+            'account_id' => $account->id,
+            'plaid_account_id' => $plaidAccount->id,
+            'error' => $e->getMessage()
+        ]);
+
+        return redirect()->back()->with('error', 'Failed to sync transactions: ' . $e->getMessage());
+    }
     
     /**
      * Generate an upgrade link token for re-authenticating a Plaid connection.
@@ -603,7 +631,7 @@ class PlaidController extends Controller
      */
     public function upgradeLinkToken(Budget $budget, Account $account)
     {
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (!$plaidAccount) {
             return response()->json(['error' => 'Account is not linked to Plaid.'], 404);
@@ -647,10 +675,10 @@ class PlaidController extends Controller
             'metadata' => 'required|array',
         ]);
         
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        $plaidAccount = $this->getPlaidAccountForAccount($account);
         
         if (!$plaidAccount || !$plaidAccount->plaidConnection) {
-            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+            return $this->notLinkedToPlaidResponse();
         }
         
         try {
@@ -690,10 +718,10 @@ class PlaidController extends Controller
      */
     public function destroy(Budget $budget, Account $account): RedirectResponse
     {
-        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+        $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (!$plaidAccount) {
-            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+            return $this->notLinkedToPlaidResponse();
         }
 
         // Get the connection before deleting the account
@@ -817,5 +845,28 @@ class PlaidController extends Controller
         
         return redirect()->back()->with('message', 
             "Synced {$totalImported} new and updated {$totalUpdated} transactions.");
+    }
+
+    /**
+     * Get the PlaidAccount for a given Account.
+     * 
+     * @param Account $account
+     * @return PlaidAccount|null
+     */
+    private function getPlaidAccountForAccount(Account $account): ?PlaidAccount
+    {
+        return PlaidAccount::where('account_id', $account->id)
+            ->with('plaidConnection')
+            ->first();
+    }
+
+    /**
+     * Return a redirect response for when an account is not linked to Plaid.
+     * 
+     * @return RedirectResponse
+     */
+    private function notLinkedToPlaidResponse(): RedirectResponse
+    {
+        return redirect()->back()->with('error', 'Account is not linked to Plaid.');
     }
 } 

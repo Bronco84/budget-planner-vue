@@ -403,14 +403,13 @@ const openPlaidLink = () => {
 const syncAllData = async () => {
   syncAllInProgress.value = true;
   
-  let transactionsSuccess = false;
-  let balanceSuccess = false;
-  let liabilitiesSuccess = false;
-  let hasErrors = false;
-  
   try {
-    // Step 1: Sync transactions
-    await new Promise((resolve, reject) => {
+    // Single sync call handles everything:
+    // - Transactions sync
+    // - Balance update
+    // - Liability data (for credit cards)
+    // - Investment data (for investment accounts)
+    await new Promise((resolve) => {
       router.post(
         route('plaid.sync', [props.budget.id, props.account.id]),
         {},
@@ -419,100 +418,29 @@ const syncAllData = async () => {
           preserveScroll: true,
           onSuccess: (page) => {
             if (page.props.flash?.error || page.props.error) {
-              hasErrors = true;
               const errorMsg = page.props.flash?.error || page.props.error;
-              toast.error(`Transactions sync failed: ${errorMsg}`);
+              toast.error(`Sync failed: ${errorMsg}`);
             } else {
-              transactionsSuccess = true;
-            }
-            resolve();
-          },
-          onError: (errors) => {
-            hasErrors = true;
-            toast.error(`Transactions sync failed: ${errors.message || 'Unknown error'}`);
-            resolve(); // Continue to next step even if this fails
-          }
-        }
-      );
-    });
-    
-    // Step 2: Update balance
-    await new Promise((resolve, reject) => {
-      router.post(
-        route('plaid.balance', [props.budget.id, props.account.id]),
-        {},
-        {
-          preserveState: true,
-          preserveScroll: true,
-          onSuccess: (page) => {
-            if (page.props.flash?.error || page.props.error) {
-              hasErrors = true;
-              const errorMsg = page.props.flash?.error || page.props.error;
-              toast.error(`Balance update failed: ${errorMsg}`);
-            } else {
-              balanceSuccess = true;
-            }
-            resolve();
-          },
-          onError: (errors) => {
-            hasErrors = true;
-            toast.error(`Balance update failed: ${errors.message || 'Unknown error'}`);
-            resolve(); // Continue to next step even if this fails
-          }
-        }
-      );
-    });
-    
-    // Step 3: Update statement balance (credit cards only)
-    if (isCreditCard.value) {
-      await new Promise((resolve, reject) => {
-        router.post(
-          route('plaid.liabilities', [props.budget.id, props.account.id]),
-          {},
-          {
-            preserveState: true,
-            preserveScroll: true,
-            onSuccess: (page) => {
-              if (page.props.flash?.error || page.props.error) {
-                hasErrors = true;
-                const errorMsg = page.props.flash?.error || page.props.error;
-                toast.error(`Statement balance update failed: ${errorMsg}`);
+              // Show appropriate success message based on account type
+              if (isCreditCard.value) {
+                toast.success('All data synced: transactions, balance, and statement information updated.');
+              } else if (props.plaidAccount?.account_type === 'investment') {
+                toast.success('All data synced: transactions, balance, and holdings updated.');
               } else {
-                liabilitiesSuccess = true;
+                toast.success('All data synced: transactions and balance updated.');
               }
-              resolve();
-            },
-            onError: (errors) => {
-              hasErrors = true;
-              toast.error(`Statement balance update failed: ${errors.message || 'Unknown error'}`);
-              resolve();
+              // Reload to get fresh data
+              router.reload({ only: ['plaidAccount', 'account'] });
             }
+            resolve();
+          },
+          onError: (errors) => {
+            toast.error(`Sync failed: ${errors.message || 'Unknown error'}`);
+            resolve();
           }
-        );
-      });
-    }
-    
-    // Show final success message
-    if (!hasErrors) {
-      if (isCreditCard.value) {
-        toast.success('All data synced successfully: transactions, balance, and statement information updated.');
-      } else {
-        toast.success('All data synced successfully: transactions and balance updated.');
-      }
-      // Reload to get fresh data
-      router.reload({ only: ['plaidAccount', 'account'] });
-    } else {
-      // Some steps succeeded, some failed
-      const successSteps = [];
-      if (transactionsSuccess) successSteps.push('transactions');
-      if (balanceSuccess) successSteps.push('balance');
-      if (liabilitiesSuccess) successSteps.push('statement data');
-      
-      if (successSteps.length > 0) {
-        toast.success(`Partially synced: ${successSteps.join(', ')} updated successfully.`);
-        router.reload({ only: ['plaidAccount', 'account'] });
-      }
-    }
+        }
+      );
+    });
     
   } catch (error) {
     toast.error('An unexpected error occurred while syncing data.');

@@ -89,17 +89,18 @@
                     </template>
                   </div>
                   
-                  <!-- Custom Logo Upload -->
+                  <!-- Account Logo -->
                   <div>
-                    <InputLabel for="custom_logo" value="Custom Logo (Optional)" />
-                    <p class="text-xs text-gray-500 mt-1">Upload a custom logo for this account. Supports images and will override the default institution logo.</p>
+                    <InputLabel for="custom_logo" value="Account Logo (Optional)" />
+                    <p class="text-xs text-gray-500 mt-1">Fetch a logo automatically or upload a custom one.</p>
                     
                     <div class="mt-3 space-y-3">
                       <!-- Current Logo Preview -->
-                      <div v-if="form.custom_logo || account.custom_logo || (isPlaidConnected && account.plaid_account?.plaid_connection?.institution_logo)" class="flex items-center gap-4">
+                      <div v-if="hasLogo || (isPlaidConnected && account.plaid_account?.plaid_connection?.institution_logo)" class="flex items-center gap-4">
                         <div class="flex-shrink-0">
                           <InstitutionLogo
                             :custom-logo="form.custom_logo || account.custom_logo"
+                            :logo-url="form.logo_url || account.logo_url"
                             :logo="account.plaid_account?.plaid_connection?.institution_logo"
                             :name="account.name"
                             size="lg"
@@ -107,24 +108,45 @@
                         </div>
                         <div class="flex-1">
                           <p class="text-sm font-medium text-gray-700">
-                            {{ form.custom_logo || account.custom_logo ? 'Custom Logo' : 'Institution Logo' }}
+                            {{ logoSourceLabel }}
                           </p>
                           <p class="text-xs text-gray-500">
-                            {{ form.custom_logo || account.custom_logo ? 'Your uploaded logo' : 'From ' + (account.plaid_account?.plaid_connection?.institution_name || 'bank') }}
+                            {{ logoSourceDescription }}
                           </p>
                         </div>
                         <button
-                          v-if="form.custom_logo || account.custom_logo"
+                          v-if="hasCustomLogo"
                           type="button"
-                          @click="removeCustomLogo"
+                          @click="clearLogo"
                           class="text-sm text-red-600 hover:text-red-700 font-medium"
                         >
                           Remove
                         </button>
                       </div>
                       
-                      <!-- File Upload Input -->
-                      <div class="flex items-center gap-3">
+                      <!-- Logo Actions -->
+                      <div class="flex items-center gap-3 flex-wrap">
+                        <!-- Fetch Logo Button -->
+                        <button
+                          type="button"
+                          @click="fetchLogo"
+                          :disabled="fetchingLogo"
+                          class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                        >
+                          <svg v-if="fetchingLogo" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                          </svg>
+                          {{ fetchingLogo ? 'Fetching...' : 'Fetch Logo' }}
+                        </button>
+                        
+                        <!-- Or separator -->
+                        <span class="text-sm text-gray-400">or</span>
+                        
+                        <!-- Upload Custom Logo -->
                         <input
                           type="file"
                           id="custom_logo"
@@ -141,12 +163,13 @@
                           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
                           </svg>
-                          {{ form.custom_logo || account.custom_logo ? 'Change Logo' : 'Upload Logo' }}
+                          Upload Custom
                         </button>
                         <span v-if="logoUploading" class="text-sm text-gray-500">Uploading...</span>
                       </div>
                       
                       <InputError class="mt-2" :message="form.errors.custom_logo" />
+                      <InputError class="mt-2" :message="form.errors.logo_url" />
                     </div>
                   </div>
                 </div>
@@ -245,6 +268,7 @@
                     <div class="flex items-center gap-3">
                       <InstitutionLogo
                         :custom-logo="account.custom_logo"
+                        :logo-url="account.logo_url"
                         :logo="account.plaid_account?.plaid_connection?.institution_logo"
                         :name="account.plaid_account?.institution_name || 'Unknown Bank'"
                         size="lg"
@@ -387,7 +411,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -456,11 +480,34 @@ const form = useForm({
   type: props.account.type,
   include_in_budget: props.account.include_in_budget,
   custom_logo: props.account.custom_logo || null,
+  logo_url: props.account.logo_url || null,
 });
 
 // Logo upload state
 const logoInput = ref(null);
 const logoUploading = ref(false);
+const fetchingLogo = ref(false);
+
+// Computed properties for logo display
+const hasCustomLogo = computed(() => {
+  return form.custom_logo || props.account.custom_logo || form.logo_url || props.account.logo_url;
+});
+
+const hasLogo = computed(() => {
+  return hasCustomLogo.value || (isPlaidConnected.value && props.account.plaid_account?.plaid_connection?.institution_logo);
+});
+
+const logoSourceLabel = computed(() => {
+  if (form.custom_logo || props.account.custom_logo) return 'Custom Logo';
+  if (form.logo_url || props.account.logo_url) return 'Fetched Logo';
+  return 'Institution Logo';
+});
+
+const logoSourceDescription = computed(() => {
+  if (form.custom_logo || props.account.custom_logo) return 'Your uploaded logo';
+  if (form.logo_url || props.account.logo_url) return 'Automatically fetched';
+  return 'From ' + (props.account.plaid_account?.plaid_connection?.institution_name || 'bank');
+});
 
 // Handle logo file upload
 const handleLogoUpload = async (event) => {
@@ -500,12 +547,36 @@ const handleLogoUpload = async (event) => {
   }
 };
 
-// Remove custom logo
-const removeCustomLogo = () => {
-  form.custom_logo = null;
-  if (logoInput.value) {
-    logoInput.value.value = '';
-  }
+// Fetch logo from external provider
+const fetchLogo = () => {
+  fetchingLogo.value = true;
+  
+  router.post(route('accounts.fetchLogo', [props.budget.id, props.account.id]), {}, {
+    preserveScroll: true,
+    onSuccess: () => {
+      // Clear local form values since the server updated them
+      form.custom_logo = null;
+      form.logo_url = null;
+      // The page will reload with updated data
+    },
+    onFinish: () => {
+      fetchingLogo.value = false;
+    },
+  });
+};
+
+// Clear all custom logos (both uploaded and fetched)
+const clearLogo = () => {
+  router.delete(route('accounts.clearLogo', [props.budget.id, props.account.id]), {
+    preserveScroll: true,
+    onSuccess: () => {
+      form.custom_logo = null;
+      form.logo_url = null;
+      if (logoInput.value) {
+        logoInput.value.value = '';
+      }
+    },
+  });
 };
 
 // Watch for changes to account status and update include_in_budget

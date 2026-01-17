@@ -41,6 +41,11 @@ const props = defineProps({
     type: String,
     default: null
   },
+  // External logo URL (second priority) - from Clearbit, Google, etc.
+  logoUrl: {
+    type: String,
+    default: null
+  },
   // Base64-encoded logo string from Plaid (without data URI prefix)
   logo: {
     type: String,
@@ -110,11 +115,11 @@ const institutionDomains = {
 };
 
 // Convert base64 to data URI for img src
-// Priority: customLogo > Plaid logo > fallbacks
+// Priority: customLogo > logoUrl > Plaid logo > fallbacks
 const logoSrc = computed(() => {
   if (imageError.value) return null;
   
-  // 1. Check for custom logo first (highest priority)
+  // 1. Check for custom logo first (highest priority - uploaded base64)
   if (props.customLogo) {
     // If it's already a full URL or data URI, use as-is
     if (props.customLogo.startsWith('http') || props.customLogo.startsWith('data:')) {
@@ -124,7 +129,12 @@ const logoSrc = computed(() => {
     return `data:image/png;base64,${props.customLogo}`;
   }
   
-  // 2. Fall back to Plaid logo
+  // 2. Check for external logo URL (fetched from Clearbit, etc.)
+  if (props.logoUrl) {
+    return props.logoUrl;
+  }
+  
+  // 3. Fall back to Plaid logo
   if (!props.logo) return null;
   
   // If it already has a data URI prefix, use as-is

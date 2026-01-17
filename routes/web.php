@@ -145,6 +145,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('budgets.accounts', AccountController::class);
     Route::post('budgets/{budget}/accounts/{account}/autopay', [AccountController::class, 'updateAutopay'])
         ->name('accounts.updateAutopay');
+    Route::post('budgets/{budget}/accounts/{account}/fetch-logo', [AccountController::class, 'fetchLogo'])
+        ->name('accounts.fetchLogo');
+    Route::delete('budgets/{budget}/accounts/{account}/logo', [AccountController::class, 'clearLogo'])
+        ->name('accounts.clearLogo');
 
     // Property routes
     Route::resource('budgets.properties', App\Http\Controllers\PropertyController::class);

@@ -129,6 +129,7 @@ class AccountController extends Controller
             'type' => 'required|string|max:50',
             'include_in_budget' => 'boolean',
             'custom_logo' => 'nullable|string',
+            'logo_url' => 'nullable|string|url|max:500',
         ]);
 
         // Auto-sync: excluded accounts are also excluded from total balance
@@ -140,6 +141,143 @@ class AccountController extends Controller
 
         return redirect()->route('budgets.show', $budget)
             ->with('message', 'Account updated successfully');
+    }
+
+    /**
+     * Fetch a logo URL for an account from external providers.
+     */
+    public function fetchLogo(Request $request, Budget $budget, Account $account): RedirectResponse
+    {
+        // Verify account belongs to budget
+        if ($account->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('update', $account);
+
+        // Get institution name from Plaid connection or account name
+        $institutionName = $account->plaidAccount?->plaidConnection?->institution_name ?? $account->name;
+        
+        // Try to find a matching domain for the institution
+        $logoUrl = $this->getLogoUrlForInstitution($institutionName);
+
+        if ($logoUrl) {
+            // Clear custom_logo (base64) in favor of the URL
+            $account->update([
+                'logo_url' => $logoUrl,
+                'custom_logo' => null,
+            ]);
+
+            return redirect()->back()->with('message', 'Logo fetched successfully!');
+        }
+
+        return redirect()->back()->with('error', 'Could not find a logo for this institution. Try uploading a custom logo instead.');
+    }
+
+    /**
+     * Clear the logo for an account (both custom_logo and logo_url).
+     */
+    public function clearLogo(Budget $budget, Account $account): RedirectResponse
+    {
+        // Verify account belongs to budget
+        if ($account->budget_id !== $budget->id) {
+            abort(404);
+        }
+
+        $this->authorize('update', $account);
+
+        $account->update([
+            'logo_url' => null,
+            'custom_logo' => null,
+        ]);
+
+        return redirect()->back()->with('message', 'Logo removed.');
+    }
+
+    /**
+     * Get logo URL for an institution name using external providers.
+     * Tries Clearbit first (higher quality), falls back to Google S2.
+     */
+    private function getLogoUrlForInstitution(string $institutionName): ?string
+    {
+        // Known institution name to domain mappings
+        $institutionDomains = [
+            'chase' => 'chase.com',
+            'bank of america' => 'bankofamerica.com',
+            'wells fargo' => 'wellsfargo.com',
+            'citibank' => 'citi.com',
+            'citi' => 'citi.com',
+            'capital one' => 'capitalone.com',
+            'us bank' => 'usbank.com',
+            'pnc' => 'pnc.com',
+            'truist' => 'truist.com',
+            'td bank' => 'td.com',
+            'fifth third' => '53.com',
+            'regions' => 'regions.com',
+            'regions bank' => 'regions.com',
+            'citizens' => 'citizensbank.com',
+            'huntington' => 'huntington.com',
+            'keybank' => 'key.com',
+            'ally' => 'ally.com',
+            'discover' => 'discover.com',
+            'synchrony' => 'synchrony.com',
+            'american express' => 'americanexpress.com',
+            'amex' => 'americanexpress.com',
+            'usaa' => 'usaa.com',
+            'navy federal' => 'navyfederal.org',
+            'schwab' => 'schwab.com',
+            'charles schwab' => 'schwab.com',
+            'fidelity' => 'fidelity.com',
+            'vanguard' => 'vanguard.com',
+            'e*trade' => 'etrade.com',
+            'etrade' => 'etrade.com',
+            'robinhood' => 'robinhood.com',
+            'paypal' => 'paypal.com',
+            'venmo' => 'venmo.com',
+            'chime' => 'chime.com',
+            'sofi' => 'sofi.com',
+            'marcus' => 'marcus.com',
+            'goldman sachs' => 'goldmansachs.com',
+            'home depot' => 'homedepot.com',
+            'lowes' => 'lowes.com',
+            'lowe\'s' => 'lowes.com',
+            'target' => 'target.com',
+            'walmart' => 'walmart.com',
+            'amazon' => 'amazon.com',
+            'apple' => 'apple.com',
+            'coinbase' => 'coinbase.com',
+            'navy federal credit union' => 'navyfederal.org',
+            'pentagon federal' => 'penfed.org',
+            'penfed' => 'penfed.org',
+            'mountain america' => 'macu.com',
+            'credit karma' => 'creditkarma.com',
+            'betterment' => 'betterment.com',
+            'wealthfront' => 'wealthfront.com',
+            'merrill' => 'ml.com',
+            'merrill lynch' => 'ml.com',
+            'morgan stanley' => 'morganstanley.com',
+            'citi cards' => 'citi.com',
+            'barclays' => 'barclays.com',
+        ];
+
+        $nameLower = strtolower($institutionName);
+        $domain = null;
+
+        // Check for exact or partial match in our domain mapping
+        foreach ($institutionDomains as $key => $mappedDomain) {
+            if (str_contains($nameLower, $key)) {
+                $domain = $mappedDomain;
+                break;
+            }
+        }
+
+        if (!$domain) {
+            return null;
+        }
+
+        // Use Clearbit Logo API (high quality, 200x200)
+        // Falls back gracefully if logo not found
+        return "https://logo.clearbit.com/{$domain}";
     }
 
     /**

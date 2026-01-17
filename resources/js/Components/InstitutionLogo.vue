@@ -3,7 +3,7 @@
     class="flex items-center justify-center rounded-full overflow-hidden flex-shrink-0"
     :class="sizeClasses"
   >
-    <!-- Primary: Base64 logo from Plaid -->
+    <!-- Primary: Custom logo (if set) or Base64 logo from Plaid -->
     <img 
       v-if="logoSrc && !imageError" 
       :src="logoSrc" 
@@ -36,6 +36,11 @@
 import { computed, ref } from 'vue';
 
 const props = defineProps({
+  // Custom logo (takes priority) - base64 or URL
+  customLogo: {
+    type: String,
+    default: null
+  },
   // Base64-encoded logo string from Plaid (without data URI prefix)
   logo: {
     type: String,
@@ -105,8 +110,22 @@ const institutionDomains = {
 };
 
 // Convert base64 to data URI for img src
+// Priority: customLogo > Plaid logo > fallbacks
 const logoSrc = computed(() => {
-  if (!props.logo || imageError.value) return null;
+  if (imageError.value) return null;
+  
+  // 1. Check for custom logo first (highest priority)
+  if (props.customLogo) {
+    // If it's already a full URL or data URI, use as-is
+    if (props.customLogo.startsWith('http') || props.customLogo.startsWith('data:')) {
+      return props.customLogo;
+    }
+    // Otherwise assume it's base64
+    return `data:image/png;base64,${props.customLogo}`;
+  }
+  
+  // 2. Fall back to Plaid logo
+  if (!props.logo) return null;
   
   // If it already has a data URI prefix, use as-is
   if (props.logo.startsWith('data:')) {

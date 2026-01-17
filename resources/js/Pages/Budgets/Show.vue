@@ -183,7 +183,8 @@
                             <div class="flex justify-between items-center gap-3">
                               <!-- Institution Logo or Account Type Icon -->
                               <InstitutionLogo
-                                v-if="account.plaid_account"
+                                v-if="account.plaid_account || account.custom_logo"
+                                :custom-logo="account.custom_logo"
                                 :logo="account.plaid_account?.plaid_connection?.institution_logo"
                                 :name="account.plaid_account?.plaid_connection?.institution_name || account.name"
                                 size="sm"

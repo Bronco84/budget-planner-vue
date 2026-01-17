@@ -88,6 +88,67 @@
                       <InputError class="mt-2" :message="form.errors.type" />
                     </template>
                   </div>
+                  
+                  <!-- Custom Logo Upload -->
+                  <div>
+                    <InputLabel for="custom_logo" value="Custom Logo (Optional)" />
+                    <p class="text-xs text-gray-500 mt-1">Upload a custom logo for this account. Supports images and will override the default institution logo.</p>
+                    
+                    <div class="mt-3 space-y-3">
+                      <!-- Current Logo Preview -->
+                      <div v-if="form.custom_logo || account.custom_logo || (isPlaidConnected && account.plaid_account?.plaid_connection?.institution_logo)" class="flex items-center gap-4">
+                        <div class="flex-shrink-0">
+                          <InstitutionLogo
+                            :custom-logo="form.custom_logo || account.custom_logo"
+                            :logo="account.plaid_account?.plaid_connection?.institution_logo"
+                            :name="account.name"
+                            size="lg"
+                          />
+                        </div>
+                        <div class="flex-1">
+                          <p class="text-sm font-medium text-gray-700">
+                            {{ form.custom_logo || account.custom_logo ? 'Custom Logo' : 'Institution Logo' }}
+                          </p>
+                          <p class="text-xs text-gray-500">
+                            {{ form.custom_logo || account.custom_logo ? 'Your uploaded logo' : 'From ' + (account.plaid_account?.plaid_connection?.institution_name || 'bank') }}
+                          </p>
+                        </div>
+                        <button
+                          v-if="form.custom_logo || account.custom_logo"
+                          type="button"
+                          @click="removeCustomLogo"
+                          class="text-sm text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      
+                      <!-- File Upload Input -->
+                      <div class="flex items-center gap-3">
+                        <input
+                          type="file"
+                          id="custom_logo"
+                          ref="logoInput"
+                          @change="handleLogoUpload"
+                          accept="image/*"
+                          class="hidden"
+                        />
+                        <button
+                          type="button"
+                          @click="$refs.logoInput.click()"
+                          class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                          </svg>
+                          {{ form.custom_logo || account.custom_logo ? 'Change Logo' : 'Upload Logo' }}
+                        </button>
+                        <span v-if="logoUploading" class="text-sm text-gray-500">Uploading...</span>
+                      </div>
+                      
+                      <InputError class="mt-2" :message="form.errors.custom_logo" />
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -183,6 +244,7 @@
                   <div v-if="isPlaidConnected" class="space-y-4">
                     <div class="flex items-center gap-3">
                       <InstitutionLogo
+                        :custom-logo="account.custom_logo"
                         :logo="account.plaid_account?.plaid_connection?.institution_logo"
                         :name="account.plaid_account?.institution_name || 'Unknown Bank'"
                         size="lg"
@@ -393,7 +455,58 @@ const form = useForm({
   name: props.account.name,
   type: props.account.type,
   include_in_budget: props.account.include_in_budget,
+  custom_logo: props.account.custom_logo || null,
 });
+
+// Logo upload state
+const logoInput = ref(null);
+const logoUploading = ref(false);
+
+// Handle logo file upload
+const handleLogoUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    alert('Please upload an image file');
+    return;
+  }
+  
+  // Validate file size (max 2MB)
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Image must be less than 2MB');
+    return;
+  }
+  
+  logoUploading.value = true;
+  
+  try {
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      form.custom_logo = e.target.result;
+      logoUploading.value = false;
+    };
+    reader.onerror = () => {
+      alert('Failed to read file');
+      logoUploading.value = false;
+    };
+    reader.readAsDataURL(file);
+  } catch (error) {
+    console.error('Error uploading logo:', error);
+    alert('Failed to upload logo');
+    logoUploading.value = false;
+  }
+};
+
+// Remove custom logo
+const removeCustomLogo = () => {
+  form.custom_logo = null;
+  if (logoInput.value) {
+    logoInput.value.value = '';
+  }
+};
 
 // Watch for changes to account status and update include_in_budget
 watch(accountStatus, (newValue) => {

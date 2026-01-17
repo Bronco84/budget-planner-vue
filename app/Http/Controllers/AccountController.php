@@ -128,6 +128,7 @@ class AccountController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:50',
             'include_in_budget' => 'boolean',
+            'custom_logo' => 'nullable|string',
         ]);
 
         // Auto-sync: excluded accounts are also excluded from total balance

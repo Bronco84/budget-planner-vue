@@ -35,6 +35,7 @@ class Account extends Model
         'budget_id',
         'name',
         'type',
+        'custom_logo',
         'current_balance_cents',
         'balance_updated_at',
         'include_in_budget',

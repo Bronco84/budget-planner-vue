@@ -503,12 +503,23 @@ class PlaidService
             
             // Handle ADDITIONAL_CONSENT_REQUIRED - user needs to re-link to grant liabilities permission
             if ($errorCode === 'ADDITIONAL_CONSENT_REQUIRED') {
-                Log::warning('Plaid liabilities requires additional consent - user must re-authenticate', [
+                Log::warning('Plaid liabilities requires additional consent - user must re-authenticate. ' .
+                    'Liability data (statement balance, due dates) will not be available until user updates their connection.', [
                     'error_code' => $errorCode,
                     'error_message' => $errorResponse['error_message'] ?? 'Unknown error',
+                    'action_required' => 'User should use "Update Connection" or re-link their bank account to grant liabilities consent',
                 ]);
                 // Return empty array - the connection was created before liabilities was enabled
                 // User needs to use the "Update Connection" flow to grant consent
+                return [];
+            }
+            
+            // Handle PRODUCTS_NOT_SUPPORTED - institution doesn't provide liabilities data
+            if ($errorCode === 'PRODUCTS_NOT_SUPPORTED') {
+                Log::info('Plaid liabilities not supported for this institution - this is normal for some banks', [
+                    'error_code' => $errorCode,
+                    'error_message' => $errorResponse['error_message'] ?? 'Unknown error',
+                ]);
                 return [];
             }
             
@@ -1048,6 +1059,41 @@ class PlaidService
             // Update account balance
             $this->updateAccountBalance($plaidAccount);
 
+            // Update liability data for credit cards (independent of balance sync)
+            // This ensures liability data is always fetched, even if balance sync had issues
+            if ($plaidAccount->isCreditCard()) {
+                try {
+                    Log::debug('Triggering liability data update for credit card during sync', [
+                        'plaid_account_id' => $plaidAccount->id,
+                        'account_name' => $plaidAccount->account_name,
+                    ]);
+                    $this->updateLiabilityData($plaidAccount);
+                } catch (\Exception $liabilityError) {
+                    Log::warning('Failed to update liability data during transaction sync', [
+                        'plaid_account_id' => $plaidAccount->id,
+                        'account_name' => $plaidAccount->account_name,
+                        'error' => $liabilityError->getMessage(),
+                    ]);
+                }
+            }
+
+            // Update investment data for investment accounts (independent of balance sync)
+            if ($plaidAccount->isInvestmentAccount()) {
+                try {
+                    Log::debug('Triggering investment data update during sync', [
+                        'plaid_account_id' => $plaidAccount->id,
+                        'account_name' => $plaidAccount->account_name,
+                    ]);
+                    $this->updateInvestmentData($plaidAccount);
+                } catch (\Exception $investmentError) {
+                    Log::warning('Failed to update investment data during transaction sync', [
+                        'plaid_account_id' => $plaidAccount->id,
+                        'account_name' => $plaidAccount->account_name,
+                        'error' => $investmentError->getMessage(),
+                    ]);
+                }
+            }
+
             return [
                 'imported' => $imported,
                 'updated' => $updated,
@@ -1110,31 +1156,9 @@ class PlaidService
                         ]);
                     }
 
-                    // Update liability data for credit cards (gracefully handle errors)
-                    if ($plaidAccount->isCreditCard()) {
-                        try {
-                            $this->updateLiabilityData($plaidAccount);
-                        } catch (\Exception $liabilityError) {
-                            // Log the error but don't fail the balance update
-                            Log::warning('Failed to update liability data during balance sync', [
-                                'plaid_account_id' => $plaidAccount->id,
-                                'error' => $liabilityError->getMessage()
-                            ]);
-                        }
-                    }
-
-                    // Update investment data for investment accounts (gracefully handle errors)
-                    if ($plaidAccount->isInvestmentAccount()) {
-                        try {
-                            $this->updateInvestmentData($plaidAccount);
-                        } catch (\Exception $investmentError) {
-                            // Log the error but don't fail the balance update
-                            Log::warning('Failed to update investment data during balance sync', [
-                                'plaid_account_id' => $plaidAccount->id,
-                                'error' => $investmentError->getMessage()
-                            ]);
-                        }
-                    }
+                    // Note: Liability and investment data updates are now handled independently
+                    // in syncTransactions() to ensure they always run, even if balance sync fails.
+                    // This prevents duplicate Plaid API calls and ensures reliable data updates.
 
                     return true;
                 }
@@ -1226,6 +1250,11 @@ class PlaidService
                 // Update this credit card's liability data
                 $this->updateSingleCardLiabilityData($matchingPlaidAccount, $card);
                 $updatedCount++;
+
+                Log::info('Updated liability data for credit card', [
+                    'plaid_account_id' => $matchingPlaidAccount->id,
+                    'card' => $card
+                ]);
             }
 
             Log::info('Updated liability data for multiple credit cards', [
@@ -1264,6 +1293,19 @@ class PlaidService
      */
     private function updateSingleCardLiabilityData(PlaidAccount $plaidAccount, array $cardData): void
     {
+        // Debug: Log raw card data received from Plaid
+        Log::debug('Plaid credit card liability data received', [
+            'plaid_account_id' => $plaidAccount->id,
+            'plaid_account_identifier' => $plaidAccount->plaid_account_id,
+            'account_name' => $plaidAccount->account_name,
+            'raw_card_data_keys' => array_keys($cardData),
+            'last_statement_balance' => $cardData['last_statement_balance'] ?? 'NOT_PROVIDED',
+            'last_statement_issue_date' => $cardData['last_statement_issue_date'] ?? 'NOT_PROVIDED',
+            'credit_limit' => $cardData['credit_limit'] ?? 'NOT_PROVIDED',
+            'minimum_payment_amount' => $cardData['minimum_payment_amount'] ?? 'NOT_PROVIDED',
+            'next_payment_due_date' => $cardData['next_payment_due_date'] ?? 'NOT_PROVIDED',
+        ]);
+
         // Extract liability data
         $statementBalance = $cardData['last_statement_balance'] ?? null;
         $statementIssueDate = $cardData['last_statement_issue_date'] ?? null;

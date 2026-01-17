@@ -3,7 +3,7 @@
 
   <component :is="layoutComponent">
     <!-- Guest layout: Card with glass morphism effect -->
-    <div v-if="isNewUser" class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-8">
+    <div v-if="isNewUser" class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/50 p-8">
           <div>
             <!-- Logo -->
             <div class="mx-auto h-20 w-auto flex justify-center mb-6">
@@ -12,31 +12,31 @@
             
             <!-- Header with gradient -->
             <div class="flex items-center justify-center mb-4">
-              <svg class="h-10 w-10 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-10 w-10 text-indigo-600 dark:text-indigo-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
-              <h2 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <h2 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                 Register a Passkey
               </h2>
             </div>
 
-            <p class="text-center text-sm text-gray-600 mb-6">
-              <span class="font-semibold text-gray-900">Welcome! To complete your registration, you must set up a passkey. </span>
+            <p class="text-center text-sm text-gray-600 dark:text-gray-400 mb-6">
+              <span class="font-semibold text-gray-900 dark:text-gray-100">Welcome! To complete your registration, you must set up a passkey. </span>
               Passkeys let you sign in using Face ID, Touch ID, Windows Hello, or a security key. They're more secure than passwords and much easier to use.
             </p>
           </div>
 
           <div class="space-y-6">
             <!-- Warning for new users -->
-            <div class="rounded-xl bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 p-4">
+            <div class="rounded-xl bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/30 dark:to-amber-900/30 border border-yellow-200 dark:border-yellow-800/50 p-4">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-yellow-500 dark:text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm font-medium text-yellow-800">
+                  <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">
                     Passkey Required: This app uses passkeys for secure, passwordless authentication. You cannot proceed without registering a passkey.
                   </p>
                 </div>
@@ -44,36 +44,36 @@
             </div>
 
             <!-- Success Message -->
-            <div v-if="success" class="rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 p-4 border border-green-200">
+            <div v-if="success" class="rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 p-4 border border-green-200 dark:border-green-800/50">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-green-500 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm font-medium text-green-800">{{ success }}</p>
+                  <p class="text-sm font-medium text-green-800 dark:text-green-300">{{ success }}</p>
                 </div>
               </div>
             </div>
 
             <!-- Error Message -->
-            <div v-if="error" class="rounded-xl bg-gradient-to-r from-red-50 to-pink-50 p-4 border border-red-200">
+            <div v-if="error" class="rounded-xl bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/30 dark:to-pink-900/30 p-4 border border-red-200 dark:border-red-800/50">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-red-500 dark:text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm font-medium text-red-800">{{ error }}</p>
+                  <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ error }}</p>
                 </div>
               </div>
             </div>
 
             <!-- Registration Form -->
             <div>
-              <label for="passkey-name" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="passkey-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Passkey Name (Optional)
               </label>
               <input
@@ -81,9 +81,9 @@
                 v-model="passkeyName"
                 type="text"
                 placeholder="e.g., My iPhone, Work Laptop"
-                class="block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                class="block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
               />
-              <p class="mt-2 text-sm text-gray-500">
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 Give this passkey a name to help you identify it later.
               </p>
             </div>
@@ -109,16 +109,16 @@
             </div>
 
             <!-- Info Box -->
-            <div class="rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-200">
+            <div class="rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 p-4 border border-blue-200 dark:border-blue-800/50">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-blue-500 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3 flex-1">
-                  <h3 class="text-sm font-medium text-blue-800">What happens next?</h3>
-                  <div class="mt-2 text-sm text-blue-700">
+                  <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300">What happens next?</h3>
+                  <div class="mt-2 text-sm text-blue-700 dark:text-blue-400">
                     <ul class="list-disc pl-5 space-y-1">
                       <li>You'll be prompted to use your device's biometric authentication</li>
                       <li>Your passkey will be securely stored on this device</li>
@@ -135,55 +135,55 @@
     <!-- Authenticated layout: Standard in-app container -->
     <div v-else class="py-12">
       <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-          <div class="p-6 bg-white border-b border-gray-200">
+        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+          <div class="p-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <!-- Header -->
             <div class="flex items-center mb-6">
-              <svg class="h-8 w-8 text-indigo-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-8 w-8 text-indigo-600 dark:text-indigo-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
-              <h2 class="text-2xl font-semibold text-gray-900">
+              <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                 Register a New Passkey
               </h2>
             </div>
 
-            <p class="text-sm text-gray-600 mb-6">
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
               Register additional passkeys for other devices. Passkeys let you sign in using Face ID, Touch ID, Windows Hello, or a security key.
             </p>
           </div>
 
           <div class="p-6 space-y-6">
             <!-- Success Message -->
-            <div v-if="success" class="rounded-lg bg-green-50 p-4 border border-green-200">
+            <div v-if="success" class="rounded-lg bg-green-50 dark:bg-green-900/30 p-4 border border-green-200 dark:border-green-800/50">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-green-500 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm font-medium text-green-800">{{ success }}</p>
+                  <p class="text-sm font-medium text-green-800 dark:text-green-300">{{ success }}</p>
                 </div>
               </div>
             </div>
 
             <!-- Error Message -->
-            <div v-if="error" class="rounded-lg bg-red-50 p-4 border border-red-200">
+            <div v-if="error" class="rounded-lg bg-red-50 dark:bg-red-900/30 p-4 border border-red-200 dark:border-red-800/50">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-red-500 dark:text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3">
-                  <p class="text-sm font-medium text-red-800">{{ error }}</p>
+                  <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ error }}</p>
                 </div>
               </div>
             </div>
 
             <!-- Registration Form -->
             <div>
-              <label for="passkey-name" class="block text-sm font-medium text-gray-700 mb-2">
+              <label for="passkey-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Passkey Name (Optional)
               </label>
               <input
@@ -191,9 +191,9 @@
                 v-model="passkeyName"
                 type="text"
                 placeholder="e.g., My iPhone, Work Laptop"
-                class="block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                class="block w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400"
               />
-              <p class="mt-2 text-sm text-gray-500">
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 Give this passkey a name to help you identify it later.
               </p>
             </div>
@@ -217,16 +217,16 @@
             </div>
 
             <!-- Info Box -->
-            <div class="rounded-lg bg-blue-50 p-4 border border-blue-200">
+            <div class="rounded-lg bg-blue-50 dark:bg-blue-900/30 p-4 border border-blue-200 dark:border-blue-800/50">
               <div class="flex">
                 <div class="flex-shrink-0">
-                  <svg class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="h-5 w-5 text-blue-500 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                   </svg>
                 </div>
                 <div class="ml-3 flex-1">
-                  <h3 class="text-sm font-medium text-blue-800">What happens next?</h3>
-                  <div class="mt-2 text-sm text-blue-700">
+                  <h3 class="text-sm font-medium text-blue-800 dark:text-blue-300">What happens next?</h3>
+                  <div class="mt-2 text-sm text-blue-700 dark:text-blue-400">
                     <ul class="list-disc pl-5 space-y-1">
                       <li>You'll be prompted to use your device's biometric authentication</li>
                       <li>Your passkey will be securely stored on this device</li>

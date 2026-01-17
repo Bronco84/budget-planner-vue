@@ -365,6 +365,32 @@ class PlaidController extends Controller
 
         return redirect()->back()->with('error', 'Failed to update statement data. This feature may not be available for all credit card providers.');
     }
+
+    /**
+     * Update investment data (holdings, securities) for an investment account.
+     */
+    public function updateInvestments(Budget $budget, Account $account): RedirectResponse
+    {
+        $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
+
+        if (!$plaidAccount) {
+            return redirect()->back()->with('error', 'Account is not linked to Plaid.');
+        }
+
+        // Verify this is an investment account
+        if (!$plaidAccount->isInvestmentAccount()) {
+            return redirect()->back()->with('error', 'Investment data is only available for investment accounts.');
+        }
+
+        $updated = $this->plaidService->updateInvestmentData($plaidAccount);
+
+        if ($updated) {
+            $holdingsCount = $plaidAccount->holdings()->count();
+            return redirect()->back()->with('message', "Investment holdings updated successfully. {$holdingsCount} positions synced.");
+        }
+
+        return redirect()->back()->with('error', 'Failed to update investment data. This feature may not be available for all institutions.');
+    }
     
     /**
      * Unlink a Plaid account.

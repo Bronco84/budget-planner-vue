@@ -6,6 +6,8 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
+use App\Models\PlaidHolding;
+use App\Models\PlaidSecurity;
 use App\Models\PlaidStatementHistory;
 use App\Models\PlaidTransaction;
 use App\Models\Transaction;
@@ -122,11 +124,10 @@ class PlaidService
 
         try {
             // Start with base products - 'transactions' is always needed
-            // We'll add 'liabilities' conditionally based on the connection
-            $products = ['transactions'];
+            // Include 'investments' for investment accounts and 'liabilities' for credit/loan accounts
+            $products = ['transactions', 'investments'];
 
-            // Only request liabilities for update mode (existing connections)
-            // For new connections, liabilities will be requested via update mode if needed
+            // Add liabilities for update mode if there are credit/loan accounts
             if ($existingAccessToken) {
                 // Check if this connection has any credit card accounts that would benefit from liabilities
                 $hasLiabilityAccounts = PlaidAccount::whereHas('plaidConnection', function ($query) use ($existingAccessToken) {
@@ -514,6 +515,82 @@ class PlaidService
                 'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
             ]);
             return [];
+        }
+    }
+
+    /**
+     * Get investment holdings (positions and securities) from Plaid
+     *
+     * @param string $accessToken
+     * @return array Array with 'holdings', 'securities', and 'accounts' keys
+     */
+    public function getInvestmentHoldings(string $accessToken): array
+    {
+        if (!$this->isConfigured) {
+            throw new \Exception('Plaid service is not properly configured');
+        }
+
+        try {
+            $response = $this->client->post('/investments/holdings/get', [
+                'json' => [
+                    'access_token' => $accessToken,
+                ]
+            ]);
+
+            $result = json_decode($response->getBody(), true);
+
+            Log::info('Plaid investment holdings retrieved', [
+                'holdings_count' => count($result['holdings'] ?? []),
+                'securities_count' => count($result['securities'] ?? []),
+                'accounts_count' => count($result['accounts'] ?? []),
+            ]);
+
+            return [
+                'holdings' => $result['holdings'] ?? [],
+                'securities' => $result['securities'] ?? [],
+                'accounts' => $result['accounts'] ?? [],
+            ];
+        } catch (RequestException $e) {
+            $errorDetails = null;
+            if ($e->hasResponse()) {
+                $errorDetails = json_decode($e->getResponse()->getBody(), true);
+            }
+
+            // Handle PRODUCTS_NOT_SUPPORTED error gracefully (institution doesn't support investments)
+            if ($errorDetails && isset($errorDetails['error_code']) && $errorDetails['error_code'] === 'PRODUCTS_NOT_SUPPORTED') {
+                Log::info('Investment holdings not supported for this institution', [
+                    'error_code' => $errorDetails['error_code'],
+                    'error_message' => $errorDetails['error_message'] ?? 'Unknown',
+                ]);
+                return [
+                    'holdings' => [],
+                    'securities' => [],
+                    'accounts' => [],
+                ];
+            }
+
+            // Handle NO_INVESTMENT_ACCOUNTS error gracefully
+            if ($errorDetails && isset($errorDetails['error_code']) && $errorDetails['error_code'] === 'NO_INVESTMENT_ACCOUNTS') {
+                Log::info('No investment accounts found for this connection', [
+                    'error_code' => $errorDetails['error_code'],
+                ]);
+                return [
+                    'holdings' => [],
+                    'securities' => [],
+                    'accounts' => [],
+                ];
+            }
+
+            Log::error('Plaid investment holdings fetch failed', [
+                'error' => $e->getMessage(),
+                'response' => $errorDetails,
+            ]);
+
+            return [
+                'holdings' => [],
+                'securities' => [],
+                'accounts' => [],
+            ];
         }
     }
 
@@ -1044,6 +1121,19 @@ class PlaidService
                         }
                     }
 
+                    // Update investment data for investment accounts (gracefully handle errors)
+                    if ($plaidAccount->isInvestmentAccount()) {
+                        try {
+                            $this->updateInvestmentData($plaidAccount);
+                        } catch (\Exception $investmentError) {
+                            // Log the error but don't fail the balance update
+                            Log::warning('Failed to update investment data during balance sync', [
+                                'plaid_account_id' => $plaidAccount->id,
+                                'error' => $investmentError->getMessage()
+                            ]);
+                        }
+                    }
+
                     return true;
                 }
             }
@@ -1237,5 +1327,179 @@ class PlaidService
             'statement_balance' => $statementBalance,
             'statement_date' => $statementIssueDate
         ]);
+    }
+
+    /**
+     * Update investment data (holdings, securities) for an investment account.
+     *
+     * @param PlaidAccount $plaidAccount
+     * @return bool
+     */
+    public function updateInvestmentData(PlaidAccount $plaidAccount): bool
+    {
+        // Only process investment accounts
+        if (!$plaidAccount->isInvestmentAccount()) {
+            Log::debug('Skipping investment update for non-investment account', [
+                'plaid_account_id' => $plaidAccount->id,
+                'account_type' => $plaidAccount->account_type,
+                'account_subtype' => $plaidAccount->account_subtype
+            ]);
+            return false;
+        }
+
+        $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
+
+        if (!$accessToken) {
+            Log::error('Update investment data failed: Access token is null', [
+                'plaid_account_id' => $plaidAccount->id,
+                'connection_id' => $plaidAccount->plaid_connection_id
+            ]);
+            return false;
+        }
+
+        try {
+            // Get investment holdings from Plaid
+            $investmentData = $this->getInvestmentHoldings($accessToken);
+
+            if (empty($investmentData['holdings']) && empty($investmentData['securities'])) {
+                Log::info('No investment holdings data returned from Plaid', [
+                    'plaid_account_id' => $plaidAccount->id
+                ]);
+                return false;
+            }
+
+            // Build a map of security_id => PlaidSecurity model
+            $securitiesMap = [];
+            foreach ($investmentData['securities'] as $securityData) {
+                $security = PlaidSecurity::createOrUpdateFromPlaid($securityData);
+                $securitiesMap[$securityData['security_id']] = $security;
+            }
+
+            Log::info('Updated securities from Plaid', [
+                'securities_count' => count($securitiesMap)
+            ]);
+
+            // Get all PlaidAccounts in this connection for batch update
+            $allConnectionAccounts = PlaidAccount::where('plaid_connection_id', $plaidAccount->plaid_connection_id)
+                ->where('account_type', 'investment')
+                ->get()
+                ->keyBy('plaid_account_id');
+
+            $holdingsUpdated = 0;
+            $totalValueCents = 0;
+
+            foreach ($investmentData['holdings'] as $holdingData) {
+                // Find the matching PlaidAccount for this holding
+                $matchingPlaidAccount = $allConnectionAccounts->get($holdingData['account_id']);
+
+                if (!$matchingPlaidAccount) {
+                    continue;
+                }
+
+                // Get the security for this holding
+                $security = $securitiesMap[$holdingData['security_id']] ?? null;
+
+                if (!$security) {
+                    Log::warning('Security not found for holding', [
+                        'security_id' => $holdingData['security_id'],
+                        'account_id' => $holdingData['account_id']
+                    ]);
+                    continue;
+                }
+
+                // Create or update the holding
+                PlaidHolding::createOrUpdateFromPlaid($matchingPlaidAccount, $security, $holdingData);
+                $holdingsUpdated++;
+
+                // Track total value for the original account we're updating
+                if ($matchingPlaidAccount->id === $plaidAccount->id) {
+                    $institutionValue = isset($holdingData['institution_value'])
+                        ? (int) round($holdingData['institution_value'] * 100)
+                        : 0;
+                    $totalValueCents += $institutionValue;
+                }
+            }
+
+            // Update account balance from investment data
+            foreach ($investmentData['accounts'] as $accountData) {
+                if ($accountData['account_id'] === $plaidAccount->plaid_account_id) {
+                    $plaidAccount->update([
+                        'current_balance_cents' => isset($accountData['balances']['current'])
+                            ? (int) round($accountData['balances']['current'] * 100)
+                            : $plaidAccount->current_balance_cents,
+                        'available_balance_cents' => isset($accountData['balances']['available'])
+                            ? (int) round($accountData['balances']['available'] * 100)
+                            : null,
+                        'balance_updated_at' => now(),
+                    ]);
+
+                    // Also update the linked Account model
+                    $linkedAccount = $plaidAccount->account;
+                    if ($linkedAccount) {
+                        $linkedAccount->update([
+                            'current_balance_cents' => isset($accountData['balances']['current'])
+                                ? (int) round($accountData['balances']['current'] * 100)
+                                : $linkedAccount->current_balance_cents,
+                            'balance_updated_at' => now(),
+                        ]);
+                    }
+
+                    break;
+                }
+            }
+
+            Log::info('Successfully updated investment data', [
+                'plaid_account_id' => $plaidAccount->id,
+                'holdings_updated' => $holdingsUpdated,
+                'total_securities' => count($securitiesMap),
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('Error updating investment data', [
+                'message' => $e->getMessage(),
+                'plaid_account_id' => $plaidAccount->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Remove holdings that are no longer present in the latest Plaid data.
+     * This handles when positions are sold or closed.
+     *
+     * @param PlaidAccount $plaidAccount
+     * @param array $currentHoldings Array of holding data from Plaid
+     * @return int Number of holdings removed
+     */
+    public function cleanupStaleHoldings(PlaidAccount $plaidAccount, array $currentHoldings): int
+    {
+        // Get current security IDs from Plaid
+        $currentSecurityIds = collect($currentHoldings)
+            ->filter(fn($h) => $h['account_id'] === $plaidAccount->plaid_account_id)
+            ->pluck('security_id')
+            ->toArray();
+
+        // Find PlaidSecurity IDs from the security_id strings
+        $currentPlaidSecurityIds = PlaidSecurity::whereIn('plaid_security_id', $currentSecurityIds)
+            ->pluck('id')
+            ->toArray();
+
+        // Delete holdings that are no longer present
+        $deleted = PlaidHolding::where('plaid_account_id', $plaidAccount->id)
+            ->whereNotIn('plaid_security_id', $currentPlaidSecurityIds)
+            ->delete();
+
+        if ($deleted > 0) {
+            Log::info('Removed stale holdings', [
+                'plaid_account_id' => $plaidAccount->id,
+                'removed_count' => $deleted
+            ]);
+        }
+
+        return $deleted;
     }
 }

@@ -258,6 +258,9 @@ Route::middleware('auth')->group(function () {
     Route::post('budget/{budget}/account/{account}/plaid/liabilities', [PlaidController::class, 'updateLiabilities'])
         ->middleware('throttle:10,1')
         ->name('plaid.liabilities');
+    Route::post('budget/{budget}/account/{account}/plaid/investments', [PlaidController::class, 'updateInvestments'])
+        ->middleware('throttle:10,1')
+        ->name('plaid.investments');
     Route::post('budget/{budget}/account/{account}/plaid/upgrade-link-token', [PlaidController::class, 'upgradeLinkToken'])
         ->middleware('throttle:10,1')
         ->name('plaid.upgrade-link-token');

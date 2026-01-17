@@ -110,11 +110,43 @@ class PlaidAccount extends Model
     }
 
     /**
+     * Get the investment holdings for this Plaid account.
+     */
+    public function holdings(): HasMany
+    {
+        return $this->hasMany(PlaidHolding::class);
+    }
+
+    /**
      * Check if this account is a credit card.
      */
     public function isCreditCard(): bool
     {
         return $this->account_type === 'credit' && $this->account_subtype === 'credit card';
+    }
+
+    /**
+     * Check if this account is an investment account.
+     */
+    public function isInvestmentAccount(): bool
+    {
+        return $this->account_type === 'investment';
+    }
+
+    /**
+     * Check if this account has investment holdings data.
+     */
+    public function hasHoldingsData(): bool
+    {
+        return $this->holdings()->exists();
+    }
+
+    /**
+     * Get the total market value of all holdings in this account.
+     */
+    public function getTotalHoldingsValueCents(): int
+    {
+        return $this->holdings()->sum('institution_value_cents') ?? 0;
     }
 
     /**

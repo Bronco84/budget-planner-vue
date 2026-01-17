@@ -1224,6 +1224,21 @@ class PlaidService
                 return false;
             }
 
+            // Get account balance data to access credit limits
+            // The liability endpoint returns account data alongside liability data
+            $accounts = $this->getAccounts($accessToken);
+            
+            // Build a map of account_id => account data for easy lookup
+            $accountsMap = [];
+            foreach ($accounts as $account) {
+                $accountsMap[$account['account_id']] = $account;
+            }
+
+            Log::debug('Built accounts map for liability update', [
+                'accounts_count' => count($accountsMap),
+                'account_ids' => array_keys($accountsMap)
+            ]);
+
             // OPTIMIZATION: Update ALL credit cards from this connection, not just the one passed in
             // This prevents redundant API calls when multiple cards exist on the same connection
             $allConnectionCards = PlaidAccount::where('plaid_connection_id', $plaidAccount->plaid_connection_id)
@@ -1239,6 +1254,10 @@ class PlaidService
                 $matchingPlaidAccount = $allConnectionCards->firstWhere('plaid_account_id', $card['account_id']);
 
                 if (!$matchingPlaidAccount) {
+                    Log::warning('No matching PlaidAccount found for liability card', [
+                        'card_account_id' => $card['account_id'],
+                        'available_plaid_accounts' => $allConnectionCards->pluck('plaid_account_id')->toArray()
+                    ]);
                     continue;
                 }
 
@@ -1247,13 +1266,17 @@ class PlaidService
                     $matchingCard = $card;
                 }
 
+                // Get the corresponding account data for this card
+                $accountData = $accountsMap[$card['account_id']] ?? null;
+
                 // Update this credit card's liability data
-                $this->updateSingleCardLiabilityData($matchingPlaidAccount, $card);
+                $this->updateSingleCardLiabilityData($matchingPlaidAccount, $card, $accountData);
                 $updatedCount++;
 
                 Log::info('Updated liability data for credit card', [
                     'plaid_account_id' => $matchingPlaidAccount->id,
-                    'card' => $card
+                    'account_name' => $matchingPlaidAccount->account_name,
+                    'has_account_data' => $accountData !== null
                 ]);
             }
 
@@ -1288,11 +1311,26 @@ class PlaidService
      * Update liability data for a single credit card.
      *
      * @param PlaidAccount $plaidAccount
-     * @param array $cardData
+     * @param array $cardData Liability data from Plaid's /liabilities/get endpoint
+     * @param array|null $accountData Account balance data from Plaid's /accounts/get endpoint
      * @return void
      */
-    private function updateSingleCardLiabilityData(PlaidAccount $plaidAccount, array $cardData): void
+    private function updateSingleCardLiabilityData(PlaidAccount $plaidAccount, array $cardData, ?array $accountData = null): void
     {
+        // Extract credit limit from account data (not available in liability data)
+        $creditLimit = $accountData['balances']['limit'] ?? null;
+        
+        // Extract purchase APR from the aprs array
+        $purchaseApr = null;
+        if (isset($cardData['aprs']) && is_array($cardData['aprs'])) {
+            foreach ($cardData['aprs'] as $aprData) {
+                if (($aprData['apr_type'] ?? null) === 'purchase_apr') {
+                    $purchaseApr = $aprData['apr_percentage'] ?? null;
+                    break;
+                }
+            }
+        }
+
         // Debug: Log raw card data received from Plaid
         Log::debug('Plaid credit card liability data received', [
             'plaid_account_id' => $plaidAccount->id,
@@ -1301,7 +1339,9 @@ class PlaidService
             'raw_card_data_keys' => array_keys($cardData),
             'last_statement_balance' => $cardData['last_statement_balance'] ?? 'NOT_PROVIDED',
             'last_statement_issue_date' => $cardData['last_statement_issue_date'] ?? 'NOT_PROVIDED',
-            'credit_limit' => $cardData['credit_limit'] ?? 'NOT_PROVIDED',
+            'credit_limit_from_account_data' => $creditLimit ?? 'NOT_PROVIDED',
+            'purchase_apr_extracted' => $purchaseApr ?? 'NOT_PROVIDED',
+            'aprs_count' => isset($cardData['aprs']) ? count($cardData['aprs']) : 0,
             'minimum_payment_amount' => $cardData['minimum_payment_amount'] ?? 'NOT_PROVIDED',
             'next_payment_due_date' => $cardData['next_payment_due_date'] ?? 'NOT_PROVIDED',
         ]);
@@ -1309,7 +1349,6 @@ class PlaidService
         // Extract liability data
         $statementBalance = $cardData['last_statement_balance'] ?? null;
         $statementIssueDate = $cardData['last_statement_issue_date'] ?? null;
-        $creditLimit = $cardData['credit_limit'] ?? null;
 
         // Update PlaidAccount with liability fields
         $plaidAccount->update([
@@ -1323,7 +1362,7 @@ class PlaidService
             'minimum_payment_amount_cents' => isset($cardData['minimum_payment_amount'])
                 ? (int) round($cardData['minimum_payment_amount'] * 100)
                 : null,
-            'apr_percentage' => $cardData['apr'] ?? null,
+            'apr_percentage' => $purchaseApr,
             'credit_limit_cents' => $creditLimit !== null ? (int) round($creditLimit * 100) : null,
             'liability_updated_at' => now(),
         ]);
@@ -1353,7 +1392,7 @@ class PlaidService
                     'minimum_payment_cents' => isset($cardData['minimum_payment_amount'])
                         ? (int) round($cardData['minimum_payment_amount'] * 100)
                         : null,
-                    'apr_percentage' => $cardData['apr'] ?? null,
+                    'apr_percentage' => $purchaseApr,
                     'credit_utilization_percentage' => $creditUtilization,
                 ]);
 

@@ -37,59 +37,197 @@
             </div>
 
             <!-- Plaid Connection Status -->
-            <div v-if="isLinked" class="mb-6">
-              <h3 class="text-lg font-medium text-gray-900 mb-2">Plaid Connection</h3>
-              <div class="bg-blue-50 p-4 rounded border border-blue-200">
-                <div class="flex justify-between items-start">
+            <div v-if="isLinked" class="mb-6 space-y-4">
+              <h3 class="text-lg font-medium text-gray-900">Plaid Connection</h3>
+              
+              <!-- Quick Actions -->
+              <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div class="flex justify-between items-start mb-4">
                   <div>
                     <p class="font-medium text-blue-800">{{ plaidAccount.institution_name }}</p>
                     <p class="text-sm text-blue-600">
                       Last synced: <PlaidSyncTimestamp
-                        :timestamp="plaidAccount.plaid_connection?.last_sync_at"
+                        :timestamp="connectionMetadata?.last_sync_at"
                         format="absolute"
                       />
                     </p>
                   </div>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      @click="syncTransactions"
-                      class="inline-flex items-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      :disabled="syncInProgress"
-                    >
-                      <svg v-if="syncInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>{{ syncInProgress ? 'Syncing...' : 'Sync Transactions' }}</span>
-                    </button>
-                    <button
-                      @click="updateBalance"
-                      class="inline-flex items-center px-3 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                      :disabled="balanceUpdateInProgress"
-                    >
-                      <svg v-if="balanceUpdateInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>{{ balanceUpdateInProgress ? 'Updating...' : 'Update Balance' }}</span>
-                    </button>
-                    <button
-                      @click="updateConnection"
-                      class="inline-flex items-center px-3 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
-                      :disabled="updateConnectionInProgress"
-                    >
-                      <svg v-if="updateConnectionInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>{{ updateConnectionInProgress ? 'Loading...' : 'Re-authenticate' }}</span>
-                    </button>
-                    <button
-                      @click="confirmDisconnect"
-                      class="inline-flex items-center px-3 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                      Disconnect
-                    </button>
+                  <span 
+                    v-if="connectionMetadata"
+                    class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border"
+                    :class="getStatusColor(connectionMetadata.status)"
+                  >
+                    {{ getStatusLabel(connectionMetadata.status) }}
+                  </span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    @click="syncTransactions"
+                    class="inline-flex items-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    :disabled="syncInProgress"
+                  >
+                    <svg v-if="syncInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>{{ syncInProgress ? 'Syncing...' : 'Sync Transactions' }}</span>
+                  </button>
+                  <button
+                    @click="updateBalance"
+                    class="inline-flex items-center px-3 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    :disabled="balanceUpdateInProgress"
+                  >
+                    <svg v-if="balanceUpdateInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>{{ balanceUpdateInProgress ? 'Updating...' : 'Update Balance' }}</span>
+                  </button>
+                  <button
+                    @click="updateConnection"
+                    class="inline-flex items-center px-3 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                    :disabled="updateConnectionInProgress"
+                  >
+                    <svg v-if="updateConnectionInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>{{ updateConnectionInProgress ? 'Loading...' : 'Re-authenticate' }}</span>
+                  </button>
+                  <button
+                    @click="confirmDisconnect"
+                    class="inline-flex items-center px-3 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+
+              <!-- Error Message (if present) -->
+              <div v-if="connectionMetadata?.error_message" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-start">
+                  <svg class="h-5 w-5 text-red-400 mt-0.5 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                  <div class="flex-1">
+                    <h4 class="text-sm font-medium text-red-800">Connection Error</h4>
+                    <p class="mt-1 text-sm text-red-700">{{ connectionMetadata.error_message }}</p>
+                    <p class="mt-2 text-sm text-red-600">Please try re-authenticating your connection using the button above.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Metadata Grid -->
+              <div v-if="connectionMetadata" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Connection Information Card -->
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                    <svg class="h-4 w-4 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                    </svg>
+                    Connection Information
+                  </h4>
+                  <dl class="space-y-2">
+                    <div>
+                      <dt class="text-xs text-gray-500">Plaid Item ID</dt>
+                      <dd class="mt-1 flex items-center justify-between">
+                        <span class="text-sm font-mono text-gray-900 truncate">{{ connectionMetadata.plaid_item_id || 'N/A' }}</span>
+                        <button 
+                          v-if="connectionMetadata.plaid_item_id"
+                          @click="copyToClipboard(connectionMetadata.plaid_item_id, 'Item ID')"
+                          class="ml-2 text-gray-400 hover:text-gray-600"
+                          title="Copy to clipboard"
+                        >
+                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+                          </svg>
+                        </button>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-gray-500">Institution ID</dt>
+                      <dd class="mt-1 flex items-center justify-between">
+                        <span class="text-sm font-mono text-gray-900 truncate">{{ connectionMetadata.institution_id || 'N/A' }}</span>
+                        <button 
+                          v-if="connectionMetadata.institution_id"
+                          @click="copyToClipboard(connectionMetadata.institution_id, 'Institution ID')"
+                          class="ml-2 text-gray-400 hover:text-gray-600"
+                          title="Copy to clipboard"
+                        >
+                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+                          </svg>
+                        </button>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-gray-500">Connection Created</dt>
+                      <dd class="mt-1 text-sm text-gray-900">{{ formatDate(connectionMetadata.created_at) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-gray-500">Linked Accounts</dt>
+                      <dd class="mt-1 text-sm text-gray-900">{{ connectionMetadata.account_count }} account(s)</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- Account Details Card -->
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                    <svg class="h-4 w-4 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                    </svg>
+                    Account Details
+                  </h4>
+                  <dl class="space-y-2">
+                    <div>
+                      <dt class="text-xs text-gray-500">Plaid Account ID</dt>
+                      <dd class="mt-1 flex items-center justify-between">
+                        <span class="text-sm font-mono text-gray-900 truncate">{{ plaidAccount.plaid_account_id || 'N/A' }}</span>
+                        <button 
+                          v-if="plaidAccount.plaid_account_id"
+                          @click="copyToClipboard(plaidAccount.plaid_account_id, 'Account ID')"
+                          class="ml-2 text-gray-400 hover:text-gray-600"
+                          title="Copy to clipboard"
+                        >
+                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+                          </svg>
+                        </button>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-gray-500">Account Mask</dt>
+                      <dd class="mt-1 text-sm text-gray-900">{{ plaidAccount.account_mask ? `****${plaidAccount.account_mask}` : 'N/A' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-gray-500">Account Type</dt>
+                      <dd class="mt-1 text-sm text-gray-900">{{ formatAccountType(plaidAccount.account_type, plaidAccount.account_subtype) }}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <!-- Balance Information Card -->
+                <div class="bg-white border border-gray-200 rounded-lg p-4 md:col-span-2">
+                  <h4 class="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                    <svg class="h-4 w-4 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    Balance Information
+                  </h4>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <dt class="text-xs text-gray-500">Current Balance</dt>
+                      <dd class="mt-1 text-lg font-semibold text-gray-900">{{ formatCurrency(plaidAccount.current_balance_cents) }}</dd>
+                    </div>
+                    <div v-if="plaidAccount.available_balance_cents !== null && plaidAccount.available_balance_cents !== plaidAccount.current_balance_cents">
+                      <dt class="text-xs text-gray-500">Available Balance</dt>
+                      <dd class="mt-1 text-lg font-semibold text-gray-900">{{ formatCurrency(plaidAccount.available_balance_cents) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-gray-500">Balance Last Updated</dt>
+                      <dd class="mt-1 text-sm text-gray-900">{{ formatDateTime(plaidAccount.balance_updated_at) }}</dd>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -162,6 +300,7 @@ const props = defineProps({
   linkToken: String,
   isLinked: Boolean,
   plaidAccount: Object,
+  connectionMetadata: Object,
   hasExistingConnection: Boolean,
   existingConnectionInstitution: String,
 });
@@ -339,5 +478,65 @@ const confirmDisconnect = async () => {
   if (confirmed) {
     router.delete(route('plaid.destroy', [props.budget.id, props.account.id]));
   }
+};
+
+// Helper functions for metadata display
+const formatDateTime = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  }).format(date);
+};
+
+const copyToClipboard = async (text, label) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  } catch (err) {
+    toast.error('Failed to copy to clipboard');
+  }
+};
+
+const getStatusColor = (status) => {
+  const colors = {
+    'active': 'bg-green-100 text-green-800 border-green-200',
+    'error': 'bg-red-100 text-red-800 border-red-200',
+    'expired': 'bg-amber-100 text-amber-800 border-amber-200',
+    'disconnected': 'bg-gray-100 text-gray-800 border-gray-200'
+  };
+  return colors[status] || colors.disconnected;
+};
+
+const getStatusLabel = (status) => {
+  const labels = {
+    'active': 'Active',
+    'error': 'Error',
+    'expired': 'Expired',
+    'disconnected': 'Disconnected'
+  };
+  return labels[status] || status;
+};
+
+const formatAccountType = (type, subtype) => {
+  if (!type) return 'N/A';
+  const typeFormatted = type.charAt(0).toUpperCase() + type.slice(1);
+  if (!subtype) return typeFormatted;
+  const subtypeFormatted = subtype.charAt(0).toUpperCase() + subtype.slice(1);
+  return `${typeFormatted} / ${subtypeFormatted}`;
 };
 </script> 

@@ -51,12 +51,31 @@ class PlaidController extends Controller
             ]);
         }
 
+        // Prepare connection metadata if account is linked
+        $connectionMetadata = null;
+        if ($plaidAccount && $plaidAccount->plaidConnection) {
+            $connection = $plaidAccount->plaidConnection;
+            $connectionMetadata = [
+                'status' => $connection->status,
+                'plaid_item_id' => $connection->plaid_item_id,
+                'institution_id' => $connection->institution_id,
+                'institution_name' => $connection->institution_name,
+                'institution_logo' => $connection->institution_logo,
+                'institution_url' => $connection->institution_url,
+                'error_message' => $connection->error_message,
+                'last_sync_at' => $connection->last_sync_at,
+                'created_at' => $connection->created_at,
+                'account_count' => $connection->getAccountCount(),
+            ];
+        }
+
         return Inertia::render('Plaid/Link', [
             'budget' => $budget,
             'account' => $account,
             'linkToken' => $linkToken,
             'isLinked' => $plaidAccount !== null,
             'plaidAccount' => $plaidAccount,
+            'connectionMetadata' => $connectionMetadata,
             'hasExistingConnection' => false,
             'existingConnectionInstitution' => null,
         ]);

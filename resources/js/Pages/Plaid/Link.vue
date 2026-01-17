@@ -62,26 +62,15 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <button
-                    @click="syncTransactions"
-                    class="inline-flex items-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    :disabled="syncInProgress"
+                    @click="syncAllData"
+                    class="inline-flex items-center px-3 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    :disabled="syncAllInProgress"
                   >
-                    <svg v-if="syncInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg v-if="syncAllInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>{{ syncInProgress ? 'Syncing...' : 'Sync Transactions' }}</span>
-                  </button>
-                  <button
-                    @click="updateBalance"
-                    class="inline-flex items-center px-3 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    :disabled="balanceUpdateInProgress"
-                  >
-                    <svg v-if="balanceUpdateInProgress" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>{{ balanceUpdateInProgress ? 'Updating...' : 'Update Balance' }}</span>
+                    <span>{{ syncAllInProgress ? 'Syncing All Data...' : 'Sync All Data' }}</span>
                   </button>
                   <button
                     @click="updateConnection"
@@ -100,6 +89,40 @@
                   >
                     Disconnect
                   </button>
+                </div>
+                
+                <!-- Helper text explaining what will be synced -->
+                <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div class="flex">
+                    <svg class="h-5 w-5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                    </svg>
+                    <div class="ml-3 flex-1">
+                      <p class="text-sm font-medium text-blue-800">
+                        Sync All Data will update:
+                      </p>
+                      <ul class="mt-2 text-sm text-blue-700 space-y-1">
+                        <li class="flex items-start">
+                          <svg class="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                          <span>Recent transactions from your bank</span>
+                        </li>
+                        <li class="flex items-start">
+                          <svg class="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                          <span>Current account balance</span>
+                        </li>
+                        <li v-if="isCreditCard" class="flex items-start">
+                          <svg class="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                          <span>Statement balance & payment information</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -283,7 +306,7 @@
 
 <script setup>
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
@@ -311,10 +334,15 @@ const publicTokenInput = ref(null);
 const metadataInput = ref(null);
 
 // State
-const syncInProgress = ref(false);
-const balanceUpdateInProgress = ref(false);
+const syncAllInProgress = ref(false);
 const updateConnectionInProgress = ref(false);
 const csrf = usePage().props.csrf || '';
+
+// Check if this is a credit card account
+const isCreditCard = computed(() => {
+  return props.plaidAccount?.account_type === 'credit' && 
+         props.plaidAccount?.account_subtype === 'credit card';
+});
 
 // Plaid Link handler
 let linkHandler = null;
@@ -372,59 +400,125 @@ const openPlaidLink = () => {
   }
 };
 
-const syncTransactions = () => {
-  syncInProgress.value = true;
-  router.post(
-    route('plaid.sync', [props.budget.id, props.account.id]),
-    {},
-    {
-      onSuccess: (page) => {
-        // Show success or error message if available
-        if (page.props.flash && page.props.flash.message) {
-          toast.success(page.props.flash.message);
-        } else if (page.props.flash && page.props.flash.error) {
-          toast.error(page.props.flash.error);
-        } else if (page.props.error) {
-          toast.error(page.props.error);
+const syncAllData = async () => {
+  syncAllInProgress.value = true;
+  
+  let transactionsSuccess = false;
+  let balanceSuccess = false;
+  let liabilitiesSuccess = false;
+  let hasErrors = false;
+  
+  try {
+    // Step 1: Sync transactions
+    await new Promise((resolve, reject) => {
+      router.post(
+        route('plaid.sync', [props.budget.id, props.account.id]),
+        {},
+        {
+          preserveState: true,
+          preserveScroll: true,
+          onSuccess: (page) => {
+            if (page.props.flash?.error || page.props.error) {
+              hasErrors = true;
+              const errorMsg = page.props.flash?.error || page.props.error;
+              toast.error(`Transactions sync failed: ${errorMsg}`);
+            } else {
+              transactionsSuccess = true;
+            }
+            resolve();
+          },
+          onError: (errors) => {
+            hasErrors = true;
+            toast.error(`Transactions sync failed: ${errors.message || 'Unknown error'}`);
+            resolve(); // Continue to next step even if this fails
+          }
         }
-      },
-      onError: (errors) => {
-        if (errors.message) {
-          toast.error(errors.message);
+      );
+    });
+    
+    // Step 2: Update balance
+    await new Promise((resolve, reject) => {
+      router.post(
+        route('plaid.balance', [props.budget.id, props.account.id]),
+        {},
+        {
+          preserveState: true,
+          preserveScroll: true,
+          onSuccess: (page) => {
+            if (page.props.flash?.error || page.props.error) {
+              hasErrors = true;
+              const errorMsg = page.props.flash?.error || page.props.error;
+              toast.error(`Balance update failed: ${errorMsg}`);
+            } else {
+              balanceSuccess = true;
+            }
+            resolve();
+          },
+          onError: (errors) => {
+            hasErrors = true;
+            toast.error(`Balance update failed: ${errors.message || 'Unknown error'}`);
+            resolve(); // Continue to next step even if this fails
+          }
         }
-      },
-      onFinish: () => {
-        syncInProgress.value = false;
+      );
+    });
+    
+    // Step 3: Update statement balance (credit cards only)
+    if (isCreditCard.value) {
+      await new Promise((resolve, reject) => {
+        router.post(
+          route('plaid.liabilities', [props.budget.id, props.account.id]),
+          {},
+          {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: (page) => {
+              if (page.props.flash?.error || page.props.error) {
+                hasErrors = true;
+                const errorMsg = page.props.flash?.error || page.props.error;
+                toast.error(`Statement balance update failed: ${errorMsg}`);
+              } else {
+                liabilitiesSuccess = true;
+              }
+              resolve();
+            },
+            onError: (errors) => {
+              hasErrors = true;
+              toast.error(`Statement balance update failed: ${errors.message || 'Unknown error'}`);
+              resolve();
+            }
+          }
+        );
+      });
+    }
+    
+    // Show final success message
+    if (!hasErrors) {
+      if (isCreditCard.value) {
+        toast.success('All data synced successfully: transactions, balance, and statement information updated.');
+      } else {
+        toast.success('All data synced successfully: transactions and balance updated.');
+      }
+      // Reload to get fresh data
+      router.reload({ only: ['plaidAccount', 'account'] });
+    } else {
+      // Some steps succeeded, some failed
+      const successSteps = [];
+      if (transactionsSuccess) successSteps.push('transactions');
+      if (balanceSuccess) successSteps.push('balance');
+      if (liabilitiesSuccess) successSteps.push('statement data');
+      
+      if (successSteps.length > 0) {
+        toast.success(`Partially synced: ${successSteps.join(', ')} updated successfully.`);
+        router.reload({ only: ['plaidAccount', 'account'] });
       }
     }
-  );
-};
-
-const updateBalance = () => {
-  balanceUpdateInProgress.value = true;
-  router.post(
-    route('plaid.balance', [props.budget.id, props.account.id]),
-    {},
-    {
-      onSuccess: (page) => {
-        // Show success or error message if available
-        if (page.props.flash && page.props.flash.message) {
-          toast.success(page.props.flash.message);
-        } else if (page.props.flash && page.props.flash.error) {
-          toast.error(page.props.flash.error);
-        }
-      },
-      onError: (errors) => {
-        // Show error message if available
-        if (errors.message) {
-          toast.error(errors.message);
-        }
-      },
-      onFinish: () => {
-        balanceUpdateInProgress.value = false;
-      }
-    }
-  );
+    
+  } catch (error) {
+    toast.error('An unexpected error occurred while syncing data.');
+  } finally {
+    syncAllInProgress.value = false;
+  }
 };
 
 const updateConnection = async () => {

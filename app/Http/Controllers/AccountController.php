@@ -7,12 +7,14 @@ use App\Models\Budget;
 use App\Models\PlaidConnection;
 use App\Models\Transaction;
 use App\Services\PlaidService;
+use App\Traits\InstitutionDomainMapping;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Http\RedirectResponse;
 
 class AccountController extends Controller
 {
+    use InstitutionDomainMapping;
     /**
      * Create the controller instance.
      */
@@ -212,95 +214,26 @@ class AccountController extends Controller
 
     /**
      * Get logo URL for an institution name using Google's S2 favicon service.
-     * This service is highly reliable and provides high-quality favicons.
+     * Uses the shared InstitutionDomainMapping trait.
      */
     private function getLogoUrlForInstitution(string $institutionName): ?string
     {
-        // Known institution name to domain mappings
-        $institutionDomains = [
-            'chase' => 'chase.com',
-            'bank of america' => 'bankofamerica.com',
-            'wells fargo' => 'wellsfargo.com',
-            'citibank' => 'citi.com',
-            'citi' => 'citi.com',
-            'capital one' => 'capitalone.com',
-            'us bank' => 'usbank.com',
-            'pnc' => 'pnc.com',
-            'truist' => 'truist.com',
-            'td bank' => 'td.com',
-            'fifth third' => '53.com',
-            'regions' => 'regions.com',
-            'regions bank' => 'regions.com',
-            'citizens' => 'citizensbank.com',
-            'huntington' => 'huntington.com',
-            'keybank' => 'key.com',
-            'ally' => 'ally.com',
-            'discover' => 'discover.com',
-            'synchrony' => 'synchrony.com',
-            'american express' => 'americanexpress.com',
-            'amex' => 'americanexpress.com',
-            'usaa' => 'usaa.com',
-            'navy federal' => 'navyfederal.org',
-            'schwab' => 'schwab.com',
-            'charles schwab' => 'schwab.com',
-            'fidelity' => 'fidelity.com',
-            'vanguard' => 'vanguard.com',
-            'e*trade' => 'etrade.com',
-            'etrade' => 'etrade.com',
-            'robinhood' => 'robinhood.com',
-            'paypal' => 'paypal.com',
-            'venmo' => 'venmo.com',
-            'chime' => 'chime.com',
-            'sofi' => 'sofi.com',
-            'marcus' => 'marcus.com',
-            'goldman sachs' => 'goldmansachs.com',
-            'home depot' => 'homedepot.com',
-            'lowes' => 'lowes.com',
-            'lowe\'s' => 'lowes.com',
-            'target' => 'target.com',
-            'walmart' => 'walmart.com',
-            'amazon' => 'amazon.com',
-            'apple' => 'apple.com',
-            'coinbase' => 'coinbase.com',
-            'navy federal credit union' => 'navyfederal.org',
-            'pentagon federal' => 'penfed.org',
-            'penfed' => 'penfed.org',
-            'mountain america' => 'macu.com',
-            'credit karma' => 'creditkarma.com',
-            'betterment' => 'betterment.com',
-            'wealthfront' => 'wealthfront.com',
-            'merrill' => 'ml.com',
-            'merrill lynch' => 'ml.com',
-            'morgan stanley' => 'morganstanley.com',
-            'citi cards' => 'citi.com',
-            'barclays' => 'barclays.com',
-        ];
+        $faviconUrl = static::getFaviconUrlForInstitution($institutionName);
 
-        $nameLower = strtolower($institutionName);
-        $domain = null;
-
-        // Check for exact or partial match in our domain mapping
-        foreach ($institutionDomains as $key => $mappedDomain) {
-            if (str_contains($nameLower, $key)) {
-                $domain = $mappedDomain;
-                break;
-            }
-        }
-
-        if (!$domain) {
+        if (!$faviconUrl) {
             \Log::info('Could not find domain mapping for institution', [
                 'institution_name' => $institutionName,
             ]);
             return null;
         }
 
+        $domain = static::getDomainForInstitution($institutionName);
         \Log::info('Found domain for institution', [
             'institution_name' => $institutionName,
             'domain' => $domain,
         ]);
 
-        // Use Google's S2 favicon service (highly reliable, max 256px)
-        return "https://www.google.com/s2/favicons?domain={$domain}&sz=128";
+        return $faviconUrl;
     }
 
     /**

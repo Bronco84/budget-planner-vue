@@ -181,19 +181,12 @@
                           <!-- Account Row -->
                           <div class="px-3 py-2.5">
                             <div class="flex justify-between items-center gap-3">
-                              <!-- Institution Logo or Account Type Icon -->
+                              <!-- Institution Logo (with initials fallback) -->
                               <InstitutionLogo
-                                v-if="account.plaid_account || account.custom_logo || account.logo_url"
-                                :custom-logo="account.custom_logo"
-                                :logo-url="account.logo_url"
-                                :logo="account.plaid_account?.plaid_connection?.institution_logo"
-                                :name="account.plaid_account?.plaid_connection?.institution_name || account.name"
+                                :account="account"
                                 size="sm"
                                 class="flex-shrink-0"
                               />
-                              <div v-else class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" :class="getAccountTypeIconBg(account.type)">
-                                <component :is="getAccountTypeIcon(account.type)" class="w-5 h-5" :class="getAccountTypeIconColor(account.type)" />
-                              </div>
                               
                               <!-- Account Info -->
                               <div class="flex-1 min-w-0">

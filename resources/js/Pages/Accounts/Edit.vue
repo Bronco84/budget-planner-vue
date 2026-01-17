@@ -96,13 +96,10 @@
                     
                     <div class="mt-3 space-y-3">
                       <!-- Current Logo Preview -->
-                      <div v-if="hasLogo || (isPlaidConnected && account.plaid_account?.plaid_connection?.institution_logo)" class="flex items-center gap-4">
+                      <div v-if="hasLogo" class="flex items-center gap-4">
                         <div class="flex-shrink-0">
                           <InstitutionLogo
-                            :custom-logo="form.custom_logo || account.custom_logo"
-                            :logo-url="form.logo_url || account.logo_url"
-                            :logo="account.plaid_account?.plaid_connection?.institution_logo"
-                            :name="account.name"
+                            :account="logoPreviewAccount"
                             size="lg"
                           />
                         </div>
@@ -267,14 +264,11 @@
                   <div v-if="isPlaidConnected" class="space-y-4">
                     <div class="flex items-center gap-3">
                       <InstitutionLogo
-                        :custom-logo="account.custom_logo"
-                        :logo-url="account.logo_url"
-                        :logo="account.plaid_account?.plaid_connection?.institution_logo"
-                        :name="account.plaid_account?.institution_name || 'Unknown Bank'"
+                        :account="account"
                         size="lg"
                       />
                       <div class="flex-1 min-w-0">
-                        <p class="font-medium text-gray-900 truncate">{{ account.plaid_account?.institution_name || 'Unknown Bank' }}</p>
+                        <p class="font-medium text-gray-900 truncate">{{ account.institution_name || 'Unknown Bank' }}</p>
                         <p class="text-xs text-gray-500">
                           Last synced: <PlaidSyncTimestamp
                             :timestamp="account.plaid_account?.plaid_connection?.last_sync_at"
@@ -494,7 +488,34 @@ const hasCustomLogo = computed(() => {
 });
 
 const hasLogo = computed(() => {
-  return hasCustomLogo.value || (isPlaidConnected.value && props.account.plaid_account?.plaid_connection?.institution_logo);
+  return hasCustomLogo.value || props.account.logo_src;
+});
+
+// Create a preview account object that uses form values for logo preview
+const logoPreviewAccount = computed(() => {
+  // If form has changes, create a modified account with computed logo_src
+  const customLogo = form.custom_logo || props.account.custom_logo;
+  const logoUrl = form.logo_url || props.account.logo_url;
+  
+  // Compute logo_src using the same priority as the backend
+  let logoSrc = null;
+  if (customLogo) {
+    if (customLogo.startsWith('http') || customLogo.startsWith('data:')) {
+      logoSrc = customLogo;
+    } else {
+      logoSrc = `data:image/png;base64,${customLogo}`;
+    }
+  } else if (logoUrl) {
+    logoSrc = logoUrl;
+  } else {
+    // Fall back to the account's computed logo_src (from backend)
+    logoSrc = props.account.logo_src;
+  }
+  
+  return {
+    ...props.account,
+    logo_src: logoSrc,
+  };
 });
 
 const logoSourceLabel = computed(() => {

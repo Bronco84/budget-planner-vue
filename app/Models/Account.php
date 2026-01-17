@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AccountStatus;
+use App\Traits\InstitutionDomainMapping;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 class Account extends Model
 {
     use HasFactory;
+    use InstitutionDomainMapping;
 
     /**
      * Account types that are considered liabilities.
@@ -70,6 +72,10 @@ class Account extends Model
     protected $appends = [
         'status_label',
         'status_classes',
+        'logo_src',
+        'institution_name',
+        'initials',
+        'initials_bg_color',
     ];
 
     /**
@@ -255,5 +261,133 @@ class Account extends Model
     {
         return $this->plaidAccount?->isCreditCard()
             && $this->plaidAccount?->hasLiabilityData();
+    }
+
+    /**
+     * Get the best available logo source URL.
+     *
+     * Priority:
+     * 1. custom_logo (base64 or URL)
+     * 2. logo_url (external URL)
+     * 3. Google S2 favicon from institution_url
+     * 4. Google S2 favicon from institution name domain mapping
+     * 5. null (frontend will show initials fallback)
+     */
+    protected function logoSrc(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                // 1. Custom logo (highest priority - user uploaded)
+                if ($this->custom_logo) {
+                    // If it's already a full URL or data URI, use as-is
+                    if (str_starts_with($this->custom_logo, 'http') || str_starts_with($this->custom_logo, 'data:')) {
+                        return $this->custom_logo;
+                    }
+                    // Otherwise assume it's base64
+                    return 'data:image/png;base64,' . $this->custom_logo;
+                }
+
+                // 2. External logo URL (fetched from Clearbit, etc.)
+                if ($this->logo_url) {
+                    return $this->logo_url;
+                }
+
+                // 3. Try to get favicon from Plaid institution URL
+                $institutionUrl = $this->plaidAccount?->plaidConnection?->institution_url;
+                if ($institutionUrl) {
+                    $domain = static::extractDomainFromUrl($institutionUrl);
+                    if ($domain) {
+                        return static::getGoogleFaviconUrl($domain);
+                    }
+                }
+
+                // 4. Try to get favicon from institution name domain mapping
+                $institutionName = $this->getInstitutionNameAttribute();
+                $faviconUrl = static::getFaviconUrlForInstitution($institutionName);
+                if ($faviconUrl) {
+                    return $faviconUrl;
+                }
+
+                // 5. No logo available - frontend will show initials fallback
+                return null;
+            }
+        );
+    }
+
+    /**
+     * Get the institution name for this account.
+     * Returns Plaid institution name if available, otherwise the account name.
+     */
+    protected function institutionName(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->plaidAccount?->plaidConnection?->institution_name ?? $this->name
+        );
+    }
+
+    /**
+     * Get 2-letter initials from the institution name.
+     */
+    protected function initials(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $name = $this->getInstitutionNameAttribute();
+
+                if (!$name) {
+                    return '?';
+                }
+
+                $words = preg_split('/\s+/', trim($name));
+
+                if (count($words) >= 2) {
+                    return strtoupper(substr($words[0], 0, 1) . substr($words[1], 0, 1));
+                }
+
+                return strtoupper(substr($name, 0, 2));
+            }
+        );
+    }
+
+    /**
+     * Get a consistent Tailwind background color class based on the institution name.
+     */
+    protected function initialsBgColor(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                $colors = [
+                    'bg-blue-500',
+                    'bg-emerald-500',
+                    'bg-violet-500',
+                    'bg-amber-500',
+                    'bg-rose-500',
+                    'bg-cyan-500',
+                    'bg-indigo-500',
+                    'bg-teal-500',
+                    'bg-orange-500',
+                    'bg-pink-500',
+                ];
+
+                // Simple hash of the name to get consistent color
+                $name = $this->getInstitutionNameAttribute() ?? '';
+                $hash = 0;
+
+                for ($i = 0; $i < strlen($name); $i++) {
+                    $hash = (($hash << 5) - $hash) + ord($name[$i]);
+                    $hash = $hash & $hash; // Convert to 32bit integer
+                }
+
+                return $colors[abs($hash) % count($colors)];
+            }
+        );
+    }
+
+    /**
+     * Helper to get institution name attribute value.
+     */
+    private function getInstitutionNameAttribute(): ?string
+    {
+        return $this->plaidAccount?->plaidConnection?->institution_name ?? $this->name;
     }
 }

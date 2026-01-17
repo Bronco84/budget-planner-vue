@@ -36,39 +36,15 @@ class PlaidController extends Controller
             ->where('account_id', $account->id)
             ->first();
 
-        // Check for existing connections to facilitate adding more accounts
-        $existingConnection = null;
-        $hasExistingConnection = false;
-
-        // If account is already linked, we can't use update mode (it's already connected)
-        // But if account is NOT linked, check if there are existing connections to same institution
-        if (!$plaidAccount) {
-            // For simplicity, we'll check if there are ANY active connections for this budget
-            // In a more advanced implementation, you could detect the institution name from the account
-            $existingConnection = PlaidConnection::where('budget_id', $budget->id)
-                ->where('status', PlaidConnection::STATUS_ACTIVE)
-                ->first();
-
-            $hasExistingConnection = $existingConnection !== null;
-        }
+        // Don't auto-detect existing connections for unlinked accounts
+        // Let the user choose their bank through Plaid Link directly
+        // Plaid handles connection reuse automatically when the user selects their bank
 
         $linkToken = null;
         try {
-            // Use update mode if there's an existing connection to add accounts to
-            $existingAccessToken = $existingConnection?->access_token;
             $linkToken = $this->plaidService->createLinkToken(
-                (string) Auth::id(),
-                $existingAccessToken
+                (string) Auth::id()
             );
-
-            if ($hasExistingConnection) {
-                Log::info('Creating link token in update mode', [
-                    'budget_id' => $budget->id,
-                    'account_id' => $account->id,
-                    'existing_connection_id' => $existingConnection->id,
-                    'institution' => $existingConnection->institution_name
-                ]);
-            }
         } catch (\Exception $e) {
             Log::error('Failed to create link token', [
                 'error' => $e->getMessage()
@@ -81,8 +57,8 @@ class PlaidController extends Controller
             'linkToken' => $linkToken,
             'isLinked' => $plaidAccount !== null,
             'plaidAccount' => $plaidAccount,
-            'hasExistingConnection' => $hasExistingConnection,
-            'existingConnectionInstitution' => $existingConnection?->institution_name,
+            'hasExistingConnection' => false,
+            'existingConnectionInstitution' => null,
         ]);
     }
     

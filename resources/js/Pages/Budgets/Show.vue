@@ -308,6 +308,13 @@
                               :eligible-source-accounts="eligibleSourceAccounts"
                               class="mt-3 pt-3 border-t border-gray-100"
                             />
+                            
+                            <!-- Investment Holdings (if applicable) - shown below the row -->
+                            <InvestmentHoldings
+                              v-if="account.plaid_account?.holdings?.length && activeAccountId === account.id"
+                              :account="account"
+                              class="mt-3 pt-3 border-t border-gray-100"
+                            />
                           </div>
                         </div>
                       </div>
@@ -934,6 +941,7 @@ import FileUpload from '@/Components/FileUpload.vue';
 import FileAttachmentList from '@/Components/FileAttachmentList.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import CreditCardDetails from '@/Components/CreditCardDetails.vue';
+import InvestmentHoldings from '@/Components/InvestmentHoldings.vue';
 import InstitutionLogo from '@/Components/InstitutionLogo.vue';
 import BudgetProjectionModal from '@/Components/BudgetProjectionModal.vue';
 import { formatCurrency } from '@/utils/format.js';

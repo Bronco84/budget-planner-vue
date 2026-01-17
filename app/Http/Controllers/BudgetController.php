@@ -121,10 +121,11 @@ class BudgetController extends Controller
         $budgetService = app(BudgetService::class);
         $user = Auth::user();
 
-        // Load relationships including plaidAccount with connection
+        // Load relationships including plaidAccount with connection and holdings
         $budget->load([
             'categories',
-            'accounts.plaidAccount.plaidConnection'
+            'accounts.plaidAccount.plaidConnection',
+            'accounts.plaidAccount.holdings.security',
         ]);
 
         // Initialize variables for account-dependent data

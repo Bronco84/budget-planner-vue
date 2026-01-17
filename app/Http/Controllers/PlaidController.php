@@ -25,6 +25,54 @@ class PlaidController extends Controller
     {
         $this->plaidService = $plaidService;
     }
+
+    /**
+     * Fetch institution details from Plaid, with fallback to search by name.
+     * 
+     * @param string|null $institutionId The Plaid institution ID (may be null)
+     * @param string $institutionName The institution name to search by if ID is missing
+     * @return array Institution details with keys: institution_id, logo, url, primary_color
+     */
+    private function fetchInstitutionDetails(?string $institutionId, string $institutionName): array
+    {
+        $details = [];
+
+        // First try with institution ID if available
+        if ($institutionId) {
+            $details = $this->plaidService->getInstitutionDetails($institutionId) ?? [];
+            if (!empty($details)) {
+                $details['institution_id'] = $institutionId;
+                return $details;
+            }
+        }
+
+        // Fallback: search by institution name
+        Log::info('Institution ID not available or failed, searching by name', [
+            'institution_name' => $institutionName,
+        ]);
+
+        $searchResult = $this->plaidService->searchInstitutions($institutionName);
+        
+        if ($searchResult && !empty($searchResult['institution_id'])) {
+            // Found institution by name, now get full details including URL
+            $fullDetails = $this->plaidService->getInstitutionDetails($searchResult['institution_id']);
+            
+            if ($fullDetails) {
+                $fullDetails['institution_id'] = $searchResult['institution_id'];
+                return $fullDetails;
+            }
+            
+            // If getInstitutionDetails failed, return search result (has logo but not URL)
+            return $searchResult;
+        }
+
+        Log::warning('Could not find institution details from Plaid', [
+            'institution_id' => $institutionId,
+            'institution_name' => $institutionName,
+        ]);
+
+        return [];
+    }
     
     /**
      * Show the form for linking a Plaid account.
@@ -178,15 +226,13 @@ class PlaidController extends Controller
                 $importedCount++;
             }
 
-            // Fetch institution logo and URL if we have an institution ID
+            // Fetch institution logo and URL
             $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
-            $institutionLogo = null;
-            $institutionUrl = null;
-            if ($institutionId) {
-                $institutionDetails = $this->plaidService->getInstitutionDetails($institutionId);
-                $institutionLogo = $institutionDetails['logo'] ?? null;
-                $institutionUrl = $institutionDetails['url'] ?? null;
-            }
+            $institutionName = $validated['metadata']['institution']['name'];
+            $institutionDetails = $this->fetchInstitutionDetails($institutionId, $institutionName);
+            $institutionId = $institutionDetails['institution_id'] ?? $institutionId;
+            $institutionLogo = $institutionDetails['logo'] ?? null;
+            $institutionUrl = $institutionDetails['url'] ?? null;
 
             // Link all accounts to Plaid under single connection
             $plaidAccounts = $this->plaidService->linkMultipleAccounts(
@@ -309,14 +355,11 @@ class PlaidController extends Controller
             }
             
             // No existing connection - create new one (original logic)
-            // Fetch institution logo and URL if we have an institution ID
-            $institutionLogo = null;
-            $institutionUrl = null;
-            if ($institutionId) {
-                $institutionDetails = $this->plaidService->getInstitutionDetails($institutionId);
-                $institutionLogo = $institutionDetails['logo'] ?? null;
-                $institutionUrl = $institutionDetails['url'] ?? null;
-            }
+            // Fetch institution logo and URL
+            $institutionDetails = $this->fetchInstitutionDetails($institutionId, $institutionName);
+            $institutionId = $institutionDetails['institution_id'] ?? $institutionId;
+            $institutionLogo = $institutionDetails['logo'] ?? null;
+            $institutionUrl = $institutionDetails['url'] ?? null;
                     
             // Link the account
             $plaidAccount = $this->plaidService->linkAccount(
@@ -427,13 +470,10 @@ class PlaidController extends Controller
                     null;
 
             // Fetch institution logo and URL
-            $institutionLogo = null;
-            $institutionUrl = null;
-            if ($institutionId) {
-                $institutionDetails = $this->plaidService->getInstitutionDetails($institutionId);
-                $institutionLogo = $institutionDetails['logo'] ?? null;
-                $institutionUrl = $institutionDetails['url'] ?? null;
-            }
+            $institutionDetails = $this->fetchInstitutionDetails($institutionId, $institutionName);
+            $institutionId = $institutionDetails['institution_id'] ?? $institutionId;
+            $institutionLogo = $institutionDetails['logo'] ?? null;
+            $institutionUrl = $institutionDetails['url'] ?? null;
             
             // Create new connection
             $plaidConnection = $this->plaidService->createOrFindConnection(

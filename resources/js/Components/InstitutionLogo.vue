@@ -74,7 +74,7 @@ const institutionDomains = {
   'wells fargo': 'wellsfargo.com',
   'citibank': 'citi.com',
   'citi': 'citi.com',
-  'capital one': 'capitalone.com',
+  'capital one': 'www.capitalone.com',
   'us bank': 'usbank.com',
   'pnc': 'pnc.com',
   'truist': 'truist.com',

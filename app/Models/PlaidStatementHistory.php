@@ -11,6 +11,12 @@ class PlaidStatementHistory extends Model
     use HasFactory;
 
     /**
+     * The table associated with the model.
+     * Note: Migration uses singular form, so we explicitly set it here.
+     */
+    protected $table = 'plaid_statement_history';
+
+    /**
      * The attributes that are mass assignable.
      */
     protected $fillable = [

@@ -124,10 +124,12 @@ class PlaidService
 
         try {
             // 'transactions' is the core required product
-            // 'investments' and 'liabilities' are optional - enabled if the institution supports them
-            // This allows connecting any bank type without requiring all product types
+            // 'investments' and 'liabilities' use 'required_if_supported_products' which:
+            //   - Enables them automatically if the institution supports them
+            //   - Prompts user for consent during update mode for existing connections
+            //   - Does NOT block linking if the institution doesn't support them
             $requiredProducts = ['transactions'];
-            $optionalProducts = ['investments', 'liabilities'];
+            $conditionalProducts = ['investments', 'liabilities'];
 
             $payload = [
                 'client_name' => config('app.name'),
@@ -136,7 +138,7 @@ class PlaidService
                     'email_address' => null, // Optional: Add user's email if available
                 ],
                 'products' => $requiredProducts,
-                'optional_products' => $optionalProducts,
+                'required_if_supported_products' => $conditionalProducts,
                 'country_codes' => ['US'],
                 'language' => 'en',
                 // Remove account_filters to allow ALL account types
@@ -158,7 +160,7 @@ class PlaidService
                 'user_id' => $userId,
                 'mode' => $existingAccessToken ? 'update' : 'create',
                 'products' => $payload['products'],
-                'optional_products' => $payload['optional_products'],
+                'required_if_supported_products' => $payload['required_if_supported_products'],
                 'account_filters_removed' => true
             ]);
 
@@ -496,9 +498,23 @@ class PlaidService
             
             return $result['liabilities'] ?? [];
         } catch (RequestException $e) {
+            $errorResponse = $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null;
+            $errorCode = $errorResponse['error_code'] ?? null;
+            
+            // Handle ADDITIONAL_CONSENT_REQUIRED - user needs to re-link to grant liabilities permission
+            if ($errorCode === 'ADDITIONAL_CONSENT_REQUIRED') {
+                Log::warning('Plaid liabilities requires additional consent - user must re-authenticate', [
+                    'error_code' => $errorCode,
+                    'error_message' => $errorResponse['error_message'] ?? 'Unknown error',
+                ]);
+                // Return empty array - the connection was created before liabilities was enabled
+                // User needs to use the "Update Connection" flow to grant consent
+                return [];
+            }
+            
             Log::error('Plaid liabilities fetch failed', [
                 'error' => $e->getMessage(),
-                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
+                'response' => $errorResponse
             ]);
             return [];
         }

@@ -23,9 +23,25 @@
             <InputError class="mt-2" :message="form.errors.account_id" />
           </div>
 
+          <!-- Friendly Label -->
+          <div>
+            <InputLabel for="friendly_label" value="Display Name (Optional)" />
+            <TextInput
+              id="friendly_label"
+              type="text"
+              class="mt-1 block w-full"
+              v-model="form.friendly_label"
+              placeholder="e.g., Electric Bill"
+            />
+            <p class="mt-1 text-xs text-gray-500">
+              A friendly name to display instead of the matching description
+            </p>
+            <InputError class="mt-2" :message="form.errors.friendly_label" />
+          </div>
+
           <!-- Description -->
           <div>
-            <InputLabel for="description" value="Description" />
+            <InputLabel for="description" value="Matching Description" />
             <TextInput
               id="description"
               type="text"
@@ -33,6 +49,9 @@
               v-model="form.description"
               required
             />
+            <p class="mt-1 text-xs text-gray-500">
+              Text to match in Plaid transaction descriptions (e.g., "Entergy Arkansas")
+            </p>
             <InputError class="mt-2" :message="form.errors.description" />
           </div>
 
@@ -647,6 +666,7 @@ const props = defineProps({
 const form = useForm({
   account_id: props.recurringTransaction.account_id,
   linked_credit_card_account_id: props.recurringTransaction.linked_credit_card_account_id,
+  friendly_label: props.recurringTransaction.friendly_label,
   description: props.recurringTransaction.description,
   category: props.recurringTransaction.category,
   amount: props.recurringTransaction.amount_in_cents / 100,

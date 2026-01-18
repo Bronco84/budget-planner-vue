@@ -146,7 +146,8 @@
                         <div class="text-sm font-medium text-gray-900">{{ formatDate(template.created_at) }}</div>
                       </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">{{ template.description }}</div>
+                        <div class="text-sm font-medium text-gray-900">{{ template.friendly_label || template.description }}</div>
+                        <div v-if="template.friendly_label" class="text-xs text-gray-500 mt-0.5">Matches: {{ template.description }}</div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center space-x-2">
@@ -310,6 +311,7 @@ const filteredTransactions = computed(() => {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(transaction => {
       return (
+        transaction.friendly_label?.toLowerCase().includes(query) ||
         transaction.description?.toLowerCase().includes(query) ||
         transaction.category?.toLowerCase().includes(query) ||
         transaction.account?.name?.toLowerCase().includes(query)

@@ -38,6 +38,7 @@ class RecurringTransactionTemplate extends Model
         'plaid_entity_id',
         'plaid_entity_name',
         'description',
+        'friendly_label',
         'category',
         'amount_in_cents',
         'frequency',

@@ -1,15 +1,18 @@
 <template>
-  <Head :title="`${recurringTransaction.description} - Recurring Transaction`" />
+  <Head :title="`${recurringTransaction.friendly_label || recurringTransaction.description} - Recurring Transaction`" />
 
   <AuthenticatedLayout>
     <template #header>
       <div class="flex justify-between items-center">
         <div>
           <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ recurringTransaction.description }}
+            {{ recurringTransaction.friendly_label || recurringTransaction.description }}
           </h2>
           <p class="text-sm text-gray-600 mt-1">
             {{ recurringTransaction.frequency }} • {{ formatCurrency(recurringTransaction.amount_in_cents) }}
+          </p>
+          <p v-if="recurringTransaction.friendly_label" class="text-xs text-gray-500 mt-1">
+            Matches: {{ recurringTransaction.description }}
           </p>
         </div>
         <Link

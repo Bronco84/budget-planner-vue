@@ -108,6 +108,7 @@ class RecurringTransactionController extends Controller
 
         $validated = $request->validate([
             'description' => 'required|string|max:255',
+            'friendly_label' => 'nullable|string|max:255',
             'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
             'account_id' => 'required|exists:accounts,id',
             'linked_credit_card_account_id' => 'nullable|exists:accounts,id',
@@ -247,6 +248,7 @@ class RecurringTransactionController extends Controller
 
         $validated = $request->validate([
             'description' => 'required|string|max:255',
+            'friendly_label' => 'nullable|string|max:255',
             'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
             'account_id' => 'required|exists:accounts,id',
             'linked_credit_card_account_id' => 'nullable|exists:accounts,id',

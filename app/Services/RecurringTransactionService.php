@@ -862,6 +862,116 @@ class RecurringTransactionService
     }
 
     /**
+     * Upgrade recurring transaction templates with Plaid entity IDs
+     * by examining their linked transactions.
+     * 
+     * @param Budget $budget
+     * @return array Stats about the upgrade process
+     */
+    public function upgradeTemplatesWithEntityIds(Budget $budget): array
+    {
+        $upgraded = 0;
+        $skipped = 0;
+        $noTransactions = 0;
+        $alreadyHasEntity = 0;
+        
+        // Get all templates without entity IDs
+        $templates = RecurringTransactionTemplate::where('budget_id', $budget->id)
+            ->whereNull('plaid_entity_id')
+            ->get();
+        
+        foreach ($templates as $template) {
+            // Skip if already has entity ID
+            if ($template->plaid_entity_id) {
+                $alreadyHasEntity++;
+                continue;
+            }
+            
+            // Get linked transactions with plaid data
+            $linkedTransactions = Transaction::where('recurring_transaction_template_id', $template->id)
+                ->whereNotNull('plaid_transaction_id')
+                ->with('plaidTransaction')
+                ->get();
+            
+            if ($linkedTransactions->isEmpty()) {
+                $noTransactions++;
+                continue;
+            }
+            
+            // Extract entity IDs from linked transactions
+            $entityIds = [];
+            $entityNames = [];
+            
+            foreach ($linkedTransactions as $transaction) {
+                if (!$transaction->plaidTransaction) {
+                    continue;
+                }
+                
+                // Extract entity ID from counterparties JSON
+                $counterparties = $transaction->plaidTransaction->counterparties;
+                if (is_string($counterparties)) {
+                    $counterparties = json_decode($counterparties, true);
+                }
+                
+                if (is_array($counterparties) && !empty($counterparties)) {
+                    foreach ($counterparties as $counterparty) {
+                        if (isset($counterparty['entity_id']) && $counterparty['entity_id']) {
+                            $entityIds[] = $counterparty['entity_id'];
+                            if (isset($counterparty['name'])) {
+                                $entityNames[$counterparty['entity_id']] = $counterparty['name'];
+                            }
+                        }
+                    }
+                }
+                
+                // Also check merchant_entity_id as fallback
+                if ($transaction->plaidTransaction->merchant_entity_id) {
+                    $entityIds[] = $transaction->plaidTransaction->merchant_entity_id;
+                    if ($transaction->plaidTransaction->merchant_name) {
+                        $entityNames[$transaction->plaidTransaction->merchant_entity_id] = 
+                            $transaction->plaidTransaction->merchant_name;
+                    }
+                }
+            }
+            
+            if (empty($entityIds)) {
+                $skipped++;
+                continue;
+            }
+            
+            // Find the most common entity ID (in case there are multiple)
+            $entityIdCounts = array_count_values($entityIds);
+            arsort($entityIdCounts);
+            $mostCommonEntityId = array_key_first($entityIdCounts);
+            $entityName = $entityNames[$mostCommonEntityId] ?? null;
+            
+            // Update the template
+            $template->update([
+                'plaid_entity_id' => $mostCommonEntityId,
+                'plaid_entity_name' => $entityName,
+            ]);
+            
+            $upgraded++;
+            
+            Log::info('RecurringTransactionService: Upgraded template with entity ID', [
+                'template_id' => $template->id,
+                'description' => $template->description,
+                'entity_id' => $mostCommonEntityId,
+                'entity_name' => $entityName,
+                'linked_transactions_count' => $linkedTransactions->count(),
+            ]);
+        }
+        
+        return [
+            'total_templates' => $templates->count(),
+            'upgraded' => $upgraded,
+            'skipped' => $skipped,
+            'no_transactions' => $noTransactions,
+            'already_has_entity' => $alreadyHasEntity,
+        ];
+    }
+
+    /**
      * Check if a transaction matches a template's description using improved matching algorithm.
      * 
      * Uses the Plaid transaction's original description (name field) if available,

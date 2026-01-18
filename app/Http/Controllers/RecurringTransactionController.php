@@ -602,4 +602,53 @@ class RecurringTransactionController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Upgrade recurring transaction templates with Plaid entity IDs
+     * by examining their linked transactions.
+     */
+    public function upgradeEntityIds(Budget $budget): RedirectResponse
+    {
+        $this->authorize('update', $budget);
+        
+        $stats = $this->recurringTransactionService->upgradeTemplatesWithEntityIds($budget);
+        
+        if ($stats['upgraded'] === 0) {
+            $message = 'No templates were upgraded. ';
+            
+            if ($stats['already_has_entity'] > 0) {
+                $message .= $stats['already_has_entity'] . ' templates already have entity IDs. ';
+            }
+            
+            if ($stats['no_transactions'] > 0) {
+                $message .= $stats['no_transactions'] . ' templates have no linked transactions. ';
+            }
+            
+            if ($stats['skipped'] > 0) {
+                $message .= $stats['skipped'] . ' templates have no entity IDs in their transactions.';
+            }
+            
+            return redirect()
+                ->route('recurring-transactions.index', $budget->id)
+                ->with('info', trim($message));
+        }
+        
+        $message = sprintf(
+            'Successfully upgraded %d template%s with entity IDs for more reliable matching.',
+            $stats['upgraded'],
+            $stats['upgraded'] === 1 ? '' : 's'
+        );
+        
+        if ($stats['skipped'] > 0 || $stats['no_transactions'] > 0) {
+            $message .= sprintf(
+                ' Skipped %d template%s (no entity IDs found or no linked transactions).',
+                $stats['skipped'] + $stats['no_transactions'],
+                ($stats['skipped'] + $stats['no_transactions']) === 1 ? '' : 's'
+            );
+        }
+        
+        return redirect()
+            ->route('recurring-transactions.index', $budget->id)
+            ->with('success', $message);
+    }
 }

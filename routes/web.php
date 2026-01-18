@@ -189,6 +189,8 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.duplicate');
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/diagnostics', [RecurringTransactionController::class, 'diagnostics'])
         ->name('recurring-transactions.diagnostics');
+    Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/test-matching', [RecurringTransactionController::class, 'testMatching'])
+        ->name('recurring-transactions.test-matching');
     
     // Routes for recurring transaction rules
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/rules', [RecurringTransactionRuleController::class, 'index'])

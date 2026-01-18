@@ -203,56 +203,138 @@
           </div>
         </div>
 
-        <!-- Plaid Entity Matching Section -->
-        <div v-if="recurringTransaction.plaid_entity_id" class="mt-6 border-t border-gray-200 pt-6">
-          <h4 class="text-md font-medium text-gray-900 mb-2">Transaction Matching</h4>
+        <!-- Transaction Matching Strategy Section -->
+        <div class="mt-6 border-t border-gray-200 pt-6">
+          <h4 class="text-md font-medium text-gray-900 mb-4">Transaction Matching Strategy</h4>
           <p class="text-sm text-gray-600 mb-4">
-            This recurring transaction is linked to a Plaid entity for reliable matching across all related transactions.
+            Transactions are automatically matched using a priority-based system. The first matching method found is used.
           </p>
           
-          <div class="bg-green-50 border border-green-200 rounded-md p-4">
-            <div class="flex items-start">
-              <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <h5 class="text-sm font-medium text-green-800">Linked to Plaid Entity</h5>
-                <div class="mt-2 text-sm text-green-700">
-                  <div class="flex items-center gap-2">
-                    <span class="font-medium">{{ recurringTransaction.plaid_entity_name || 'Unknown Entity' }}</span>
-                  </div>
-                  <div class="mt-1 text-xs text-green-600 font-mono">
-                    ID: {{ recurringTransaction.plaid_entity_id }}
-                  </div>
+          <div class="space-y-3">
+            <!-- Priority 1: Plaid Entity ID -->
+            <div class="border rounded-lg p-4" :class="recurringTransaction.plaid_entity_id ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'">
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 mt-0.5">
+                  <svg v-if="recurringTransaction.plaid_entity_id" class="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                  </svg>
+                  <div v-else class="h-5 w-5 rounded-full border-2 border-gray-300"></div>
                 </div>
-                <p class="mt-2 text-xs text-green-600">
-                  Transactions from this entity will be automatically matched regardless of description variations.
-                </p>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium" :class="recurringTransaction.plaid_entity_id ? 'text-green-900' : 'text-gray-700'">
+                      Priority 1: Plaid Entity ID
+                    </span>
+                    <span v-if="recurringTransaction.plaid_entity_id" class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
+                      ACTIVE
+                    </span>
+                  </div>
+                  <p class="mt-1 text-sm" :class="recurringTransaction.plaid_entity_id ? 'text-green-700' : 'text-gray-500'">
+                    <template v-if="recurringTransaction.plaid_entity_id">
+                      <span class="font-medium">{{ recurringTransaction.plaid_entity_name || 'Unknown Entity' }}</span>
+                      <span class="block text-xs mt-1 font-mono">ID: {{ recurringTransaction.plaid_entity_id }}</span>
+                      <span class="block mt-2 text-xs">
+                        Most reliable method. All transactions from this merchant are automatically matched regardless of description variations.
+                      </span>
+                    </template>
+                    <template v-else>
+                      Not configured. Use transaction analysis to capture entity ID for best matching accuracy.
+                    </template>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Priority 2: Rules -->
+            <div class="border rounded-lg p-4" :class="activeRulesCount > 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'">
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 mt-0.5">
+                  <svg v-if="activeRulesCount > 0" class="h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                  </svg>
+                  <div v-else class="h-5 w-5 rounded-full border-2 border-gray-300"></div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium" :class="activeRulesCount > 0 ? 'text-blue-900' : 'text-gray-700'">
+                      Priority 2: Rules ({{ activeRulesCount }} active)
+                    </span>
+                    <span v-if="activeRulesCount > 0" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-medium">
+                      ACTIVE
+                    </span>
+                  </div>
+                  <p class="mt-1 text-sm" :class="activeRulesCount > 0 ? 'text-blue-700' : 'text-gray-500'">
+                    <template v-if="activeRulesCount > 0">
+                      Transactions must match ALL {{ activeRulesCount }} active {{ activeRulesCount === 1 ? 'rule' : 'rules' }} to be linked.
+                      <span class="block mt-1 text-xs">
+                        Used when no entity ID is available. Provides precise control over matching criteria.
+                      </span>
+                    </template>
+                    <template v-else>
+                      No active rules. Add rules in the Rules tab for more precise matching control.
+                    </template>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Priority 3: Description -->
+            <div class="border rounded-lg p-4" :class="!recurringTransaction.plaid_entity_id && activeRulesCount === 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200'">
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 mt-0.5">
+                  <svg v-if="!recurringTransaction.plaid_entity_id && activeRulesCount === 0" class="h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                  </svg>
+                  <div v-else class="h-5 w-5 rounded-full border-2 border-gray-300"></div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium" :class="!recurringTransaction.plaid_entity_id && activeRulesCount === 0 ? 'text-yellow-900' : 'text-gray-700'">
+                      Priority 3: Description Matching
+                    </span>
+                    <span v-if="!recurringTransaction.plaid_entity_id && activeRulesCount === 0" class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-medium">
+                      FALLBACK
+                    </span>
+                  </div>
+                  <p class="mt-1 text-sm" :class="!recurringTransaction.plaid_entity_id && activeRulesCount === 0 ? 'text-yellow-700' : 'text-gray-500'">
+                    <template v-if="!recurringTransaction.plaid_entity_id && activeRulesCount === 0">
+                      Currently matching: "{{ recurringTransaction.description }}"
+                      <span class="block mt-1 text-xs">
+                        Matches transactions containing this text (70%+ similarity). Less reliable than entity ID or rules.
+                      </span>
+                      <span class="block mt-2 text-xs font-medium">
+                        💡 Tip: Add rules or capture entity ID for better accuracy.
+                      </span>
+                    </template>
+                    <template v-else>
+                      Fallback method. Only used when entity ID and rules don't match.
+                    </template>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- No Entity Matching (show only if no entity ID) -->
-        <div v-else class="mt-6 border-t border-gray-200 pt-6">
-          <h4 class="text-md font-medium text-gray-900 mb-2">Transaction Matching</h4>
-          <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-            <div class="flex items-start">
-              <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <h5 class="text-sm font-medium text-yellow-800">Using Description-Based Matching</h5>
-                <p class="mt-1 text-sm text-yellow-700">
-                  This template uses description patterns and rules for matching. For more reliable matching, 
-                  consider re-analyzing transactions to capture the Plaid entity ID.
-                </p>
-              </div>
-            </div>
+          
+          <!-- Test Matching Button -->
+          <div class="mt-4 pt-4 border-t">
+            <button
+              type="button"
+              @click="testMatching"
+              class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 active:bg-indigo-800 focus:outline-none focus:border-indigo-900 focus:ring focus:ring-indigo-300 disabled:opacity-25 transition"
+              :disabled="loadingTestResults"
+            >
+              <svg v-if="!loadingTestResults" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+              </svg>
+              <svg v-else class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ loadingTestResults ? 'Testing...' : 'Test Current Matching' }}
+            </button>
+            <p class="mt-2 text-xs text-gray-500">
+              Preview which recent transactions would match with current settings
+            </p>
           </div>
         </div>
 
@@ -413,20 +495,139 @@
         </div>
       </form>
     </div>
+
+    <!-- Test Matching Results Modal -->
+    <TransitionRoot appear :show="showTestModal" as="template">
+      <Dialog as="div" @close="showTestModal = false" class="relative z-50">
+        <TransitionChild
+          as="template"
+          enter="duration-300 ease-out"
+          enter-from="opacity-0"
+          enter-to="opacity-100"
+          leave="duration-200 ease-in"
+          leave-from="opacity-100"
+          leave-to="opacity-0"
+        >
+          <div class="fixed inset-0 bg-black bg-opacity-25" />
+        </TransitionChild>
+
+        <div class="fixed inset-0 overflow-y-auto">
+          <div class="flex min-h-full items-center justify-center p-4 text-center">
+            <TransitionChild
+              as="template"
+              enter="duration-300 ease-out"
+              enter-from="opacity-0 scale-95"
+              enter-to="opacity-100 scale-100"
+              leave="duration-200 ease-in"
+              leave-from="opacity-100 scale-100"
+              leave-to="opacity-0 scale-95"
+            >
+              <DialogPanel class="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <DialogTitle as="h3" class="text-lg font-medium leading-6 text-gray-900 mb-4">
+                  Test Matching Results
+                </DialogTitle>
+                
+                <div v-if="testResults" class="space-y-4">
+                  <!-- Summary -->
+                  <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div class="text-2xl font-bold text-gray-900">{{ testResults.total_tested }}</div>
+                        <div class="text-sm text-gray-600">Transactions Tested</div>
+                      </div>
+                      <div>
+                        <div class="text-2xl font-bold text-green-600">{{ testResults.matches_found }}</div>
+                        <div class="text-sm text-gray-600">Matches Found</div>
+                      </div>
+                      <div>
+                        <div class="text-2xl font-bold text-blue-600">
+                          {{ testResults.total_tested > 0 ? Math.round((testResults.matches_found / testResults.total_tested) * 100) : 0 }}%
+                        </div>
+                        <div class="text-sm text-gray-600">Match Rate</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Matches List -->
+                  <div v-if="testResults.matches_found > 0" class="max-h-96 overflow-y-auto">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Matching Transactions</h4>
+                    <div class="space-y-2">
+                      <div
+                        v-for="match in testResults.matches"
+                        :key="match.transaction.id"
+                        class="border rounded-lg p-3 hover:bg-gray-50"
+                      >
+                        <div class="flex items-start justify-between">
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center space-x-2">
+                              <span class="text-sm font-medium text-gray-900">{{ match.transaction.description }}</span>
+                              <span :class="getMatchMethodColor(match.match_method)" class="px-2 py-0.5 rounded-full text-xs font-medium">
+                                {{ getMatchMethodLabel(match.match_method) }}
+                              </span>
+                            </div>
+                            <div class="mt-1 flex items-center space-x-4 text-xs text-gray-500">
+                              <span>{{ match.transaction.date }}</span>
+                              <span v-if="match.transaction.category" class="px-2 py-0.5 bg-gray-100 rounded">{{ match.transaction.category }}</span>
+                              <span class="font-mono" :class="match.transaction.amount < 0 ? 'text-red-600' : 'text-green-600'">
+                                {{ formatCurrencyAmount(match.transaction.amount * 100) }}
+                              </span>
+                            </div>
+                            <div v-if="match.match_details" class="mt-1 text-xs text-gray-600">
+                              {{ match.match_details }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- No Matches -->
+                  <div v-else class="text-center py-8">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No Matches Found</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                      No recent transactions match the current settings. Try adjusting your matching criteria.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                  <button
+                    type="button"
+                    class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    @click="showTestModal = false"
+                  >
+                    Close
+                  </button>
+                </div>
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </div>
+      </Dialog>
+    </TransitionRoot>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useForm, Link, router } from '@inertiajs/vue3';
+import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } from '@headlessui/vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
 import InputError from '@/Components/InputError.vue';
 import { formatCurrency } from '@/utils/format.js';
 import { useToast } from '@/composables/useToast';
+import axios from 'axios';
 
 const toast = useToast();
+
+const showTestModal = ref(false);
+const loadingTestResults = ref(false);
+const testResults = ref(null);
 
 const props = defineProps({
   budget: Object,
@@ -471,8 +672,9 @@ const selectedCreditCard = computed(() => {
   return props.eligibleCreditCards?.find(c => c.id === form.linked_credit_card_account_id);
 });
 
+// Count active rules for matching strategy display
 const activeRulesCount = computed(() => {
-  return props.rules.filter(r => r.is_active).length;
+  return props.rules ? props.rules.filter(r => r.is_active).length : 0;
 });
 
 const totalAmount = computed(() => {
@@ -517,5 +719,39 @@ const confirmDelete = async () => {
   if (confirmed) {
     router.delete(route('recurring-transactions.destroy', [props.budget.id, props.recurringTransaction.id]));
   }
+};
+
+const testMatching = async () => {
+  loadingTestResults.value = true;
+  try {
+    const response = await axios.get(route('recurring-transactions.test-matching', {
+      budget: props.budget.id,
+      recurring_transaction: props.recurringTransaction.id
+    }));
+    testResults.value = response.data;
+    showTestModal.value = true;
+  } catch (error) {
+    console.error('Failed to test matching:', error);
+    toast.error('Failed to test matching');
+  } finally {
+    loadingTestResults.value = false;
+  }
+};
+
+const getMatchMethodLabel = (method) => {
+  const labels = {
+    'entity_id': 'Plaid Entity ID',
+    'rules': 'Rules',
+    'description_exact': 'Description (Exact)',
+    'description_contains': 'Description (Contains)',
+    'description_fuzzy': 'Description (Fuzzy)',
+  };
+  return labels[method] || method;
+};
+
+const getMatchMethodColor = (method) => {
+  if (method === 'entity_id') return 'text-green-600 bg-green-50';
+  if (method === 'rules') return 'text-blue-600 bg-blue-50';
+  return 'text-yellow-600 bg-yellow-50';
 };
 </script>

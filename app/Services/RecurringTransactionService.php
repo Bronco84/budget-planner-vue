@@ -393,23 +393,20 @@ class RecurringTransactionService
                 'transaction_ids' => $matchingTransactions->pluck('id')->toArray(),
             ]);
         } else {
-            // Priority 2: Fallback to description matching
+            // Priority 2: Fallback to description matching with improved algorithm
             Log::debug('RecurringTransactionService: Using description-based matching', [
                 'template_id' => $template->id,
                 'description' => $template->description,
                 'category' => $template->category,
             ]);
             
-            $matchingTransactions = $query->where(function($q) use ($template) {
-                // Match by description (exact match or contains)
-                $q->where('description', $template->description)
-                    ->orWhere('description', 'like', '%' . $template->description . '%');
-
-                // If category exists, also match by that
-                if ($template->category) {
-                    $q->where('category', $template->category);
-                }
-            })->get();
+            // Get all unlinked transactions for the budget
+            $allTransactions = $query->get();
+            
+            // Filter using improved matching algorithm
+            $matchingTransactions = $allTransactions->filter(function($transaction) use ($template) {
+                return $this->matchesDescription($transaction, $template);
+            });
             
             Log::debug('RecurringTransactionService: Description matching found transactions', [
                 'template_id' => $template->id,
@@ -714,16 +711,11 @@ class RecurringTransactionService
                     }
                 }
                 
-                // Strategy 3: Match by description (exact or partial)
-                if ($template->description) {
-                    if (
-                        $transaction->description === $template->description ||
-                        stripos($transaction->description, $template->description) !== false
-                    ) {
-                        $matchedTemplate = $template;
-                        $matchMethod = 'description';
-                        break;
-                    }
+                // Strategy 3: Match by description with improved algorithm
+                if ($template->description && $this->matchesDescription($transaction, $template)) {
+                    $matchedTemplate = $template;
+                    $matchMethod = 'description';
+                    break;
                 }
             }
             
@@ -867,6 +859,56 @@ class RecurringTransactionService
     public function getRules(RecurringTransactionTemplate $template): Collection
     {
         return $template->rules()->where('is_active', true)->orderBy('priority', 'desc')->get();
+    }
+
+    /**
+     * Check if a transaction matches a template's description using improved matching algorithm.
+     * 
+     * Matching strategy (in order of priority):
+     * 1. Exact match (case-insensitive)
+     * 2. Contains match with minimum length requirement (5+ chars) + category check
+     * 3. Fuzzy match with 70% similarity threshold + category check
+     *
+     * @param Transaction $transaction
+     * @param RecurringTransactionTemplate $template
+     * @return bool
+     */
+    protected function matchesDescription(Transaction $transaction, RecurringTransactionTemplate $template): bool
+    {
+        if (!$template->description) {
+            return false;
+        }
+
+        $templateDesc = strtolower(trim($template->description));
+        $transactionDesc = strtolower(trim($transaction->description));
+
+        // Strategy 1: Exact match (highest priority)
+        if ($transactionDesc === $templateDesc) {
+            return true;
+        }
+
+        // Strategy 2: Contains match with minimum length requirement
+        // Require at least 5 characters to avoid false positives
+        if (strlen($templateDesc) >= 5 && str_contains($transactionDesc, $templateDesc)) {
+            // If template has a category, require category match (AND logic)
+            if ($template->category) {
+                return $transaction->category === $template->category;
+            }
+            return true;
+        }
+
+        // Strategy 3: Fuzzy match with similarity threshold (70%)
+        // This helps catch variations like "ENTERGY ARKANSAS" vs "Entergy Arkansas Electric"
+        similar_text($templateDesc, $transactionDesc, $percent);
+        if ($percent >= 70) {
+            // If template has a category, require category match (AND logic)
+            if ($template->category) {
+                return $transaction->category === $template->category;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     /**

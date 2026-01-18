@@ -493,4 +493,115 @@ class RecurringTransactionController extends Controller
         
         return response()->json($diagnostics);
     }
+
+    /**
+     * Test matching for a recurring transaction template.
+     * Shows which recent unlinked transactions would match with current settings.
+     */
+    public function testMatching(Budget $budget, RecurringTransactionTemplate $recurring_transaction)
+    {
+        $this->authorize('view', $budget);
+        
+        $account = $recurring_transaction->account;
+        $rules = $recurring_transaction->rules()->where('is_active', true)->get();
+        
+        // Get recent unlinked transactions (last 90 days)
+        $recentTransactions = Transaction::where('account_id', $account->id)
+            ->whereNull('recurring_transaction_template_id')
+            ->where('date', '>=', now()->subDays(90)->toDateString())
+            ->orderBy('date', 'desc')
+            ->with('plaidTransaction')
+            ->get();
+        
+        $matches = [];
+        
+        foreach ($recentTransactions as $transaction) {
+            $matchMethod = null;
+            $matchDetails = null;
+            
+            // Test entity ID matching
+            if ($recurring_transaction->plaid_entity_id && $transaction->plaidTransaction) {
+                $counterparties = $transaction->plaidTransaction->counterparties ?? '';
+                if (is_string($counterparties) && str_contains($counterparties, $recurring_transaction->plaid_entity_id)) {
+                    $matchMethod = 'entity_id';
+                    $matchDetails = 'Matched by Plaid entity ID: ' . $recurring_transaction->plaid_entity_name;
+                }
+            }
+            
+            // Test rules matching (only if no entity match)
+            if (!$matchMethod && $rules->isNotEmpty()) {
+                $matchesAllRules = true;
+                
+                foreach ($rules as $rule) {
+                    if (!$rule->matchesTransaction($transaction)) {
+                        $matchesAllRules = false;
+                        break;
+                    }
+                }
+                
+                if ($matchesAllRules) {
+                    $matchMethod = 'rules';
+                    $matchDetails = 'Matched all ' . $rules->count() . ' active rules';
+                }
+            }
+            
+            // Test description matching (only if no entity or rules match)
+            if (!$matchMethod && $recurring_transaction->description) {
+                // Use the improved matching algorithm
+                $templateDesc = strtolower(trim($recurring_transaction->description));
+                $transactionDesc = strtolower(trim($transaction->description));
+                
+                if ($transactionDesc === $templateDesc) {
+                    $matchMethod = 'description_exact';
+                    $matchDetails = 'Exact description match';
+                } elseif (strlen($templateDesc) >= 5 && str_contains($transactionDesc, $templateDesc)) {
+                    if (!$recurring_transaction->category || $transaction->category === $recurring_transaction->category) {
+                        $matchMethod = 'description_contains';
+                        $matchDetails = 'Description contains "' . $recurring_transaction->description . '"';
+                        if ($recurring_transaction->category) {
+                            $matchDetails .= ' and category matches';
+                        }
+                    }
+                } else {
+                    similar_text($templateDesc, $transactionDesc, $percent);
+                    if ($percent >= 70) {
+                        if (!$recurring_transaction->category || $transaction->category === $recurring_transaction->category) {
+                            $matchMethod = 'description_fuzzy';
+                            $matchDetails = 'Fuzzy match (' . round($percent) . '% similarity)';
+                            if ($recurring_transaction->category) {
+                                $matchDetails .= ' and category matches';
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if ($matchMethod) {
+                $matches[] = [
+                    'transaction' => [
+                        'id' => $transaction->id,
+                        'date' => $transaction->date->format('Y-m-d'),
+                        'description' => $transaction->description,
+                        'category' => $transaction->category,
+                        'amount' => $transaction->amount_in_cents / 100,
+                    ],
+                    'match_method' => $matchMethod,
+                    'match_details' => $matchDetails,
+                ];
+            }
+        }
+        
+        return response()->json([
+            'total_tested' => $recentTransactions->count(),
+            'matches_found' => count($matches),
+            'matches' => $matches,
+            'template' => [
+                'description' => $recurring_transaction->description,
+                'category' => $recurring_transaction->category,
+                'has_entity_id' => !empty($recurring_transaction->plaid_entity_id),
+                'entity_name' => $recurring_transaction->plaid_entity_name,
+                'active_rules_count' => $rules->count(),
+            ],
+        ]);
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Budget;
 use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
+use App\Models\Transaction;
 use App\Services\RecurringTransactionService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;

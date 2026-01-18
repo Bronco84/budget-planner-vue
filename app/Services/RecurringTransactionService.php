@@ -870,6 +870,10 @@ class RecurringTransactionService
      */
     public function upgradeTemplatesWithEntityIds(Budget $budget): array
     {
+        Log::info('RecurringTransactionService: upgradeTemplatesWithEntityIds called', [
+            'budget_id' => $budget->id,
+        ]);
+        
         $upgraded = 0;
         $skipped = 0;
         $noTransactions = 0;
@@ -880,6 +884,12 @@ class RecurringTransactionService
         $templates = RecurringTransactionTemplate::where('budget_id', $budget->id)
             ->whereNull('plaid_entity_id')
             ->get();
+        
+        Log::info('RecurringTransactionService: Found templates without entity IDs', [
+            'budget_id' => $budget->id,
+            'template_count' => $templates->count(),
+            'template_ids' => $templates->pluck('id')->toArray(),
+        ]);
         
         foreach ($templates as $template) {
             // Skip if already has entity ID

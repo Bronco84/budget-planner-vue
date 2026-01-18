@@ -609,9 +609,18 @@ class RecurringTransactionController extends Controller
      */
     public function upgradeEntityIds(Budget $budget): RedirectResponse
     {
+        Log::info('RecurringTransactionController: upgradeEntityIds called', [
+            'budget_id' => $budget->id,
+        ]);
+        
         $this->authorize('update', $budget);
         
         $stats = $this->recurringTransactionService->upgradeTemplatesWithEntityIds($budget);
+        
+        Log::info('RecurringTransactionController: upgradeEntityIds completed', [
+            'budget_id' => $budget->id,
+            'stats' => $stats,
+        ]);
         
         if ($stats['upgraded'] === 0) {
             $message = 'No templates were upgraded. ';

@@ -493,9 +493,25 @@
                       <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       <!-- Variable to track if we've shown the today marker -->
                       <template v-for="(transaction, index) in sortedTransactions" :key="transaction.id || ('proj-' + index)">
+                        <!-- Month divider - shown when month changes between transactions -->
+                        <tr v-if="shouldShowMonthDivider(transaction, index)">
+                          <td colspan="6" class="px-0 py-0">
+                            <div class="flex items-center gap-3 py-2 bg-gray-50 border-y border-gray-200">
+                              <div class="flex-1 h-px bg-gray-300"></div>
+                              <div class="flex items-center gap-1.5 px-3 py-1">
+                                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                <span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">{{ getMonthLabel(transaction.date) }}</span>
+                              </div>
+                              <div class="flex-1 h-px bg-gray-300"></div>
+                            </div>
+                          </td>
+                        </tr>
+
                         <!-- Today marker -->
                         <tr v-if="shouldShowTodayMarker(transaction, index)">
-                          <td colspan="7" class="px-6 py-3">
+                          <td colspan="6" class="px-6 py-3">
                             <div class="flex items-center justify-center">
                               <div class="flex items-center space-x-2 px-3 py-1.5 bg-indigo-100 border border-indigo-300 rounded-full shadow-sm">
                                 <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1658,10 +1674,56 @@ onMounted(() => {
 // Helper function to determine if a transaction should be marked as today
 const hasShownTodayMarker = ref(false);
 
-// Watch for changes in transactions data to reset the marker
+// Track shown month dividers to avoid duplicates
+const shownMonthDividers = ref(new Set());
+
+// Watch for changes in transactions data to reset the markers
 watch(() => props.transactions, () => {
   hasShownTodayMarker.value = false;
+  shownMonthDividers.value = new Set();
 }, { deep: true });
+
+// Helper function to determine if a month divider should be shown
+const shouldShowMonthDivider = (transaction, index) => {
+  if (!transaction.date) return false;
+  
+  const transactionDate = new Date(transaction.date);
+  const monthKey = `${transactionDate.getFullYear()}-${transactionDate.getMonth()}`;
+  
+  // Don't show if we've already shown this month's divider
+  if (shownMonthDividers.value.has(monthKey)) return false;
+  
+  // For the first transaction, show the month divider
+  if (index === 0) {
+    shownMonthDividers.value.add(monthKey);
+    return true;
+  }
+  
+  // Check if the previous transaction is in a different month
+  const prevTransaction = sortedTransactions.value[index - 1];
+  if (!prevTransaction || !prevTransaction.date) {
+    shownMonthDividers.value.add(monthKey);
+    return true;
+  }
+  
+  const prevDate = new Date(prevTransaction.date);
+  const prevMonthKey = `${prevDate.getFullYear()}-${prevDate.getMonth()}`;
+  
+  if (monthKey !== prevMonthKey) {
+    shownMonthDividers.value.add(monthKey);
+    return true;
+  }
+  
+  return false;
+};
+
+// Helper function to get the month label for a date
+const getMonthLabel = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const options = { month: 'long', year: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
 
 const shouldShowTodayMarker = (transaction, index) => {
   // Only check the first transaction or if we haven't shown the marker yet
@@ -1698,8 +1760,9 @@ const shouldShowTodayMarker = (transaction, index) => {
 
 // Computed property for sorted transactions
 const sortedTransactions = computed(() => {
-  // Reset the today marker flag whenever we recalculate the sorted transactions
+  // Reset the today marker flag and month dividers whenever we recalculate the sorted transactions
   hasShownTodayMarker.value = false;
+  shownMonthDividers.value = new Set();
 
   // Convert transactions data to array if it's an object with numeric keys
   const actualTransactions = Array.isArray(props.transactions.data)

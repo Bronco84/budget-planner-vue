@@ -9,6 +9,7 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Category;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 
@@ -18,83 +19,223 @@ class RecurringTransactionService
     {
         $projectedTransactions = collect();
 
-        // Get all active recurring transaction templates with their transactions and linked credit cards preloaded
+        // Get all active recurring transaction templates with their transactions, linked credit cards, and rules preloaded
+        // Eager loading rules prevents N+1 queries when calculating dynamic amounts
         $templates = RecurringTransactionTemplate::where('account_id', $account->id)
             ->where(function ($query) use ($startDate) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', $startDate);
             })
-            ->with(['transactions', 'linkedCreditCard.plaidAccount'])
+            ->with(['transactions', 'linkedCreditCard.plaidAccount', 'rules'])
             ->get();
 
         foreach ($templates as $template) {
-
-            // Start from today or template's start date, whichever is later
-            $date = max($startDate, $template->start_date)->copy()->startOfDay();
-
             // End at the earlier of endDate or template's end_date
             $templateEndDate = $template->end_date ? min($endDate, $template->end_date) : $endDate;
-
-            // For weekly and biweekly transactions, move to the next occurrence of the specified day
-            if ($template->frequency === 'weekly' || $template->frequency === 'biweekly') {
-                while ($date->dayOfWeek !== $template->day_of_week) {
-                    $date->addDay();
-                }
+            
+            // Use optimized occurrence date generation instead of day-by-day iteration
+            // This changes O(days) to O(occurrences), a significant improvement for multi-month projections
+            $occurrenceDates = $this->generateOccurrenceDates($template, $startDate, $templateEndDate);
+            
+            // Calculate dynamic amount once per template (not per occurrence) if applicable
+            $dynamicAmount = null;
+            if ($template->is_dynamic_amount) {
+                $dynamicAmount = $this->calculateDynamicAmount($template);
             }
 
-            // Generate all occurrences
-            while ($date <= $templateEndDate)
-            {
-                if ($template->shouldGenerateForDate($date)) {
-                    // Check if autopay should override this projection
-                    // If this template is linked to a credit card with active autopay,
-                    // skip the projection for the month that autopay will handle
-                    if ($template->shouldAutopayOverrideFor($date)) {
-                        $date->addDay();
-                        continue;
-                    }
-
-                    // Determine the amount for this transaction
-                    $existingTransaction = $this->getTransactionForDate($template, $date);
-
-                    if ($existingTransaction) {
-                        // If there are future transactions, use the existing amount
-                        $amount = $existingTransaction->amount_in_cents;
-                    } else {
-                        // If this is a dynamic amount template, calculate it based on rules
-                        if ($template->is_dynamic_amount) {
-                            $calculatedAmount = $this->calculateDynamicAmount($template);
-
-                            // If we have a valid calculated amount, use it
-                            if ($calculatedAmount !== null) {
-                                $amount = $calculatedAmount;
-                            }
-                        } else {
-                            $amount = $template->amount_in_cents;
-                        }
-                    }
-
-
-                    $projectedTransactions->push([
-                        'account' => $account,
-                        'budget_id' => $template->budget_id,
-                        'description' => $template->description,
-                        'amount_in_cents' => $amount,
-                        'category' => $template->category,
-                        'account_id' => $template->account_id,
-                        'date' => $date->copy(),
-                        'recurring_transaction_template_id' => $template->id,
-                        'is_dynamic_amount' => $template->is_dynamic_amount,
-                        'created_by' => $template->created_by ?? null,
-                        'is_projected' => true
-                    ]);
+            foreach ($occurrenceDates as $date) {
+                // Check if autopay should override this projection
+                if ($template->shouldAutopayOverrideFor($date)) {
+                    continue;
                 }
 
-                $date->addDay();
+                // Determine the amount for this transaction
+                $existingTransaction = $this->getTransactionForDate($template, $date);
+
+                if ($existingTransaction) {
+                    $amount = $existingTransaction->amount_in_cents;
+                } elseif ($dynamicAmount !== null) {
+                    $amount = $dynamicAmount;
+                } else {
+                    $amount = $template->amount_in_cents;
+                }
+
+                $projectedTransactions->push([
+                    'account' => $account,
+                    'budget_id' => $template->budget_id,
+                    'description' => $template->description,
+                    'amount_in_cents' => $amount,
+                    'category' => $template->category,
+                    'account_id' => $template->account_id,
+                    'date' => $date->copy(),
+                    'recurring_transaction_template_id' => $template->id,
+                    'is_dynamic_amount' => $template->is_dynamic_amount,
+                    'created_by' => $template->created_by ?? null,
+                    'is_projected' => true
+                ]);
             }
         }
 
         return $projectedTransactions->sortBy('date')->values();
+    }
+
+    /**
+     * Generate occurrence dates for a template within a date range.
+     * Uses direct date calculation instead of day-by-day iteration for O(occurrences) performance.
+     *
+     * @param RecurringTransactionTemplate $template
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return array<Carbon>
+     */
+    protected function generateOccurrenceDates(RecurringTransactionTemplate $template, Carbon $startDate, Carbon $endDate): array
+    {
+        $occurrences = [];
+        $effectiveStart = max($startDate, $template->start_date)->copy()->startOfDay();
+
+        switch ($template->frequency) {
+            case RecurringTransactionTemplate::FREQUENCY_DAILY:
+                // For daily, iterate by day (every day is a hit, no optimization needed)
+                $date = $effectiveStart->copy();
+                while ($date <= $endDate) {
+                    if (!$template->hasTransactionForDate($date)) {
+                        $occurrences[] = $date->copy();
+                    }
+                    $date->addDay();
+                }
+                break;
+
+            case RecurringTransactionTemplate::FREQUENCY_WEEKLY:
+                // Find the first occurrence on the correct day of week
+                $date = $effectiveStart->copy();
+                while ($date->dayOfWeek !== $template->day_of_week && $date <= $endDate) {
+                    $date->addDay();
+                }
+                // Then jump by weeks
+                while ($date <= $endDate) {
+                    if (!$template->hasTransactionForDate($date)) {
+                        $occurrences[] = $date->copy();
+                    }
+                    $date->addWeek();
+                }
+                break;
+
+            case RecurringTransactionTemplate::FREQUENCY_BIWEEKLY:
+                // Find the first occurrence on the correct day of week
+                $date = $effectiveStart->copy();
+                while ($date->dayOfWeek !== $template->day_of_week && $date <= $endDate) {
+                    $date->addDay();
+                }
+                // Align to the biweekly schedule from template start
+                $weeksSinceStart = (int) $template->start_date->diffInWeeks($date);
+                if ($weeksSinceStart % 2 !== 0) {
+                    $date->addWeek();
+                }
+                // Then jump by 2 weeks
+                while ($date <= $endDate) {
+                    if (!$template->hasTransactionForDate($date)) {
+                        $occurrences[] = $date->copy();
+                    }
+                    $date->addWeeks(2);
+                }
+                break;
+
+            case RecurringTransactionTemplate::FREQUENCY_MONTHLY:
+                $targetDay = $template->day_of_month ?? $template->start_date->day;
+                $date = $effectiveStart->copy()->startOfMonth();
+                
+                while ($date <= $endDate) {
+                    // Calculate actual day for this month (handle 29th-31st in shorter months)
+                    $actualDay = min($targetDay, $date->daysInMonth);
+                    $occurrenceDate = $date->copy()->setDay($actualDay);
+                    
+                    if ($occurrenceDate >= $effectiveStart && $occurrenceDate <= $endDate) {
+                        if (!$template->hasTransactionForDate($occurrenceDate)) {
+                            $occurrences[] = $occurrenceDate;
+                        }
+                    }
+                    $date->addMonth();
+                }
+                break;
+
+            case RecurringTransactionTemplate::FREQUENCY_BIMONTHLY:
+                // Twice per month on two specific days
+                $firstDay = $template->first_day_of_month ?? 1;
+                $secondDay = $template->day_of_month ?? 15;
+                if ($firstDay > $secondDay) {
+                    [$firstDay, $secondDay] = [$secondDay, $firstDay];
+                }
+                
+                $date = $effectiveStart->copy()->startOfMonth();
+                while ($date <= $endDate) {
+                    $daysInMonth = $date->daysInMonth;
+                    
+                    // First occurrence of the month
+                    $firstOccurrence = $date->copy()->setDay(min($firstDay, $daysInMonth));
+                    if ($firstOccurrence >= $effectiveStart && $firstOccurrence <= $endDate) {
+                        if (!$template->hasTransactionForDate($firstOccurrence)) {
+                            $occurrences[] = $firstOccurrence;
+                        }
+                    }
+                    
+                    // Second occurrence of the month
+                    $secondOccurrence = $date->copy()->setDay(min($secondDay, $daysInMonth));
+                    if ($secondOccurrence >= $effectiveStart && $secondOccurrence <= $endDate) {
+                        if (!$template->hasTransactionForDate($secondOccurrence)) {
+                            $occurrences[] = $secondOccurrence;
+                        }
+                    }
+                    
+                    $date->addMonth();
+                }
+                break;
+
+            case RecurringTransactionTemplate::FREQUENCY_QUARTERLY:
+                $targetDay = $template->day_of_month ?? $template->start_date->day;
+                $date = $effectiveStart->copy()->startOfMonth();
+                
+                // Align to quarter from template start
+                $monthsSinceStart = (int) $template->start_date->diffInMonths($date);
+                $monthsToNextQuarter = $monthsSinceStart % 3;
+                if ($monthsToNextQuarter !== 0) {
+                    $date->addMonths(3 - $monthsToNextQuarter);
+                }
+                
+                while ($date <= $endDate) {
+                    $actualDay = min($targetDay, $date->daysInMonth);
+                    $occurrenceDate = $date->copy()->setDay($actualDay);
+                    
+                    if ($occurrenceDate >= $effectiveStart && $occurrenceDate <= $endDate) {
+                        if (!$template->hasTransactionForDate($occurrenceDate)) {
+                            $occurrences[] = $occurrenceDate;
+                        }
+                    }
+                    $date->addMonths(3);
+                }
+                break;
+
+            case RecurringTransactionTemplate::FREQUENCY_YEARLY:
+                $targetMonth = $template->start_date->month;
+                $targetDay = $template->start_date->day;
+                $date = $effectiveStart->copy()->startOfYear();
+                
+                while ($date <= $endDate) {
+                    $occurrenceDate = $date->copy()->setMonth($targetMonth);
+                    $daysInMonth = $occurrenceDate->daysInMonth;
+                    $actualDay = min($targetDay, $daysInMonth);
+                    $occurrenceDate->setDay($actualDay);
+                    
+                    if ($occurrenceDate >= $effectiveStart && $occurrenceDate <= $endDate) {
+                        if (!$template->hasTransactionForDate($occurrenceDate)) {
+                            $occurrences[] = $occurrenceDate;
+                        }
+                    }
+                    $date->addYear();
+                }
+                break;
+        }
+
+        return $occurrences;
     }
 
     /**
@@ -120,16 +261,41 @@ class RecurringTransactionService
     }
 
     /**
+     * Cache TTL for dynamic amounts in seconds (30 minutes)
+     */
+    protected const DYNAMIC_AMOUNT_CACHE_TTL = 1800;
+
+    /**
      * Calculate the dynamic amount for a recurring transaction template based on rules.
      * If the template is linked to a credit card, uses the card's current balance
      * if it exceeds the calculated average (reflecting current spending trajectory).
+     * Results are cached for 30 minutes.
      *
      * @param RecurringTransactionTemplate $template
      * @return int|null The calculated amount in cents or null if not calculable
      */
     protected function calculateDynamicAmount(RecurringTransactionTemplate $template): ?int
     {
-        $rules = $template->rules()->where('is_active', true)->get();
+        // Cache key for this template's dynamic amount
+        $cacheKey = "template:{$template->id}:dynamic_amount";
+
+        return Cache::remember($cacheKey, self::DYNAMIC_AMOUNT_CACHE_TTL, function () use ($template) {
+            return $this->computeDynamicAmount($template);
+        });
+    }
+
+    /**
+     * Compute the dynamic amount without caching.
+     *
+     * @param RecurringTransactionTemplate $template
+     * @return int|null
+     */
+    protected function computeDynamicAmount(RecurringTransactionTemplate $template): ?int
+    {
+        // Use pre-loaded rules if available to avoid N+1 queries
+        $rules = $template->relationLoaded('rules')
+            ? $template->rules->where('is_active', true)
+            : $template->rules()->where('is_active', true)->get();
 
         if ($rules->isEmpty()) {
             if ($template->average_amount !== null) {
@@ -260,8 +426,20 @@ class RecurringTransactionService
      * @param \Illuminate\Support\Collection $rules
      * @return \Illuminate\Support\Collection
      */
-    protected function findTransactionsMatchingAllRules(RecurringTransactionTemplate $template, Collection $rules): Collection
-    {
+    /**
+     * Find transactions that match all the provided rules for a template.
+     * If the template has a plaid_entity_id, use that for matching first.
+     *
+     * @param RecurringTransactionTemplate $template
+     * @param Collection $rules
+     * @param Collection|null $preloadedTransactions Optional pre-fetched transactions to avoid N+1 queries
+     * @return Collection
+     */
+    protected function findTransactionsMatchingAllRules(
+        RecurringTransactionTemplate $template, 
+        Collection $rules,
+        ?Collection $preloadedTransactions = null
+    ): Collection {
         // Get the budget ID from the template
         $budgetId = $template->budget_id;
 
@@ -275,13 +453,24 @@ class RecurringTransactionService
                 'plaid_entity_id' => $entityId,
             ]);
             
-            $entityMatches = Transaction::where('budget_id', $budgetId)
-                ->whereHas('plaidTransaction', function ($query) use ($entityId) {
-                    // Simple LIKE search - entity_id is unique enough
-                    $query->where('counterparties', 'like', '%' . $entityId . '%');
-                })
-                ->with('plaidTransaction')
-                ->get();
+            // Use preloaded transactions if available, otherwise query
+            if ($preloadedTransactions !== null) {
+                $entityMatches = $preloadedTransactions->filter(function (Transaction $transaction) use ($entityId) {
+                    if (!$transaction->plaidTransaction) {
+                        return false;
+                    }
+                    $counterparties = $transaction->plaidTransaction->counterparties ?? '';
+                    return is_string($counterparties) && str_contains($counterparties, $entityId);
+                });
+            } else {
+                $entityMatches = Transaction::where('budget_id', $budgetId)
+                    ->whereHas('plaidTransaction', function ($query) use ($entityId) {
+                        // Simple LIKE search - entity_id is unique enough
+                        $query->where('counterparties', 'like', '%' . $entityId . '%');
+                    })
+                    ->with('plaidTransaction')
+                    ->get();
+            }
             
             Log::debug('RecurringTransactionService: Entity matching results', [
                 'template_id' => $template->id,
@@ -324,7 +513,8 @@ class RecurringTransactionService
             'rules_count' => $rules->count(),
         ]);
         
-        $transactions = Transaction::where('budget_id', $budgetId)->get();
+        // Use preloaded transactions if available, otherwise query
+        $transactions = $preloadedTransactions ?? Transaction::where('budget_id', $budgetId)->with('plaidTransaction')->get();
 
         // Filter transactions that match all rules
         $matchingTransactions = $transactions->filter(function (Transaction $transaction) use ($rules) {
@@ -1988,6 +2178,28 @@ class RecurringTransactionService
         }
 
         return $category;
+    }
+
+    /**
+     * Clear the dynamic amount cache for a template.
+     */
+    public static function clearDynamicAmountCache(int $templateId): void
+    {
+        Cache::forget("template:{$templateId}:dynamic_amount");
+    }
+
+    /**
+     * Clear all dynamic amount caches for templates belonging to an account.
+     */
+    public static function clearDynamicAmountCacheForAccount(int $accountId): void
+    {
+        // Get all template IDs for this account and clear their caches
+        $templateIds = RecurringTransactionTemplate::where('account_id', $accountId)
+            ->pluck('id');
+
+        foreach ($templateIds as $templateId) {
+            Cache::forget("template:{$templateId}:dynamic_amount");
+        }
     }
 
 }

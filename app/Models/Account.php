@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AccountStatus;
+use App\Services\BudgetService;
 use App\Traits\InstitutionDomainMapping;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,44 @@ class Account extends Model
 {
     use HasFactory;
     use InstitutionDomainMapping;
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Clear projection caches when autopay settings change
+        static::updated(function (Account $account) {
+            // Check if autopay-related fields changed
+            $autopayFields = ['autopay_enabled', 'autopay_source_account_id', 'autopay_amount_override_cents', 'current_balance_cents'];
+            $autopayChanged = false;
+            
+            foreach ($autopayFields as $field) {
+                if ($account->isDirty($field)) {
+                    $autopayChanged = true;
+                    break;
+                }
+            }
+            
+            if ($autopayChanged) {
+                // Clear caches for this account
+                BudgetService::clearAccountCaches($account->id);
+                
+                // If this is an autopay source, also clear caches for target accounts
+                if ($account->isDirty('autopay_source_account_id')) {
+                    $oldSourceId = $account->getOriginal('autopay_source_account_id');
+                    if ($oldSourceId) {
+                        BudgetService::clearAccountCaches($oldSourceId);
+                    }
+                    if ($account->autopay_source_account_id) {
+                        BudgetService::clearAccountCaches($account->autopay_source_account_id);
+                    }
+                }
+            }
+        });
+    }
 
     /**
      * Account types that are considered liabilities.

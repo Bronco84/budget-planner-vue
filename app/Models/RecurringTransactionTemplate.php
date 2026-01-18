@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\BudgetService;
+use App\Services\RecurringTransactionService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,8 +20,35 @@ class RecurringTransactionTemplate extends Model
     {
         parent::boot();
 
-        // When deleting a template, unlink any associated transactions
+        // Clear projection caches when templates are created/updated
+        static::created(function (RecurringTransactionTemplate $template) {
+            if ($template->account_id) {
+                BudgetService::clearAccountCaches($template->account_id);
+            }
+        });
+
+        static::updated(function (RecurringTransactionTemplate $template) {
+            // Clear dynamic amount cache for this template
+            RecurringTransactionService::clearDynamicAmountCache($template->id);
+            
+            // Clear projection caches for affected account(s)
+            if ($template->account_id) {
+                BudgetService::clearAccountCaches($template->account_id);
+            }
+            // Also clear for old account if account changed
+            if ($template->isDirty('account_id') && $template->getOriginal('account_id')) {
+                BudgetService::clearAccountCaches($template->getOriginal('account_id'));
+            }
+        });
+
+        // When deleting a template, unlink any associated transactions and clear caches
         static::deleting(function (RecurringTransactionTemplate $template) {
+            // Clear caches before deletion
+            RecurringTransactionService::clearDynamicAmountCache($template->id);
+            if ($template->account_id) {
+                BudgetService::clearAccountCaches($template->account_id);
+            }
+            
             // Clear the recurring_transaction_template_id on all linked transactions
             Transaction::where('recurring_transaction_template_id', $template->id)
                 ->update(['recurring_transaction_template_id' => null]);

@@ -121,11 +121,16 @@ class BudgetController extends Controller
         $budgetService = app(BudgetService::class);
         $user = Auth::user();
 
-        // Load relationships including plaidAccount with connection and holdings
+        // Load all relationships upfront to prevent N+1 queries
+        // This includes plaidAccount with connection, holdings, statement history for autopay projections,
+        // and autopaySourceAccount for autopay deduction calculations
         $budget->load([
             'categories',
             'accounts.plaidAccount.plaidConnection',
             'accounts.plaidAccount.holdings.security',
+            'accounts.plaidAccount.statementHistory',
+            'accounts.autopaySourceAccount',
+            'properties.linkedAccounts',
         ]);
 
         // Initialize variables for account-dependent data
@@ -204,9 +209,6 @@ class BudgetController extends Controller
 
         // Calculate the total balance across all accounts
         $totalBalance = $budgetService->calculateTotalBalance($budget);
-
-        // Load properties with their linked accounts
-        $budget->load('properties.linkedAccounts');
 
         return Inertia::render('Budgets/Show', [
             'budget' => $budget,

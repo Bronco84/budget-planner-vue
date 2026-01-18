@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\BudgetService;
+use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +16,48 @@ use Spatie\Activitylog\LogOptions;
 class Transaction extends Model
 {
     use HasFactory, LogsActivity;
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Clear projection caches when transactions are created/updated/deleted
+        static::created(function (Transaction $transaction) {
+            if ($transaction->account_id) {
+                BudgetService::clearAccountCaches($transaction->account_id);
+            }
+            // If linked to a template, clear its dynamic amount cache
+            if ($transaction->recurring_transaction_template_id) {
+                RecurringTransactionService::clearDynamicAmountCache($transaction->recurring_transaction_template_id);
+            }
+        });
+
+        static::updated(function (Transaction $transaction) {
+            if ($transaction->account_id) {
+                BudgetService::clearAccountCaches($transaction->account_id);
+            }
+            // Also clear for old account if account changed
+            if ($transaction->isDirty('account_id') && $transaction->getOriginal('account_id')) {
+                BudgetService::clearAccountCaches($transaction->getOriginal('account_id'));
+            }
+            // If linked to a template, clear its dynamic amount cache
+            if ($transaction->recurring_transaction_template_id) {
+                RecurringTransactionService::clearDynamicAmountCache($transaction->recurring_transaction_template_id);
+            }
+        });
+
+        static::deleted(function (Transaction $transaction) {
+            if ($transaction->account_id) {
+                BudgetService::clearAccountCaches($transaction->account_id);
+            }
+            if ($transaction->recurring_transaction_template_id) {
+                RecurringTransactionService::clearDynamicAmountCache($transaction->recurring_transaction_template_id);
+            }
+        });
+    }
 
     /**
      * The attributes that are mass assignable.

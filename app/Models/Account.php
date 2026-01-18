@@ -371,13 +371,11 @@ class Account extends Model
 
                 // Simple hash of the name to get consistent color
                 $name = $this->getInstitutionNameAttribute() ?? '';
-                $hash = 0;
-
-                for ($i = 0; $i < strlen($name); $i++) {
-                    $hash = (($hash << 5) - $hash) + ord($name[$i]);
-                    $hash = $hash & $hash; // Convert to 32bit integer
-                }
-
+                
+                // Use a simple string hash that won't overflow
+                $hash = crc32($name);
+                
+                // crc32 can return negative values, so use abs
                 return $colors[abs($hash) % count($colors)];
             }
         );

@@ -177,6 +177,10 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.index');
     Route::get('budget/{budget}/recurring-transactions/create', [RecurringTransactionController::class, 'create'])
         ->name('recurring-transactions.create');
+    Route::get('budget/{budget}/recurring-transactions/find-matching', [RecurringTransactionController::class, 'findMatchingTransactions'])
+        ->name('recurring-transactions.find-matching');
+    Route::post('budget/{budget}/recurring-transactions/link-transactions', [RecurringTransactionController::class, 'linkSelectedTransactions'])
+        ->name('recurring-transactions.link-transactions');
     Route::post('budget/{budget}/recurring-transactions', [RecurringTransactionController::class, 'store'])
         ->name('recurring-transactions.store');
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}', [RecurringTransactionController::class, 'edit'])
@@ -191,10 +195,6 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.diagnostics');
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/test-matching', [RecurringTransactionController::class, 'testMatching'])
         ->name('recurring-transactions.test-matching');
-    Route::get('budget/{budget}/recurring-transactions/find-matching', [RecurringTransactionController::class, 'findMatchingTransactions'])
-        ->name('recurring-transactions.find-matching');
-    Route::post('budget/{budget}/recurring-transactions/link-transactions', [RecurringTransactionController::class, 'linkSelectedTransactions'])
-        ->name('recurring-transactions.link-transactions');
     
     // Routes for recurring transaction rules
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/rules', [RecurringTransactionRuleController::class, 'index'])

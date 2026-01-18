@@ -898,10 +898,9 @@ class RecurringTransactionService
         // Strategy 2: Contains match with minimum length requirement
         // Require at least 5 characters to avoid false positives
         if (strlen($templateDesc) >= 5 && str_contains($transactionDesc, $templateDesc)) {
-            // If template has a category, require category match (AND logic)
-            if ($template->category) {
-                return $transaction->category === $template->category;
-            }
+            // For description matching, category is optional (not enforced)
+            // This is because description matching is already a fallback method
+            // and enforcing category would be too restrictive
             return true;
         }
 
@@ -909,10 +908,7 @@ class RecurringTransactionService
         // This helps catch variations like "ENTERGY ARKANSAS" vs "Entergy Arkansas Electric"
         similar_text($templateDesc, $transactionDesc, $percent);
         if ($percent >= 70) {
-            // If template has a category, require category match (AND logic)
-            if ($template->category) {
-                return $transaction->category === $template->category;
-            }
+            // For description matching, category is optional (not enforced)
             return true;
         }
 

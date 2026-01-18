@@ -300,10 +300,10 @@
                     <template v-if="!recurringTransaction.plaid_entity_id && activeRulesCount === 0">
                       Currently matching: "{{ recurringTransaction.description }}"
                       <span class="block mt-1 text-xs">
-                        Matches transactions containing this text (70%+ similarity). Less reliable than entity ID or rules.
+                        Matches transactions containing this text (70%+ similarity) in the original Plaid description. Category is not enforced.
                       </span>
                       <span class="block mt-2 text-xs font-medium">
-                        💡 Tip: Add rules or capture entity ID for better accuracy.
+                        💡 Tip: Use "Test Matching" to see what matches, or add rules/capture entity ID for better accuracy.
                       </span>
                     </template>
                     <template v-else>

@@ -558,23 +558,13 @@ class RecurringTransactionController extends Controller
                     $matchMethod = 'description_exact';
                     $matchDetails = 'Exact description match';
                 } elseif (strlen($templateDesc) >= 5 && str_contains($transactionDesc, $templateDesc)) {
-                    if (!$recurring_transaction->category || $transaction->category === $recurring_transaction->category) {
-                        $matchMethod = 'description_contains';
-                        $matchDetails = 'Description contains "' . $recurring_transaction->description . '"';
-                        if ($recurring_transaction->category) {
-                            $matchDetails .= ' and category matches';
-                        }
-                    }
+                    $matchMethod = 'description_contains';
+                    $matchDetails = 'Description contains "' . $recurring_transaction->description . '"';
                 } else {
                     similar_text($templateDesc, $transactionDesc, $percent);
                     if ($percent >= 70) {
-                        if (!$recurring_transaction->category || $transaction->category === $recurring_transaction->category) {
-                            $matchMethod = 'description_fuzzy';
-                            $matchDetails = 'Fuzzy match (' . round($percent) . '% similarity)';
-                            if ($recurring_transaction->category) {
-                                $matchDetails .= ' and category matches';
-                            }
-                        }
+                        $matchMethod = 'description_fuzzy';
+                        $matchDetails = 'Fuzzy match (' . round($percent) . '% similarity)';
                     }
                 }
             }

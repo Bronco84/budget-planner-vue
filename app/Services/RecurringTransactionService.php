@@ -892,8 +892,17 @@ class RecurringTransactionService
         ]);
         
         foreach ($templates as $template) {
+            Log::debug('RecurringTransactionService: Processing template', [
+                'template_id' => $template->id,
+                'description' => $template->description,
+            ]);
+            
             // Skip if already has entity ID
             if ($template->plaid_entity_id) {
+                Log::debug('RecurringTransactionService: Template already has entity ID', [
+                    'template_id' => $template->id,
+                    'plaid_entity_id' => $template->plaid_entity_id,
+                ]);
                 $alreadyHasEntity++;
                 continue;
             }
@@ -904,7 +913,20 @@ class RecurringTransactionService
                 ->with('plaidTransaction')
                 ->get();
             
+            // Also check total linked transactions (including manual ones)
+            $totalLinkedCount = Transaction::where('recurring_transaction_template_id', $template->id)->count();
+            
+            Log::debug('RecurringTransactionService: Linked transactions check', [
+                'template_id' => $template->id,
+                'plaid_linked_count' => $linkedTransactions->count(),
+                'total_linked_count' => $totalLinkedCount,
+            ]);
+            
             if ($linkedTransactions->isEmpty()) {
+                Log::debug('RecurringTransactionService: No Plaid-linked transactions found', [
+                    'template_id' => $template->id,
+                    'total_linked_count' => $totalLinkedCount,
+                ]);
                 $noTransactions++;
                 continue;
             }
@@ -945,7 +967,16 @@ class RecurringTransactionService
                 }
             }
             
+            Log::debug('RecurringTransactionService: Entity IDs extracted', [
+                'template_id' => $template->id,
+                'entity_ids_found' => count($entityIds),
+                'entity_ids' => array_unique($entityIds),
+            ]);
+            
             if (empty($entityIds)) {
+                Log::debug('RecurringTransactionService: No entity IDs found in transactions', [
+                    'template_id' => $template->id,
+                ]);
                 $skipped++;
                 continue;
             }

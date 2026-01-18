@@ -673,7 +673,7 @@ const form = useForm({
   is_dynamic_amount: props.recurringTransaction.is_dynamic_amount,
   min_amount: props.recurringTransaction.min_amount ? Math.abs(props.recurringTransaction.min_amount / 100) : '',
   max_amount: props.recurringTransaction.max_amount ? Math.abs(props.recurringTransaction.max_amount / 100) : '',
-  average_amount: props.recurringTransaction.average_amount ? props.recurringTransaction.average_amount / 100 : '',
+  average_amount: props.recurringTransaction.average_amount ?? '',
   frequency: props.recurringTransaction.frequency,
   day_of_week: props.recurringTransaction.day_of_week,
   day_of_month: props.recurringTransaction.day_of_month,

@@ -287,6 +287,11 @@ class RecurringTransactionService
     /**
      * Compute the dynamic amount without caching.
      *
+     * Calculation priority:
+     * 1. If rules exist, find matching transactions via rules and calculate average
+     * 2. If no rules but has linked transactions, use those for averaging
+     * 3. Fall back to stored average_amount or amount_in_cents
+     *
      * @param RecurringTransactionTemplate $template
      * @return int|null
      */
@@ -297,26 +302,48 @@ class RecurringTransactionService
             ? $template->rules->where('is_active', true)
             : $template->rules()->where('is_active', true)->get();
 
-        if ($rules->isEmpty()) {
-            if ($template->average_amount !== null) {
-                $calculatedAmount = (int)($template->average_amount * 100);
-                return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
-            }
-            return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
+        $matchingTransactions = collect();
+
+        // Priority 1: If rules exist, use rule-based matching
+        if ($rules->isNotEmpty()) {
+            $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
+
+            Log::debug('computeDynamicAmount: Rule-based matching', [
+                'template_id' => $template->id,
+                'rules_count' => $rules->count(),
+                'matches_found' => $matchingTransactions->count(),
+            ]);
         }
 
-        $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
-
-        Log::debug($rules);
-
-        Log::debug($matchingTransactions);
-
+        // Priority 2: If no rules or no rule matches, check linked transactions
         if ($matchingTransactions->isEmpty()) {
+            // Get linked transactions (those with recurring_transaction_template_id = this template)
+            $linkedTransactions = $template->relationLoaded('transactions')
+                ? $template->transactions
+                : $template->transactions()->get();
+
+            if ($linkedTransactions->isNotEmpty()) {
+                $matchingTransactions = $linkedTransactions;
+
+                Log::debug('computeDynamicAmount: Using linked transactions', [
+                    'template_id' => $template->id,
+                    'linked_count' => $linkedTransactions->count(),
+                ]);
+            }
+        }
+
+        // Priority 3: If still no transactions, fall back to stored values
+        if ($matchingTransactions->isEmpty()) {
+            Log::debug('computeDynamicAmount: No transactions found, using fallback', [
+                'template_id' => $template->id,
+                'has_average_amount' => $template->average_amount !== null,
+                'average_amount' => $template->average_amount,
+            ]);
+
             if ($template->average_amount !== null) {
                 $calculatedAmount = (int)($template->average_amount * 100);
                 return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
             }
-
             return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
         }
 
@@ -346,6 +373,11 @@ class RecurringTransactionService
 
         if ($filteredTransactions->isEmpty()) {
             // If no transactions left after filtering, fallback
+            Log::debug('computeDynamicAmount: All transactions filtered out by min/max, using fallback', [
+                'template_id' => $template->id,
+                'original_count' => $matchingTransactions->count(),
+            ]);
+
             if ($template->average_amount !== null) {
                 $calculatedAmount = (int)($template->average_amount * 100);
                 return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
@@ -357,6 +389,13 @@ class RecurringTransactionService
         // Calculate average of only the valid transactions
         $totalAmount = $filteredTransactions->sum('amount_in_cents');
         $averageAmount = (int)($totalAmount / $filteredTransactions->count());
+
+        Log::debug('computeDynamicAmount: Calculated average from transactions', [
+            'template_id' => $template->id,
+            'transaction_count' => $filteredTransactions->count(),
+            'total_amount_cents' => $totalAmount,
+            'average_amount_cents' => $averageAmount,
+        ]);
 
         return $this->applyLinkedCreditCardBalance($template, $averageAmount);
     }
@@ -1622,28 +1661,46 @@ class RecurringTransactionService
     /**
      * Calculate improved dynamic amount using advanced analytics
      *
+     * Calculation priority:
+     * 1. If rules exist, find matching transactions via rules
+     * 2. If no rules but has linked transactions, use those
+     * 3. Fall back to stored average_amount or amount_in_cents
+     *
      * @param RecurringTransactionTemplate $template
      * @return array
      */
     protected function calculateImprovedDynamicAmount(RecurringTransactionTemplate $template): array
     {
         $rules = $template->rules()->where('is_active', true)->get();
+        $matchingTransactions = collect();
+        $matchMethod = 'none';
         
-        if ($rules->isEmpty()) {
-            return [
-                'amount' => $template->average_amount ? (int)($template->average_amount * 100) : $template->amount_in_cents,
-                'method' => 'fallback',
-                'confidence' => ['score' => 0, 'level' => 'low', 'factors' => ['No rules configured']]
-            ];
+        // Priority 1: If rules exist, use rule-based matching
+        if ($rules->isNotEmpty()) {
+            $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
+            $matchMethod = 'rules';
         }
         
-        $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
-        
+        // Priority 2: If no rules or no rule matches, check linked transactions
         if ($matchingTransactions->isEmpty()) {
+            $linkedTransactions = $template->transactions()->get();
+            
+            if ($linkedTransactions->isNotEmpty()) {
+                $matchingTransactions = $linkedTransactions;
+                $matchMethod = 'linked_transactions';
+            }
+        }
+        
+        // Priority 3: If still no transactions, fall back to stored values
+        if ($matchingTransactions->isEmpty()) {
+            $factors = $rules->isEmpty() 
+                ? ['No rules configured and no linked transactions'] 
+                : ['No matching transactions found'];
+            
             return [
                 'amount' => $template->average_amount ? (int)($template->average_amount * 100) : $template->amount_in_cents,
                 'method' => 'fallback',
-                'confidence' => ['score' => 0, 'level' => 'low', 'factors' => ['No matching transactions found']]
+                'confidence' => ['score' => 0, 'level' => 'low', 'factors' => $factors]
             ];
         }
         

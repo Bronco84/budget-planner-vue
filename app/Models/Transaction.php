@@ -151,7 +151,7 @@ class Transaction extends Model
         return '$' . number_format($this->amount_in_cents / 100, 2);
     }
 
-    public function scopeFromFuture(\Illuminate\Database\Eloquent\Builder $query, string $date = null): \Illuminate\Database\Eloquent\Builder
+    public function scopeFromFuture(\Illuminate\Database\Eloquent\Builder $query, ?string $date = null): \Illuminate\Database\Eloquent\Builder
     {
         return $query->when(
             isset($date),

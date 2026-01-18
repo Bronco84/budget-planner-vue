@@ -874,6 +874,7 @@ class RecurringTransactionService
         $skipped = 0;
         $noTransactions = 0;
         $alreadyHasEntity = 0;
+        $totalNewlyLinked = 0;
         
         // Get all templates without entity IDs
         $templates = RecurringTransactionTemplate::where('budget_id', $budget->id)
@@ -951,6 +952,13 @@ class RecurringTransactionService
                 'plaid_entity_name' => $entityName,
             ]);
             
+            // Refresh the template to get the updated entity ID
+            $template->refresh();
+            
+            // Now link any unlinked transactions that match this entity ID
+            $newlyLinkedCount = $this->linkTransactionsToTemplate($template);
+            $totalNewlyLinked += $newlyLinkedCount;
+            
             $upgraded++;
             
             Log::info('RecurringTransactionService: Upgraded template with entity ID', [
@@ -958,7 +966,8 @@ class RecurringTransactionService
                 'description' => $template->description,
                 'entity_id' => $mostCommonEntityId,
                 'entity_name' => $entityName,
-                'linked_transactions_count' => $linkedTransactions->count(),
+                'already_linked_transactions_count' => $linkedTransactions->count(),
+                'newly_linked_transactions_count' => $newlyLinkedCount,
             ]);
         }
         
@@ -968,6 +977,7 @@ class RecurringTransactionService
             'skipped' => $skipped,
             'no_transactions' => $noTransactions,
             'already_has_entity' => $alreadyHasEntity,
+            'newly_linked' => $totalNewlyLinked,
         ];
     }
 

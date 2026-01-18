@@ -639,6 +639,14 @@ class RecurringTransactionController extends Controller
             $stats['upgraded'] === 1 ? '' : 's'
         );
         
+        if (isset($stats['newly_linked']) && $stats['newly_linked'] > 0) {
+            $message .= sprintf(
+                ' Linked %d additional transaction%s using the new entity IDs.',
+                $stats['newly_linked'],
+                $stats['newly_linked'] === 1 ? '' : 's'
+            );
+        }
+        
         if ($stats['skipped'] > 0 || $stats['no_transactions'] > 0) {
             $message .= sprintf(
                 ' Skipped %d template%s (no entity IDs found or no linked transactions).',

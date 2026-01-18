@@ -16,7 +16,7 @@
       </div>
     </template>
 
-    <div class="py-4">
+    <div class="py-4" :class="{ 'pb-20': totalSelectedTransactions > 0 }">
       <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
         <!-- Summary Card -->
         <div class="bg-white shadow-sm sm:rounded-lg mb-6">
@@ -131,32 +131,33 @@
           </div>
         </div>
 
-        <!-- Bottom Action Bar (sticky) -->
-        <div v-if="totalSelectedTransactions > 0" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4">
-          <div class="max-w-8xl mx-auto flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              <span class="font-semibold">{{ totalSelectedTransactions }}</span> transaction{{ totalSelectedTransactions !== 1 ? 's' : '' }} selected
-            </div>
-            <div class="flex items-center space-x-3">
-              <button
-                @click="clearSelection"
-                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
-              >
-                Clear Selection
-              </button>
-              <button
-                @click="linkSelected"
-                :disabled="isLinking"
-                class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
-              >
-                <svg v-if="isLinking" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {{ isLinking ? 'Linking...' : `Link ${totalSelectedTransactions} Transaction${totalSelectedTransactions !== 1 ? 's' : ''}` }}
-              </button>
-            </div>
-          </div>
+      </div>
+    </div>
+
+    <!-- Bottom Action Bar (sticky) -->
+    <div v-if="totalSelectedTransactions > 0" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 z-50">
+      <div class="max-w-8xl mx-auto px-2 sm:px-2 lg:px-4 flex items-center justify-between">
+        <div class="text-sm text-gray-600">
+          <span class="font-semibold">{{ totalSelectedTransactions }}</span> transaction{{ totalSelectedTransactions !== 1 ? 's' : '' }} selected
+        </div>
+        <div class="flex items-center space-x-3">
+          <button
+            @click="clearSelection"
+            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
+          >
+            Clear Selection
+          </button>
+          <button
+            @click="linkSelected"
+            :disabled="isLinking"
+            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
+          >
+            <svg v-if="isLinking" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            {{ isLinking ? 'Linking...' : `Link ${totalSelectedTransactions} Transaction${totalSelectedTransactions !== 1 ? 's' : ''}` }}
+          </button>
         </div>
       </div>
     </div>

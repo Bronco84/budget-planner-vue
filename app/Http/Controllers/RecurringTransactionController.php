@@ -125,6 +125,7 @@ class RecurringTransactionController extends Controller
             'max_amount' => 'nullable|numeric',
             'average_amount' => 'nullable|numeric',
             'notes' => 'nullable|string',
+            'from_transaction_id' => 'nullable|integer|exists:transactions,id',
             'rules' => 'array',
             'rules.*.field' => 'required|string|in:description,amount,category',
             'rules.*.operator' => 'required|string|in:contains,equals,starts_with,ends_with,regex,greater_than,less_than',
@@ -160,6 +161,10 @@ class RecurringTransactionController extends Controller
         $rules = $validated['rules'] ?? [];
         unset($validated['rules']);
         
+        // Extract source transaction ID if provided (for linking after creation)
+        $fromTransactionId = $validated['from_transaction_id'] ?? null;
+        unset($validated['from_transaction_id']);
+        
         // Ensure budget_id is set
         $validated['budget_id'] = $budget->id;
 
@@ -178,6 +183,24 @@ class RecurringTransactionController extends Controller
                 'stack_trace' => $e->getTraceAsString()
             ]);
             throw $e;
+        }
+
+        // Link the source transaction if provided (from "Make Recurring" action)
+        if ($fromTransactionId) {
+            $sourceTransaction = Transaction::where('id', $fromTransactionId)
+                ->where('budget_id', $budget->id)
+                ->whereNull('recurring_transaction_template_id')
+                ->first();
+            
+            if ($sourceTransaction) {
+                $sourceTransaction->recurring_transaction_template_id = $recurringTransaction->id;
+                $sourceTransaction->save();
+                
+                \Log::debug('Linked source transaction to new recurring template:', [
+                    'transaction_id' => $sourceTransaction->id,
+                    'template_id' => $recurringTransaction->id,
+                ]);
+            }
         }
 
         // Create rules if provided (rules can be used for both dynamic and fixed amount templates)

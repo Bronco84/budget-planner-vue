@@ -502,6 +502,7 @@ const today = new Date().toISOString().substring(0, 10);
 
 // Initialize form with sourceTransaction data if available
 const form = useForm({
+  from_transaction_id: props.sourceTransaction?.id || null,
   description: props.sourceTransaction?.description || '',
   amount: props.sourceTransaction ? Math.abs(props.sourceTransaction.amount_in_cents / 100) : '',
   account_id: props.sourceTransaction?.account_id || '',

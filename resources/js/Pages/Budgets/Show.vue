@@ -511,14 +511,16 @@
 
                         <!-- Today marker -->
                         <tr v-if="shouldShowTodayMarker(transaction, index)">
-                          <td colspan="6" class="px-6 py-3">
-                            <div class="flex items-center justify-center">
-                              <div class="flex items-center space-x-2 px-3 py-1.5 bg-indigo-100 border border-indigo-300 rounded-full shadow-sm">
-                                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <td colspan="6" class="px-0 py-0">
+                            <div class="flex items-center gap-3 py-2 bg-indigo-50 border-y border-indigo-200">
+                              <div class="flex-1 h-px bg-indigo-300"></div>
+                              <div class="flex items-center gap-1.5 px-3 py-1">
+                                <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
-                                <span class="font-semibold text-indigo-700 text-xs uppercase tracking-wide">Today</span>
+                                <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wider">Today</span>
                               </div>
+                              <div class="flex-1 h-px bg-indigo-300"></div>
                             </div>
                           </td>
                         </tr>
@@ -1726,7 +1728,7 @@ const getMonthLabel = (dateString) => {
 };
 
 const shouldShowTodayMarker = (transaction, index) => {
-  // Only check the first transaction or if we haven't shown the marker yet
+  // Only show the marker once
   if (hasShownTodayMarker.value) return false;
   if (!transaction.date) return false;
 
@@ -1735,20 +1737,33 @@ const shouldShowTodayMarker = (transaction, index) => {
   const transactionDate = new Date(transaction.date);
   transactionDate.setHours(0, 0, 0, 0);
 
-  // If this is the first transaction that's on or after today, show the marker
-  if (transactionDate >= today && index > 0) {
+  // Transactions are sorted newest first (descending)
+  // We want to show the "Today" marker at the transition point between future and past
+  
+  // If this is the first transaction (newest) and it's today or in the future,
+  // show the marker before it
+  if (index === 0 && transactionDate >= today) {
     hasShownTodayMarker.value = true;
     return true;
   }
 
-  // Also check if this is the last transaction before today
+  // If the previous transaction is in the future and this one is today or in the past,
+  // show the marker before the previous one (but since we check at current index,
+  // we need to detect the transition differently)
   if (index > 0) {
     const prevTransaction = sortedTransactions.value[index - 1];
-    if (prevTransaction) {
+    if (prevTransaction && prevTransaction.date) {
       const prevDate = new Date(prevTransaction.date);
       prevDate.setHours(0, 0, 0, 0);
 
-      if (prevDate < today && transactionDate >= today) {
+      // If previous transaction is in the future and current is today or past
+      if (prevDate > today && transactionDate <= today) {
+        hasShownTodayMarker.value = true;
+        return true;
+      }
+      
+      // If previous transaction is today or future and current is in the past
+      if (prevDate >= today && transactionDate < today) {
         hasShownTodayMarker.value = true;
         return true;
       }

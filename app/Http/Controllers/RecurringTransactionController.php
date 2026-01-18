@@ -178,8 +178,8 @@ class RecurringTransactionController extends Controller
             throw $e;
         }
 
-        // Create rules if this is a dynamic amount transaction
-        if ($validated['is_dynamic_amount'] && !empty($rules)) {
+        // Create rules if provided (rules can be used for both dynamic and fixed amount templates)
+        if (!empty($rules)) {
             foreach ($rules as $index => $ruleData) {
                 // Add priority based on the order of rules
                 $ruleData['priority'] = $index + 1;
@@ -192,7 +192,8 @@ class RecurringTransactionController extends Controller
             
             \Log::debug('Linked matching transactions by rules:', [
                 'template_id' => $recurringTransaction->id,
-                'linked_count' => $linkedCount
+                'linked_count' => $linkedCount,
+                'is_dynamic_amount' => $validated['is_dynamic_amount']
             ]);
         }
 
@@ -317,65 +318,60 @@ class RecurringTransactionController extends Controller
             'is_dynamic_amount' => $recurring_transaction->is_dynamic_amount,
         ]);
 
-        // Handle rules if this is a dynamic amount transaction
-        if ($request->input('is_dynamic_amount')) {
-            // Get existing rule IDs to determine which ones to delete
-            $existingRuleIds = $recurring_transaction->rules()->pluck('id')->toArray();
-            $updatedRuleIds = [];
+        // Handle rules (rules can be used for both dynamic and fixed amount templates)
+        // Get existing rule IDs to determine which ones to delete
+        $existingRuleIds = $recurring_transaction->rules()->pluck('id')->toArray();
+        $updatedRuleIds = [];
 
-            Log::debug('Processing dynamic amount transaction rules:', [
-                'existing_rule_ids' => $existingRuleIds,
-                'rules_count' => count($rules),
-            ]);
+        Log::debug('Processing recurring transaction rules:', [
+            'existing_rule_ids' => $existingRuleIds,
+            'rules_count' => count($rules),
+            'is_dynamic_amount' => $request->input('is_dynamic_amount'),
+        ]);
 
-            // Update or create rules
-            foreach ($rules as $ruleData) {
-                $ruleId = $ruleData['id'] ?? null;
+        // Update or create rules
+        foreach ($rules as $ruleData) {
+            $ruleId = $ruleData['id'] ?? null;
 
-                // Remove id from the data before create/update
-                if (isset($ruleData['id'])) {
-                    unset($ruleData['id']);
-                }
-
-                Log::debug('Processing rule:', [
-                    'rule_id' => $ruleId,
-                    'rule_data' => $ruleData,
-                ]);
-
-                if ($ruleId) {
-                    // Update existing rule if it belongs to this template
-                    $rule = $recurring_transaction->rules()->find($ruleId);
-                    if ($rule) {
-                        $rule->update($ruleData);
-                        $updatedRuleIds[] = $ruleId;
-                        Log::debug('Updated existing rule:', ['rule_id' => $ruleId]);
-                    }
-                } else {
-                    // Create new rule
-                    $rule = $recurring_transaction->rules()->create($ruleData);
-                    $updatedRuleIds[] = $rule->id;
-                    Log::debug('Created new rule:', ['rule_id' => $rule->id]);
-                }
+            // Remove id from the data before create/update
+            if (isset($ruleData['id'])) {
+                unset($ruleData['id']);
             }
 
-            // Delete rules that weren't updated
-            $toDelete = array_diff($existingRuleIds, $updatedRuleIds);
-            if (!empty($toDelete)) {
-                $recurring_transaction->rules()->whereIn('id', $toDelete)->delete();
-                Log::debug('Deleted rules:', ['deleted_rule_ids' => $toDelete]);
-            }
-
-            // Verify rules were created
-            $finalRules = $recurring_transaction->rules()->get();
-            Log::debug('Final rules after update:', [
-                'count' => $finalRules->count(),
-                'rules' => $finalRules,
+            Log::debug('Processing rule:', [
+                'rule_id' => $ruleId,
+                'rule_data' => $ruleData,
             ]);
-        } else {
-            // If not dynamic amount, delete all rules
-            $recurring_transaction->rules()->delete();
-            Log::debug('Deleted all rules (not a dynamic amount transaction)');
+
+            if ($ruleId) {
+                // Update existing rule if it belongs to this template
+                $rule = $recurring_transaction->rules()->find($ruleId);
+                if ($rule) {
+                    $rule->update($ruleData);
+                    $updatedRuleIds[] = $ruleId;
+                    Log::debug('Updated existing rule:', ['rule_id' => $ruleId]);
+                }
+            } else {
+                // Create new rule
+                $rule = $recurring_transaction->rules()->create($ruleData);
+                $updatedRuleIds[] = $rule->id;
+                Log::debug('Created new rule:', ['rule_id' => $rule->id]);
+            }
         }
+
+        // Delete rules that weren't in the update (removed by user)
+        $toDelete = array_diff($existingRuleIds, $updatedRuleIds);
+        if (!empty($toDelete)) {
+            $recurring_transaction->rules()->whereIn('id', $toDelete)->delete();
+            Log::debug('Deleted rules:', ['deleted_rule_ids' => $toDelete]);
+        }
+
+        // Verify rules were processed
+        $finalRules = $recurring_transaction->rules()->get();
+        Log::debug('Final rules after update:', [
+            'count' => $finalRules->count(),
+            'rules' => $finalRules,
+        ]);
 
         return redirect()->route('recurring-transactions.index', $budget)
             ->with('message', 'Recurring transaction updated successfully');

@@ -553,10 +553,7 @@ class RecurringTransactionService
      */
     public function linkMatchingTransactionsByRules(RecurringTransactionTemplate $template)
     {
-        if (!$template->is_dynamic_amount) {
-            return 0;
-        }
-
+        // Allow rule-based matching for all templates, not just dynamic amount ones
         $rules = $template->rules()->where('is_active', true)->get();
         if ($rules->isEmpty()) {
             return 0;
@@ -625,6 +622,148 @@ class RecurringTransactionService
         }
 
         return ['unlinked' => $unlinkedCount, 'linked' => $linkedCount];
+    }
+
+    /**
+     * Automatically link new unlinked transactions to existing recurring templates for an account.
+     * This is called after new transactions are synced from Plaid.
+     * 
+     * Uses a multi-strategy approach:
+     * 1. Plaid entity_id matching (most reliable)
+     * 2. Rule-based matching (for templates with active rules)
+     * 3. Description matching (fallback)
+     *
+     * @param Account $account
+     * @param int $daysBack Number of days back to look for unlinked transactions
+     * @return array Stats about linked transactions
+     */
+    public function autoLinkTransactionsForAccount(Account $account, int $daysBack = 30): array
+    {
+        $linkedCount = 0;
+        $linkedByEntity = 0;
+        $linkedByRules = 0;
+        $linkedByDescription = 0;
+        
+        // Get unlinked transactions for this account from the specified period
+        $unlinkedTransactions = Transaction::where('account_id', $account->id)
+            ->whereNull('recurring_transaction_template_id')
+            ->where('date', '>=', now()->subDays($daysBack)->toDateString())
+            ->with('plaidTransaction')
+            ->get();
+        
+        if ($unlinkedTransactions->isEmpty()) {
+            return [
+                'total_linked' => 0,
+                'by_entity' => 0,
+                'by_rules' => 0,
+                'by_description' => 0,
+            ];
+        }
+        
+        // Get all recurring templates for this account
+        $templates = RecurringTransactionTemplate::where('account_id', $account->id)
+            ->with('rules')
+            ->get();
+        
+        if ($templates->isEmpty()) {
+            return [
+                'total_linked' => 0,
+                'by_entity' => 0,
+                'by_rules' => 0,
+                'by_description' => 0,
+            ];
+        }
+        
+        foreach ($unlinkedTransactions as $transaction) {
+            // Skip if already linked (might have been linked in a previous iteration)
+            if ($transaction->recurring_transaction_template_id !== null) {
+                continue;
+            }
+            
+            $matchedTemplate = null;
+            $matchMethod = null;
+            
+            foreach ($templates as $template) {
+                // Strategy 1: Match by Plaid entity_id
+                if ($template->plaid_entity_id && $transaction->plaidTransaction) {
+                    $counterparties = $transaction->plaidTransaction->counterparties ?? '';
+                    if (is_string($counterparties) && str_contains($counterparties, $template->plaid_entity_id)) {
+                        $matchedTemplate = $template;
+                        $matchMethod = 'entity';
+                        break;
+                    }
+                }
+                
+                // Strategy 2: Match by rules (all rules must match - AND logic)
+                $rules = $template->rules->where('is_active', true);
+                if ($rules->isNotEmpty()) {
+                    $matchesAllRules = true;
+                    foreach ($rules as $rule) {
+                        $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
+                        $ruleValue = $rule->value;
+                        if (!$this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue)) {
+                            $matchesAllRules = false;
+                            break;
+                        }
+                    }
+                    
+                    if ($matchesAllRules) {
+                        $matchedTemplate = $template;
+                        $matchMethod = 'rules';
+                        break;
+                    }
+                }
+                
+                // Strategy 3: Match by description (exact or partial)
+                if ($template->description) {
+                    if (
+                        $transaction->description === $template->description ||
+                        stripos($transaction->description, $template->description) !== false
+                    ) {
+                        $matchedTemplate = $template;
+                        $matchMethod = 'description';
+                        break;
+                    }
+                }
+            }
+            
+            // Link the transaction if a match was found
+            if ($matchedTemplate) {
+                $transaction->recurring_transaction_template_id = $matchedTemplate->id;
+                $transaction->save();
+                $linkedCount++;
+                
+                switch ($matchMethod) {
+                    case 'entity':
+                        $linkedByEntity++;
+                        break;
+                    case 'rules':
+                        $linkedByRules++;
+                        break;
+                    case 'description':
+                        $linkedByDescription++;
+                        break;
+                }
+            }
+        }
+        
+        if ($linkedCount > 0) {
+            Log::info('RecurringTransactionService: Auto-linked transactions for account', [
+                'account_id' => $account->id,
+                'account_name' => $account->name,
+                'total_linked' => $linkedCount,
+                'by_entity' => $linkedByEntity,
+                'by_rules' => $linkedByRules,
+                'by_description' => $linkedByDescription,
+            ]);
+        }
+        
+        return [
+            'total_linked' => $linkedCount,
+            'by_entity' => $linkedByEntity,
+            'by_rules' => $linkedByRules,
+            'by_description' => $linkedByDescription,
+        ];
     }
 
     /**

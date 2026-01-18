@@ -11,6 +11,7 @@ use App\Models\PlaidSecurity;
 use App\Models\PlaidStatementHistory;
 use App\Models\PlaidTransaction;
 use App\Models\Transaction;
+use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
@@ -1050,6 +1051,63 @@ class PlaidService
                             'settled_transaction_id' => $transaction['transaction_id']
                         ]);
                     }
+                } elseif (!($transaction['pending'] ?? false)) {
+                    // This is a settled transaction without a pending_transaction_id
+                    // Use fuzzy matching to find and remove any matching pending transactions
+                    // This handles cases where Plaid doesn't provide the pending_transaction_id link
+                    $amountInCents = -1 * $transaction['amount'] * 100;
+                    $transactionDate = Carbon::parse($transaction['date']);
+                    
+                    // Search for matching pending transactions to clean up
+                    $matchingPendingTransactions = Transaction::where('account_id', $plaidAccount->account_id)
+                        ->where('is_plaid_imported', true)
+                        ->whereNotNull('plaid_transaction_id')
+                        // Exclude the current transaction (if it was just created/updated)
+                        ->where('plaid_transaction_id', '!=', $transaction['transaction_id'])
+                        // Match amount within $1 tolerance (for rounding differences)
+                        ->whereBetween('amount_in_cents', [$amountInCents - 100, $amountInCents + 100])
+                        // Match date within ±3 days (pending transactions can shift dates)
+                        ->whereBetween('date', [
+                            $transactionDate->copy()->subDays(3),
+                            $transactionDate->copy()->addDays(3)
+                        ])
+                        // Match description similarity (extract key identifiers)
+                        ->where(function ($query) use ($transaction) {
+                            $description = $transaction['name'];
+                            // Extract numeric identifiers (like account numbers, reference numbers)
+                            preg_match_all('/\d{4,}/', $description, $matches);
+                            if (!empty($matches[0])) {
+                                foreach ($matches[0] as $identifier) {
+                                    $query->orWhere('description', 'LIKE', "%{$identifier}%");
+                                }
+                            } else {
+                                // Fallback: match first 20 characters (handles cases like "SOUTHERN REPROGR BIWEEKLY")
+                                $prefix = substr($description, 0, 20);
+                                $query->where('description', 'LIKE', "{$prefix}%");
+                            }
+                        })
+                        ->get();
+
+                    // Delete matching pending transactions (they've been replaced by this settled one)
+                    foreach ($matchingPendingTransactions as $matchingPending) {
+                        // Verify the pending transaction is actually pending in Plaid by checking PlaidTransaction
+                        $plaidPendingTransaction = PlaidTransaction::where('plaid_transaction_id', $matchingPending->plaid_transaction_id)->first();
+                        
+                        if ($plaidPendingTransaction && $plaidPendingTransaction->pending) {
+                            $matchingPending->delete();
+
+                            Log::info('Deleted pending transaction after settlement (fuzzy match)', [
+                                'deleted_transaction_id' => $matchingPending->id,
+                                'deleted_plaid_id' => $matchingPending->plaid_transaction_id,
+                                'settled_transaction_id' => $transaction['transaction_id'],
+                                'match_criteria' => [
+                                    'amount' => $transaction['amount'],
+                                    'date' => $transaction['date'],
+                                    'description' => $transaction['name'],
+                                ],
+                            ]);
+                        }
+                    }
                 }
             }
 
@@ -1090,6 +1148,32 @@ class PlaidService
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $plaidAccount->account_name,
                         'error' => $investmentError->getMessage(),
+                    ]);
+                }
+            }
+
+            // Auto-link new transactions to recurring transaction templates
+            // This matches new transactions using entity_id, rules, or description
+            if ($imported > 0 && $plaidAccount->account) {
+                try {
+                    $recurringService = app(RecurringTransactionService::class);
+                    $linkResults = $recurringService->autoLinkTransactionsForAccount($plaidAccount->account);
+                    
+                    if ($linkResults['total_linked'] > 0) {
+                        Log::info('Auto-linked transactions to recurring templates during sync', [
+                            'account_id' => $plaidAccount->account_id,
+                            'account_name' => $plaidAccount->account_name,
+                            'linked' => $linkResults['total_linked'],
+                            'by_entity' => $linkResults['by_entity'],
+                            'by_rules' => $linkResults['by_rules'],
+                            'by_description' => $linkResults['by_description'],
+                        ]);
+                    }
+                } catch (\Exception $linkError) {
+                    Log::warning('Failed to auto-link transactions to recurring templates', [
+                        'account_id' => $plaidAccount->account_id,
+                        'account_name' => $plaidAccount->account_name,
+                        'error' => $linkError->getMessage(),
                     ]);
                 }
             }

@@ -208,14 +208,25 @@ class RecurringTransactionRuleController extends Controller
         $matchingTransactions = [];
 
         foreach ($transactions as $transaction) {
+            // Transaction must match ALL rules (AND logic) to be considered a match
+            $matchesAllRules = true;
+            $matchedRules = [];
+            
             foreach ($rules as $rule) {
                 if ($rule->matchesTransaction($transaction)) {
-                    $matchingTransactions[] = [
-                        'transaction' => $transaction,
-                        'matched_by_rule' => $rule,
-                    ];
-                    break; // Stop checking rules once a match is found
+                    $matchedRules[] = $rule;
+                } else {
+                    $matchesAllRules = false;
+                    break; // Stop checking if any rule fails
                 }
+            }
+            
+            if ($matchesAllRules) {
+                $matchingTransactions[] = [
+                    'transaction' => $transaction,
+                    'matched_by_rule' => $matchedRules[0] ?? null, // Keep backward compatibility
+                    'matched_rules' => $matchedRules, // Also include all matched rules
+                ];
             }
         }
 
@@ -254,14 +265,20 @@ class RecurringTransactionRuleController extends Controller
         $matchCount = 0;
 
         foreach ($transactions as $transaction) {
+            // Transaction must match ALL rules (AND logic) to be linked
+            $matchesAllRules = true;
             foreach ($rules as $rule) {
-                if ($rule->matchesTransaction($transaction)) {
-                    $transaction->update([
-                        'recurring_transaction_template_id' => $recurring_transaction->id
-                    ]);
-                    $matchCount++;
-                    break; // Stop checking rules once a match is found
+                if (!$rule->matchesTransaction($transaction)) {
+                    $matchesAllRules = false;
+                    break; // Stop checking if any rule fails
                 }
+            }
+            
+            if ($matchesAllRules) {
+                $transaction->update([
+                    'recurring_transaction_template_id' => $recurring_transaction->id
+                ]);
+                $matchCount++;
             }
         }
 

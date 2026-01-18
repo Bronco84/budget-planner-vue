@@ -165,6 +165,40 @@
                         <span v-if="logoUploading" class="text-sm text-gray-500">Uploading...</span>
                       </div>
                       
+                      <!-- Manual Logo URL Input -->
+                      <div class="pt-3 border-t border-gray-100">
+                        <div class="flex items-center gap-2 mb-2">
+                          <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                          </svg>
+                          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Or enter URL directly</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <TextInput
+                            id="logo_url"
+                            type="url"
+                            class="flex-1 text-sm"
+                            v-model="form.logo_url"
+                            placeholder="https://example.com/logo.png"
+                            :disabled="!!form.custom_logo"
+                          />
+                          <button
+                            v-if="form.logo_url && !form.custom_logo"
+                            type="button"
+                            @click="form.logo_url = null"
+                            class="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                            title="Clear URL"
+                          >
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <p v-if="form.custom_logo" class="mt-1 text-xs text-amber-600">
+                          Clear the uploaded logo to use a URL instead
+                        </p>
+                      </div>
+                      
                       <InputError class="mt-2" :message="form.errors.custom_logo" />
                       <InputError class="mt-2" :message="form.errors.logo_url" />
                     </div>
@@ -493,9 +527,9 @@ const hasLogo = computed(() => {
 
 // Create a preview account object that uses form values for logo preview
 const logoPreviewAccount = computed(() => {
-  // If form has changes, create a modified account with computed logo_src
-  const customLogo = form.custom_logo || props.account.custom_logo;
-  const logoUrl = form.logo_url || props.account.logo_url;
+  // Use form values directly for real-time preview
+  const customLogo = form.custom_logo;
+  const logoUrl = form.logo_url;
   
   // Compute logo_src using the same priority as the backend
   let logoSrc = null;
@@ -519,14 +553,18 @@ const logoPreviewAccount = computed(() => {
 });
 
 const logoSourceLabel = computed(() => {
-  if (form.custom_logo || props.account.custom_logo) return 'Custom Logo';
-  if (form.logo_url || props.account.logo_url) return 'Fetched Logo';
+  if (form.custom_logo) return 'Custom Logo';
+  if (form.logo_url) return 'Logo URL';
+  if (props.account.custom_logo) return 'Custom Logo';
+  if (props.account.logo_url) return 'Logo URL';
   return 'Institution Logo';
 });
 
 const logoSourceDescription = computed(() => {
-  if (form.custom_logo || props.account.custom_logo) return 'Your uploaded logo';
-  if (form.logo_url || props.account.logo_url) return 'Automatically fetched';
+  if (form.custom_logo) return 'Your uploaded logo';
+  if (form.logo_url) return form.logo_url;
+  if (props.account.custom_logo) return 'Your uploaded logo';
+  if (props.account.logo_url) return props.account.logo_url;
   return 'From ' + (props.account.plaid_account?.plaid_connection?.institution_name || 'bank');
 });
 
@@ -554,6 +592,8 @@ const handleLogoUpload = async (event) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       form.custom_logo = e.target.result;
+      // Clear logo_url since custom_logo takes precedence
+      form.logo_url = null;
       logoUploading.value = false;
     };
     reader.onerror = () => {
@@ -583,6 +623,10 @@ const fetchLogo = () => {
 
 // Clear all custom logos (both uploaded and fetched)
 const clearLogo = () => {
+  // Clear form values immediately for responsive UI
+  form.custom_logo = null;
+  form.logo_url = null;
+  
   router.delete(route('accounts.clearLogo', [props.budget.id, props.account.id]), {
     preserveScroll: true,
     preserveState: false, // Force full page refresh to get updated account data

@@ -876,7 +876,7 @@ class RecurringTransactionService
         
         $upgraded = 0;
         $skipped = 0;
-        $noTransactions = 0;
+        $noMatchingTransactions = 0;
         $alreadyHasEntity = 0;
         $totalNewlyLinked = 0;
         
@@ -889,6 +889,18 @@ class RecurringTransactionService
             'budget_id' => $budget->id,
             'template_count' => $templates->count(),
             'template_ids' => $templates->pluck('id')->toArray(),
+        ]);
+        
+        // Get all unlinked Plaid transactions with entity data
+        $unlinkedPlaidTransactions = Transaction::where('budget_id', $budget->id)
+            ->whereNull('recurring_transaction_template_id')
+            ->whereNotNull('plaid_transaction_id')
+            ->with('plaidTransaction')
+            ->get();
+        
+        Log::info('RecurringTransactionService: Found unlinked Plaid transactions', [
+            'budget_id' => $budget->id,
+            'count' => $unlinkedPlaidTransactions->count(),
         ]);
         
         foreach ($templates as $template) {
@@ -907,35 +919,27 @@ class RecurringTransactionService
                 continue;
             }
             
-            // Get linked transactions with plaid data
-            $linkedTransactions = Transaction::where('recurring_transaction_template_id', $template->id)
-                ->whereNotNull('plaid_transaction_id')
-                ->with('plaidTransaction')
-                ->get();
+            // Find unlinked transactions that match this template's description
+            $matchingTransactions = $unlinkedPlaidTransactions->filter(function($transaction) use ($template) {
+                return $this->matchesDescription($transaction, $template);
+            });
             
-            // Also check total linked transactions (including manual ones)
-            $totalLinkedCount = Transaction::where('recurring_transaction_template_id', $template->id)->count();
-            
-            Log::debug('RecurringTransactionService: Linked transactions check', [
+            Log::debug('RecurringTransactionService: Description matching results', [
                 'template_id' => $template->id,
-                'plaid_linked_count' => $linkedTransactions->count(),
-                'total_linked_count' => $totalLinkedCount,
+                'template_description' => $template->description,
+                'matching_count' => $matchingTransactions->count(),
             ]);
             
-            if ($linkedTransactions->isEmpty()) {
-                Log::debug('RecurringTransactionService: No Plaid-linked transactions found', [
-                    'template_id' => $template->id,
-                    'total_linked_count' => $totalLinkedCount,
-                ]);
-                $noTransactions++;
+            if ($matchingTransactions->isEmpty()) {
+                $noMatchingTransactions++;
                 continue;
             }
             
-            // Extract entity IDs from linked transactions
+            // Extract entity IDs from matching transactions
             $entityIds = [];
             $entityNames = [];
             
-            foreach ($linkedTransactions as $transaction) {
+            foreach ($matchingTransactions as $transaction) {
                 if (!$transaction->plaidTransaction) {
                     continue;
                 }
@@ -967,14 +971,14 @@ class RecurringTransactionService
                 }
             }
             
-            Log::debug('RecurringTransactionService: Entity IDs extracted', [
+            Log::debug('RecurringTransactionService: Entity IDs extracted from matching transactions', [
                 'template_id' => $template->id,
                 'entity_ids_found' => count($entityIds),
-                'entity_ids' => array_unique($entityIds),
+                'unique_entity_ids' => array_unique($entityIds),
             ]);
             
             if (empty($entityIds)) {
-                Log::debug('RecurringTransactionService: No entity IDs found in transactions', [
+                Log::debug('RecurringTransactionService: No entity IDs found in matching transactions', [
                     'template_id' => $template->id,
                 ]);
                 $skipped++;
@@ -987,18 +991,26 @@ class RecurringTransactionService
             $mostCommonEntityId = array_key_first($entityIdCounts);
             $entityName = $entityNames[$mostCommonEntityId] ?? null;
             
-            // Update the template
+            // Update the template with the entity ID
             $template->update([
                 'plaid_entity_id' => $mostCommonEntityId,
                 'plaid_entity_name' => $entityName,
             ]);
             
-            // Refresh the template to get the updated entity ID
-            $template->refresh();
+            // Link the matching transactions to this template
+            $linkedCount = 0;
+            foreach ($matchingTransactions as $transaction) {
+                if ($transaction->recurring_transaction_template_id === null) {
+                    $transaction->recurring_transaction_template_id = $template->id;
+                    $transaction->save();
+                    $linkedCount++;
+                }
+            }
             
-            // Now link any unlinked transactions that match this entity ID
-            $newlyLinkedCount = $this->linkMatchingTransactions($template);
-            $totalNewlyLinked += $newlyLinkedCount;
+            // Refresh the template and find any additional transactions by entity ID
+            $template->refresh();
+            $additionalLinked = $this->linkMatchingTransactions($template);
+            $totalNewlyLinked += $linkedCount + $additionalLinked;
             
             $upgraded++;
             
@@ -1007,8 +1019,9 @@ class RecurringTransactionService
                 'description' => $template->description,
                 'entity_id' => $mostCommonEntityId,
                 'entity_name' => $entityName,
-                'already_linked_transactions_count' => $linkedTransactions->count(),
-                'newly_linked_transactions_count' => $newlyLinkedCount,
+                'matched_by_description' => $matchingTransactions->count(),
+                'linked_count' => $linkedCount,
+                'additional_linked_by_entity' => $additionalLinked,
             ]);
         }
         
@@ -1016,7 +1029,7 @@ class RecurringTransactionService
             'total_templates' => $templates->count(),
             'upgraded' => $upgraded,
             'skipped' => $skipped,
-            'no_transactions' => $noTransactions,
+            'no_matching_transactions' => $noMatchingTransactions,
             'already_has_entity' => $alreadyHasEntity,
             'newly_linked' => $totalNewlyLinked,
         ];

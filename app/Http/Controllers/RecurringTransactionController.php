@@ -622,6 +622,8 @@ class RecurringTransactionController extends Controller
             'stats' => $stats,
         ]);
         
+        $noMatching = $stats['no_matching_transactions'] ?? 0;
+        
         if ($stats['upgraded'] === 0) {
             $message = 'No templates were upgraded. ';
             
@@ -629,12 +631,12 @@ class RecurringTransactionController extends Controller
                 $message .= $stats['already_has_entity'] . ' templates already have entity IDs. ';
             }
             
-            if ($stats['no_transactions'] > 0) {
-                $message .= $stats['no_transactions'] . ' templates have no linked transactions. ';
+            if ($noMatching > 0) {
+                $message .= $noMatching . ' templates had no matching unlinked transactions. ';
             }
             
             if ($stats['skipped'] > 0) {
-                $message .= $stats['skipped'] . ' templates have no entity IDs in their transactions.';
+                $message .= $stats['skipped'] . ' templates had matching transactions but no entity IDs.';
             }
             
             return redirect()
@@ -650,17 +652,17 @@ class RecurringTransactionController extends Controller
         
         if (isset($stats['newly_linked']) && $stats['newly_linked'] > 0) {
             $message .= sprintf(
-                ' Linked %d additional transaction%s using the new entity IDs.',
+                ' Linked %d transaction%s.',
                 $stats['newly_linked'],
                 $stats['newly_linked'] === 1 ? '' : 's'
             );
         }
         
-        if ($stats['skipped'] > 0 || $stats['no_transactions'] > 0) {
+        if ($stats['skipped'] > 0 || $noMatching > 0) {
             $message .= sprintf(
-                ' Skipped %d template%s (no entity IDs found or no linked transactions).',
-                $stats['skipped'] + $stats['no_transactions'],
-                ($stats['skipped'] + $stats['no_transactions']) === 1 ? '' : 's'
+                ' Skipped %d template%s (no matching transactions or no entity IDs found).',
+                $stats['skipped'] + $noMatching,
+                ($stats['skipped'] + $noMatching) === 1 ? '' : 's'
             );
         }
         

@@ -209,7 +209,7 @@ class CalendarController extends Controller
         // fast-forward to find the first occurrence in our range
         if ($currentDate->lt($startDate)) {
             // Calculate how many periods to skip
-            $daysDiff = $currentDate->diffInDays($startDate);
+            $daysDiff = (int) $currentDate->diffInDays($startDate);
 
             switch ($recurring->frequency) {
                 case 'daily':
@@ -225,15 +225,15 @@ class CalendarController extends Controller
                     $currentDate->addWeeks($periodsToSkip * 2);
                     break;
                 case 'monthly':
-                    $periodsToSkip = $currentDate->diffInMonths($startDate);
+                    $periodsToSkip = (int) $currentDate->diffInMonths($startDate);
                     $currentDate->addMonths($periodsToSkip);
                     break;
                 case 'bimonthly':
-                    $periodsToSkip = floor($currentDate->diffInMonths($startDate) / 2);
+                    $periodsToSkip = (int) floor($currentDate->diffInMonths($startDate) / 2);
                     $currentDate->addMonths($periodsToSkip * 2);
                     break;
                 case 'yearly':
-                    $periodsToSkip = $currentDate->diffInYears($startDate);
+                    $periodsToSkip = (int) $currentDate->diffInYears($startDate);
                     $currentDate->addYears($periodsToSkip);
                     break;
             }

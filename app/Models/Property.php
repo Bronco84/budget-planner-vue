@@ -194,6 +194,6 @@ class Property extends Model
             return true;
         }
 
-        return $this->value_updated_at->diffInDays(now()) > 30;
+        return (int) $this->value_updated_at->diffInDays(now()) > 30;
     }
 }

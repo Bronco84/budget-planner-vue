@@ -1289,7 +1289,7 @@ class RecurringTransactionService
         // Calculate monthly change percentage
         $firstDate = $dates->first();
         $lastDate = $dates->last();
-        $daysDiff = $firstDate->diffInDays($lastDate);
+        $daysDiff = (int) $firstDate->diffInDays($lastDate);
         $monthlyChangePercent = 0;
         
         if ($daysDiff > 0) {
@@ -1336,8 +1336,8 @@ class RecurringTransactionService
         // Factor 2: Data age (transactions older than 6 months get lower confidence)
         $oldestTransaction = $transactions->min('date');
         $newestTransaction = $transactions->max('date');
-        $daysSinceNewest = now()->diffInDays($newestTransaction);
-        $dataSpanDays = $oldestTransaction->diffInDays($newestTransaction);
+        $daysSinceNewest = (int) now()->diffInDays($newestTransaction);
+        $dataSpanDays = (int) $oldestTransaction->diffInDays($newestTransaction);
         
         if ($daysSinceNewest > 90) {
             $score -= 20;
@@ -1474,7 +1474,7 @@ class RecurringTransactionService
                 }
                 
                 // Weight more recent transactions higher
-                $daysAgo = now()->diffInDays($transaction->date);
+                $daysAgo = (int) now()->diffInDays($transaction->date);
                 $weight = 1 / (1 + $daysAgo / 30); // Exponential decay over months
                 
                 $weightedSum += $amount * $weight;

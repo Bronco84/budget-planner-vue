@@ -418,7 +418,7 @@ class RecurringTransactionTemplate extends Model
                 }
 
                 // Check if it's a quarter month (Jan, Apr, Jul, Oct)
-                $monthsSinceStart = $this->start_date->diffInMonths($date);
+                $monthsSinceStart = (int) $this->start_date->diffInMonths($date);
                 return $monthsSinceStart % 3 === 0;
 
             case self::FREQUENCY_YEARLY:

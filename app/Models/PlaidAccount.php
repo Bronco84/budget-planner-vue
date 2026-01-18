@@ -227,7 +227,7 @@ class PlaidAccount extends Model
             return null;
         }
 
-        return Carbon::now()->diffInDays($this->next_payment_due_date, false);
+        return (int) Carbon::now()->diffInDays($this->next_payment_due_date, false);
     }
 
     /**
@@ -252,7 +252,7 @@ class PlaidAccount extends Model
             for ($i = 0; $i < $statements->count() - 1; $i++) {
                 $current = Carbon::parse($statements[$i]->statement_issue_date);
                 $previous = Carbon::parse($statements[$i + 1]->statement_issue_date);
-                $daysBetween = $previous->diffInDays($current);
+                $daysBetween = (int) $previous->diffInDays($current);
                 
                 // Only count reasonable intervals (20-40 days)
                 if ($daysBetween >= 20 && $daysBetween <= 40) {
@@ -281,7 +281,7 @@ class PlaidAccount extends Model
             return null;
         }
 
-        return Carbon::parse($this->last_statement_issue_date)->diffInDays(Carbon::now());
+        return (int) Carbon::parse($this->last_statement_issue_date)->diffInDays(Carbon::now());
     }
 
     /**

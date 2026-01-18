@@ -323,7 +323,7 @@ class RecurringTransactionAnalysisService
 
         // Calculate intervals between consecutive transactions
         for ($i = 1; $i < $dates->count(); $i++) {
-            $intervals[] = $dates[$i-1]->diffInDays($dates[$i]);
+            $intervals[] = (int) $dates[$i-1]->diffInDays($dates[$i]);
         }
 
         if (empty($intervals)) {
@@ -437,7 +437,7 @@ class RecurringTransactionAnalysisService
 
         // Factor 4: Recency
         $mostRecentDate = $transactions->max('date');
-        $daysSinceLastOccurrence = Carbon::now()->diffInDays($mostRecentDate);
+        $daysSinceLastOccurrence = (int) Carbon::now()->diffInDays($mostRecentDate);
 
         if ($daysSinceLastOccurrence <= 7) {
             $factors['recency'] = ['score' => 1.0, 'description' => 'Very recent activity'];

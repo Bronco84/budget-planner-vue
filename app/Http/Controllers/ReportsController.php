@@ -113,7 +113,7 @@ class ReportsController extends Controller
         $currentDate = $startDate->copy();
 
         // Determine interval based on date range
-        $daysDiff = $startDate->diffInDays($endDate);
+        $daysDiff = (int) $startDate->diffInDays($endDate);
         $interval = match(true) {
             $daysDiff <= 31 => 1, // Daily for 1 month
             $daysDiff <= 90 => 3, // Every 3 days for 3 months

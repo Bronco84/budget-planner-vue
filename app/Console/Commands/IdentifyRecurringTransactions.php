@@ -77,7 +77,7 @@ class IdentifyRecurringTransactions extends Command
             // Determine if it's monthly or weekly based on average interval
             $intervals = [];
             for ($i = 1; $i < $dates->count(); $i++) {
-                $intervals[] = $dates[$i]->diffInDays($dates[$i-1]);
+                $intervals[] = (int) $dates[$i]->diffInDays($dates[$i-1]);
             }
             $avgInterval = array_sum($intervals) / count($intervals);
 

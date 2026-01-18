@@ -231,7 +231,7 @@ class ScenarioAdjustment extends Model
                 if ($this->day_of_week !== null && $date->dayOfWeek !== $this->day_of_week) {
                     return false;
                 }
-                $weekDiff = $this->start_date->diffInWeeks($date);
+                $weekDiff = (int) $this->start_date->diffInWeeks($date);
                 return $weekDiff % 2 === 0;
 
             case 'monthly':
@@ -255,7 +255,7 @@ class ScenarioAdjustment extends Model
                         return false;
                     }
                 }
-                $monthsSinceStart = $this->start_date->diffInMonths($date);
+                $monthsSinceStart = (int) $this->start_date->diffInMonths($date);
                 return $monthsSinceStart % 3 === 0;
 
             case 'yearly':

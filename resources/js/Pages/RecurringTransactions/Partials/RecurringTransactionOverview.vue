@@ -565,6 +565,9 @@
                                 {{ getMatchMethodLabel(match.match_method) }}
                               </span>
                             </div>
+                            <div v-if="match.transaction.plaid_description && match.transaction.plaid_description !== match.transaction.description" class="mt-1 text-xs text-gray-500">
+                              <span class="font-medium">Plaid:</span> {{ match.transaction.plaid_description }}
+                            </div>
                             <div class="mt-1 flex items-center space-x-4 text-xs text-gray-500">
                               <span>{{ match.transaction.date }}</span>
                               <span v-if="match.transaction.category" class="px-2 py-0.5 bg-gray-100 rounded">{{ match.transaction.category }}</span>

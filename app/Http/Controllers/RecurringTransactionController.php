@@ -548,8 +548,11 @@ class RecurringTransactionController extends Controller
             // Test description matching (only if no entity or rules match)
             if (!$matchMethod && $recurring_transaction->description) {
                 // Use the improved matching algorithm
+                // Use Plaid transaction's original description if available, otherwise use transaction description
                 $templateDesc = strtolower(trim($recurring_transaction->description));
-                $transactionDesc = strtolower(trim($transaction->description));
+                $transactionDesc = $transaction->plaidTransaction && $transaction->plaidTransaction->name
+                    ? strtolower(trim($transaction->plaidTransaction->name))
+                    : strtolower(trim($transaction->description));
                 
                 if ($transactionDesc === $templateDesc) {
                     $matchMethod = 'description_exact';
@@ -577,11 +580,13 @@ class RecurringTransactionController extends Controller
             }
             
             if ($matchMethod) {
+                $plaidName = $transaction->plaidTransaction ? $transaction->plaidTransaction->name : null;
                 $matches[] = [
                     'transaction' => [
                         'id' => $transaction->id,
                         'date' => $transaction->date->format('Y-m-d'),
                         'description' => $transaction->description,
+                        'plaid_description' => $plaidName,
                         'category' => $transaction->category,
                         'amount' => $transaction->amount_in_cents / 100,
                     ],

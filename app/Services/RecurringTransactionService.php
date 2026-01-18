@@ -864,6 +864,10 @@ class RecurringTransactionService
     /**
      * Check if a transaction matches a template's description using improved matching algorithm.
      * 
+     * Uses the Plaid transaction's original description (name field) if available,
+     * otherwise falls back to the transaction's description field. This preserves
+     * user-friendly descriptions while matching against the original Plaid data.
+     * 
      * Matching strategy (in order of priority):
      * 1. Exact match (case-insensitive)
      * 2. Contains match with minimum length requirement (5+ chars) + category check
@@ -880,7 +884,11 @@ class RecurringTransactionService
         }
 
         $templateDesc = strtolower(trim($template->description));
-        $transactionDesc = strtolower(trim($transaction->description));
+        
+        // Use Plaid transaction's original description if available, otherwise use transaction description
+        $transactionDesc = $transaction->plaidTransaction && $transaction->plaidTransaction->name
+            ? strtolower(trim($transaction->plaidTransaction->name))
+            : strtolower(trim($transaction->description));
 
         // Strategy 1: Exact match (highest priority)
         if ($transactionDesc === $templateDesc) {

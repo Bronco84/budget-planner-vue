@@ -941,11 +941,26 @@ class RecurringTransactionService
             
             foreach ($matchingTransactions as $transaction) {
                 if (!$transaction->plaidTransaction) {
+                    Log::debug('RecurringTransactionService: Transaction has no plaidTransaction', [
+                        'transaction_id' => $transaction->id,
+                    ]);
                     continue;
                 }
                 
+                $plaidTxn = $transaction->plaidTransaction;
+                
+                // Log what we're working with
+                Log::debug('RecurringTransactionService: Examining plaid transaction for entity ID', [
+                    'transaction_id' => $transaction->id,
+                    'plaid_transaction_id' => $plaidTxn->id,
+                    'merchant_name' => $plaidTxn->merchant_name,
+                    'merchant_entity_id' => $plaidTxn->merchant_entity_id,
+                    'counterparties_type' => gettype($plaidTxn->counterparties),
+                    'counterparties' => $plaidTxn->counterparties,
+                ]);
+                
                 // Extract entity ID from counterparties JSON
-                $counterparties = $transaction->plaidTransaction->counterparties;
+                $counterparties = $plaidTxn->counterparties;
                 if (is_string($counterparties)) {
                     $counterparties = json_decode($counterparties, true);
                 }
@@ -962,11 +977,10 @@ class RecurringTransactionService
                 }
                 
                 // Also check merchant_entity_id as fallback
-                if ($transaction->plaidTransaction->merchant_entity_id) {
-                    $entityIds[] = $transaction->plaidTransaction->merchant_entity_id;
-                    if ($transaction->plaidTransaction->merchant_name) {
-                        $entityNames[$transaction->plaidTransaction->merchant_entity_id] = 
-                            $transaction->plaidTransaction->merchant_name;
+                if ($plaidTxn->merchant_entity_id) {
+                    $entityIds[] = $plaidTxn->merchant_entity_id;
+                    if ($plaidTxn->merchant_name) {
+                        $entityNames[$plaidTxn->merchant_entity_id] = $plaidTxn->merchant_name;
                     }
                 }
             }

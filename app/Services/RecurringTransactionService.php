@@ -862,190 +862,145 @@ class RecurringTransactionService
     }
 
     /**
-     * Upgrade recurring transaction templates with Plaid entity IDs
-     * by examining their linked transactions.
-     * 
+     * Find unlinked transactions that match existing recurring transaction templates.
+     * Returns structured data for UI display with manual approval.
+     *
      * @param Budget $budget
-     * @return array Stats about the upgrade process
+     * @return array Array of templates with their matching unlinked transactions
      */
-    public function upgradeTemplatesWithEntityIds(Budget $budget): array
+    public function findMatchingTransactionsForTemplates(Budget $budget): array
     {
-        Log::info('RecurringTransactionService: upgradeTemplatesWithEntityIds called', [
-            'budget_id' => $budget->id,
-        ]);
+        $results = [];
         
-        $upgraded = 0;
-        $skipped = 0;
-        $noMatchingTransactions = 0;
-        $alreadyHasEntity = 0;
-        $totalNewlyLinked = 0;
-        
-        // Get all templates without entity IDs
+        // Get all recurring templates for this budget
         $templates = RecurringTransactionTemplate::where('budget_id', $budget->id)
-            ->whereNull('plaid_entity_id')
+            ->with(['account', 'transactions'])
+            ->orderBy('description')
             ->get();
         
-        Log::info('RecurringTransactionService: Found templates without entity IDs', [
-            'budget_id' => $budget->id,
-            'template_count' => $templates->count(),
-            'template_ids' => $templates->pluck('id')->toArray(),
-        ]);
+        if ($templates->isEmpty()) {
+            return [
+                'templates_with_matches' => [],
+                'total_templates' => 0,
+                'total_matches' => 0,
+            ];
+        }
         
-        // Get all unlinked Plaid transactions with entity data
-        $unlinkedPlaidTransactions = Transaction::where('budget_id', $budget->id)
+        // Get all unlinked Plaid transactions for this budget
+        $unlinkedTransactions = Transaction::where('budget_id', $budget->id)
             ->whereNull('recurring_transaction_template_id')
             ->whereNotNull('plaid_transaction_id')
-            ->with('plaidTransaction')
+            ->with('plaidTransaction', 'account')
+            ->orderBy('date', 'desc')
             ->get();
         
-        Log::info('RecurringTransactionService: Found unlinked Plaid transactions', [
-            'budget_id' => $budget->id,
-            'count' => $unlinkedPlaidTransactions->count(),
-        ]);
+        $totalMatches = 0;
         
         foreach ($templates as $template) {
-            Log::debug('RecurringTransactionService: Processing template', [
-                'template_id' => $template->id,
-                'description' => $template->description,
-            ]);
-            
-            // Skip if already has entity ID
-            if ($template->plaid_entity_id) {
-                Log::debug('RecurringTransactionService: Template already has entity ID', [
-                    'template_id' => $template->id,
-                    'plaid_entity_id' => $template->plaid_entity_id,
-                ]);
-                $alreadyHasEntity++;
-                continue;
-            }
-            
-            // Find unlinked transactions that match this template's description
-            $matchingTransactions = $unlinkedPlaidTransactions->filter(function($transaction) use ($template) {
-                return $this->matchesDescription($transaction, $template);
-            });
-            
-            Log::debug('RecurringTransactionService: Description matching results', [
-                'template_id' => $template->id,
-                'template_description' => $template->description,
-                'matching_count' => $matchingTransactions->count(),
-            ]);
-            
-            if ($matchingTransactions->isEmpty()) {
-                $noMatchingTransactions++;
-                continue;
-            }
-            
-            // Extract entity IDs from matching transactions
-            $entityIds = [];
-            $entityNames = [];
-            
-            foreach ($matchingTransactions as $transaction) {
-                if (!$transaction->plaidTransaction) {
-                    Log::debug('RecurringTransactionService: Transaction has no plaidTransaction', [
-                        'transaction_id' => $transaction->id,
-                    ]);
-                    continue;
-                }
-                
-                $plaidTxn = $transaction->plaidTransaction;
-                
-                // Log what we're working with
-                Log::debug('RecurringTransactionService: Examining plaid transaction for entity ID', [
-                    'transaction_id' => $transaction->id,
-                    'plaid_transaction_id' => $plaidTxn->id,
-                    'merchant_name' => $plaidTxn->merchant_name,
-                    'merchant_entity_id' => $plaidTxn->merchant_entity_id,
-                    'counterparties_type' => gettype($plaidTxn->counterparties),
-                    'counterparties' => $plaidTxn->counterparties,
-                ]);
-                
-                // Extract entity ID from counterparties JSON
-                $counterparties = $plaidTxn->counterparties;
-                if (is_string($counterparties)) {
-                    $counterparties = json_decode($counterparties, true);
-                }
-                
-                if (is_array($counterparties) && !empty($counterparties)) {
-                    foreach ($counterparties as $counterparty) {
-                        if (isset($counterparty['entity_id']) && $counterparty['entity_id']) {
-                            $entityIds[] = $counterparty['entity_id'];
-                            if (isset($counterparty['name'])) {
-                                $entityNames[$counterparty['entity_id']] = $counterparty['name'];
+            // Find transactions that match this template
+            $matchingTransactions = $unlinkedTransactions->filter(function($transaction) use ($template) {
+                // First check entity ID match if available
+                if ($template->plaid_entity_id && $transaction->plaidTransaction) {
+                    $counterparties = $transaction->plaidTransaction->counterparties;
+                    if (is_array($counterparties)) {
+                        foreach ($counterparties as $counterparty) {
+                            if (isset($counterparty['entity_id']) && $counterparty['entity_id'] === $template->plaid_entity_id) {
+                                return true;
                             }
                         }
                     }
-                }
-                
-                // Also check merchant_entity_id as fallback
-                if ($plaidTxn->merchant_entity_id) {
-                    $entityIds[] = $plaidTxn->merchant_entity_id;
-                    if ($plaidTxn->merchant_name) {
-                        $entityNames[$plaidTxn->merchant_entity_id] = $plaidTxn->merchant_name;
+                    // Also check merchant_entity_id
+                    if ($transaction->plaidTransaction->merchant_entity_id === $template->plaid_entity_id) {
+                        return true;
                     }
                 }
+                
+                // Fallback to description matching
+                return $this->matchesDescription($transaction, $template);
+            });
+            
+            if ($matchingTransactions->isNotEmpty()) {
+                $results[] = [
+                    'template' => [
+                        'id' => $template->id,
+                        'description' => $template->description,
+                        'amount_in_cents' => $template->amount_in_cents,
+                        'frequency' => $template->frequency,
+                        'account_id' => $template->account_id,
+                        'account_name' => $template->account?->name,
+                        'linked_count' => $template->transactions->count(),
+                        'plaid_entity_id' => $template->plaid_entity_id,
+                        'plaid_entity_name' => $template->plaid_entity_name,
+                    ],
+                    'matching_transactions' => $matchingTransactions->map(function($transaction) {
+                        return [
+                            'id' => $transaction->id,
+                            'description' => $transaction->description,
+                            'plaid_description' => $transaction->plaidTransaction?->name,
+                            'merchant_name' => $transaction->plaidTransaction?->merchant_name,
+                            'amount_in_cents' => $transaction->amount_in_cents,
+                            'date' => $transaction->date->format('Y-m-d'),
+                            'account_id' => $transaction->account_id,
+                            'account_name' => $transaction->account?->name,
+                        ];
+                    })->values()->toArray(),
+                ];
+                
+                $totalMatches += $matchingTransactions->count();
             }
+        }
+        
+        return [
+            'templates_with_matches' => $results,
+            'total_templates' => count($results),
+            'total_matches' => $totalMatches,
+        ];
+    }
+
+    /**
+     * Link selected transactions to their matching templates.
+     *
+     * @param array $selections Array of ['template_id' => int, 'transaction_ids' => int[]]
+     * @return array Stats about linked transactions
+     */
+    public function linkSelectedTransactions(array $selections): array
+    {
+        $linkedCount = 0;
+        $errors = [];
+        
+        foreach ($selections as $selection) {
+            $templateId = $selection['template_id'] ?? null;
+            $transactionIds = $selection['transaction_ids'] ?? [];
             
-            Log::debug('RecurringTransactionService: Entity IDs extracted from matching transactions', [
-                'template_id' => $template->id,
-                'entity_ids_found' => count($entityIds),
-                'unique_entity_ids' => array_unique($entityIds),
-            ]);
-            
-            if (empty($entityIds)) {
-                Log::debug('RecurringTransactionService: No entity IDs found in matching transactions', [
-                    'template_id' => $template->id,
-                ]);
-                $skipped++;
+            if (!$templateId || empty($transactionIds)) {
                 continue;
             }
             
-            // Find the most common entity ID (in case there are multiple)
-            $entityIdCounts = array_count_values($entityIds);
-            arsort($entityIdCounts);
-            $mostCommonEntityId = array_key_first($entityIdCounts);
-            $entityName = $entityNames[$mostCommonEntityId] ?? null;
+            $template = RecurringTransactionTemplate::find($templateId);
+            if (!$template) {
+                $errors[] = "Template {$templateId} not found";
+                continue;
+            }
             
-            // Update the template with the entity ID
-            $template->update([
-                'plaid_entity_id' => $mostCommonEntityId,
-                'plaid_entity_name' => $entityName,
-            ]);
-            
-            // Link the matching transactions to this template
-            $linkedCount = 0;
-            foreach ($matchingTransactions as $transaction) {
+            foreach ($transactionIds as $transactionId) {
+                $transaction = Transaction::find($transactionId);
+                if (!$transaction) {
+                    $errors[] = "Transaction {$transactionId} not found";
+                    continue;
+                }
+                
+                // Only link if not already linked
                 if ($transaction->recurring_transaction_template_id === null) {
-                    $transaction->recurring_transaction_template_id = $template->id;
+                    $transaction->recurring_transaction_template_id = $templateId;
                     $transaction->save();
                     $linkedCount++;
                 }
             }
-            
-            // Refresh the template and find any additional transactions by entity ID
-            $template->refresh();
-            $additionalLinked = $this->linkMatchingTransactions($template);
-            $totalNewlyLinked += $linkedCount + $additionalLinked;
-            
-            $upgraded++;
-            
-            Log::info('RecurringTransactionService: Upgraded template with entity ID', [
-                'template_id' => $template->id,
-                'description' => $template->description,
-                'entity_id' => $mostCommonEntityId,
-                'entity_name' => $entityName,
-                'matched_by_description' => $matchingTransactions->count(),
-                'linked_count' => $linkedCount,
-                'additional_linked_by_entity' => $additionalLinked,
-            ]);
         }
         
         return [
-            'total_templates' => $templates->count(),
-            'upgraded' => $upgraded,
-            'skipped' => $skipped,
-            'no_matching_transactions' => $noMatchingTransactions,
-            'already_has_entity' => $alreadyHasEntity,
-            'newly_linked' => $totalNewlyLinked,
+            'linked_count' => $linkedCount,
+            'errors' => $errors,
         ];
     }
 

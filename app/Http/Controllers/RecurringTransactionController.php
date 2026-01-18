@@ -604,70 +604,52 @@ class RecurringTransactionController extends Controller
     }
 
     /**
-     * Upgrade recurring transaction templates with Plaid entity IDs
-     * by examining their linked transactions.
+     * Show page to find and review matching transactions for templates.
      */
-    public function upgradeEntityIds(Budget $budget): RedirectResponse
+    public function findMatchingTransactions(Budget $budget): Response
     {
-        Log::info('RecurringTransactionController: upgradeEntityIds called', [
-            'budget_id' => $budget->id,
-        ]);
+        $this->authorize('view', $budget);
         
+        $matchingData = $this->recurringTransactionService->findMatchingTransactionsForTemplates($budget);
+        
+        return Inertia::render('RecurringTransactions/FindMatchingTransactions', [
+            'budget' => $budget,
+            'templatesWithMatches' => $matchingData['templates_with_matches'],
+            'totalTemplates' => $matchingData['total_templates'],
+            'totalMatches' => $matchingData['total_matches'],
+        ]);
+    }
+
+    /**
+     * Link selected transactions to their matching templates.
+     */
+    public function linkSelectedTransactions(Request $request, Budget $budget): RedirectResponse
+    {
         $this->authorize('update', $budget);
         
-        $stats = $this->recurringTransactionService->upgradeTemplatesWithEntityIds($budget);
-        
-        Log::info('RecurringTransactionController: upgradeEntityIds completed', [
-            'budget_id' => $budget->id,
-            'stats' => $stats,
+        $validated = $request->validate([
+            'selections' => 'required|array',
+            'selections.*.template_id' => 'required|integer|exists:recurring_transaction_templates,id',
+            'selections.*.transaction_ids' => 'required|array',
+            'selections.*.transaction_ids.*' => 'integer|exists:transactions,id',
         ]);
         
-        $noMatching = $stats['no_matching_transactions'] ?? 0;
+        $result = $this->recurringTransactionService->linkSelectedTransactions($validated['selections']);
         
-        if ($stats['upgraded'] === 0) {
-            $message = 'No templates were upgraded. ';
-            
-            if ($stats['already_has_entity'] > 0) {
-                $message .= $stats['already_has_entity'] . ' templates already have entity IDs. ';
-            }
-            
-            if ($noMatching > 0) {
-                $message .= $noMatching . ' templates had no matching unlinked transactions. ';
-            }
-            
-            if ($stats['skipped'] > 0) {
-                $message .= $stats['skipped'] . ' templates had matching transactions but no entity IDs.';
-            }
+        if ($result['linked_count'] > 0) {
+            $message = sprintf(
+                'Successfully linked %d transaction%s to recurring templates.',
+                $result['linked_count'],
+                $result['linked_count'] === 1 ? '' : 's'
+            );
             
             return redirect()
                 ->route('recurring-transactions.index', $budget->id)
-                ->with('info', trim($message));
-        }
-        
-        $message = sprintf(
-            'Successfully upgraded %d template%s with entity IDs for more reliable matching.',
-            $stats['upgraded'],
-            $stats['upgraded'] === 1 ? '' : 's'
-        );
-        
-        if (isset($stats['newly_linked']) && $stats['newly_linked'] > 0) {
-            $message .= sprintf(
-                ' Linked %d transaction%s.',
-                $stats['newly_linked'],
-                $stats['newly_linked'] === 1 ? '' : 's'
-            );
-        }
-        
-        if ($stats['skipped'] > 0 || $noMatching > 0) {
-            $message .= sprintf(
-                ' Skipped %d template%s (no matching transactions or no entity IDs found).',
-                $stats['skipped'] + $noMatching,
-                ($stats['skipped'] + $noMatching) === 1 ? '' : 's'
-            );
+                ->with('success', $message);
         }
         
         return redirect()
             ->route('recurring-transactions.index', $budget->id)
-            ->with('success', $message);
+            ->with('info', 'No transactions were linked.');
     }
 }

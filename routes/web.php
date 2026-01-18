@@ -191,8 +191,10 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.diagnostics');
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/test-matching', [RecurringTransactionController::class, 'testMatching'])
         ->name('recurring-transactions.test-matching');
-    Route::post('budget/{budget}/recurring-transactions/upgrade-entity-ids', [RecurringTransactionController::class, 'upgradeEntityIds'])
-        ->name('recurring-transactions.upgrade-entity-ids');
+    Route::get('budget/{budget}/recurring-transactions/find-matching', [RecurringTransactionController::class, 'findMatchingTransactions'])
+        ->name('recurring-transactions.find-matching');
+    Route::post('budget/{budget}/recurring-transactions/link-transactions', [RecurringTransactionController::class, 'linkSelectedTransactions'])
+        ->name('recurring-transactions.link-transactions');
     
     // Routes for recurring transaction rules
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/rules', [RecurringTransactionRuleController::class, 'index'])

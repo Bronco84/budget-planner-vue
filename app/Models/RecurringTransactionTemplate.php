@@ -357,7 +357,7 @@ class RecurringTransactionTemplate extends Model
                 }
 
                 // Must be an even number of weeks from the start date
-                $weekDiff = $this->start_date->diffInWeeks($date);
+                $weekDiff = (int) $this->start_date->diffInWeeks($date);
                 return $weekDiff % 2 === 0;
 
             case self::FREQUENCY_MONTHLY:

@@ -488,7 +488,7 @@
                   </div>
 
                   <!-- Scrollable Body -->
-                  <div class="md:flex-1 md:overflow-y-auto md:overflow-x-auto md:min-h-0" ref="tableContainer" @scroll="syncHeaderScroll">
+                  <div class="overflow-x-auto md:flex-1 md:overflow-y-auto md:min-h-0" ref="tableContainer" @scroll="syncHeaderScroll">
                     <table class="min-w-full table-fixed">
                       <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       <!-- Variable to track if we've shown the today marker -->
@@ -529,12 +529,27 @@
                                   <span class="text-sm font-medium text-gray-900">{{ transaction.description }}</span>
                                   <div v-if="transaction.plaid_transaction?.pending" class="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded-full inline-block ml-4">Pending</div>
                                   <template v-if="transaction.recurring_transaction_template_id">
+                                      <!-- Show "Matched" indicator for historical (non-projected) transactions linked to recurring -->
+                                      <template v-if="!transaction.is_projected">
+                                          <Link
+                                            :href="route('recurring-transactions.edit', [budget.id, transaction.recurring_transaction_template_id])"
+                                            class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded-full ml-2 hover:bg-purple-200 transition-colors"
+                                            title="This transaction is matched to a recurring transaction template"
+                                          >
+                                              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                              </svg>
+                                              Matched
+                                          </Link>
+                                      </template>
+                                      <template v-else>
+                                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                          </svg>
+                                      </template>
                                       <template v-if="transaction.is_dynamic_amount">
                                           <div class="text-xs text-orange-800 bg-orange-100 px-2 py-1 rounded-full inline-block ml-2">Variable</div>
                                       </template>
-                                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                      </svg>
                                   </template>
                                   <template v-if="transaction.is_projected && transaction.projection_source === 'autopay'">
                                       <div 

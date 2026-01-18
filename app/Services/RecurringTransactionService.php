@@ -956,7 +956,7 @@ class RecurringTransactionService
             $template->refresh();
             
             // Now link any unlinked transactions that match this entity ID
-            $newlyLinkedCount = $this->linkTransactionsToTemplate($template);
+            $newlyLinkedCount = $this->linkMatchingTransactions($template);
             $totalNewlyLinked += $newlyLinkedCount;
             
             $upgraded++;

@@ -1169,16 +1169,12 @@ const syncHeaderScroll = () => {
   }
 };
 
-// Dynamic per-page calculation
-const calculatedPerPage = ref(50); // Default fallback
-
-// Per-page selection
+// Per-page selection - always default to 50
 const perPageOptions = [10, 25, 50, 100, 200];
-const perPage = ref(props.transactions?.per_page || 50);
+const perPage = ref(50);
 
 // Handle per-page change
 const handlePerPageChange = () => {
-  calculatedPerPage.value = perPage.value;
   router.visit(route('budgets.show', props.budget.id), {
     data: {
       account_id: form.account_id,
@@ -1335,67 +1331,17 @@ const closeDropdown = () => {
 
 // Account selection functionality is handled by the existing selectAccount function
 
-// Calculate optimal per-page based on viewport height
-const calculatePerPage = () => {
-  if (!tableContainer.value) return 50;
-  
-  // Only calculate on medium+ screens
-  if (window.innerWidth < 768) return 50;
-  
-  const containerHeight = tableContainer.value.clientHeight;
-  const rowHeight = 65; // Approximate height of each row including padding
-  const bufferRows = 2; // Add extra rows for smooth scrolling
-  
-  const calculatedRows = Math.floor(containerHeight / rowHeight) + bufferRows;
-  
-  // Constrain to reasonable limits
-  return Math.max(10, Math.min(200, calculatedRows));
-};
-
-// Debounced resize handler
-let resizeTimeout = null;
-const handleResize = () => {
-  clearTimeout(resizeTimeout);
-  resizeTimeout = setTimeout(() => {
-    const newPerPage = calculatePerPage();
-    if (newPerPage !== calculatedPerPage.value && Math.abs(newPerPage - calculatedPerPage.value) > 5) {
-      calculatedPerPage.value = newPerPage;
-      // Reload with new per_page value
-      router.visit(route('budgets.show', props.budget.id), {
-        data: {
-          account_id: form.account_id,
-          projection_months: projectionForm.months || 1,
-          per_page: calculatedPerPage.value
-        },
-        preserveState: true,
-        preserveScroll: true,
-        replace: true
-      });
-    }
-  }, 500);
-};
-
 // Load budget attachments on mount
 onMounted(() => {
   loadBudgetAttachments();
 
   // Add click outside listener
   document.addEventListener('click', closeDropdown);
-  
-  // Calculate initial per-page after DOM is ready
-  setTimeout(() => {
-    calculatedPerPage.value = calculatePerPage();
-  }, 100);
-  
-  // Add resize listener
-  window.addEventListener('resize', handleResize);
 });
 
 // Cleanup on unmount
 onUnmounted(() => {
   document.removeEventListener('click', closeDropdown);
-  window.removeEventListener('resize', handleResize);
-  if (resizeTimeout) clearTimeout(resizeTimeout);
 });
 
 const loadBudgetAttachments = async () => {
@@ -1445,7 +1391,7 @@ function updateProjections(months) {
     data: {
       account_id: form.account_id,
       projection_months: projectionForm.months,
-      per_page: calculatedPerPage.value
+      per_page: perPage.value
     },
     preserveState: true,
     preserveScroll: true
@@ -1808,7 +1754,7 @@ const selectAccount = (accountId) => {
     data: {
       account_id: accountId,
       projection_months: projectionForm.months || 1,
-      per_page: calculatedPerPage.value
+      per_page: perPage.value
     },
     preserveState: true,
     preserveScroll: true,

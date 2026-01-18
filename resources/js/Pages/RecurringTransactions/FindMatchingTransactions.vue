@@ -2,135 +2,125 @@
   <Head :title="budget.name + ' - Find Matching Transactions'" />
 
   <AuthenticatedLayout>
-    <template #header>
-      <div class="flex justify-between items-center">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ budget.name }} - Find Matching Transactions</h2>
-        <div class="flex items-center space-x-3">
-          <Link
-            :href="route('recurring-transactions.index', budget.id)"
-            class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-sm transition duration-150 ease-in-out hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25"
-          >
-            Back to Templates
-          </Link>
-        </div>
-      </div>
-    </template>
-
     <div class="py-4" :class="{ 'pb-20': totalSelectedTransactions > 0 }">
       <div class="max-w-8xl mx-auto sm:px-2 lg:px-4">
-        <!-- Summary Card -->
-        <div class="bg-white shadow-sm sm:rounded-lg mb-6">
+        <div class="bg-white shadow-sm sm:rounded-lg">
           <div class="p-6">
-            <div class="flex items-center justify-between">
+            <!-- Header Row -->
+            <div class="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-2">Matching Transactions Found</h3>
-                <p class="text-sm text-gray-600">
+                <h2 class="text-xl font-semibold text-gray-900">Find Matching Transactions</h2>
+                <p class="text-sm text-gray-600 mt-1">
                   Found <span class="font-semibold">{{ totalMatches }}</span> unlinked transactions 
                   matching <span class="font-semibold">{{ totalTemplates }}</span> recurring templates.
-                  Select the transactions you want to link.
                 </p>
               </div>
-              <div v-if="totalSelectedTransactions > 0">
+              <div class="flex items-center gap-2">
+                <Link
+                  :href="route('recurring-transactions.index', budget.id)"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 transition"
+                >
+                  Back to Templates
+                </Link>
                 <button
+                  v-if="totalSelectedTransactions > 0"
                   @click="linkSelected"
                   :disabled="isLinking"
-                  class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-50"
+                  class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 transition disabled:opacity-50"
                 >
                   <svg v-if="isLinking" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  {{ isLinking ? 'Linking...' : `Link ${totalSelectedTransactions} Transaction${totalSelectedTransactions !== 1 ? 's' : ''}` }}
+                  {{ isLinking ? 'Linking...' : `Link ${totalSelectedTransactions} Selected` }}
                 </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- No Matches Message -->
-        <div v-if="templatesWithMatches.length === 0" class="bg-white shadow-sm sm:rounded-lg">
-          <div class="p-6 text-center py-10">
-            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No matching transactions found</h3>
-            <p class="mt-1 text-sm text-gray-500">
-              All unlinked transactions have already been reviewed or don't match any templates.
-            </p>
-          </div>
-        </div>
-
-        <!-- Templates with Matches -->
-        <div v-else class="space-y-4">
-          <div 
-            v-for="item in templatesWithMatches" 
-            :key="item.template.id"
-            class="bg-white shadow-sm sm:rounded-lg overflow-hidden"
-          >
-            <!-- Template Header -->
-            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                  <input
-                    type="checkbox"
-                    :checked="isTemplateFullySelected(item.template.id)"
-                    :indeterminate="isTemplatePartiallySelected(item.template.id)"
-                    @change="toggleTemplate(item.template.id, item.matching_transactions)"
-                    class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                  />
-                  <div>
-                    <h4 class="text-lg font-medium text-gray-900">{{ item.template.description }}</h4>
-                    <div class="flex items-center space-x-4 text-sm text-gray-500">
-                      <span>{{ formatCurrency(item.template.amount_in_cents) }}</span>
-                      <span class="capitalize">{{ item.template.frequency }}</span>
-                      <span>{{ item.template.account_name }}</span>
-                      <span v-if="item.template.linked_count > 0" class="text-green-600">
-                        {{ item.template.linked_count }} already linked
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div class="text-sm text-gray-500">
-                  {{ item.matching_transactions.length }} match{{ item.matching_transactions.length !== 1 ? 'es' : '' }}
-                </div>
-              </div>
+            <!-- No Matches Message -->
+            <div v-if="templatesWithMatches.length === 0" class="text-center py-10">
+              <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <h3 class="mt-2 text-sm font-medium text-gray-900">No matching transactions found</h3>
+              <p class="mt-1 text-sm text-gray-500">
+                All unlinked transactions have already been reviewed or don't match any templates.
+              </p>
             </div>
 
-            <!-- Matching Transactions -->
-            <div class="divide-y divide-gray-100">
+            <!-- Templates with Matches -->
+            <div v-else class="space-y-6">
               <div 
-                v-for="transaction in item.matching_transactions" 
-                :key="transaction.id"
-                class="px-6 py-3 flex items-center justify-between hover:bg-gray-50"
+                v-for="item in templatesWithMatches" 
+                :key="item.template.id"
+                class="border border-gray-200 rounded-lg overflow-hidden"
               >
-                <div class="flex items-center space-x-4">
-                  <input
-                    type="checkbox"
-                    :value="transaction.id"
-                    v-model="selectedTransactions[item.template.id]"
-                    class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                  />
-                  <div>
-                    <div class="text-sm font-medium text-gray-900">
-                      {{ transaction.merchant_name || transaction.plaid_description || transaction.description }}
+                <!-- Template Header -->
+                <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        :checked="isTemplateFullySelected(item.template.id)"
+                        :indeterminate="isTemplatePartiallySelected(item.template.id)"
+                        @change="toggleTemplate(item.template.id, item.matching_transactions)"
+                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      />
+                      <div>
+                        <h4 class="text-base font-medium text-gray-900">{{ item.template.description }}</h4>
+                        <div class="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm text-gray-500">
+                          <span>{{ formatCurrency(item.template.amount_in_cents) }}</span>
+                          <span class="capitalize">{{ item.template.frequency }}</span>
+                          <span>{{ item.template.account_name }}</span>
+                          <span v-if="item.template.linked_count > 0" class="text-green-600">
+                            {{ item.template.linked_count }} already linked
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div v-if="transaction.plaid_description && transaction.plaid_description !== transaction.merchant_name" class="text-xs text-gray-500">
-                      {{ transaction.plaid_description }}
+                    <div class="text-sm text-gray-500">
+                      {{ item.matching_transactions.length }} match{{ item.matching_transactions.length !== 1 ? 'es' : '' }}
                     </div>
                   </div>
                 </div>
-                <div class="flex items-center space-x-6 text-sm">
-                  <span :class="getAmountColor(transaction.amount_in_cents)">
-                    {{ formatCurrency(transaction.amount_in_cents) }}
-                  </span>
-                  <span class="text-gray-500 w-24 text-right">{{ formatDate(transaction.date) }}</span>
-                  <span class="text-gray-400 w-32 text-right truncate">{{ transaction.account_name }}</span>
+
+                <!-- Matching Transactions -->
+                <div class="divide-y divide-gray-100">
+                  <div 
+                    v-for="transaction in item.matching_transactions" 
+                    :key="transaction.id"
+                    class="px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                  >
+                    <div class="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        :value="transaction.id"
+                        v-model="selectedTransactions[item.template.id]"
+                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      />
+                      <div>
+                        <div class="text-sm font-medium text-gray-900">
+                          {{ transaction.merchant_name || transaction.plaid_description || transaction.description }}
+                        </div>
+                        <div v-if="transaction.plaid_description && transaction.plaid_description !== transaction.merchant_name" class="text-xs text-gray-500">
+                          {{ transaction.plaid_description }}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center space-x-4 text-sm">
+                      <span :class="getAmountColor(transaction.amount_in_cents)">
+                        {{ formatCurrency(transaction.amount_in_cents) }}
+                      </span>
+                      <span class="text-gray-500 w-24 text-right">{{ formatDate(transaction.date) }}</span>
+                      <span class="text-gray-400 w-28 text-right truncate hidden sm:block">{{ transaction.account_name }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
-
       </div>
     </div>
 

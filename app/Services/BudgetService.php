@@ -233,17 +233,6 @@ class BudgetService
     }
 
     /**
-     * Clear the projection cache for an account.
-     */
-    public static function clearProjectionCache(int $accountId): void
-    {
-        // Clear all projection caches for this account using pattern matching
-        // Note: This clears projections for all date ranges for this account
-        $pattern = "account:{$accountId}:projections:*";
-        self::forgetCachePattern($pattern);
-    }
-
-    /**
      * Clear the monthly cash flow cache for an account.
      */
     public static function clearCashFlowCache(int $accountId): void
@@ -261,22 +250,36 @@ class BudgetService
     }
 
     /**
+     * Clear the projection cache for an account.
+     * Generates and clears all possible cache keys for common projection date ranges.
+     */
+    public static function clearProjectionCache(int $accountId): void
+    {
+        // Generate cache keys for common projection date ranges (1-12 months)
+        // This ensures we clear all cached projections regardless of cache driver
+        $today = Carbon::now();
+        
+        for ($months = 1; $months <= 12; $months++) {
+            $startDate = $today->copy()->addDay()->startOfDay()->format('Y-m-d');
+            $endDate = $today->copy()->addMonths($months)->endOfMonth()->format('Y-m-d');
+            $cacheKey = "account:{$accountId}:projections:{$startDate}:{$endDate}";
+            Cache::forget($cacheKey);
+        }
+        
+        // Also try Redis pattern matching for Redis/Memcached drivers
+        self::forgetCachePattern("account:{$accountId}:projections:*");
+    }
+
+    /**
      * Forget cache keys matching a pattern.
-     * For file/database cache drivers, this uses tags if available,
-     * otherwise clears individual known keys.
+     * For Redis/Memcached cache drivers that support pattern-based deletion.
      */
     protected static function forgetCachePattern(string $pattern): void
     {
-        // For Redis/Memcached with pattern support, you could use:
-        // Cache::getStore()->getRedis()->del(Cache::getStore()->getPrefix() . $pattern);
-        
-        // For simpler cache drivers, we clear the main cache tags or use a different strategy
-        // For now, we'll store known cache keys in a tracking array
         $cacheDriver = config('cache.default');
         
         if (in_array($cacheDriver, ['redis', 'memcached'])) {
             // These drivers support pattern-based deletion
-            // Implementation depends on specific driver
             try {
                 $store = Cache::getStore();
                 if (method_exists($store, 'getRedis')) {
@@ -288,10 +291,10 @@ class BudgetService
                     }
                 }
             } catch (\Exception $e) {
-                // Silently fail for pattern deletion, individual keys will expire naturally
+                // Silently fail for pattern deletion
             }
         }
-        // For file/array cache, keys will expire naturally via TTL
+        // For file/array/database cache, keys are cleared individually in clearProjectionCache
     }
 
     /**

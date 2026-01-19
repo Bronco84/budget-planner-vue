@@ -39,6 +39,29 @@
             <div v-if="selectedAccountId !== 'all'" class="text-sm text-gray-500">
               Showing items for: <span class="font-medium text-gray-700">{{ selectedAccountName }}</span>
             </div>
+            
+            <!-- Simulation Mode Toggle -->
+            <div class="flex items-center gap-2 ml-auto">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="simulationMode" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                <span class="ml-2 text-sm font-medium text-gray-700">What-If Mode</span>
+              </label>
+              <button
+                v-if="simulationMode && hasAdjustments"
+                @click="resetAdjustments"
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Reset All
+              </button>
+            </div>
+          </div>
+          
+          <!-- Simulation Mode Hint -->
+          <div v-if="simulationMode" class="mt-3 p-3 bg-indigo-50 rounded-lg">
+            <p class="text-sm text-indigo-700">
+              <strong>What-If Mode:</strong> Click on any amount to adjust it and see how it affects your monthly totals. Changes are for simulation only and won't be saved.
+            </p>
           </div>
         </div>
 
@@ -47,28 +70,40 @@
           <div class="bg-white border rounded-lg shadow-sm p-5">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Monthly Income</h3>
             <div class="text-2xl font-bold text-green-600">
-              {{ formatCurrency(filteredTotals.monthly_income) }}
+              {{ formatCurrency(adjustedTotals.monthly_income) }}
+            </div>
+            <div v-if="incomeAdjustmentDiff !== 0" class="text-xs mt-1" :class="incomeAdjustmentDiff > 0 ? 'text-green-500' : 'text-red-500'">
+              {{ incomeAdjustmentDiff > 0 ? '+' : '' }}{{ formatCurrency(incomeAdjustmentDiff) }} from original
             </div>
           </div>
 
           <div class="bg-white border rounded-lg shadow-sm p-5">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Monthly Expenses</h3>
             <div class="text-2xl font-bold text-red-600">
-              {{ formatCurrency(filteredTotals.monthly_expenses) }}
+              {{ formatCurrency(adjustedTotals.monthly_expenses) }}
+            </div>
+            <div v-if="expenseAdjustmentDiff !== 0" class="text-xs mt-1" :class="expenseAdjustmentDiff < 0 ? 'text-green-500' : 'text-red-500'">
+              {{ expenseAdjustmentDiff > 0 ? '+' : '' }}{{ formatCurrency(expenseAdjustmentDiff) }} from original
             </div>
           </div>
 
           <div class="bg-white border rounded-lg shadow-sm p-5">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Autopay Payments</h3>
             <div class="text-2xl font-bold text-orange-600">
-              {{ formatCurrency(filteredTotals.monthly_autopay) }}
+              {{ formatCurrency(adjustedTotals.monthly_autopay) }}
+            </div>
+            <div v-if="autopayAdjustmentDiff !== 0" class="text-xs mt-1" :class="autopayAdjustmentDiff < 0 ? 'text-green-500' : 'text-red-500'">
+              {{ autopayAdjustmentDiff > 0 ? '+' : '' }}{{ formatCurrency(autopayAdjustmentDiff) }} from original
             </div>
           </div>
 
           <div class="bg-white border rounded-lg shadow-sm p-5">
             <h3 class="text-sm font-medium text-gray-500 mb-2">Net Monthly</h3>
-            <div class="text-2xl font-bold" :class="filteredTotals.net >= 0 ? 'text-green-600' : 'text-red-600'">
-              {{ formatCurrency(filteredTotals.net) }}
+            <div class="text-2xl font-bold" :class="adjustedTotals.net >= 0 ? 'text-green-600' : 'text-red-600'">
+              {{ formatCurrency(adjustedTotals.net) }}
+            </div>
+            <div v-if="netAdjustmentDiff !== 0" class="text-xs mt-1" :class="netAdjustmentDiff > 0 ? 'text-green-500' : 'text-red-500'">
+              {{ netAdjustmentDiff > 0 ? '+' : '' }}{{ formatCurrency(netAdjustmentDiff) }} from original
             </div>
           </div>
         </div>
@@ -113,9 +148,35 @@
                         </span>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-sm font-semibold text-green-600">
+                        <!-- Editable Amount -->
+                        <div v-if="simulationMode" class="flex items-center justify-end gap-1">
+                          <span class="text-gray-400">$</span>
+                          <input
+                            type="number"
+                            :value="getAdjustedAmount('income', item.id, item.monthly_amount) / 100"
+                            @change="updateAdjustment('income', item.id, $event)"
+                            class="w-24 px-2 py-1 text-sm font-semibold text-green-600 text-right border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                            step="0.01"
+                          />
+                          <button
+                            v-if="hasItemAdjustment('income', item.id)"
+                            @click="clearItemAdjustment('income', item.id)"
+                            class="p-1 text-gray-400 hover:text-gray-600"
+                            title="Reset to original"
+                          >
+                            <XMarkIcon class="w-4 h-4" />
+                          </button>
+                        </div>
+                        <!-- Static Display -->
+                        <div v-else>
+                          <span class="text-sm font-semibold text-green-600">
+                            {{ formatCurrency(getAdjustedAmount('income', item.id, item.monthly_amount)) }}
+                          </span>
+                        </div>
+                        <!-- Original value indicator -->
+                        <div v-if="hasItemAdjustment('income', item.id)" class="text-xs text-gray-400 line-through">
                           {{ formatCurrency(item.monthly_amount) }}
-                        </span>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -125,7 +186,7 @@
                         Total Monthly Income
                       </td>
                       <td class="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {{ formatCurrency(filteredTotals.monthly_income) }}
+                        {{ formatCurrency(adjustedTotals.monthly_income) }}
                       </td>
                     </tr>
                   </tfoot>
@@ -184,9 +245,35 @@
                         </span>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-sm font-semibold text-red-600">
+                        <!-- Editable Amount -->
+                        <div v-if="simulationMode" class="flex items-center justify-end gap-1">
+                          <span class="text-gray-400">$</span>
+                          <input
+                            type="number"
+                            :value="Math.abs(getAdjustedAmount('expense', item.id, item.monthly_amount)) / 100"
+                            @change="updateExpenseAdjustment('expense', item.id, $event)"
+                            class="w-24 px-2 py-1 text-sm font-semibold text-red-600 text-right border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                            step="0.01"
+                          />
+                          <button
+                            v-if="hasItemAdjustment('expense', item.id)"
+                            @click="clearItemAdjustment('expense', item.id)"
+                            class="p-1 text-gray-400 hover:text-gray-600"
+                            title="Reset to original"
+                          >
+                            <XMarkIcon class="w-4 h-4" />
+                          </button>
+                        </div>
+                        <!-- Static Display -->
+                        <div v-else>
+                          <span class="text-sm font-semibold text-red-600">
+                            {{ formatCurrency(Math.abs(getAdjustedAmount('expense', item.id, item.monthly_amount))) }}
+                          </span>
+                        </div>
+                        <!-- Original value indicator -->
+                        <div v-if="hasItemAdjustment('expense', item.id)" class="text-xs text-gray-400 line-through">
                           {{ formatCurrency(Math.abs(item.monthly_amount)) }}
-                        </span>
+                        </div>
                       </td>
                     </tr>
 
@@ -212,9 +299,35 @@
                         </span>
                       </td>
                       <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-sm font-semibold text-orange-600">
+                        <!-- Editable Amount -->
+                        <div v-if="simulationMode" class="flex items-center justify-end gap-1">
+                          <span class="text-gray-400">$</span>
+                          <input
+                            type="number"
+                            :value="Math.abs(getAdjustedAmount('autopay', item.id, item.monthly_amount)) / 100"
+                            @change="updateExpenseAdjustment('autopay', item.id, $event)"
+                            class="w-24 px-2 py-1 text-sm font-semibold text-orange-600 text-right border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                            step="0.01"
+                          />
+                          <button
+                            v-if="hasItemAdjustment('autopay', item.id)"
+                            @click="clearItemAdjustment('autopay', item.id)"
+                            class="p-1 text-gray-400 hover:text-gray-600"
+                            title="Reset to original"
+                          >
+                            <XMarkIcon class="w-4 h-4" />
+                          </button>
+                        </div>
+                        <!-- Static Display -->
+                        <div v-else>
+                          <span class="text-sm font-semibold text-orange-600">
+                            {{ formatCurrency(Math.abs(getAdjustedAmount('autopay', item.id, item.monthly_amount))) }}
+                          </span>
+                        </div>
+                        <!-- Original value indicator -->
+                        <div v-if="hasItemAdjustment('autopay', item.id)" class="text-xs text-gray-400 line-through">
                           {{ formatCurrency(Math.abs(item.monthly_amount)) }}
-                        </span>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -224,7 +337,7 @@
                         Recurring Expenses
                       </td>
                       <td class="px-4 py-2 text-right text-sm font-semibold text-red-600">
-                        {{ formatCurrency(filteredTotals.monthly_expenses) }}
+                        {{ formatCurrency(adjustedTotals.monthly_expenses) }}
                       </td>
                     </tr>
                     <tr v-if="filteredAutopayItems.length > 0">
@@ -232,7 +345,7 @@
                         Autopay Payments
                       </td>
                       <td class="px-4 py-2 text-right text-sm font-semibold text-orange-600">
-                        {{ formatCurrency(filteredTotals.monthly_autopay) }}
+                        {{ formatCurrency(adjustedTotals.monthly_autopay) }}
                       </td>
                     </tr>
                     <tr class="border-t-2 border-gray-300">
@@ -240,7 +353,7 @@
                         Total Monthly Expenses
                       </td>
                       <td class="px-4 py-3 text-right text-sm font-bold text-red-600">
-                        {{ formatCurrency(filteredTotals.monthly_expenses + filteredTotals.monthly_autopay) }}
+                        {{ formatCurrency(adjustedTotals.monthly_expenses + adjustedTotals.monthly_autopay) }}
                       </td>
                     </tr>
                   </tfoot>
@@ -268,6 +381,9 @@
               <div>
                 <h3 class="text-lg font-semibold text-gray-900">Monthly Summary</h3>
                 <p class="text-sm text-gray-500 mt-1">
+                  <span v-if="hasAdjustments" class="text-indigo-600 font-medium">
+                    Simulated values - 
+                  </span>
                   Based on your recurring transactions and autopay settings
                   <span v-if="selectedAccountId !== 'all'" class="text-indigo-600">
                     (filtered by {{ selectedAccountName }})
@@ -278,12 +394,12 @@
                 <div class="text-sm text-gray-500">Net Monthly Cash Flow</div>
                 <div
                   class="text-3xl font-bold"
-                  :class="filteredTotals.net >= 0 ? 'text-green-600' : 'text-red-600'"
+                  :class="adjustedTotals.net >= 0 ? 'text-green-600' : 'text-red-600'"
                 >
-                  {{ formatCurrency(filteredTotals.net) }}
+                  {{ formatCurrency(adjustedTotals.net) }}
                 </div>
-                <div class="text-sm mt-1" :class="filteredTotals.net >= 0 ? 'text-green-500' : 'text-red-500'">
-                  {{ filteredTotals.net >= 0 ? 'Surplus' : 'Deficit' }} per month
+                <div class="text-sm mt-1" :class="adjustedTotals.net >= 0 ? 'text-green-500' : 'text-red-500'">
+                  {{ adjustedTotals.net >= 0 ? 'Surplus' : 'Deficit' }} per month
                 </div>
               </div>
             </div>
@@ -295,7 +411,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import {
@@ -304,6 +420,7 @@ import {
   ArrowTrendingDownIcon,
   CreditCardIcon,
   FunnelIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline';
 import { formatCurrency } from '@/utils/format.js';
 
@@ -320,34 +437,97 @@ const props = defineProps({
 // Account filter state
 const selectedAccountId = ref('all');
 
+// Simulation mode toggle
+const simulationMode = ref(false);
+
+// Adjustments tracking - stores the adjusted values in cents
+const adjustments = reactive({
+  income: {},    // { itemId: adjustedAmountInCents }
+  expense: {},   // { itemId: adjustedAmountInCents }
+  autopay: {},   // { itemId: adjustedAmountInCents }
+});
+
+// Get the selected account ID as a number for comparison (or null if 'all')
+const selectedAccountIdNum = computed(() => {
+  if (selectedAccountId.value === 'all') return null;
+  return parseInt(selectedAccountId.value, 10);
+});
+
 // Get selected account name for display
 const selectedAccountName = computed(() => {
   if (selectedAccountId.value === 'all') return 'All Accounts';
-  const account = props.accounts.find(a => a.id === selectedAccountId.value);
+  const account = props.accounts.find(a => a.id === selectedAccountIdNum.value);
   return account?.name || 'Unknown';
 });
 
 // Filtered items based on selected account
 const filteredIncomeItems = computed(() => {
-  if (selectedAccountId.value === 'all') return props.incomeItems;
-  return props.incomeItems.filter(item => item.account_id === selectedAccountId.value);
+  if (selectedAccountIdNum.value === null) return props.incomeItems;
+  return props.incomeItems.filter(item => item.account_id === selectedAccountIdNum.value);
 });
 
 const filteredExpenseItems = computed(() => {
-  if (selectedAccountId.value === 'all') return props.expenseItems;
-  return props.expenseItems.filter(item => item.account_id === selectedAccountId.value);
+  if (selectedAccountIdNum.value === null) return props.expenseItems;
+  return props.expenseItems.filter(item => item.account_id === selectedAccountIdNum.value);
 });
 
 const filteredAutopayItems = computed(() => {
-  if (selectedAccountId.value === 'all') return props.autopayItems;
-  // Autopay items: filter by either the credit card itself or the source account
+  if (selectedAccountIdNum.value === null) return props.autopayItems;
   return props.autopayItems.filter(item => 
-    item.id === selectedAccountId.value || 
-    item.source_account_id === selectedAccountId.value
+    item.id === selectedAccountIdNum.value || 
+    item.source_account_id === selectedAccountIdNum.value
   );
 });
 
-// Recalculate totals based on filtered items
+// Check if there are any adjustments
+const hasAdjustments = computed(() => {
+  return Object.keys(adjustments.income).length > 0 ||
+         Object.keys(adjustments.expense).length > 0 ||
+         Object.keys(adjustments.autopay).length > 0;
+});
+
+// Get adjusted amount for an item
+const getAdjustedAmount = (type, itemId, originalAmount) => {
+  if (adjustments[type][itemId] !== undefined) {
+    return adjustments[type][itemId];
+  }
+  return originalAmount;
+};
+
+// Check if an item has been adjusted
+const hasItemAdjustment = (type, itemId) => {
+  return adjustments[type][itemId] !== undefined;
+};
+
+// Update an adjustment (for income - positive values)
+const updateAdjustment = (type, itemId, event) => {
+  const value = parseFloat(event.target.value);
+  if (!isNaN(value)) {
+    adjustments[type][itemId] = Math.round(value * 100); // Convert to cents
+  }
+};
+
+// Update an expense adjustment (stores as negative cents)
+const updateExpenseAdjustment = (type, itemId, event) => {
+  const value = parseFloat(event.target.value);
+  if (!isNaN(value)) {
+    adjustments[type][itemId] = -Math.round(Math.abs(value) * 100); // Convert to negative cents
+  }
+};
+
+// Clear a specific item adjustment
+const clearItemAdjustment = (type, itemId) => {
+  delete adjustments[type][itemId];
+};
+
+// Reset all adjustments
+const resetAdjustments = () => {
+  adjustments.income = {};
+  adjustments.expense = {};
+  adjustments.autopay = {};
+};
+
+// Calculate original totals (without adjustments) for comparison
 const filteredTotals = computed(() => {
   const monthlyIncome = filteredIncomeItems.value.reduce((sum, item) => sum + item.monthly_amount, 0);
   const monthlyExpenses = Math.abs(filteredExpenseItems.value.reduce((sum, item) => sum + item.monthly_amount, 0));
@@ -360,6 +540,34 @@ const filteredTotals = computed(() => {
     net: monthlyIncome - monthlyExpenses - monthlyAutopay,
   };
 });
+
+// Calculate adjusted totals
+const adjustedTotals = computed(() => {
+  const monthlyIncome = filteredIncomeItems.value.reduce((sum, item) => {
+    return sum + getAdjustedAmount('income', item.id, item.monthly_amount);
+  }, 0);
+  
+  const monthlyExpenses = Math.abs(filteredExpenseItems.value.reduce((sum, item) => {
+    return sum + getAdjustedAmount('expense', item.id, item.monthly_amount);
+  }, 0));
+  
+  const monthlyAutopay = Math.abs(filteredAutopayItems.value.reduce((sum, item) => {
+    return sum + getAdjustedAmount('autopay', item.id, item.monthly_amount);
+  }, 0));
+  
+  return {
+    monthly_income: monthlyIncome,
+    monthly_expenses: monthlyExpenses,
+    monthly_autopay: monthlyAutopay,
+    net: monthlyIncome - monthlyExpenses - monthlyAutopay,
+  };
+});
+
+// Calculate adjustment differences for display
+const incomeAdjustmentDiff = computed(() => adjustedTotals.value.monthly_income - filteredTotals.value.monthly_income);
+const expenseAdjustmentDiff = computed(() => adjustedTotals.value.monthly_expenses - filteredTotals.value.monthly_expenses);
+const autopayAdjustmentDiff = computed(() => adjustedTotals.value.monthly_autopay - filteredTotals.value.monthly_autopay);
+const netAdjustmentDiff = computed(() => adjustedTotals.value.net - filteredTotals.value.net);
 
 // Format frequency for display
 const formatFrequency = (frequency) => {

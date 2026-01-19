@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Budget;
 use App\Models\Account;
 use App\Models\Scenario;
+use App\Models\Transaction;
 use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -56,6 +57,10 @@ class ProjectionsController extends Controller
             );
             
             $projectedTransactions = $projectedTransactions->merge($accountProjections);
+            
+            // Add future manual transactions for this account
+            $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
+            $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
         }
         
         // Group by month
@@ -110,7 +115,7 @@ class ProjectionsController extends Controller
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
         
-        // Get projected transactions for this account
+        // Get projected transactions for this account (from recurring templates)
         $projectedTransactions = $this->recurringTransactionService->projectTransactions(
             $account,
             $startDate,
@@ -121,6 +126,12 @@ class ProjectionsController extends Controller
         if (!$projectedTransactions instanceof Collection) {
             $projectedTransactions = collect($projectedTransactions);
         }
+        
+        // Get future manual transactions (not from recurring templates)
+        $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
+        
+        // Merge manual transactions with recurring projections
+        $projectedTransactions = $projectedTransactions->merge($futureManualTransactions)->sortBy('date')->values();
         
         // Project daily balance for the account
         // Use different calculation for liabilities vs assets
@@ -249,7 +260,7 @@ class ProjectionsController extends Controller
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
         
-        // Get projected transactions for this account
+        // Get projected transactions for this account (from recurring templates)
         $projectedTransactions = $this->recurringTransactionService->projectTransactions(
             $account,
             $startDate,
@@ -260,6 +271,12 @@ class ProjectionsController extends Controller
         if (!$projectedTransactions instanceof Collection) {
             $projectedTransactions = collect($projectedTransactions);
         }
+        
+        // Get future manual transactions (not from recurring templates)
+        $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
+        
+        // Merge manual transactions with recurring projections
+        $projectedTransactions = $projectedTransactions->merge($futureManualTransactions)->sortBy('date')->values();
         
         // Project daily balance for the account
         // Use different calculation for liabilities vs assets
@@ -374,6 +391,10 @@ class ProjectionsController extends Controller
                 $projectedTransactions = $projectedTransactions->merge($autopayByAccount->get($account->id));
             }
 
+            // Add future manual transactions for this account
+            $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
+            $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
+
             $balanceProjection = $this->projectDailyBalance(
                 $projectedTransactions,
                 $account->current_balance_cents,
@@ -406,6 +427,10 @@ class ProjectionsController extends Controller
                 if ($autopayByAccount->has($account->id)) {
                     $projectedTransactions = $projectedTransactions->merge($autopayByAccount->get($account->id));
                 }
+
+                // Add future manual transactions for this account
+                $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
+                $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
 
                 // Apply scenario adjustments
                 $adjustedTransactions = $this->applyScenarioAdjustments(
@@ -483,5 +508,40 @@ class ProjectionsController extends Controller
         });
 
         return $allTransactions;
+    }
+
+    /**
+     * Get future manual transactions for an account.
+     * 
+     * These are one-time transactions created by the user with a future date,
+     * that are not linked to recurring transaction templates or transfers.
+     *
+     * @param Account $account
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @return Collection
+     */
+    protected function getFutureManualTransactions(Account $account, Carbon $startDate, Carbon $endDate): Collection
+    {
+        return Transaction::where('account_id', $account->id)
+            ->where('date', '>=', $startDate->format('Y-m-d'))
+            ->where('date', '<=', $endDate->format('Y-m-d'))
+            ->whereNull('recurring_transaction_template_id') // Exclude recurring transactions
+            ->whereNull('transfer_id') // Exclude transfers (handled separately if needed)
+            ->get()
+            ->map(function ($transaction) {
+                return [
+                    'id' => $transaction->id,
+                    'budget_id' => $transaction->budget_id,
+                    'account_id' => $transaction->account_id,
+                    'description' => $transaction->description,
+                    'amount_in_cents' => $transaction->amount_in_cents,
+                    'category' => $transaction->category,
+                    'date' => $transaction->date,
+                    'is_projected' => $transaction->date->isFuture(),
+                    'is_manual' => true,
+                    'recurring_transaction_template_id' => null,
+                ];
+            });
     }
 }

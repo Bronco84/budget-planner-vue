@@ -357,6 +357,9 @@ class BudgetController extends Controller
     {
         $this->authorize('view', $budget);
 
+        // Get all accounts for the filter dropdown
+        $accounts = $budget->accounts()->select('id', 'name')->get();
+
         // Get recurring income (positive amounts)
         $incomeTemplates = $budget->recurringTransactionTemplates()
             ->where('amount_in_cents', '>', 0)
@@ -365,6 +368,7 @@ class BudgetController extends Controller
             ->map(function ($template) {
                 return [
                     'id' => $template->id,
+                    'account_id' => $template->account_id,
                     'description' => $template->friendly_label ?: $template->description,
                     'amount_in_cents' => $template->amount_in_cents,
                     'frequency' => $template->frequency,
@@ -382,6 +386,7 @@ class BudgetController extends Controller
             ->map(function ($template) {
                 return [
                     'id' => $template->id,
+                    'account_id' => $template->account_id,
                     'description' => $template->friendly_label ?: $template->description,
                     'amount_in_cents' => $template->amount_in_cents,
                     'frequency' => $template->frequency,
@@ -401,6 +406,7 @@ class BudgetController extends Controller
             ->map(function ($account) {
                 return [
                     'id' => $account->id,
+                    'source_account_id' => $account->autopay_source_account_id,
                     'name' => $account->name,
                     'source_account_name' => $account->autopaySourceAccount?->name,
                     'amount_in_cents' => -abs($account->getAutopayAmountCents() ?? 0),
@@ -416,6 +422,7 @@ class BudgetController extends Controller
 
         return Inertia::render('Budgets/IncomeVsExpenses', [
             'budget' => $budget,
+            'accounts' => $accounts,
             'incomeItems' => $incomeTemplates,
             'expenseItems' => $expenseTemplates,
             'autopayItems' => $autopayAccounts,

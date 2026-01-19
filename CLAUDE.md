@@ -280,6 +280,33 @@ This project follows [Claude Code best practices](https://www.anthropic.com/engi
 - Plan implementation strategy before coding
 - Use Laravel Boost optimization commands appropriately
 
+## Breadcrumb Requirements
+
+**MANDATORY**: When creating new pages that are children of the budget (e.g., reports, statistics, account views, or any budget-related feature pages), you MUST add a breadcrumb definition.
+
+### How to Add Breadcrumbs
+
+1. **Add the breadcrumb definition** in `routes/breadcrumbs.php`:
+   ```php
+   Breadcrumbs::for('route.name', function (BreadcrumbTrail $trail, Budget $budget) {
+       $trail->parent('budgets.show', $budget);
+       $trail->push('Page Title', route('route.name', $budget));
+   });
+   ```
+
+2. **Follow the hierarchy pattern**:
+   - Most budget-related pages should have `budgets.show` as their parent
+   - Sub-pages should reference their parent page (e.g., `recurring-transactions.edit` has parent `recurring-transactions.index`)
+   - Use consistent naming: route name should match the breadcrumb name
+
+3. **The breadcrumb will automatically appear** - The `AuthenticatedLayout` checks for `$page.props.breadcrumbs` and displays the `Breadcrumbs` component if present.
+
+### Examples from this project:
+- Statistics pages: `budget.statistics.yearly`, `budget.statistics.monthly`
+- Account pages: `budgets.accounts.edit`, `budget.account.balance-projection`
+- Transaction pages: `recurring-transactions.index`, `recurring-transactions.edit`
+- Reports: `reports.index`, `budget.income-vs-expenses`
+
 ## Critical UI Verification Rule
 **MANDATORY**: When adjusting any process or page in the UI, you MUST use Playwright MCP to verify the adjustment was successful by:
 1. Taking a screenshot or snapshot to visually confirm the changes

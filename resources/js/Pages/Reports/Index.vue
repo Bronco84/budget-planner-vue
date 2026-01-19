@@ -8,6 +8,7 @@ import CashFlowTab from './Tabs/CashFlowTab.vue';
 import BudgetPerformanceTab from './Tabs/BudgetPerformanceTab.vue';
 import SpendingPatternsTab from './Tabs/SpendingPatternsTab.vue';
 import DebtPayoffTab from './Tabs/DebtPayoffTab.vue';
+import IncomeVsExpensesTab from './Tabs/IncomeVsExpensesTab.vue';
 import DateRangePicker from '@/Components/DateRangePicker.vue';
 
 const props = defineProps({
@@ -21,6 +22,7 @@ const props = defineProps({
     budgetPerformance: Object,
     spendingPatterns: Object,
     debtPayoff: Object,
+    incomeVsExpenses: Object,
 });
 
 const tabs = [
@@ -29,6 +31,7 @@ const tabs = [
     { name: 'Cash Flow', component: 'cashFlow' },
     { name: 'Budget Performance', component: 'budgetPerformance' },
     { name: 'Spending Patterns', component: 'spendingPatterns' },
+    { name: 'Income vs Expenses', component: 'incomeVsExpenses' },
     // { name: 'Debt Payoff', component: 'debtPayoff' },
 ];
 
@@ -56,6 +59,8 @@ const activeComponent = computed(() => {
             return BudgetPerformanceTab;
         case 'spendingPatterns':
             return SpendingPatternsTab;
+        case 'incomeVsExpenses':
+            return IncomeVsExpensesTab;
         case 'debtPayoff':
             return DebtPayoffTab;
         default:
@@ -156,6 +161,7 @@ const handleAccountChange = (event) => {
                             :budget-performance="budgetPerformance"
                             :spending-patterns="spendingPatterns"
                             :debt-payoff="debtPayoff"
+                            :income-vs-expenses="incomeVsExpenses"
                         />
                     </div>
                 </div>

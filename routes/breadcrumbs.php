@@ -220,11 +220,6 @@ Breadcrumbs::for('budget.statistics.monthly', function (BreadcrumbTrail $trail, 
     $trail->push('Monthly Statistics', route('budget.statistics.monthly', $budget));
 });
 
-Breadcrumbs::for('budget.income-vs-expenses', function (BreadcrumbTrail $trail, Budget $budget) {
-    $trail->parent('budgets.show', $budget);
-    $trail->push('Income vs Expenses', route('budget.income-vs-expenses', $budget));
-});
-
 Breadcrumbs::for('budget.projections', function (BreadcrumbTrail $trail, Budget $budget) {
     $trail->parent('budgets.show', $budget);
     $trail->push('Budget Projections', route('budget.projections', $budget));

@@ -33,7 +33,7 @@
 
                         <!-- Income vs Expenses Icon -->
                         <Link
-                          :href="route('budget.income-vs-expenses', budget.id)"
+                          :href="route('reports.index', { budget: budget.id }) + '?tab=incomeVsExpenses'"
                           class="inline-flex items-center justify-center p-1.5 bg-emerald-100 hover:bg-emerald-200 rounded-md transition-colors"
                           title="Income vs Expenses"
                         >

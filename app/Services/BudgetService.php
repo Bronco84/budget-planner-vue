@@ -23,8 +23,14 @@ class BudgetService
     protected const CASH_FLOW_CACHE_TTL = 3600;
 
     public function __construct(
-        protected RecurringTransactionService $recurringService
-    ) {}
+        protected RecurringTransactionService $recurringService,
+        protected ?TransferService $transferService = null
+    ) {
+        // TransferService is optional for backwards compatibility
+        if ($this->transferService === null) {
+            $this->transferService = app(TransferService::class);
+        }
+    }
 
     /**
      * Get the appropriate account for the budget view
@@ -132,15 +138,19 @@ class BudgetService
             $model->budget_id = $transactionData['budget_id'] ?? null;
             $model->is_projected = $transactionData['is_projected'] ?? true;
             $model->is_recurring = $transactionData['is_recurring'] ?? false;
+            $model->is_transfer = $transactionData['is_transfer'] ?? false;
             $model->date = isset($transactionData['date']) ? Carbon::parse($transactionData['date']) : null;
             $model->account_id = $transactionData['account_id'] ?? null;
             $model->recurring_transaction_template_id = $transactionData['recurring_transaction_template_id'] ?? null;
+            $model->transfer_id = $transactionData['transfer_id'] ?? null;
             $model->is_dynamic_amount = $transactionData['is_dynamic_amount'] ?? false;
             $model->amount_in_cents = $transactionData['amount_in_cents'] ?? 0;
             $model->category_id = $transactionData['category_id'] ?? null;
             $model->description = $transactionData['description'] ?? null;
             $model->projection_source = $transactionData['projection_source'] ?? null;
             $model->is_first_autopay = $transactionData['is_first_autopay'] ?? null;
+            $model->transfer_from_account = $transactionData['transfer_from_account'] ?? null;
+            $model->transfer_to_account = $transactionData['transfer_to_account'] ?? null;
             return $model;
         });
     }
@@ -198,8 +208,28 @@ class BudgetService
                 ];
             });
 
-        // Merge both types of projections and return as array
-        return $recurringProjections->concat($autopayProjections)->values()->toArray();
+        // Get transfer projections for this account
+        $transferProjections = $this->transferService->getProjectedTransferTransactions($account, $startDate, $endDate)
+            ->map(function ($transaction) use ($budgetId) {
+                return [
+                    'budget_id' => $budgetId,
+                    'is_projected' => true,
+                    'is_recurring' => false,
+                    'is_transfer' => true,
+                    'date' => $transaction['date'] instanceof Carbon ? $transaction['date']->toDateString() : $transaction['date'],
+                    'account_id' => $transaction['account_id'],
+                    'transfer_id' => $transaction['transfer_id'] ?? null,
+                    'description' => $transaction['description'],
+                    'category' => $transaction['category'] ?? 'Transfer',
+                    'amount_in_cents' => $transaction['amount_in_cents'],
+                    'projection_source' => 'transfer',
+                    'transfer_from_account' => $transaction['transfer_from_account'] ?? null,
+                    'transfer_to_account' => $transaction['transfer_to_account'] ?? null,
+                ];
+            });
+
+        // Merge all types of projections and return as array
+        return $recurringProjections->concat($autopayProjections)->concat($transferProjections)->values()->toArray();
     }
 
     /**

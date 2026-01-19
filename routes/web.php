@@ -11,6 +11,7 @@ use App\Http\Controllers\FileController;
 use App\Http\Controllers\BudgetFilesController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\TransferController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\RecurringTransactionRuleController;
 use App\Http\Controllers\PlaidController;
@@ -171,6 +172,22 @@ Route::middleware('auth')->group(function () {
         ->name('budget.transaction.destroy');
     Route::get('budget/{budget}/transactions/{transaction}/activity-log', [TransactionController::class, 'getActivityLog'])
         ->name('budget.transaction.activity-log');
+
+    // Routes for transfers
+    Route::get('budget/{budget}/transfers', [TransferController::class, 'index'])
+        ->name('budget.transfers.index');
+    Route::get('budget/{budget}/transfers/create', [TransferController::class, 'create'])
+        ->name('budget.transfers.create');
+    Route::post('budget/{budget}/transfers', [TransferController::class, 'store'])
+        ->name('budget.transfers.store');
+    Route::get('budget/{budget}/transfers/{transfer}', [TransferController::class, 'show'])
+        ->name('budget.transfers.show');
+    Route::get('budget/{budget}/transfers/{transfer}/edit', [TransferController::class, 'edit'])
+        ->name('budget.transfers.edit');
+    Route::patch('budget/{budget}/transfers/{transfer}', [TransferController::class, 'update'])
+        ->name('budget.transfers.update');
+    Route::delete('budget/{budget}/transfers/{transfer}', [TransferController::class, 'destroy'])
+        ->name('budget.transfers.destroy');
         
     // Routes for recurring transactions
     Route::get('budget/{budget}/recurring-transactions', [RecurringTransactionController::class, 'index'])

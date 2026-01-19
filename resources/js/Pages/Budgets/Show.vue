@@ -584,6 +584,20 @@
                                         Estimated
                                       </div>
                                   </template>
+                                  <!-- Transfer indicator -->
+                                  <template v-if="transaction.is_transfer || transaction.projection_source === 'transfer' || transaction.transfer_id">
+                                      <div 
+                                        class="text-xs text-cyan-800 bg-cyan-100 px-2 py-1 rounded-full inline-flex items-center ml-2 cursor-help" 
+                                        :title="transaction.amount_in_cents >= 0 
+                                          ? `Transfer from ${transaction.transfer_from_account || 'another account'}`
+                                          : `Transfer to ${transaction.transfer_to_account || 'another account'}`"
+                                      >
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                        </svg>
+                                        Transfer
+                                      </div>
+                                  </template>
                               </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">
@@ -623,6 +637,19 @@
                               </Link>
                               <span v-else class="text-gray-400 text-xs">
                                 Autopay
+                              </span>
+                            </template>
+                            <!-- Transfer projected transaction - link to edit transfer -->
+                            <template v-else-if="transaction.is_projected && (transaction.projection_source === 'transfer' || transaction.transfer_id)">
+                              <Link
+                                v-if="transaction.transfer_id"
+                                :href="route('budget.transfers.edit', [budget.id, transaction.transfer_id])"
+                                class="text-cyan-600 hover:text-cyan-900 text-xs font-medium"
+                              >
+                                Edit Transfer
+                              </Link>
+                              <span v-else class="text-cyan-400 text-xs italic">
+                                Transfer
                               </span>
                             </template>
                             <!-- Other projected transactions without template -->

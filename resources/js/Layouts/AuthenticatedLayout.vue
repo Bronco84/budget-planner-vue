@@ -13,6 +13,7 @@ import ChatPanel from '@/Components/ChatPanel.vue';
 import CreateBudgetModal from '@/Components/Modals/CreateBudgetModal.vue';
 import QuickAddTransactionModal from '@/Components/Modals/QuickAddTransactionModal.vue';
 import QuickAddRecurringModal from '@/Components/Modals/QuickAddRecurringModal.vue';
+import QuickAddTransferModal from '@/Components/Modals/QuickAddTransferModal.vue';
 import ConfirmDialog from '@/Components/ConfirmDialog.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { useTheme } from '@/composables/useTheme';
@@ -33,6 +34,7 @@ const { isCollapsed, isMobileOpen, toggleCollapsed, openMobile, closeMobile } = 
 const showCreateBudgetModal = ref(false);
 const showQuickAddTransactionModal = ref(false);
 const showQuickAddRecurringModal = ref(false);
+const showQuickAddTransferModal = ref(false);
 const showChatPanel = ref(false);
 
 const page = usePage();
@@ -51,6 +53,10 @@ const handleCreateTransaction = () => {
 
 const handleCreateRecurring = () => {
     showQuickAddRecurringModal.value = true;
+};
+
+const handleCreateTransfer = () => {
+    showQuickAddTransferModal.value = true;
 };
 
 const handleConnectAccount = () => {
@@ -104,6 +110,7 @@ const logout = () => {
             @create-budget="handleCreateBudget"
             @create-transaction="handleCreateTransaction"
             @create-recurring="handleCreateRecurring"
+            @create-transfer="handleCreateTransfer"
             @connect-account="handleConnectAccount"
             @create-property="handleCreateProperty"
             @toggle-chat="handleToggleChat"
@@ -286,6 +293,10 @@ const logout = () => {
         <QuickAddRecurringModal
             :show="showQuickAddRecurringModal"
             @close="showQuickAddRecurringModal = false"
+        />
+        <QuickAddTransferModal
+            :show="showQuickAddTransferModal"
+            @close="showQuickAddTransferModal = false"
         />
 
         <!-- Global Confirm Dialog -->

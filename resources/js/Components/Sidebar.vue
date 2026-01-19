@@ -15,7 +15,8 @@ import {
     PresentationChartLineIcon,
     CreditCardIcon,
     DocumentTextIcon,
-    ChartPieIcon
+    ChartPieIcon,
+    ArrowsRightLeftIcon
 } from '@heroicons/vue/24/outline';
 import BudgetSwitcher from '@/Components/BudgetSwitcher.vue';
 
@@ -30,7 +31,7 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['toggle', 'close', 'create-budget', 'create-transaction', 'create-recurring', 'connect-account', 'create-property', 'toggle-chat']);
+const emit = defineEmits(['toggle', 'close', 'create-budget', 'create-transaction', 'create-recurring', 'create-transfer', 'connect-account', 'create-property', 'toggle-chat']);
 
 const page = usePage();
 const activeBudget = computed(() => page.props.activeBudget);
@@ -318,6 +319,14 @@ onUnmounted(() => {
                         >
                             <ArrowPathIcon class="w-4 h-4 mr-2 text-purple-500/70 dark:text-purple-400/70" />
                             New Recurring
+                        </button>
+
+                        <button
+                            @click="handleAction('create-transfer')"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center transition-colors"
+                        >
+                            <ArrowsRightLeftIcon class="w-4 h-4 mr-2 text-cyan-500/70 dark:text-cyan-400/70" />
+                            New Transfer
                         </button>
 
                         <button

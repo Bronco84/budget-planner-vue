@@ -75,6 +75,7 @@ class Transaction extends Model
         'is_plaid_imported',
         'is_reconciled',
         'recurring_transaction_template_id',
+        'transfer_id',
         'bank_feed_transaction_id',
         'import_source',
         'notes',
@@ -138,6 +139,22 @@ class Transaction extends Model
     public function bankFeedTransaction(): BelongsTo
     {
         return $this->belongsTo(BankFeedTransaction::class);
+    }
+
+    /**
+     * Get the transfer that generated this transaction (if any).
+     */
+    public function transfer(): BelongsTo
+    {
+        return $this->belongsTo(Transfer::class);
+    }
+
+    /**
+     * Check if this transaction is part of a transfer.
+     */
+    public function isTransfer(): bool
+    {
+        return $this->transfer_id !== null;
     }
 
     /**

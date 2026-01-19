@@ -31,17 +31,6 @@
                           </svg>
                         </button>
 
-                        <!-- Income vs Expenses Icon -->
-                        <Link
-                          :href="route('reports.index', { budget: budget.id }) + '?tab=incomeVsExpenses'"
-                          class="inline-flex items-center justify-center p-1.5 bg-emerald-100 hover:bg-emerald-200 rounded-md transition-colors"
-                          title="Income vs Expenses"
-                        >
-                          <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                        </Link>
-
                         <!-- Edit Budget Icon -->
                         <Link
                           :href="route('budgets.edit', budget.id)"

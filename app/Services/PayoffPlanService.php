@@ -20,7 +20,8 @@ class PayoffPlanService
 
     /**
      * Calculate available monthly cash flow for debt payoff.
-     * This uses the projected cash flow across all accounts in the budget.
+     * This uses the projected cash flow across all accounts in the budget,
+     * including autopay deductions from credit cards based on statement balances.
      */
     public function calculateAvailableCashFlow(Budget $budget): int
     {
@@ -29,6 +30,17 @@ class PayoffPlanService
         foreach ($budget->accounts as $account) {
             $accountCashFlow = $this->recurringTransactionService->calculateMonthlyProjectedCashFlow($account);
             $totalProjectedCashFlow += $accountCashFlow;
+        }
+
+        // Include autopay projections for credit cards (statement-based payments)
+        // These are deductions from checking/savings accounts to pay credit card balances
+        $startDate = Carbon::now();
+        $endDate = Carbon::now()->addDays(30);
+        $autopayProjections = $this->recurringTransactionService->generateAutopayProjections($budget, $startDate, $endDate);
+        
+        foreach ($autopayProjections as $projection) {
+            // Autopay amounts are already negative (deductions), so add them directly
+            $totalProjectedCashFlow += $projection->amount_in_cents;
         }
 
         return $totalProjectedCashFlow;

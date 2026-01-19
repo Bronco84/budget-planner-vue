@@ -341,7 +341,7 @@ class Account extends Model
                 }
 
                 // 4. Try to get favicon from institution name domain mapping
-                $institutionName = $this->getInstitutionNameAttribute();
+                $institutionName = $this->resolveInstitutionName();
                 $faviconUrl = static::getFaviconUrlForInstitution($institutionName);
                 if ($faviconUrl) {
                     return $faviconUrl;
@@ -371,7 +371,7 @@ class Account extends Model
     {
         return Attribute::make(
             get: function () {
-                $name = $this->getInstitutionNameAttribute();
+                $name = $this->resolveInstitutionName();
 
                 if (!$name) {
                     return '?';
@@ -409,7 +409,7 @@ class Account extends Model
                 ];
 
                 // Simple hash of the name to get consistent color
-                $name = $this->getInstitutionNameAttribute() ?? '';
+                $name = $this->resolveInstitutionName() ?? '';
                 
                 // Use a simple string hash that won't overflow
                 $hash = crc32($name);
@@ -421,9 +421,9 @@ class Account extends Model
     }
 
     /**
-     * Helper to get institution name attribute value.
+     * Helper to resolve the institution name value.
      */
-    private function getInstitutionNameAttribute(): ?string
+    private function resolveInstitutionName(): ?string
     {
         return $this->plaidAccount?->plaidConnection?->institution_name ?? $this->name;
     }

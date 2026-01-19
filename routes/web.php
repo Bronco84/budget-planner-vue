@@ -114,6 +114,8 @@ Route::middleware('auth')->group(function () {
         ->name('budget.statistics.yearly');
     Route::get('budget/{budget}/statistics/monthly/{month?}/{year?}', [BudgetController::class, 'monthlyStatistics'])
         ->name('budget.statistics.monthly');
+    Route::get('budget/{budget}/income-vs-expenses', [BudgetController::class, 'incomeVsExpenses'])
+        ->name('budget.income-vs-expenses');
     Route::get('budget/{budget}/projections', [BudgetController::class, 'projections'])
         ->name('budget.projections');
     Route::get('budget/{budget}/account/{account}/projections', [ProjectionsController::class, 'showAccountProjections'])

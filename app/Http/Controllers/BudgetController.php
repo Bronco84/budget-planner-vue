@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Budget;
 use App\Models\Account;
+use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Services\ProjectionService;
 use App\Services\RecurringTransactionService;
@@ -191,7 +192,7 @@ class BudgetController extends Controller
                 ->where('is_projected', true);
 
             // Get per_page from request, validate and constrain to reasonable limits
-            $perPage = (int) $request->input('per_page', 50);
+            $perPage = (int) $request->input('per_page', 100);
             $perPage = max(10, min(200, $perPage)); // Constrain between 10 and 200
 
             // Paginate the transactions
@@ -347,5 +348,102 @@ class BudgetController extends Controller
                 'months' => $months,
             ],
         ]);
+    }
+
+    /**
+     * Display income vs expenses comparison for a budget
+     */
+    public function incomeVsExpenses(Budget $budget): Response
+    {
+        $this->authorize('view', $budget);
+
+        // Get recurring income (positive amounts)
+        $incomeTemplates = $budget->recurringTransactionTemplates()
+            ->where('amount_in_cents', '>', 0)
+            ->with('account')
+            ->get()
+            ->map(function ($template) {
+                return [
+                    'id' => $template->id,
+                    'description' => $template->friendly_label ?: $template->description,
+                    'amount_in_cents' => $template->amount_in_cents,
+                    'frequency' => $template->frequency,
+                    'monthly_amount' => $this->calculateMonthlyAmount($template),
+                    'account_name' => $template->account?->name,
+                    'category' => $template->category,
+                ];
+            });
+
+        // Get recurring expenses (negative amounts)
+        $expenseTemplates = $budget->recurringTransactionTemplates()
+            ->where('amount_in_cents', '<', 0)
+            ->with('account')
+            ->get()
+            ->map(function ($template) {
+                return [
+                    'id' => $template->id,
+                    'description' => $template->friendly_label ?: $template->description,
+                    'amount_in_cents' => $template->amount_in_cents,
+                    'frequency' => $template->frequency,
+                    'monthly_amount' => $this->calculateMonthlyAmount($template),
+                    'account_name' => $template->account?->name,
+                    'category' => $template->category,
+                ];
+            });
+
+        // Get credit cards with autopay enabled
+        $autopayAccounts = $budget->accounts()
+            ->where('autopay_enabled', true)
+            ->whereNotNull('autopay_source_account_id')
+            ->with(['plaidAccount', 'autopaySourceAccount'])
+            ->get()
+            ->filter(fn($account) => $account->hasActiveAutopay())
+            ->map(function ($account) {
+                return [
+                    'id' => $account->id,
+                    'name' => $account->name,
+                    'source_account_name' => $account->autopaySourceAccount?->name,
+                    'amount_in_cents' => -abs($account->getAutopayAmountCents() ?? 0),
+                    'monthly_amount' => -abs($account->getAutopayAmountCents() ?? 0),
+                ];
+            })
+            ->values();
+
+        // Calculate totals
+        $totalMonthlyIncome = $incomeTemplates->sum('monthly_amount');
+        $totalMonthlyExpenses = abs($expenseTemplates->sum('monthly_amount'));
+        $totalMonthlyAutopay = abs($autopayAccounts->sum('monthly_amount'));
+
+        return Inertia::render('Budgets/IncomeVsExpenses', [
+            'budget' => $budget,
+            'incomeItems' => $incomeTemplates,
+            'expenseItems' => $expenseTemplates,
+            'autopayItems' => $autopayAccounts,
+            'totals' => [
+                'monthly_income' => $totalMonthlyIncome,
+                'monthly_expenses' => $totalMonthlyExpenses,
+                'monthly_autopay' => $totalMonthlyAutopay,
+                'net' => $totalMonthlyIncome - $totalMonthlyExpenses - $totalMonthlyAutopay,
+            ],
+        ]);
+    }
+
+    /**
+     * Calculate the monthly equivalent amount for a recurring transaction template
+     */
+    private function calculateMonthlyAmount(RecurringTransactionTemplate $template): int
+    {
+        $amount = $template->amount_in_cents;
+
+        return match ($template->frequency) {
+            RecurringTransactionTemplate::FREQUENCY_DAILY => (int) round($amount * 30.44),
+            RecurringTransactionTemplate::FREQUENCY_WEEKLY => (int) round($amount * 4.33),
+            RecurringTransactionTemplate::FREQUENCY_BIWEEKLY => (int) round($amount * 2.17),
+            RecurringTransactionTemplate::FREQUENCY_MONTHLY => $amount,
+            RecurringTransactionTemplate::FREQUENCY_BIMONTHLY => $amount * 2,
+            RecurringTransactionTemplate::FREQUENCY_QUARTERLY => (int) round($amount / 3),
+            RecurringTransactionTemplate::FREQUENCY_YEARLY => (int) round($amount / 12),
+            default => $amount,
+        };
     }
 }

@@ -131,7 +131,18 @@ class ProjectionsController extends Controller
         $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
         
         // Merge manual transactions with recurring projections
-        $projectedTransactions = $projectedTransactions->merge($futureManualTransactions)->sortBy('date')->values();
+        $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
+        
+        // Generate autopay projections and filter for this account
+        $autopayProjections = $this->recurringTransactionService->generateAutopayProjections(
+            $budget,
+            $startDate,
+            $endDate
+        )->filter(fn($p) => $p->account_id === $account->id)
+         ->map(fn($p) => (array) $p);
+        
+        // Merge autopay projections
+        $projectedTransactions = $projectedTransactions->merge($autopayProjections)->sortBy('date')->values();
         
         // Project daily balance for the account
         // Use different calculation for liabilities vs assets
@@ -276,7 +287,18 @@ class ProjectionsController extends Controller
         $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
         
         // Merge manual transactions with recurring projections
-        $projectedTransactions = $projectedTransactions->merge($futureManualTransactions)->sortBy('date')->values();
+        $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
+        
+        // Generate autopay projections and filter for this account
+        $autopayProjections = $this->recurringTransactionService->generateAutopayProjections(
+            $budget,
+            $startDate,
+            $endDate
+        )->filter(fn($p) => $p->account_id === $account->id)
+         ->map(fn($p) => (array) $p);
+        
+        // Merge autopay projections
+        $projectedTransactions = $projectedTransactions->merge($autopayProjections)->sortBy('date')->values();
         
         // Project daily balance for the account
         // Use different calculation for liabilities vs assets

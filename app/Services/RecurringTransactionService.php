@@ -1897,13 +1897,22 @@ class RecurringTransactionService
      * Calculate the projected statement balance for the second autopay.
      * Uses current spending trajectory to project end-of-cycle balance.
      *
-     * Formula: spending_since_statement + (per_day_average * remaining_days)
+     * Formula: raw_spending_since_statement + (adjusted_per_day_average * remaining_days)
+     *
+     * The actual spending (including large purchases) is preserved in the total,
+     * but large one-time purchases (over $1000) are excluded when calculating
+     * the per-day average for projecting the remaining days. This is because
+     * large purchases typically represent planned one-off expenses covered by
+     * savings transfers, not the regular daily spending pattern.
      *
      * @param Account $creditCard
+     * @param int $oneTimePurchaseThresholdCents Threshold for one-time purchases (default $1000 = 100000 cents)
      * @return array{amount: int, metadata: array}
      */
-    protected function calculateProjectedStatementBalance(Account $creditCard): array
-    {
+    protected function calculateProjectedStatementBalance(
+        Account $creditCard,
+        int $oneTimePurchaseThresholdCents = 100000
+    ): array {
         $plaidAccount = $creditCard->plaidAccount;
         
         if (!$plaidAccount) {
@@ -1915,7 +1924,7 @@ class RecurringTransactionService
 
         $currentBalance = $creditCard->current_balance_cents ?? 0;
         $statementBalance = $plaidAccount->last_statement_balance_cents ?? 0;
-        $spendingSinceStatement = $currentBalance - $statementBalance;
+        $rawSpendingSinceStatement = $currentBalance - $statementBalance;
 
         // Get cycle timing
         $daysSinceStatement = $plaidAccount->getDaysSinceStatement() ?? 0;
@@ -1934,40 +1943,142 @@ class RecurringTransactionService
             ];
         }
 
-        // Calculate per-day average spending
-        $perDayAverage = $spendingSinceStatement / $daysSinceStatement;
-
         // Handle negative spending (payments/credits exceed new charges)
-        if ($spendingSinceStatement <= 0) {
+        if ($rawSpendingSinceStatement <= 0) {
             // Use historical average when no net spending
             $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
             return [
                 'amount' => $historicalResult['amount'],
                 'metadata' => array_merge($historicalResult['metadata'], [
                     'projection_method' => 'historical_average_negative_spending',
-                    'actual_spending_since_statement_cents' => $spendingSinceStatement,
+                    'actual_spending_since_statement_cents' => $rawSpendingSinceStatement,
                 ]),
             ];
         }
 
-        // Project end-of-cycle balance
-        $projectedBalance = $spendingSinceStatement + (int) round($perDayAverage * $daysRemainingInCycle);
+        // Calculate adjustment for large one-time purchases
+        // These are excluded from the daily average calculation, not from the total
+        $oneTimePurchaseData = $this->calculateOneTimePurchaseAdjustment(
+            $creditCard,
+            $plaidAccount->last_statement_issue_date,
+            $oneTimePurchaseThresholdCents
+        );
+        
+        // Calculate "regular" spending by excluding large one-time purchases
+        // This is used only for computing the per-day average, not the base total
+        $regularSpendingForAverage = $rawSpendingSinceStatement - $oneTimePurchaseData['total_excluded_cents'];
 
-        // Ensure projection is at least as much as current new spending
-        $projectedBalance = max($projectedBalance, $spendingSinceStatement);
+        // Calculate per-day average based on regular spending patterns only
+        // If regular spending is zero or negative, use a small positive value to avoid division issues
+        if ($regularSpendingForAverage <= 0) {
+            // All spending was one-time purchases, so assume minimal regular spending going forward
+            // Use historical average for the projection instead
+            $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
+            
+            // But still add the actual spending so far to the historical projection rate
+            // The projection is: what we've spent so far + historical average for remaining days
+            $historicalDailyAverage = $historicalResult['amount'] / $cycleLength;
+            $projectedRemainder = (int) round($historicalDailyAverage * $daysRemainingInCycle);
+            $projectedBalance = $rawSpendingSinceStatement + $projectedRemainder;
+            
+            return [
+                'amount' => $projectedBalance,
+                'metadata' => [
+                    'projection_method' => 'trajectory_with_historical_remainder',
+                    'current_balance_cents' => $currentBalance,
+                    'statement_balance_cents' => $statementBalance,
+                    'spending_since_statement_cents' => $rawSpendingSinceStatement,
+                    'regular_spending_for_average_cents' => $regularSpendingForAverage,
+                    'one_time_purchases_excluded' => $oneTimePurchaseData,
+                    'days_since_statement' => $daysSinceStatement,
+                    'days_remaining_in_cycle' => $daysRemainingInCycle,
+                    'cycle_length_days' => $cycleLength,
+                    'historical_daily_average_cents' => (int) round($historicalDailyAverage),
+                    'projected_remainder_cents' => $projectedRemainder,
+                ],
+            ];
+        }
+
+        // Calculate per-day average based on regular spending (excluding one-time purchases)
+        $adjustedPerDayAverage = $regularSpendingForAverage / $daysSinceStatement;
+
+        // Project end-of-cycle balance:
+        // Actual spending so far (including one-time purchases) + projected remainder (based on regular spending rate)
+        $projectedRemainder = (int) round($adjustedPerDayAverage * $daysRemainingInCycle);
+        $projectedBalance = $rawSpendingSinceStatement + $projectedRemainder;
+
+        // Ensure projection is at least as much as current spending
+        $projectedBalance = max($projectedBalance, $rawSpendingSinceStatement);
 
         return [
             'amount' => $projectedBalance,
             'metadata' => [
-                'projection_method' => 'trajectory',
+                'projection_method' => 'trajectory_adjusted',
                 'current_balance_cents' => $currentBalance,
                 'statement_balance_cents' => $statementBalance,
-                'spending_since_statement_cents' => $spendingSinceStatement,
+                'spending_since_statement_cents' => $rawSpendingSinceStatement,
+                'regular_spending_for_average_cents' => $regularSpendingForAverage,
+                'one_time_purchases_excluded' => $oneTimePurchaseData,
                 'days_since_statement' => $daysSinceStatement,
                 'days_remaining_in_cycle' => $daysRemainingInCycle,
                 'cycle_length_days' => $cycleLength,
-                'per_day_average_cents' => (int) round($perDayAverage),
+                'adjusted_per_day_average_cents' => (int) round($adjustedPerDayAverage),
+                'projected_remainder_cents' => $projectedRemainder,
             ],
+        ];
+    }
+
+    /**
+     * Calculate the total of large one-time purchases to exclude from spending projections.
+     * 
+     * These are typically planned purchases (electronics, appliances, etc.) that are
+     * covered by a transfer from savings and shouldn't affect the regular monthly
+     * spending projection.
+     *
+     * @param Account $creditCard
+     * @param Carbon|string|null $statementIssueDate
+     * @param int $thresholdCents Minimum amount to consider as one-time purchase
+     * @return array{total_excluded_cents: int, count: int, transactions: array}
+     */
+    protected function calculateOneTimePurchaseAdjustment(
+        Account $creditCard,
+        $statementIssueDate,
+        int $thresholdCents
+    ): array {
+        if (!$statementIssueDate) {
+            return [
+                'total_excluded_cents' => 0,
+                'count' => 0,
+                'transactions' => [],
+                'threshold_cents' => $thresholdCents,
+            ];
+        }
+
+        $statementDate = $statementIssueDate instanceof Carbon 
+            ? $statementIssueDate 
+            : Carbon::parse($statementIssueDate);
+
+        // Query transactions on this credit card since the statement date
+        // On credit cards, spending transactions are positive (increases balance)
+        // We look for large positive transactions that exceed the threshold
+        $largeTransactions = Transaction::where('account_id', $creditCard->id)
+            ->where('date', '>', $statementDate)
+            ->where('amount_in_cents', '>=', $thresholdCents)
+            ->orderBy('date', 'desc')
+            ->get(['id', 'description', 'amount_in_cents', 'date']);
+
+        $totalExcluded = $largeTransactions->sum('amount_in_cents');
+
+        return [
+            'total_excluded_cents' => $totalExcluded,
+            'count' => $largeTransactions->count(),
+            'threshold_cents' => $thresholdCents,
+            'transactions' => $largeTransactions->map(fn($t) => [
+                'id' => $t->id,
+                'description' => $t->description,
+                'amount_cents' => $t->amount_in_cents,
+                'date' => $t->date->format('Y-m-d'),
+            ])->toArray(),
         ];
     }
 

@@ -2037,7 +2037,7 @@ class RecurringTransactionService
      *
      * @param Account $creditCard
      * @param Carbon|string|null $statementIssueDate
-     * @param int $thresholdCents Minimum amount to consider as one-time purchase
+     * @param int $thresholdCents Minimum amount to consider as one-time purchase (as positive value)
      * @return array{total_excluded_cents: int, count: int, transactions: array}
      */
     protected function calculateOneTimePurchaseAdjustment(
@@ -2059,15 +2059,34 @@ class RecurringTransactionService
             : Carbon::parse($statementIssueDate);
 
         // Query transactions on this credit card since the statement date
-        // On credit cards, spending transactions are positive (increases balance)
-        // We look for large positive transactions that exceed the threshold
+        // IMPORTANT: In this system, expenses are stored as NEGATIVE values
+        // (e.g., a $1,500 purchase is stored as -150000 cents)
+        // So we look for amounts <= -threshold (large negative = large expense)
+        $negativeThreshold = -1 * abs($thresholdCents);
+        
         $largeTransactions = Transaction::where('account_id', $creditCard->id)
             ->where('date', '>', $statementDate)
-            ->where('amount_in_cents', '>=', $thresholdCents)
+            ->where('amount_in_cents', '<=', $negativeThreshold)
             ->orderBy('date', 'desc')
             ->get(['id', 'description', 'amount_in_cents', 'date']);
 
-        $totalExcluded = $largeTransactions->sum('amount_in_cents');
+        // Sum of negative amounts (will be negative total)
+        // We return the absolute value since the caller will subtract this from spending
+        $totalExcluded = abs($largeTransactions->sum('amount_in_cents'));
+
+        Log::debug('calculateOneTimePurchaseAdjustment', [
+            'account_id' => $creditCard->id,
+            'statement_date' => $statementDate->toDateString(),
+            'threshold_cents' => $thresholdCents,
+            'negative_threshold' => $negativeThreshold,
+            'large_transactions_count' => $largeTransactions->count(),
+            'total_excluded_cents' => $totalExcluded,
+            'transactions' => $largeTransactions->map(fn($t) => [
+                'description' => $t->description,
+                'amount_cents' => $t->amount_in_cents,
+                'date' => $t->date->format('Y-m-d'),
+            ])->toArray(),
+        ]);
 
         return [
             'total_excluded_cents' => $totalExcluded,
@@ -2079,6 +2098,146 @@ class RecurringTransactionService
                 'amount_cents' => $t->amount_in_cents,
                 'date' => $t->date->format('Y-m-d'),
             ])->toArray(),
+        ];
+    }
+
+    /**
+     * Calculate average monthly spending from credit card transaction history.
+     * This is used as a fallback when statement history is not available.
+     * 
+     * Groups transactions by calendar month, sums spending (negative amounts),
+     * applies outlier detection, and calculates weighted average.
+     *
+     * @param Account $creditCard
+     * @param int $maxMonths Maximum months of history to consider
+     * @param float $decayFactor Weight decay per month (default 0.7)
+     * @return array{amount: int, months_used: int, metadata: array}
+     */
+    protected function calculateMonthlySpendingFromTransactions(
+        Account $creditCard,
+        int $maxMonths = 6,
+        float $decayFactor = 0.7
+    ): array {
+        // Query transactions from the credit card account
+        // Only include expenses (negative amounts) from the past N months
+        $startDate = Carbon::now()->subMonths($maxMonths)->startOfMonth();
+        
+        $transactions = Transaction::where('account_id', $creditCard->id)
+            ->where('amount_in_cents', '<', 0) // Only expenses
+            ->where('date', '>=', $startDate)
+            ->orderBy('date', 'desc')
+            ->get(['amount_in_cents', 'date']);
+
+        if ($transactions->isEmpty()) {
+            return [
+                'amount' => 0,
+                'months_used' => 0,
+                'metadata' => [
+                    'projection_method' => 'transaction_based_no_data',
+                ],
+            ];
+        }
+
+        // Group transactions by month and sum spending per month
+        $monthlyTotals = $transactions->groupBy(function ($transaction) {
+            return $transaction->date->format('Y-m');
+        })->map(function ($monthTransactions) {
+            // Sum absolute values of negative amounts (expenses)
+            return abs($monthTransactions->sum('amount_in_cents'));
+        });
+
+        // Sort by month (most recent first)
+        $monthlyTotals = $monthlyTotals->sortKeysDesc();
+
+        // Need at least 1 month of data
+        if ($monthlyTotals->isEmpty()) {
+            return [
+                'amount' => 0,
+                'months_used' => 0,
+                'metadata' => [
+                    'projection_method' => 'transaction_based_no_complete_months',
+                ],
+            ];
+        }
+
+        // Apply outlier detection to filter unusual months
+        $monthlyAmounts = collect($monthlyTotals->values());
+        $outlierAnalysis = $this->detectOutliers($monthlyAmounts);
+        $cleanAmounts = $outlierAnalysis['clean_amounts'];
+        
+        // If all months were filtered as outliers, use all data
+        if ($cleanAmounts->isEmpty()) {
+            $cleanAmounts = $monthlyAmounts;
+        }
+
+        // Calculate weighted average with exponential decay (recent months weighted higher)
+        $weightedSum = 0;
+        $totalWeight = 0;
+        $weights = [];
+        $monthKeys = $monthlyTotals->keys()->toArray();
+
+        foreach ($monthlyTotals as $month => $amount) {
+            // Skip if this month was identified as an outlier
+            if (!$cleanAmounts->contains($amount) && $outlierAnalysis['outliers']) {
+                continue;
+            }
+
+            $index = array_search($month, $monthKeys);
+            $weight = pow($decayFactor, $index); // 1.0, 0.7, 0.49, 0.34, ...
+            
+            $weightedSum += $amount * $weight;
+            $totalWeight += $weight;
+            $weights[] = [
+                'month' => $month,
+                'spending_cents' => $amount,
+                'weight' => round($weight, 3),
+                'included' => true,
+            ];
+        }
+
+        // Add excluded months to metadata
+        foreach ($monthlyTotals as $month => $amount) {
+            if (!$cleanAmounts->contains($amount) && $outlierAnalysis['outliers']) {
+                $weights[] = [
+                    'month' => $month,
+                    'spending_cents' => $amount,
+                    'weight' => 0,
+                    'included' => false,
+                    'excluded_reason' => 'outlier',
+                ];
+            }
+        }
+
+        // Sort weights by month for readability
+        usort($weights, function ($a, $b) {
+            return strcmp($b['month'], $a['month']);
+        });
+
+        $weightedAverage = $totalWeight > 0 ? (int) round($weightedSum / $totalWeight) : 0;
+        $monthsUsed = $cleanAmounts->count();
+
+        Log::debug('calculateMonthlySpendingFromTransactions', [
+            'account_id' => $creditCard->id,
+            'account_name' => $creditCard->name,
+            'total_transactions' => $transactions->count(),
+            'months_available' => $monthlyTotals->count(),
+            'months_used' => $monthsUsed,
+            'outliers_excluded' => count($outlierAnalysis['outliers']),
+            'weighted_average_cents' => $weightedAverage,
+        ]);
+
+        return [
+            'amount' => $weightedAverage,
+            'months_used' => $monthsUsed,
+            'metadata' => [
+                'projection_method' => 'transaction_based_average',
+                'total_transactions_analyzed' => $transactions->count(),
+                'months_available' => $monthlyTotals->count(),
+                'months_used' => $monthsUsed,
+                'outliers_excluded' => count($outlierAnalysis['outliers']),
+                'decay_factor' => $decayFactor,
+                'monthly_breakdown' => $weights,
+            ],
         ];
     }
 
@@ -2099,14 +2258,26 @@ class RecurringTransactionService
         $plaidAccount = $creditCard->plaidAccount;
         
         if (!$plaidAccount) {
-            // Fallback to current statement balance or balance
-            $fallbackAmount = $plaidAccount?->last_statement_balance_cents 
-                ?? $creditCard->current_balance_cents 
-                ?? 0;
+            // No Plaid account - try transaction-based calculation first
+            $transactionResult = $this->calculateMonthlySpendingFromTransactions(
+                $creditCard, 
+                $maxMonths, 
+                $decayFactor
+            );
+            
+            if ($transactionResult['months_used'] > 0) {
+                return [
+                    'amount' => $transactionResult['amount'],
+                    'metadata' => $transactionResult['metadata'],
+                ];
+            }
+            
+            // Fallback to current balance
+            $fallbackAmount = $creditCard->current_balance_cents ?? 0;
             return [
                 'amount' => $fallbackAmount,
                 'metadata' => [
-                    'projection_method' => 'fallback_no_plaid_account',
+                    'projection_method' => 'fallback_no_plaid_no_transactions',
                     'historical_months_used' => 0,
                 ],
             ];
@@ -2119,14 +2290,29 @@ class RecurringTransactionService
             ->get();
 
         if ($statements->isEmpty()) {
-            // No history, use current statement balance
+            // No statement history - try transaction-based calculation first
+            $transactionResult = $this->calculateMonthlySpendingFromTransactions(
+                $creditCard, 
+                $maxMonths, 
+                $decayFactor
+            );
+            
+            if ($transactionResult['months_used'] > 0) {
+                // Successfully calculated from transactions
+                return [
+                    'amount' => $transactionResult['amount'],
+                    'metadata' => $transactionResult['metadata'],
+                ];
+            }
+            
+            // Final fallback: use current statement balance
             $fallbackAmount = $plaidAccount->last_statement_balance_cents 
                 ?? $creditCard->current_balance_cents 
                 ?? 0;
             return [
                 'amount' => $fallbackAmount,
                 'metadata' => [
-                    'projection_method' => 'fallback_no_history',
+                    'projection_method' => 'fallback_no_history_no_transactions',
                     'historical_months_used' => 0,
                 ],
             ];

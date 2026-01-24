@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Category;
+use App\Models\PlaidAccount;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -1913,6 +1914,7 @@ class RecurringTransactionService
         Account $creditCard,
         int $oneTimePurchaseThresholdCents = 100000
     ): array {
+        /** @var PlaidAccount|null $plaidAccount */
         $plaidAccount = $creditCard->plaidAccount;
         
         if (!$plaidAccount) {
@@ -2255,6 +2257,7 @@ class RecurringTransactionService
         float $decayFactor = 0.7, 
         int $maxMonths = 6
     ): array {
+        /** @var PlaidAccount|null $plaidAccount */
         $plaidAccount = $creditCard->plaidAccount;
         
         if (!$plaidAccount) {

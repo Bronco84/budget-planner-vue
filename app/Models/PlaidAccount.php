@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\BudgetService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,40 @@ use Carbon\Carbon;
 class PlaidAccount extends Model
 {
     use HasFactory;
+
+    /**
+     * Boot the model.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (PlaidAccount $plaidAccount) {
+            // Check if liability-related fields changed
+            $liabilityFields = [
+                'last_statement_balance_cents',
+                'last_statement_issue_date',
+                'current_balance_cents',
+            ];
+
+            $liabilityChanged = false;
+            foreach ($liabilityFields as $field) {
+                if ($plaidAccount->isDirty($field)) {
+                    $liabilityChanged = true;
+                    break;
+                }
+            }
+
+            if ($liabilityChanged && $plaidAccount->account_id) {
+                // Clear the linked account's cache
+                BudgetService::clearAccountCaches($plaidAccount->account_id);
+
+                // If this is a credit card with autopay, also clear the source account's cache
+                $account = $plaidAccount->account;
+                if ($account && $account->autopay_source_account_id) {
+                    BudgetService::clearAccountCaches($account->autopay_source_account_id);
+                }
+            }
+        });
+    }
 
     /**
      * The attributes that are mass assignable.

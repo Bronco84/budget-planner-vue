@@ -42,14 +42,17 @@ class Account extends Model
                 // Clear caches for this account
                 BudgetService::clearAccountCaches($account->id);
                 
-                // If this is an autopay source, also clear caches for target accounts
+                // If this account has autopay configured to a source account, clear that cache too
+                // This ensures the source account's projection cache is refreshed when credit card data changes
+                if ($account->autopay_source_account_id) {
+                    BudgetService::clearAccountCaches($account->autopay_source_account_id);
+                }
+                
+                // If the autopay_source_account_id itself changed, also clear the old source's cache
                 if ($account->isDirty('autopay_source_account_id')) {
                     $oldSourceId = $account->getOriginal('autopay_source_account_id');
                     if ($oldSourceId) {
                         BudgetService::clearAccountCaches($oldSourceId);
-                    }
-                    if ($account->autopay_source_account_id) {
-                        BudgetService::clearAccountCaches($account->autopay_source_account_id);
                     }
                 }
             }

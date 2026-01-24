@@ -2031,6 +2031,129 @@ class RecurringTransactionService
     }
 
     /**
+     * Trace autopay projection calculation for debugging.
+     * Call from tinker: app(RecurringTransactionService::class)->traceAutopayProjection($account)
+     *
+     * @param Account $creditCard The credit card account to trace
+     * @return array Detailed calculation breakdown with tagged identifiers
+     */
+    public function traceAutopayProjection(Account $creditCard): array
+    {
+        $tag = 'AUTOPAY_TRACE_' . $creditCard->id;
+        
+        /** @var PlaidAccount|null $plaidAccount */
+        $plaidAccount = $creditCard->plaidAccount;
+        
+        $trace = [
+            'tag' => $tag,
+            'timestamp' => now()->toIso8601String(),
+            'credit_card' => [
+                'id' => $creditCard->id,
+                'name' => $creditCard->name,
+                'current_balance' => $creditCard->current_balance_cents / 100,
+                'has_autopay' => $creditCard->hasActiveAutopay(),
+                'autopay_source_id' => $creditCard->autopay_source_account_id,
+            ],
+        ];
+        
+        if (!$plaidAccount) {
+            $trace['error'] = 'No PlaidAccount linked';
+            $trace['result'] = $creditCard->current_balance_cents / 100;
+            return $trace;
+        }
+        
+        $currentBalance = $creditCard->current_balance_cents ?? 0;
+        $statementBalance = $plaidAccount->last_statement_balance_cents ?? 0;
+        $spendingSinceStatement = $currentBalance - $statementBalance;
+        $daysSinceStatement = $plaidAccount->getDaysSinceStatement() ?? 0;
+        $daysRemainingInCycle = $plaidAccount->getDaysRemainingInCycle() ?? 0;
+        $cycleLength = $plaidAccount->getStatementCycleLength();
+        
+        $trace['plaid_account'] = [
+            'id' => $plaidAccount->id,
+            'last_statement_balance' => $statementBalance / 100,
+            'last_statement_issue_date' => $plaidAccount->last_statement_issue_date?->format('Y-m-d'),
+            'days_since_statement' => $daysSinceStatement,
+            'days_remaining_in_cycle' => $daysRemainingInCycle,
+            'cycle_length' => $cycleLength,
+        ];
+        
+        $trace['inputs'] = [
+            'current_balance' => $currentBalance / 100,
+            'statement_balance' => $statementBalance / 100,
+            'spending_since_statement' => $spendingSinceStatement / 100,
+        ];
+        
+        // Check for one-time purchase adjustments
+        $oneTimePurchases = $this->calculateOneTimePurchaseAdjustment(
+            $creditCard,
+            $plaidAccount->last_statement_issue_date,
+            100000 // $1000 threshold
+        );
+        
+        $regularSpending = $spendingSinceStatement - $oneTimePurchases['total_excluded_cents'];
+        
+        $trace['one_time_purchases'] = [
+            'total_excluded' => $oneTimePurchases['total_excluded_cents'] / 100,
+            'count' => $oneTimePurchases['count'],
+            'transactions' => array_map(fn($t) => [
+                'description' => $t['description'],
+                'amount' => abs($t['amount_cents']) / 100,
+                'date' => $t['date'],
+            ], $oneTimePurchases['transactions'] ?? []),
+        ];
+        
+        $trace['calculation'] = [
+            'regular_spending_for_average' => $regularSpending / 100,
+        ];
+        
+        if ($daysSinceStatement > 0 && $regularSpending > 0) {
+            $dailyAverage = $regularSpending / $daysSinceStatement;
+            $projectedRemainder = $dailyAverage * $daysRemainingInCycle;
+            $projectedTotal = $spendingSinceStatement + $projectedRemainder;
+            
+            $trace['calculation']['daily_average'] = round($dailyAverage / 100, 2);
+            $trace['calculation']['projected_remainder'] = round($projectedRemainder / 100, 2);
+            $trace['calculation']['formula'] = sprintf(
+                '$%.2f + ($%.2f/day × %d days) = $%.2f',
+                $spendingSinceStatement / 100,
+                $dailyAverage / 100,
+                $daysRemainingInCycle,
+                $projectedTotal / 100
+            );
+            $trace['result'] = round($projectedTotal / 100, 2);
+            $trace['method'] = 'trajectory_adjusted';
+        } else {
+            // Would use historical average
+            $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
+            $trace['calculation']['fallback_reason'] = $daysSinceStatement <= 0 
+                ? 'days_since_statement <= 0' 
+                : 'regular_spending <= 0';
+            $trace['result'] = $historicalResult['amount'] / 100;
+            $trace['method'] = $historicalResult['metadata']['projection_method'] ?? 'historical_average';
+        }
+        
+        // Also get what generateAutopayProjections would return
+        $budget = $creditCard->budget;
+        if ($budget) {
+            $projections = $this->generateAutopayProjections(
+                $budget,
+                Carbon::now(),
+                Carbon::now()->addMonths(3)
+            )->filter(fn($p) => str_contains($p->description, $creditCard->name) || 
+                                $p->description === $creditCard->name);
+            
+            $trace['generated_projections'] = $projections->map(fn($p) => [
+                'date' => $p->date->format('Y-m-d'),
+                'amount' => abs($p->amount_in_cents) / 100,
+                'method' => $p->metadata['projection_method'] ?? 'unknown',
+            ])->values()->toArray();
+        }
+        
+        return $trace;
+    }
+
+    /**
      * Calculate the total of large one-time purchases to exclude from spending projections.
      * 
      * These are typically planned purchases (electronics, appliances, etc.) that are

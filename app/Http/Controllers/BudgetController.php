@@ -115,6 +115,7 @@ class BudgetController extends Controller
 
     /**
      * Display the specified resource.
+     * @throws \Exception
      */
     public function show(Budget $budget, Request $request): Response|RedirectResponse
     {
@@ -138,7 +139,7 @@ class BudgetController extends Controller
         $accountTransactions = null;
         $projectedTransactions = collect();
         $monthlyProjectedCashFlow = 0;
-        
+
         // Get saved projection months preference for this budget, default to 1
         $preferenceKey = "budget_{$budget->id}_projection_months";
         $savedProjectionMonths = (int) $user->getPreference($preferenceKey, 1);

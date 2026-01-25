@@ -2415,33 +2415,49 @@ class RecurringTransactionService
             ->limit($maxMonths)
             ->get();
 
-        if ($statements->isEmpty()) {
-            // No statement history - try transaction-based calculation first
+        // If insufficient statement history (less than 2 records), prefer transaction-based calculation
+        // A single statement isn't enough for a meaningful weighted average
+        if ($statements->count() < 2) {
             $transactionResult = $this->calculateMonthlySpendingFromTransactions(
                 $creditCard, 
                 $maxMonths, 
                 $decayFactor
             );
             
-            if ($transactionResult['months_used'] > 0) {
-                // Successfully calculated from transactions
+            if ($transactionResult['months_used'] >= 2) {
+                // Transaction-based has more data points, use it
                 return [
                     'amount' => $transactionResult['amount'],
-                    'metadata' => $transactionResult['metadata'],
+                    'metadata' => array_merge($transactionResult['metadata'], [
+                        'statement_history_count' => $statements->count(),
+                        'preferred_over_statements' => true,
+                    ]),
                 ];
             }
             
-            // Final fallback: use current statement balance
-            $fallbackAmount = $plaidAccount->last_statement_balance_cents 
-                ?? $creditCard->current_balance_cents 
-                ?? 0;
-            return [
-                'amount' => $fallbackAmount,
-                'metadata' => [
-                    'projection_method' => 'fallback_no_history_no_transactions',
-                    'historical_months_used' => 0,
-                ],
-            ];
+            // If we have 1 statement and transaction-based doesn't have enough data,
+            // fall through to use the statement data below
+            if ($statements->isEmpty()) {
+                // No statements at all - use transaction result if any, else fallback
+                if ($transactionResult['months_used'] > 0) {
+                    return [
+                        'amount' => $transactionResult['amount'],
+                        'metadata' => $transactionResult['metadata'],
+                    ];
+                }
+                
+                // Final fallback: use current statement balance
+                $fallbackAmount = $plaidAccount->last_statement_balance_cents 
+                    ?? $creditCard->current_balance_cents 
+                    ?? 0;
+                return [
+                    'amount' => $fallbackAmount,
+                    'metadata' => [
+                        'projection_method' => 'fallback_no_history_no_transactions',
+                        'historical_months_used' => 0,
+                    ],
+                ];
+            }
         }
 
         // Calculate weighted average with exponential decay

@@ -1907,12 +1907,12 @@ class RecurringTransactionService
      * savings transfers, not the regular daily spending pattern.
      *
      * @param Account $creditCard
-     * @param int $oneTimePurchaseThresholdCents Threshold for one-time purchases (default $1000 = 100000 cents)
+     * @param int $oneTimePurchaseThresholdCents Threshold for one-time purchases (default $500 = 50000 cents)
      * @return array{amount: int, metadata: array}
      */
     protected function calculateProjectedStatementBalance(
         Account $creditCard,
-        int $oneTimePurchaseThresholdCents = 100000
+        int $oneTimePurchaseThresholdCents = 50000
     ): array {
         /** @var PlaidAccount|null $plaidAccount */
         $plaidAccount = $creditCard->plaidAccount;
@@ -2088,7 +2088,7 @@ class RecurringTransactionService
         $oneTimePurchases = $this->calculateOneTimePurchaseAdjustment(
             $creditCard,
             $plaidAccount->last_statement_issue_date,
-            100000 // $1000 threshold
+            50000 // $500 threshold
         );
         
         $regularSpending = $spendingSinceStatement - $oneTimePurchases['total_excluded_cents'];

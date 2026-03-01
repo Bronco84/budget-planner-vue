@@ -595,6 +595,21 @@ class PlaidService
                 ];
             }
 
+            // Handle ADDITIONAL_CONSENT_REQUIRED - user needs to re-link to grant investments permission
+            if ($errorDetails && isset($errorDetails['error_code']) && $errorDetails['error_code'] === 'ADDITIONAL_CONSENT_REQUIRED') {
+                Log::warning('Plaid investments requires additional consent - user must re-authenticate. ' .
+                    'Investment holdings data will not be available until user updates their connection.', [
+                    'error_code' => $errorDetails['error_code'],
+                    'error_message' => $errorDetails['error_message'] ?? 'Unknown error',
+                    'action_required' => 'User should use "Update Connection" or re-link their bank account to grant investments consent',
+                ]);
+                return [
+                    'holdings' => [],
+                    'securities' => [],
+                    'accounts' => [],
+                ];
+            }
+
             Log::error('Plaid investment holdings fetch failed', [
                 'error' => $e->getMessage(),
                 'response' => $errorDetails,
@@ -886,17 +901,26 @@ class PlaidService
         }
 
         try {
-            $transactions = $this->getTransactions(
-                $accessToken,
-                $startDate,
-                $endDate
-            );
-
-            if (empty($transactions)) {
-                return [
-                    'imported' => 0,
-                    'updated' => 0,
-                ];
+            // Fetch transactions - may return empty for investment-only accounts
+            $transactions = [];
+            try {
+                $transactions = $this->getTransactions(
+                    $accessToken,
+                    $startDate,
+                    $endDate
+                );
+            } catch (\Exception $txError) {
+                // For investment accounts, transaction fetch failures are expected
+                // (e.g., PRODUCT_NOT_READY). Log but continue to balance/investment updates.
+                if ($plaidAccount->isInvestmentAccount()) {
+                    Log::info('Transaction fetch failed for investment account (expected, continuing to balance update)', [
+                        'plaid_account_id' => $plaidAccount->id,
+                        'account_name' => $plaidAccount->account_name,
+                        'error' => $txError->getMessage(),
+                    ]);
+                } else {
+                    throw $txError;
+                }
             }
 
             $imported = 0;

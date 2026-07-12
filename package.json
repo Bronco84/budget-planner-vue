@@ -4,11 +4,16 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
+        "lint": "eslint resources/js",
+        "lint:fix": "eslint resources/js --fix",
+        "format": "prettier --write resources/js",
+        "format:check": "prettier --check resources/js",
         "test": "playwright test",
         "test:ui": "playwright test --ui",
         "test:debug": "playwright test --debug"
     },
     "devDependencies": {
+        "@eslint/js": "^9.39.5",
         "@inertiajs/vue3": "^2.0.0",
         "@playwright/test": "^1.56.1",
         "@tailwindcss/forms": "^0.5.3",
@@ -17,8 +22,13 @@
         "autoprefixer": "^10.4.12",
         "axios": "^1.8.2",
         "concurrently": "^9.0.1",
+        "eslint": "^9.39.5",
+        "eslint-config-prettier": "^9.1.2",
+        "eslint-plugin-vue": "^9.33.0",
+        "globals": "^17.7.0",
         "laravel-vite-plugin": "^1.2.0",
         "postcss": "^8.4.31",
+        "prettier": "^3.9.5",
         "tailwindcss": "^3.2.1",
         "vite": "^6.3.3",
         "vue": "^3.4.0"

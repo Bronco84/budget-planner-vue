@@ -78,6 +78,12 @@
         ],
         "phpstan": [
             "vendor/bin/phpstan analyse"
+        ],
+        "pint": [
+            "vendor/bin/pint"
+        ],
+        "pint:test": [
+            "vendor/bin/pint --test"
         ]
     },
     "extra": {

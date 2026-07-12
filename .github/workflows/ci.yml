@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (PHP)
+    runs-on: ubuntu-latest
+    env:
+      # Nova is installed from the private nova.laravel.com Composer repo.
+      # Add a repository secret named COMPOSER_AUTH containing, e.g.:
+      # {"http-basic":{"nova.laravel.com":{"username":"you@example.com","password":"YOUR_NOVA_LICENSE_KEY"}}}
+      COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests
+        run: php artisan test
+
+      # --- Quality checks below are non-blocking until the pre-existing debt is
+      # --- cleared, then remove continue-on-error to make them required gates.
+      - name: Check code style (Pint)
+        run: vendor/bin/pint --test
+        continue-on-error: true
+
+      - name: Static analysis (PHPStan)
+        run: composer phpstan
+        continue-on-error: true
+
+  frontend:
+    name: Frontend (JS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build
+
+      # Non-blocking until the existing lint findings are addressed.
+      - name: Lint (ESLint)
+        run: npm run lint
+        continue-on-error: true

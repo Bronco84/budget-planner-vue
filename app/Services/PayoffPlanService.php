@@ -197,8 +197,10 @@ class PayoffPlanService
         $comparisons = [];
 
         foreach ($strategies as $strategy) {
-            // Create a temporary plan for calculation
+            // Create a temporary plan for calculation. The name is required
+            // (payoff_plans.name is NOT NULL); this row is deleted below.
             $tempPlan = new PayoffPlan([
+                'name' => "Strategy comparison ({$strategy})",
                 'strategy' => $strategy,
                 'monthly_extra_payment_cents' => $monthlyExtraPayment,
                 'start_date' => Carbon::now(),

@@ -210,6 +210,25 @@ class RecurringTransactionTemplate extends Model
     }
 
     /**
+     * Limit to templates that are active as of the given date (default: today).
+     * A template is active when it has started and has not ended.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param \Carbon\Carbon|string|null $asOf
+     */
+    public function scopeActive($query, $asOf = null)
+    {
+        $asOf = $asOf ? \Carbon\Carbon::parse($asOf) : \Carbon\Carbon::today();
+
+        return $query
+            ->where('start_date', '<=', $asOf)
+            ->where(function ($q) use ($asOf) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $asOf);
+            });
+    }
+
+    /**
      * Calculate the next occurrence date based on frequency and other parameters.
      *
      * @param \Carbon\Carbon|null $fromDate The date to calculate from, defaults to now

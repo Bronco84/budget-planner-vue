@@ -451,6 +451,7 @@ class ReportsController extends Controller
 
         // Get recurring income (positive amounts)
         $incomeTemplates = $budget->recurringTransactionTemplates()
+            ->active()
             ->where('amount_in_cents', '>', 0)
             ->with('account')
             ->get()
@@ -469,6 +470,7 @@ class ReportsController extends Controller
 
         // Get recurring expenses (negative amounts)
         $expenseTemplates = $budget->recurringTransactionTemplates()
+            ->active()
             ->where('amount_in_cents', '<', 0)
             ->with('account')
             ->get()

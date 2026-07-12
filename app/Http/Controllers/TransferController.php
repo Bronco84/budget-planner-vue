@@ -162,6 +162,8 @@ class TransferController extends Controller
      */
     public function destroy(Request $request, Budget $budget, Transfer $transfer): RedirectResponse|JsonResponse
     {
+        $this->authorize('update', $budget);
+
         // Verify transfer belongs to budget
         if ($transfer->budget_id !== $budget->id) {
             abort(404);

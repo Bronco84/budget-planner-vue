@@ -29,7 +29,8 @@ class CalendarController extends Controller
         // Use active budget (can be overridden by query param for future multi-budget support)
         $selectedBudgetId = $request->input('budget_id', $activeBudget->id);
         $budget = Budget::findOrFail($selectedBudgetId);
-        
+        $this->authorize('view', $budget);
+
         // Get all user's budgets for potential budget switcher in calendar
         $budgets = auth()->user()->accessibleBudgets();
 

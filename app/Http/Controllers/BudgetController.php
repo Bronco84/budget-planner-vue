@@ -279,6 +279,8 @@ class BudgetController extends Controller
      */
     public function monthlyStatistics(Budget $budget, $month = null, $year = null): Response
     {
+        $this->authorize('view', $budget);
+
         // Set default month and year if not provided
         $month = $month ?? now()->month;
         $year = $year ?? now()->year;
@@ -298,6 +300,8 @@ class BudgetController extends Controller
      */
     public function yearlyStatistics(Budget $budget, Request $request): Response
     {
+        $this->authorize('view', $budget);
+
         $year = $request->input('year', now()->year);
         $statistics = $budget->getYearlyStatistics($year);
 

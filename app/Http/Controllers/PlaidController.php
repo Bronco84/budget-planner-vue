@@ -24,6 +24,15 @@ class PlaidController extends Controller
     public function __construct(PlaidService $plaidService)
     {
         $this->plaidService = $plaidService;
+
+        // Authorize budget ownership for every action that resolves a budget route parameter
+        $this->middleware(function ($request, $next) {
+            $budget = $request->route('budget');
+            if ($budget) {
+                $this->authorize('view', $budget);
+            }
+            return $next($request);
+        });
     }
 
     /**
@@ -591,6 +600,10 @@ class PlaidController extends Controller
      */
     public function updateLiabilities(Budget $budget, Account $account): RedirectResponse
     {
+        if ($account->budget_id !== $budget->id) {
+            abort(404);
+        }
+
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (!$plaidAccount) {

@@ -9,6 +9,18 @@ use Inertia\Inertia;
 
 class CategoryController extends Controller
 {
+    public function __construct()
+    {
+        // Authorize budget ownership for every action that resolves a budget route parameter
+        $this->middleware(function ($request, $next) {
+            $budget = $request->route('budget');
+            if ($budget) {
+                $this->authorize('view', $budget);
+            }
+            return $next($request);
+        });
+    }
+
     /**
      * Display a listing of the resource.
      */

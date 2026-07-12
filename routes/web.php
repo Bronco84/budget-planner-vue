@@ -375,12 +375,3 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
-
-// Temporary debug route
-Route::get('/debug-auth', function () {
-    return response()->json([
-        'authenticated' => auth()->check(),
-        'user_id' => auth()->id(),
-        'user' => auth()->user(),
-    ]);
-})->middleware('web');

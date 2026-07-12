@@ -20,6 +20,12 @@ class PlaidStatementHistoryController extends Controller
      */
     public function index(Budget $budget, Account $account): JsonResponse
     {
+        $this->authorize('view', $budget);
+
+        if ($account->budget_id !== $budget->id) {
+            abort(404);
+        }
+
         // Find the PlaidAccount
         $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
 

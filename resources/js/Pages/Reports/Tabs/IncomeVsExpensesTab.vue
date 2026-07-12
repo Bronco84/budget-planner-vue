@@ -7,6 +7,9 @@ import {
   CreditCardIcon,
   XMarkIcon,
   PlusIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  ChevronUpDownIcon,
 } from '@heroicons/vue/24/outline';
 import { formatCurrency } from '@/utils/format.js';
 
@@ -75,11 +78,33 @@ const filteredExpenseItems = computed(() => {
 
 const filteredAutopayItems = computed(() => {
   if (selectedAccountIdNum.value === null) return autopayItems.value;
-  return autopayItems.value.filter(item => 
-    item.id === selectedAccountIdNum.value || 
+  return autopayItems.value.filter(item =>
+    item.id === selectedAccountIdNum.value ||
     item.source_account_id === selectedAccountIdNum.value
   );
 });
+
+// Sorting state for the "Monthly" column (null = original order, 'desc', 'asc')
+const incomeSortDir = ref(null);
+const expenseSortDir = ref(null);
+
+// Cycle the sort direction for the given table: null -> 'desc' -> 'asc' -> null
+const toggleSort = (which) => {
+  const dir = which === 'income' ? incomeSortDir : expenseSortDir;
+  dir.value = dir.value === null ? 'desc' : dir.value === 'desc' ? 'asc' : null;
+};
+
+// Sort by displayed magnitude so income and expenses order by what the user sees
+const sortByMonthly = (items, dir) => {
+  if (!dir) return items;
+  return [...items].sort((a, b) => {
+    const diff = Math.abs(a.monthly_amount) - Math.abs(b.monthly_amount);
+    return dir === 'asc' ? diff : -diff;
+  });
+};
+
+const sortedIncomeItems = computed(() => sortByMonthly(filteredIncomeItems.value, incomeSortDir.value));
+const sortedExpenseItems = computed(() => sortByMonthly(filteredExpenseItems.value, expenseSortDir.value));
 
 // Check if there are any adjustments or hypothetical items
 const hasAdjustments = computed(() => {
@@ -393,14 +418,27 @@ const frequencyOptions = [
                   <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Frequency
                   </th>
-                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Monthly
+                  <th
+                    class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                    role="button"
+                    tabindex="0"
+                    aria-label="Sort by monthly amount"
+                    @click="toggleSort('income')"
+                    @keydown.enter.prevent="toggleSort('income')"
+                    @keydown.space.prevent="toggleSort('income')"
+                  >
+                    <span class="inline-flex items-center justify-end gap-1">
+                      Monthly
+                      <ChevronUpDownIcon v-if="incomeSortDir === null" class="h-4 w-4 text-gray-400" />
+                      <ChevronDownIcon v-else-if="incomeSortDir === 'desc'" class="h-4 w-4" />
+                      <ChevronUpIcon v-else class="h-4 w-4" />
+                    </span>
                   </th>
                 </tr>
               </thead>
               <tbody class="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
                 <!-- Real Income Items -->
-                <tr v-for="item in filteredIncomeItems" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-600">
+                <tr v-for="item in sortedIncomeItems" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-600">
                   <td class="px-4 py-3 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.description }}</div>
                     <div v-if="item.account_name" class="text-xs text-gray-500 dark:text-gray-400">{{ item.account_name }}</div>
@@ -573,14 +611,27 @@ const frequencyOptions = [
                   <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Frequency
                   </th>
-                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Monthly
+                  <th
+                    class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200"
+                    role="button"
+                    tabindex="0"
+                    aria-label="Sort by monthly amount"
+                    @click="toggleSort('expense')"
+                    @keydown.enter.prevent="toggleSort('expense')"
+                    @keydown.space.prevent="toggleSort('expense')"
+                  >
+                    <span class="inline-flex items-center justify-end gap-1">
+                      Monthly
+                      <ChevronUpDownIcon v-if="expenseSortDir === null" class="h-4 w-4 text-gray-400" />
+                      <ChevronDownIcon v-else-if="expenseSortDir === 'desc'" class="h-4 w-4" />
+                      <ChevronUpIcon v-else class="h-4 w-4" />
+                    </span>
                   </th>
                 </tr>
               </thead>
               <tbody class="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
                 <!-- Regular Recurring Expenses -->
-                <tr v-for="item in filteredExpenseItems" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-600">
+                <tr v-for="item in sortedExpenseItems" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-600">
                   <td class="px-4 py-3 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ item.description }}</div>
                     <div v-if="item.account_name" class="text-xs text-gray-500 dark:text-gray-400">{{ item.account_name }}</div>

@@ -280,7 +280,6 @@ const props = defineProps({
   budget: Object,
   property: Object,
   liabilityAccounts: Array,
-  propertyTypes: Object,
 });
 
 const propertyTypes = [

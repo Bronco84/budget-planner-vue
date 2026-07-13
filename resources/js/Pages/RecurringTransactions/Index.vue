@@ -431,7 +431,7 @@ const getNextOccurrence = (template) => {
       nextDate.setDate(today.getDate() + 1);
       break;
 
-    case 'weekly':
+    case 'weekly': {
       // Find the next occurrence of day_of_week
       const dayOfWeek = template.day_of_week;
       let daysToAdd = (dayOfWeek - today.getDay() + 7) % 7;
@@ -440,8 +440,9 @@ const getNextOccurrence = (template) => {
       nextDate = new Date();
       nextDate.setDate(today.getDate() + daysToAdd);
       break;
+    }
 
-    case 'biweekly':
+    case 'biweekly': {
       // Similar to weekly but add 14 days
       const biweeklyDayOfWeek = template.day_of_week;
       let biweeklyDaysToAdd = (biweeklyDayOfWeek - today.getDay() + 7) % 7;
@@ -451,8 +452,9 @@ const getNextOccurrence = (template) => {
       nextDate = new Date();
       nextDate.setDate(today.getDate() + biweeklyDaysToAdd);
       break;
+    }
 
-    case 'monthly':
+    case 'monthly': {
       // Find the next occurrence of day_of_month
       const dayOfMonth = template.day_of_month || new Date(template.start_date).getDate();
       nextDate = new Date();
@@ -467,8 +469,9 @@ const getNextOccurrence = (template) => {
         setSafeDayOfMonth(nextDate, dayOfMonth);
       }
       break;
+    }
 
-    case 'bimonthly':
+    case 'bimonthly': {
       // Twice per month (e.g., 1st and 15th)
       const firstDay = template.first_day_of_month || 1;
       const secondDay = template.day_of_month || 15;
@@ -494,8 +497,9 @@ const getNextOccurrence = (template) => {
         setSafeDayOfMonth(nextDate, actualFirstDay);
       }
       break;
+    }
 
-    case 'quarterly':
+    case 'quarterly': {
       // Similar to monthly but every 3 months
       const quarterlyDayOfMonth = template.day_of_month || new Date(template.start_date).getDate();
       nextDate = new Date();
@@ -513,8 +517,9 @@ const getNextOccurrence = (template) => {
         setSafeDayOfMonth(nextDate, quarterlyDayOfMonth);
       }
       break;
+    }
 
-    case 'yearly':
+    case 'yearly': {
       // Occurs on the same day and month each year
       const startDate = new Date(template.start_date);
       nextDate = new Date();
@@ -530,6 +535,7 @@ const getNextOccurrence = (template) => {
         setSafeDayOfMonth(nextDate, startDate.getDate());
       }
       break;
+    }
   }
 
   return nextDate;

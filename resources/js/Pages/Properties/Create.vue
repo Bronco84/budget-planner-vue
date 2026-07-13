@@ -276,7 +276,6 @@ import { HomeIcon, TruckIcon, CubeIcon } from '@heroicons/vue/24/outline';
 const props = defineProps({
   budget: Object,
   liabilityAccounts: Array,
-  propertyTypes: Object,
 });
 
 const propertyTypes = [

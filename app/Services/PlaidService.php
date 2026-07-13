@@ -11,7 +11,6 @@ use App\Models\PlaidSecurity;
 use App\Models\PlaidStatementHistory;
 use App\Models\PlaidTransaction;
 use App\Models\Transaction;
-use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
@@ -21,10 +20,15 @@ use Illuminate\Support\Facades\Log;
 class PlaidService
 {
     protected $client;
+
     protected $clientId;
+
     protected $secret;
+
     protected $environment;
+
     protected $baseUrl;
+
     protected $isConfigured = false;
 
     public function __construct()
@@ -34,21 +38,23 @@ class PlaidService
         $this->environment = config('services.plaid.environment', 'sandbox');
 
         // Validate configuration
-        if (!$this->clientId || !$this->secret) {
+        if (! $this->clientId || ! $this->secret) {
             Log::error('Plaid configuration missing', [
-                'client_id_set' => !empty($this->clientId),
-                'secret_set' => !empty($this->secret),
-                'environment' => $this->environment
+                'client_id_set' => ! empty($this->clientId),
+                'secret_set' => ! empty($this->secret),
+                'environment' => $this->environment,
             ]);
+
             return;
         }
 
         // Validate environment
-        if (!in_array($this->environment, ['sandbox', 'production'])) {
+        if (! in_array($this->environment, ['sandbox', 'production'])) {
             Log::error('Invalid Plaid environment', [
                 'environment' => $this->environment,
-                'valid_environments' => ['sandbox', 'production']
+                'valid_environments' => ['sandbox', 'production'],
             ]);
+
             return;
         }
 
@@ -79,13 +85,13 @@ class PlaidService
 
         // Only allow SSL bypass in local environment with debug mode enabled
         // This is a triple-check to prevent accidental production bypass
-        if (app()->environment('local') 
-            && config('app.debug') === true 
+        if (app()->environment('local')
+            && config('app.debug') === true
             && config('services.plaid.disable_ssl_verification', false) === true) {
             $options['verify'] = false;
             Log::warning('SSL verification disabled for Plaid - DEVELOPMENT ONLY', [
                 'environment' => app()->environment(),
-                'debug' => config('app.debug')
+                'debug' => config('app.debug'),
             ]);
         }
 
@@ -115,11 +121,12 @@ class PlaidService
 
     /**
      * Create a link token for initializing Plaid Link
+     *
      * @throws \Exception
      */
     public function createLinkToken($userId, $existingAccessToken = null)
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             throw new \Exception('Plaid service is not properly configured. Please check your environment settings.');
         }
 
@@ -151,7 +158,7 @@ class PlaidService
             if ($existingAccessToken) {
                 $payload['access_token'] = $existingAccessToken;
                 $payload['update'] = [
-                    'account_selection_enabled' => true
+                    'account_selection_enabled' => true,
                 ];
             }
 
@@ -162,18 +169,18 @@ class PlaidService
                 'mode' => $existingAccessToken ? 'update' : 'create',
                 'products' => $payload['products'],
                 'required_if_supported_products' => $payload['required_if_supported_products'],
-                'account_filters_removed' => true
+                'account_filters_removed' => true,
             ]);
 
             $response = $this->client->post('/link/token/create', [
-                'json' => $payload
+                'json' => $payload,
             ]);
 
             $result = json_decode($response->getBody(), true);
 
-            if (!isset($result['link_token'])) {
+            if (! isset($result['link_token'])) {
                 Log::error('Invalid Plaid response - missing link_token', [
-                    'response' => $result
+                    'response' => $result,
                 ]);
                 throw new \Exception('Invalid response from Plaid API');
             }
@@ -184,12 +191,11 @@ class PlaidService
             Log::error('Plaid connection failed', [
                 'error' => $e->getMessage(),
                 'host' => $this->baseUrl,
-                'environment' => $this->environment
+                'environment' => $this->environment,
             ]);
 
             $message = $this->getConnectionErrorMessage($e);
             throw new \Exception($message, 0, $e);
-
         } catch (RequestException $e) {
             $response = null;
             $errorDetails = null;
@@ -204,8 +210,8 @@ class PlaidService
                 'status_code' => $response ? $response->getStatusCode() : null,
                 'error_details' => $errorDetails,
                 'environment' => $this->environment,
-                'client_id_set' => !empty($this->clientId),
-                'secret_set' => !empty($this->secret)
+                'client_id_set' => ! empty($this->clientId),
+                'secret_set' => ! empty($this->secret),
             ]);
 
             $errorMessage = 'Failed to initialize Plaid connection. ';
@@ -231,7 +237,7 @@ class PlaidService
         if (str_contains($e->getMessage(), 'Could not resolve host')) {
             $message .= 'DNS resolution failed. Please check your internet connection and DNS settings. ';
             if (app()->environment('local')) {
-                $message .= "Current environment: {$this->environment}, API host: " . parse_url($this->baseUrl, PHP_URL_HOST);
+                $message .= "Current environment: {$this->environment}, API host: ".parse_url($this->baseUrl, PHP_URL_HOST);
             }
         } elseif (str_contains($e->getMessage(), 'Connection timed out')) {
             $message .= 'Connection timed out. Please check your internet connection. ';
@@ -250,11 +256,12 @@ class PlaidService
      */
     protected function getRequestErrorMessage(RequestException $e): string
     {
-        if (!$e->hasResponse()) {
+        if (! $e->hasResponse()) {
             return 'No response received from Plaid API.';
         }
 
         $response = json_decode($e->getResponse()->getBody(), true);
+
         return $response['error_message'] ?? 'An unexpected error occurred.';
     }
 
@@ -263,23 +270,24 @@ class PlaidService
      */
     public function exchangePublicToken($publicToken)
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             throw new \Exception('Plaid service is not properly configured');
         }
 
         try {
             $response = $this->client->post('/item/public_token/exchange', [
                 'json' => [
-                    'public_token' => $publicToken
-                ]
+                    'public_token' => $publicToken,
+                ],
             ]);
 
             $result = json_decode($response->getBody(), true);
+
             return $result['access_token'] ?? null;
         } catch (RequestException $e) {
             Log::error('Plaid token exchange failed', [
                 'error' => $e->getMessage(),
-                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
+                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null,
             ]);
             throw new \Exception($this->getRequestErrorMessage($e));
         }
@@ -288,13 +296,14 @@ class PlaidService
     /**
      * Search for institutions by name.
      *
-     * @param string $query The institution name to search for
+     * @param  string  $query  The institution name to search for
      * @return array|null Array with 'institution_id', 'name', 'logo', or null if not found
      */
     public function searchInstitutions(string $query): ?array
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             Log::warning('Plaid service not configured, cannot search institutions');
+
             return null;
         }
 
@@ -307,7 +316,7 @@ class PlaidService
                     'options' => [
                         'include_optional_metadata' => true,
                     ],
-                ]
+                ],
             ]);
 
             $result = json_decode($response->getBody(), true);
@@ -319,6 +328,7 @@ class PlaidService
 
             // Return the first match
             $institution = $institutions[0];
+
             return [
                 'institution_id' => $institution['institution_id'] ?? null,
                 'name' => $institution['name'] ?? null,
@@ -330,6 +340,7 @@ class PlaidService
                 'query' => $query,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -337,13 +348,14 @@ class PlaidService
     /**
      * Get institution details including logo from Plaid.
      *
-     * @param string $institutionId The Plaid institution ID (e.g., "ins_3")
+     * @param  string  $institutionId  The Plaid institution ID (e.g., "ins_3")
      * @return array|null Array with 'name', 'logo' (base64), 'primary_color', or null on failure
      */
     public function getInstitutionDetails(string $institutionId): ?array
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             Log::warning('Plaid service not configured, cannot fetch institution details');
+
             return null;
         }
 
@@ -355,13 +367,13 @@ class PlaidService
                     'options' => [
                         'include_optional_metadata' => true,
                     ],
-                ]
+                ],
             ]);
 
             $result = json_decode($response->getBody(), true);
             $institution = $result['institution'] ?? null;
 
-            if (!$institution) {
+            if (! $institution) {
                 return null;
             }
 
@@ -375,19 +387,21 @@ class PlaidService
             Log::warning('Failed to fetch institution details from Plaid', [
                 'institution_id' => $institutionId,
                 'error' => $e->getMessage(),
-                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
+                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null,
             ]);
+
             return null;
         }
     }
 
     /**
      * Get transactions for a specific date range
+     *
      * @throws \Exception
      */
     public function getTransactions($accessToken, $startDate, $endDate)
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             throw new \Exception('Plaid service is not properly configured');
         }
 
@@ -397,10 +411,11 @@ class PlaidService
                     'access_token' => $accessToken,
                     'start_date' => is_string($startDate) ? $startDate : $startDate->format('Y-m-d'),
                     'end_date' => is_string($endDate) ? $endDate : $endDate->format('Y-m-d'),
-                ]
+                ],
             ]);
 
             $result = json_decode($response->getBody(), true);
+
             return $result['transactions'] ?? [];
         } catch (RequestException $e) {
             $response = null;
@@ -415,12 +430,12 @@ class PlaidService
                 'error' => $e->getMessage(),
                 'response' => $errorDetails,
                 'start_date' => $startDate,
-                'end_date' => $endDate
+                'end_date' => $endDate,
             ]);
 
             // If it's a PRODUCT_NOT_READY error, throw a specific exception
             if ($errorDetails && isset($errorDetails['error_code']) && $errorDetails['error_code'] === 'PRODUCT_NOT_READY') {
-                throw new \Exception('PRODUCT_NOT_READY: ' . ($errorDetails['error_message'] ?? 'Transaction data is not yet ready'));
+                throw new \Exception('PRODUCT_NOT_READY: '.($errorDetails['error_message'] ?? 'Transaction data is not yet ready'));
             }
 
             return [];
@@ -432,7 +447,7 @@ class PlaidService
      */
     public function getAccounts(string $accessToken)
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             throw new \Exception('Plaid service is not properly configured');
         }
 
@@ -440,7 +455,7 @@ class PlaidService
             $response = $this->client->post('/accounts/get', [
                 'json' => [
                     'access_token' => $accessToken,
-                ]
+                ],
             ]);
 
             $result = json_decode($response->getBody(), true);
@@ -456,17 +471,18 @@ class PlaidService
                         'type' => $account['type'],
                         'subtype' => $account['subtype'] ?? 'no_subtype',
                         'mask' => $account['mask'] ?? 'no_mask',
-                        'balance' => $account['balances']['current'] ?? 'no_balance'
+                        'balance' => $account['balances']['current'] ?? 'no_balance',
                     ];
-                }, $accounts)
+                }, $accounts),
             ]);
 
             return $accounts;
         } catch (RequestException $e) {
             Log::error('Plaid accounts fetch failed', [
                 'error' => $e->getMessage(),
-                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null
+                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null,
             ]);
+
             return [];
         }
     }
@@ -476,7 +492,7 @@ class PlaidService
      */
     public function getLiabilities(string $accessToken)
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             throw new \Exception('Plaid service is not properly configured');
         }
 
@@ -484,50 +500,53 @@ class PlaidService
             $response = $this->client->post('/liabilities/get', [
                 'json' => [
                     'access_token' => $accessToken,
-                ]
+                ],
             ]);
 
             $result = json_decode($response->getBody(), true);
-            
+
             Log::info('Plaid liabilities retrieved', [
                 'credit_cards' => count($result['liabilities']['credit'] ?? []),
                 'mortgages' => count($result['liabilities']['mortgage'] ?? []),
                 'student_loans' => count($result['liabilities']['student'] ?? []),
                 'other_liabilities' => count($result['liabilities']['other'] ?? []),
-                'raw_data' => $result
+                'raw_data' => $result,
             ]);
-            
+
             return $result['liabilities'] ?? [];
         } catch (RequestException $e) {
             $errorResponse = $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null;
             $errorCode = $errorResponse['error_code'] ?? null;
-            
+
             // Handle ADDITIONAL_CONSENT_REQUIRED - user needs to re-link to grant liabilities permission
             if ($errorCode === 'ADDITIONAL_CONSENT_REQUIRED') {
-                Log::warning('Plaid liabilities requires additional consent - user must re-authenticate. ' .
+                Log::warning('Plaid liabilities requires additional consent - user must re-authenticate. '.
                     'Liability data (statement balance, due dates) will not be available until user updates their connection.', [
-                    'error_code' => $errorCode,
-                    'error_message' => $errorResponse['error_message'] ?? 'Unknown error',
-                    'action_required' => 'User should use "Update Connection" or re-link their bank account to grant liabilities consent',
-                ]);
+                        'error_code' => $errorCode,
+                        'error_message' => $errorResponse['error_message'] ?? 'Unknown error',
+                        'action_required' => 'User should use "Update Connection" or re-link their bank account to grant liabilities consent',
+                    ]);
+
                 // Return empty array - the connection was created before liabilities was enabled
                 // User needs to use the "Update Connection" flow to grant consent
                 return [];
             }
-            
+
             // Handle PRODUCTS_NOT_SUPPORTED - institution doesn't provide liabilities data
             if ($errorCode === 'PRODUCTS_NOT_SUPPORTED') {
                 Log::info('Plaid liabilities not supported for this institution - this is normal for some banks', [
                     'error_code' => $errorCode,
                     'error_message' => $errorResponse['error_message'] ?? 'Unknown error',
                 ]);
+
                 return [];
             }
-            
+
             Log::error('Plaid liabilities fetch failed', [
                 'error' => $e->getMessage(),
-                'response' => $errorResponse
+                'response' => $errorResponse,
             ]);
+
             return [];
         }
     }
@@ -535,12 +554,11 @@ class PlaidService
     /**
      * Get investment holdings (positions and securities) from Plaid
      *
-     * @param string $accessToken
      * @return array Array with 'holdings', 'securities', and 'accounts' keys
      */
     public function getInvestmentHoldings(string $accessToken): array
     {
-        if (!$this->isConfigured) {
+        if (! $this->isConfigured) {
             throw new \Exception('Plaid service is not properly configured');
         }
 
@@ -548,7 +566,7 @@ class PlaidService
             $response = $this->client->post('/investments/holdings/get', [
                 'json' => [
                     'access_token' => $accessToken,
-                ]
+                ],
             ]);
 
             $result = json_decode($response->getBody(), true);
@@ -576,6 +594,7 @@ class PlaidService
                     'error_code' => $errorDetails['error_code'],
                     'error_message' => $errorDetails['error_message'] ?? 'Unknown',
                 ]);
+
                 return [
                     'holdings' => [],
                     'securities' => [],
@@ -588,6 +607,7 @@ class PlaidService
                 Log::info('No investment accounts found for this connection', [
                     'error_code' => $errorDetails['error_code'],
                 ]);
+
                 return [
                     'holdings' => [],
                     'securities' => [],
@@ -597,12 +617,13 @@ class PlaidService
 
             // Handle ADDITIONAL_CONSENT_REQUIRED - user needs to re-link to grant investments permission
             if ($errorDetails && isset($errorDetails['error_code']) && $errorDetails['error_code'] === 'ADDITIONAL_CONSENT_REQUIRED') {
-                Log::warning('Plaid investments requires additional consent - user must re-authenticate. ' .
+                Log::warning('Plaid investments requires additional consent - user must re-authenticate. '.
                     'Investment holdings data will not be available until user updates their connection.', [
-                    'error_code' => $errorDetails['error_code'],
-                    'error_message' => $errorDetails['error_message'] ?? 'Unknown error',
-                    'action_required' => 'User should use "Update Connection" or re-link their bank account to grant investments consent',
-                ]);
+                        'error_code' => $errorDetails['error_code'],
+                        'error_message' => $errorDetails['error_message'] ?? 'Unknown error',
+                        'action_required' => 'User should use "Update Connection" or re-link their bank account to grant investments consent',
+                    ]);
+
                 return [
                     'holdings' => [],
                     'securities' => [],
@@ -626,14 +647,8 @@ class PlaidService
     /**
      * Create or find a PlaidConnection for the given item.
      *
-     * @param Budget $budget
-     * @param string $accessToken
-     * @param string $itemId
-     * @param string|null $institutionId
-     * @param string|null $institutionName
-     * @param string|null $institutionLogo Base64-encoded logo from Plaid
-     * @param string|null $institutionUrl Institution website URL
-     * @return PlaidConnection
+     * @param  string|null  $institutionLogo  Base64-encoded logo from Plaid
+     * @param  string|null  $institutionUrl  Institution website URL
      */
     public function createOrFindConnection(
         Budget $budget,
@@ -674,10 +689,6 @@ class PlaidService
 
     /**
      * Find an existing active PlaidConnection for the given institution.
-     *
-     * @param Budget $budget
-     * @param string $institutionName
-     * @return PlaidConnection|null
      */
     public function findConnectionByInstitution(Budget $budget, string $institutionName): ?PlaidConnection
     {
@@ -687,14 +698,9 @@ class PlaidService
     /**
      * Link multiple Plaid accounts to budget accounts under a single connection.
      *
-     * @param Budget $budget
-     * @param array $accountData Array of [local_account, plaid_account_data] pairs
-     * @param string $accessToken
-     * @param string $itemId
-     * @param string|null $institutionId
-     * @param string|null $institutionName
-     * @param string|null $institutionLogo Base64-encoded logo from Plaid
-     * @param string|null $institutionUrl Institution website URL
+     * @param  array  $accountData  Array of [local_account, plaid_account_data] pairs
+     * @param  string|null  $institutionLogo  Base64-encoded logo from Plaid
+     * @param  string|null  $institutionUrl  Institution website URL
      * @return array Array of created PlaidAccount records
      */
     public function linkMultipleAccounts(
@@ -735,11 +741,6 @@ class PlaidService
 
     /**
      * Link a single Plaid account to a connection.
-     *
-     * @param PlaidConnection $plaidConnection
-     * @param Account $account
-     * @param array $plaidAccountData
-     * @return PlaidAccount
      */
     public function linkAccountToConnection(
         PlaidConnection $plaidConnection,
@@ -782,16 +783,8 @@ class PlaidService
     /**
      * Link a Plaid account to an application account.
      *
-     * @param Budget $budget
-     * @param Account $account
-     * @param string $accessToken
-     * @param string $plaidAccountId
-     * @param string|null $itemId
-     * @param string|null $institutionName
-     * @param string|null $institutionId
-     * @param string|null $institutionLogo Base64-encoded logo from Plaid
-     * @param string|null $institutionUrl Institution website URL
-     * @return PlaidAccount
+     * @param  string|null  $institutionLogo  Base64-encoded logo from Plaid
+     * @param  string|null  $institutionUrl  Institution website URL
      */
     public function linkAccount(
         Budget $budget,
@@ -806,14 +799,14 @@ class PlaidService
     ): PlaidAccount {
         // Ensure we have a valid item ID
         if ($itemId === null || empty($itemId)) {
-            $itemId = 'plaid-item-' . uniqid();
+            $itemId = 'plaid-item-'.uniqid();
         }
 
         // Get the account data from Plaid
         $plaidAccounts = $this->getAccounts($accessToken);
         $plaidAccountData = collect($plaidAccounts)->firstWhere('account_id', $plaidAccountId);
 
-        if (!$plaidAccountData) {
+        if (! $plaidAccountData) {
             throw new \Exception("Plaid account {$plaidAccountId} not found");
         }
 
@@ -841,7 +834,7 @@ class PlaidService
         $subtype = $plaidAccount['subtype'] ?? '';
 
         // If there's a subtype, use it for more specific typing
-        if (!empty($subtype)) {
+        if (! empty($subtype)) {
             // Common mappings for better readability
             $subtypeMap = [
                 'checking' => 'checking',
@@ -877,9 +870,7 @@ class PlaidService
     /**
      * Sync transactions from Plaid to the application.
      *
-     * @param PlaidAccount $plaidAccount
-     * @param int $days Number of days in the past to sync
-     * @return array
+     * @param  int  $days  Number of days in the past to sync
      */
     public function syncTransactions(PlaidAccount $plaidAccount, int $days = 180): array
     {
@@ -888,10 +879,10 @@ class PlaidService
 
         $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
 
-        if (!$accessToken) {
+        if (! $accessToken) {
             Log::error('Sync transactions failed: Access token is null', [
                 'plaid_account_id' => $plaidAccount->id,
-                'connection_id' => $plaidAccount->plaid_connection_id
+                'connection_id' => $plaidAccount->plaid_connection_id,
             ]);
 
             return [
@@ -990,7 +981,7 @@ class PlaidService
                     if ($transaction['pending'] ?? false) {
                         $amountInCents = -1 * $transaction['amount'] * 100;
                         $transactionDate = Carbon::parse($transaction['date']);
-                        
+
                         // Search for potential duplicate pending transactions
                         $pendingDuplicate = Transaction::where('account_id', $plaidAccount->account_id)
                             ->where('is_plaid_imported', true)
@@ -1000,14 +991,14 @@ class PlaidService
                             // Match date within ±3 days (pending transactions can shift dates)
                             ->whereBetween('date', [
                                 $transactionDate->copy()->subDays(3),
-                                $transactionDate->copy()->addDays(3)
+                                $transactionDate->copy()->addDays(3),
                             ])
                             // Match description similarity (extract key identifiers)
                             ->where(function ($query) use ($transaction) {
                                 $description = $transaction['name'];
                                 // Extract numeric identifiers (like account numbers, reference numbers)
                                 preg_match_all('/\d{4,}/', $description, $matches);
-                                if (!empty($matches[0])) {
+                                if (! empty($matches[0])) {
                                     foreach ($matches[0] as $identifier) {
                                         $query->orWhere('description', 'LIKE', "%{$identifier}%");
                                     }
@@ -1059,7 +1050,7 @@ class PlaidService
                 }
 
                 // Check if this transaction was previously pending and handle accordingly
-                if (isset($transaction['pending_transaction_id']) && !empty($transaction['pending_transaction_id'])) {
+                if (isset($transaction['pending_transaction_id']) && ! empty($transaction['pending_transaction_id'])) {
                     // This is a settled transaction that was previously pending
                     // Find the transaction linked to the pending plaid transaction
                     $pendingTransaction = Transaction::where('plaid_transaction_id', $transaction['pending_transaction_id'])
@@ -1072,16 +1063,16 @@ class PlaidService
                         // Log the deletion for debugging
                         Log::info('Deleted pending transaction after settlement', [
                             'pending_transaction_id' => $transaction['pending_transaction_id'],
-                            'settled_transaction_id' => $transaction['transaction_id']
+                            'settled_transaction_id' => $transaction['transaction_id'],
                         ]);
                     }
-                } elseif (!($transaction['pending'] ?? false)) {
+                } elseif (! ($transaction['pending'] ?? false)) {
                     // This is a settled transaction without a pending_transaction_id
                     // Use fuzzy matching to find and remove any matching pending transactions
                     // This handles cases where Plaid doesn't provide the pending_transaction_id link
                     $amountInCents = -1 * $transaction['amount'] * 100;
                     $transactionDate = Carbon::parse($transaction['date']);
-                    
+
                     // Search for matching pending transactions to clean up
                     $matchingPendingTransactions = Transaction::where('account_id', $plaidAccount->account_id)
                         ->where('is_plaid_imported', true)
@@ -1093,14 +1084,14 @@ class PlaidService
                         // Match date within ±3 days (pending transactions can shift dates)
                         ->whereBetween('date', [
                             $transactionDate->copy()->subDays(3),
-                            $transactionDate->copy()->addDays(3)
+                            $transactionDate->copy()->addDays(3),
                         ])
                         // Match description similarity (extract key identifiers)
                         ->where(function ($query) use ($transaction) {
                             $description = $transaction['name'];
                             // Extract numeric identifiers (like account numbers, reference numbers)
                             preg_match_all('/\d{4,}/', $description, $matches);
-                            if (!empty($matches[0])) {
+                            if (! empty($matches[0])) {
                                 foreach ($matches[0] as $identifier) {
                                     $query->orWhere('description', 'LIKE', "%{$identifier}%");
                                 }
@@ -1116,7 +1107,7 @@ class PlaidService
                     foreach ($matchingPendingTransactions as $matchingPending) {
                         // Verify the pending transaction is actually pending in Plaid by checking PlaidTransaction
                         $plaidPendingTransaction = PlaidTransaction::where('plaid_transaction_id', $matchingPending->plaid_transaction_id)->first();
-                        
+
                         if ($plaidPendingTransaction && $plaidPendingTransaction->pending) {
                             $matchingPending->delete();
 
@@ -1182,7 +1173,7 @@ class PlaidService
                 try {
                     $recurringService = app(RecurringTransactionService::class);
                     $linkResults = $recurringService->autoLinkTransactionsForAccount($plaidAccount->account);
-                    
+
                     if ($linkResults['total_linked'] > 0) {
                         Log::info('Auto-linked transactions to recurring templates during sync', [
                             'account_id' => $plaidAccount->account_id,
@@ -1210,31 +1201,28 @@ class PlaidService
             Log::error('Error syncing transactions', [
                 'message' => $e->getMessage(),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'imported' => 0,
                 'updated' => 0,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
 
     /**
      * Update the account balance from Plaid.
-     *
-     * @param PlaidAccount $plaidAccount
-     * @return bool
      */
     public function updateAccountBalance(PlaidAccount $plaidAccount): bool
     {
         $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
 
-        if (!$accessToken) {
+        if (! $accessToken) {
             Log::error('Update account balance failed: Access token is null', [
                 'plaid_account_id' => $plaidAccount->id,
-                'connection_id' => $plaidAccount->plaid_connection_id
+                'connection_id' => $plaidAccount->plaid_connection_id,
             ]);
 
             return false;
@@ -1277,7 +1265,7 @@ class PlaidService
             Log::error('Error updating account balance', [
                 'message' => $e->getMessage(),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return false;
@@ -1286,29 +1274,28 @@ class PlaidService
 
     /**
      * Update liability data (statement balance, payment info) for a credit card account.
-     *
-     * @param PlaidAccount $plaidAccount
-     * @return bool
      */
     public function updateLiabilityData(PlaidAccount $plaidAccount): bool
     {
         // Only process credit card accounts
-        if (!$plaidAccount->isCreditCard()) {
+        if (! $plaidAccount->isCreditCard()) {
             Log::debug('Skipping liability update for non-credit card account', [
                 'plaid_account_id' => $plaidAccount->id,
                 'account_type' => $plaidAccount->account_type,
-                'account_subtype' => $plaidAccount->account_subtype
+                'account_subtype' => $plaidAccount->account_subtype,
             ]);
+
             return false;
         }
 
         $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
 
-        if (!$accessToken) {
+        if (! $accessToken) {
             Log::error('Update liability data failed: Access token is null', [
                 'plaid_account_id' => $plaidAccount->id,
-                'connection_id' => $plaidAccount->plaid_connection_id
+                'connection_id' => $plaidAccount->plaid_connection_id,
             ]);
+
             return false;
         }
 
@@ -1318,8 +1305,9 @@ class PlaidService
 
             if (empty($liabilities)) {
                 Log::info('No liability data returned from Plaid', [
-                    'plaid_account_id' => $plaidAccount->id
+                    'plaid_account_id' => $plaidAccount->id,
                 ]);
+
                 return false;
             }
 
@@ -1327,15 +1315,16 @@ class PlaidService
 
             if (empty($creditCards)) {
                 Log::info('No credit cards found in liabilities data', [
-                    'plaid_account_id' => $plaidAccount->id
+                    'plaid_account_id' => $plaidAccount->id,
                 ]);
+
                 return false;
             }
 
             // Get account balance data to access credit limits
             // The liability endpoint returns account data alongside liability data
             $accounts = $this->getAccounts($accessToken);
-            
+
             // Build a map of account_id => account data for easy lookup
             $accountsMap = [];
             foreach ($accounts as $account) {
@@ -1344,7 +1333,7 @@ class PlaidService
 
             Log::debug('Built accounts map for liability update', [
                 'accounts_count' => count($accountsMap),
-                'account_ids' => array_keys($accountsMap)
+                'account_ids' => array_keys($accountsMap),
             ]);
 
             // OPTIMIZATION: Update ALL credit cards from this connection, not just the one passed in
@@ -1361,11 +1350,12 @@ class PlaidService
                 // Find the PlaidAccount that matches this card
                 $matchingPlaidAccount = $allConnectionCards->firstWhere('plaid_account_id', $card['account_id']);
 
-                if (!$matchingPlaidAccount) {
+                if (! $matchingPlaidAccount) {
                     Log::warning('No matching PlaidAccount found for liability card', [
                         'card_account_id' => $card['account_id'],
-                        'available_plaid_accounts' => $allConnectionCards->pluck('plaid_account_id')->toArray()
+                        'available_plaid_accounts' => $allConnectionCards->pluck('plaid_account_id')->toArray(),
                     ]);
+
                     continue;
                 }
 
@@ -1384,21 +1374,22 @@ class PlaidService
                 Log::info('Updated liability data for credit card', [
                     'plaid_account_id' => $matchingPlaidAccount->id,
                     'account_name' => $matchingPlaidAccount->account_name,
-                    'has_account_data' => $accountData !== null
+                    'has_account_data' => $accountData !== null,
                 ]);
             }
 
             Log::info('Updated liability data for multiple credit cards', [
                 'connection_id' => $plaidAccount->plaid_connection_id,
                 'updated_count' => $updatedCount,
-                'total_cards' => count($creditCards)
+                'total_cards' => count($creditCards),
             ]);
 
-            if (!$matchingCard) {
+            if (! $matchingCard) {
                 Log::info('No matching credit card found for the requested account', [
                     'plaid_account_id' => $plaidAccount->plaid_account_id,
-                    'credit_cards_count' => count($creditCards)
+                    'credit_cards_count' => count($creditCards),
                 ]);
+
                 return false;
             }
 
@@ -1408,7 +1399,7 @@ class PlaidService
             Log::error('Error updating liability data', [
                 'message' => $e->getMessage(),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return false;
@@ -1418,16 +1409,14 @@ class PlaidService
     /**
      * Update liability data for a single credit card.
      *
-     * @param PlaidAccount $plaidAccount
-     * @param array $cardData Liability data from Plaid's /liabilities/get endpoint
-     * @param array|null $accountData Account balance data from Plaid's /accounts/get endpoint
-     * @return void
+     * @param  array  $cardData  Liability data from Plaid's /liabilities/get endpoint
+     * @param  array|null  $accountData  Account balance data from Plaid's /accounts/get endpoint
      */
     private function updateSingleCardLiabilityData(PlaidAccount $plaidAccount, array $cardData, ?array $accountData = null): void
     {
         // Extract credit limit from account data (not available in liability data)
         $creditLimit = $accountData['balances']['limit'] ?? null;
-        
+
         // Extract purchase APR from the aprs array
         $purchaseApr = null;
         if (isset($cardData['aprs']) && is_array($cardData['aprs'])) {
@@ -1491,7 +1480,7 @@ class PlaidService
                 ->where('statement_issue_date', $statementIssueDate)
                 ->first();
 
-            if (!$existingHistory) {
+            if (! $existingHistory) {
                 PlaidStatementHistory::create([
                     'plaid_account_id' => $plaidAccount->id,
                     'statement_balance_cents' => $statementBalanceCents,
@@ -1507,7 +1496,7 @@ class PlaidService
                 Log::info('Created new statement history record', [
                     'plaid_account_id' => $plaidAccount->id,
                     'statement_issue_date' => $statementIssueDate,
-                    'credit_utilization' => $creditUtilization
+                    'credit_utilization' => $creditUtilization,
                 ]);
             }
         }
@@ -1516,35 +1505,34 @@ class PlaidService
             'plaid_account_id' => $plaidAccount->id,
             'plaid_account_identifier' => $plaidAccount->plaid_account_id,
             'statement_balance' => $statementBalance,
-            'statement_date' => $statementIssueDate
+            'statement_date' => $statementIssueDate,
         ]);
     }
 
     /**
      * Update investment data (holdings, securities) for an investment account.
-     *
-     * @param PlaidAccount $plaidAccount
-     * @return bool
      */
     public function updateInvestmentData(PlaidAccount $plaidAccount): bool
     {
         // Only process investment accounts
-        if (!$plaidAccount->isInvestmentAccount()) {
+        if (! $plaidAccount->isInvestmentAccount()) {
             Log::debug('Skipping investment update for non-investment account', [
                 'plaid_account_id' => $plaidAccount->id,
                 'account_type' => $plaidAccount->account_type,
-                'account_subtype' => $plaidAccount->account_subtype
+                'account_subtype' => $plaidAccount->account_subtype,
             ]);
+
             return false;
         }
 
         $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
 
-        if (!$accessToken) {
+        if (! $accessToken) {
             Log::error('Update investment data failed: Access token is null', [
                 'plaid_account_id' => $plaidAccount->id,
-                'connection_id' => $plaidAccount->plaid_connection_id
+                'connection_id' => $plaidAccount->plaid_connection_id,
             ]);
+
             return false;
         }
 
@@ -1554,8 +1542,9 @@ class PlaidService
 
             if (empty($investmentData['holdings']) && empty($investmentData['securities'])) {
                 Log::info('No investment holdings data returned from Plaid', [
-                    'plaid_account_id' => $plaidAccount->id
+                    'plaid_account_id' => $plaidAccount->id,
                 ]);
+
                 return false;
             }
 
@@ -1567,7 +1556,7 @@ class PlaidService
             }
 
             Log::info('Updated securities from Plaid', [
-                'securities_count' => count($securitiesMap)
+                'securities_count' => count($securitiesMap),
             ]);
 
             // Get all PlaidAccounts in this connection for batch update
@@ -1575,7 +1564,7 @@ class PlaidService
             $allConnectionAccounts = PlaidAccount::where('plaid_connection_id', $plaidAccount->plaid_connection_id)
                 ->where(function ($query) {
                     $query->where('account_type', 'investment')
-                          ->orWhereIn('account_subtype', PlaidAccount::INVESTMENT_SUBTYPES);
+                        ->orWhereIn('account_subtype', PlaidAccount::INVESTMENT_SUBTYPES);
                 })
                 ->get()
                 ->keyBy('plaid_account_id');
@@ -1587,18 +1576,19 @@ class PlaidService
                 // Find the matching PlaidAccount for this holding
                 $matchingPlaidAccount = $allConnectionAccounts->get($holdingData['account_id']);
 
-                if (!$matchingPlaidAccount) {
+                if (! $matchingPlaidAccount) {
                     continue;
                 }
 
                 // Get the security for this holding
                 $security = $securitiesMap[$holdingData['security_id']] ?? null;
 
-                if (!$security) {
+                if (! $security) {
                     Log::warning('Security not found for holding', [
                         'security_id' => $holdingData['security_id'],
-                        'account_id' => $holdingData['account_id']
+                        'account_id' => $holdingData['account_id'],
                     ]);
+
                     continue;
                 }
 
@@ -1658,7 +1648,7 @@ class PlaidService
             Log::error('Error updating investment data', [
                 'message' => $e->getMessage(),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return false;
@@ -1669,15 +1659,14 @@ class PlaidService
      * Remove holdings that are no longer present in the latest Plaid data.
      * This handles when positions are sold or closed.
      *
-     * @param PlaidAccount $plaidAccount
-     * @param array $currentHoldings Array of holding data from Plaid
+     * @param  array  $currentHoldings  Array of holding data from Plaid
      * @return int Number of holdings removed
      */
     public function cleanupStaleHoldings(PlaidAccount $plaidAccount, array $currentHoldings): int
     {
         // Get current security IDs from Plaid
         $currentSecurityIds = collect($currentHoldings)
-            ->filter(fn($h) => $h['account_id'] === $plaidAccount->plaid_account_id)
+            ->filter(fn ($h) => $h['account_id'] === $plaidAccount->plaid_account_id)
             ->pluck('security_id')
             ->toArray();
 
@@ -1694,7 +1683,7 @@ class PlaidService
         if ($deleted > 0) {
             Log::info('Removed stale holdings', [
                 'plaid_account_id' => $plaidAccount->id,
-                'removed_count' => $deleted
+                'removed_count' => $deleted,
             ]);
         }
 

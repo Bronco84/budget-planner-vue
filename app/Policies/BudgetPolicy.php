@@ -65,4 +65,4 @@ class BudgetPolicy
     {
         return $user->id === $budget->user_id;
     }
-} 
+}

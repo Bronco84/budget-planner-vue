@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\Budget;
-use App\Models\Transaction;
 use App\Models\RecurringTransactionTemplate;
+use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -66,8 +66,8 @@ class RecurringTransactionAnalysisService
                     'criteria' => [
                         'min_occurrences' => $minOccurrences,
                         'confidence_threshold' => $confidenceThreshold,
-                    ]
-                ]
+                    ],
+                ],
             ];
         }
 
@@ -109,8 +109,8 @@ class RecurringTransactionAnalysisService
                 'criteria' => [
                     'min_occurrences' => $minOccurrences,
                     'confidence_threshold' => $confidenceThreshold,
-                ]
-            ]
+                ],
+            ],
         ];
     }
 
@@ -136,7 +136,7 @@ class RecurringTransactionAnalysisService
                 $createdTemplates[] = [
                     'template' => $template,
                     'linked_transactions' => $linkedCount,
-                    'pattern_data' => $patternData
+                    'pattern_data' => $patternData,
                 ];
 
                 Log::info('Created recurring transaction template from analysis', [
@@ -149,7 +149,7 @@ class RecurringTransactionAnalysisService
                 $errors[] = [
                     'index' => $index,
                     'description' => $patternData['description'] ?? 'Unknown pattern',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ];
 
                 Log::error('Failed to create recurring transaction template', [
@@ -185,7 +185,7 @@ class RecurringTransactionAnalysisService
             // Get original description from Plaid if available, otherwise use transaction description
             $originalDescription = $this->getOriginalDescription($transaction);
 
-            if (!isset($groupedTransactions[$key])) {
+            if (! isset($groupedTransactions[$key])) {
                 $groupedTransactions[$key] = [
                     'transactions' => collect(),
                     'normalized_description' => $normalizedDescription,
@@ -239,7 +239,7 @@ class RecurringTransactionAnalysisService
         // Detect frequency pattern
         $frequencyAnalysis = $this->detectFrequencyPattern($sortedTransactions);
 
-        if (!$frequencyAnalysis) {
+        if (! $frequencyAnalysis) {
             return null;
         }
 
@@ -323,7 +323,7 @@ class RecurringTransactionAnalysisService
 
         // Calculate intervals between consecutive transactions
         for ($i = 1; $i < $dates->count(); $i++) {
-            $intervals[] = (int) $dates[$i-1]->diffInDays($dates[$i]);
+            $intervals[] = (int) $dates[$i - 1]->diffInDays($dates[$i]);
         }
 
         if (empty($intervals)) {
@@ -375,7 +375,7 @@ class RecurringTransactionAnalysisService
         }
 
         // Validate the detected pattern has reasonable consistency
-        if (!$frequency || $intervalVariance > pow($avgInterval * 0.5, 2)) {
+        if (! $frequency || $intervalVariance > pow($avgInterval * 0.5, 2)) {
             return null;
         }
 
@@ -488,16 +488,16 @@ class RecurringTransactionAnalysisService
     {
         // Check if this is data from the confirmation modal (has user-edited form fields)
         $isConfirmationData = isset($patternData['description']) && isset($patternData['frequency']) &&
-                              !isset($patternData['suggested_start_date']) && !isset($patternData['confidence_score']);
+                              ! isset($patternData['suggested_start_date']) && ! isset($patternData['confidence_score']);
 
         if ($isConfirmationData) {
             // Handle user-edited confirmation data
             // Always store the amount - for dynamic amounts, this is the estimated/average amount
             $amountInCents = intval(($patternData['amount'] ?? 0) * 100);
-            
+
             // Determine if this is an expense (negative) based on the main amount
             $isExpense = $amountInCents < 0;
-            
+
             // Ensure min/max have the same sign as the main amount
             // Frontend sends positive values, we apply the sign here
             $minAmount = null;
@@ -505,13 +505,13 @@ class RecurringTransactionAnalysisService
                 $minCents = intval(abs($patternData['min_amount']) * 100);
                 $minAmount = $isExpense ? -$minCents : $minCents;
             }
-            
+
             $maxAmount = null;
             if ($patternData['amount_type'] === 'dynamic' && $patternData['max_amount'] !== null) {
                 $maxCents = intval(abs($patternData['max_amount']) * 100);
                 $maxAmount = $isExpense ? -$maxCents : $maxCents;
             }
-            
+
             return [
                 'budget_id' => $budget->id,
                 'account_id' => $account->id,
@@ -520,7 +520,7 @@ class RecurringTransactionAnalysisService
                 'amount_in_cents' => $amountInCents,
                 'frequency' => $patternData['frequency'],
                 'start_date' => $patternData['start_date'],
-                'end_date' => !empty($patternData['end_date']) ? $patternData['end_date'] : null,
+                'end_date' => ! empty($patternData['end_date']) ? $patternData['end_date'] : null,
                 'day_of_month' => $patternData['day_of_month'] ?? null,
                 'day_of_week' => $patternData['day_of_week'] ?? null,
                 'bimonthly_first_day' => $patternData['bimonthly_first_day'] ?? null,
@@ -553,7 +553,7 @@ class RecurringTransactionAnalysisService
                 'max_amount' => $patternData['is_dynamic_amount'] ? $patternData['amount_stats']['max'] : null,
                 'plaid_entity_id' => $patternData['plaid_entity_id'] ?? null,
                 'plaid_entity_name' => $patternData['plaid_entity_name'] ?? null,
-                'notes' => 'Generated from pattern analysis. Confidence: ' . number_format($patternData['confidence_score'] * 100, 1) . '%',
+                'notes' => 'Generated from pattern analysis. Confidence: '.number_format($patternData['confidence_score'] * 100, 1).'%',
             ];
         }
     }
@@ -565,7 +565,7 @@ class RecurringTransactionAnalysisService
     {
         // Check if this is confirmation data (from modal) - it won't have transaction data to link
         $isConfirmationData = isset($patternData['description']) && isset($patternData['frequency']) &&
-                              !isset($patternData['suggested_start_date']) && !isset($patternData['confidence_score']);
+                              ! isset($patternData['suggested_start_date']) && ! isset($patternData['confidence_score']);
 
         if ($isConfirmationData) {
             // For confirmation data, we don't link transactions since the user is manually creating templates
@@ -574,7 +574,7 @@ class RecurringTransactionAnalysisService
         }
 
         // Original logic for analysis-generated patterns
-        if (!isset($patternData['transactions'])) {
+        if (! isset($patternData['transactions'])) {
             return 0;
         }
 
@@ -606,15 +606,15 @@ class RecurringTransactionAnalysisService
     {
         if ($transaction->plaidTransaction) {
             // Prefer merchant_name as it's cleaner (e.g., "Amazon" vs "AMAZON MKTPLACE PMTS...")
-            if (!empty($transaction->plaidTransaction->merchant_name)) {
+            if (! empty($transaction->plaidTransaction->merchant_name)) {
                 return $transaction->plaidTransaction->merchant_name;
             }
             // Fall back to the raw Plaid name
-            if (!empty($transaction->plaidTransaction->name)) {
+            if (! empty($transaction->plaidTransaction->name)) {
                 return $transaction->plaidTransaction->name;
             }
         }
-        
+
         // Fall back to the transaction's description
         return $transaction->description;
     }
@@ -623,37 +623,37 @@ class RecurringTransactionAnalysisService
      * Extract the primary Plaid entity ID and name from a collection of transactions.
      * Finds the most common entity across all transactions in the group.
      *
-     * @param \Illuminate\Support\Collection $transactions
+     * @param  Collection  $transactions
      * @return array{entity_id: string|null, entity_name: string|null}
      */
     protected function extractPrimaryEntityFromTransactions($transactions): array
     {
         $entityCounts = [];
-        
+
         foreach ($transactions as $transaction) {
-            if (!$transaction->plaidTransaction) {
+            if (! $transaction->plaidTransaction) {
                 continue;
             }
-            
+
             $counterparties = $transaction->plaidTransaction->counterparties;
-            
+
             // Handle JSON string if not auto-decoded by Eloquent cast
             if (is_string($counterparties)) {
                 $counterparties = json_decode($counterparties, true);
             }
-            
-            if (empty($counterparties) || !is_array($counterparties)) {
+
+            if (empty($counterparties) || ! is_array($counterparties)) {
                 continue;
             }
-            
+
             // Get the first counterparty (usually the primary one)
             $primary = $counterparties[0] ?? null;
-            if (!$primary || empty($primary['entity_id'])) {
+            if (! $primary || empty($primary['entity_id'])) {
                 continue;
             }
-            
+
             $entityId = $primary['entity_id'];
-            if (!isset($entityCounts[$entityId])) {
+            if (! isset($entityCounts[$entityId])) {
                 $entityCounts[$entityId] = [
                     'count' => 0,
                     'name' => $primary['name'] ?? null,
@@ -661,15 +661,15 @@ class RecurringTransactionAnalysisService
             }
             $entityCounts[$entityId]['count']++;
         }
-        
+
         if (empty($entityCounts)) {
             return ['entity_id' => null, 'entity_name' => null];
         }
-        
+
         // Find the most common entity
-        uasort($entityCounts, fn($a, $b) => $b['count'] <=> $a['count']);
+        uasort($entityCounts, fn ($a, $b) => $b['count'] <=> $a['count']);
         $topEntityId = array_key_first($entityCounts);
-        
+
         return [
             'entity_id' => $topEntityId,
             'entity_name' => $entityCounts[$topEntityId]['name'],
@@ -698,6 +698,7 @@ class RecurringTransactionAnalysisService
         $key = strtolower($normalizedDescription);
         $key = preg_replace('/[^a-z0-9\s]/', '', $key);
         $key = trim($key);
+
         return $key;
     }
 
@@ -708,11 +709,12 @@ class RecurringTransactionAnalysisService
         }
 
         $mean = array_sum($values) / count($values);
-        $squaredDifferences = array_map(function($value) use ($mean) {
+        $squaredDifferences = array_map(function ($value) use ($mean) {
             return pow($value - $mean, 2);
         }, $values);
 
         $variance = array_sum($squaredDifferences) / count($values);
+
         return sqrt($variance);
     }
 
@@ -723,7 +725,7 @@ class RecurringTransactionAnalysisService
         }
 
         $mean = array_sum($values) / count($values);
-        $squaredDifferences = array_map(function($value) use ($mean) {
+        $squaredDifferences = array_map(function ($value) use ($mean) {
             return pow($value - $mean, 2);
         }, $values);
 
@@ -737,6 +739,7 @@ class RecurringTransactionAnalysisService
         });
 
         $dayCounts = $days->countBy();
+
         return $dayCounts->keys()->sortDesc()->first();
     }
 
@@ -747,6 +750,7 @@ class RecurringTransactionAnalysisService
         });
 
         $dayCounts = $days->countBy();
+
         return $dayCounts->keys()->sortDesc()->first();
     }
 

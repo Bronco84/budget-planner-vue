@@ -24,7 +24,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->string('access_token')->nullable();
             $table->timestamps();
-            
+
             $table->unique(['plaid_account_id', 'plaid_item_id']);
         });
     }

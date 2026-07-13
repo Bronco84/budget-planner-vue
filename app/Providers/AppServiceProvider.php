@@ -2,9 +2,10 @@
 
 namespace App\Providers;
 
-use App\Services\RecurringTransactionService;
 use App\Observers\WebAuthnCredentialObserver;
+use App\Services\RecurringTransactionService;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
 
@@ -16,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(RecurringTransactionService::class, function ($app) {
-            return new RecurringTransactionService();
+            return new RecurringTransactionService;
         });
     }
 
@@ -30,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Force HTTPS in production
         if ($this->app->environment('production')) {
-            \Illuminate\Support\Facades\URL::forceScheme('https');
+            URL::forceScheme('https');
         }
 
         // Allow all authenticated users to register WebAuthn credentials

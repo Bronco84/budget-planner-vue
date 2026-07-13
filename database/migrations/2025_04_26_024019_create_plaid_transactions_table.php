@@ -30,7 +30,7 @@ return new class extends Migration
             $table->json('payment_meta')->nullable();
             $table->json('original_data')->nullable();
             $table->timestamps();
-            
+
             $table->index('plaid_account_id');
             $table->index('date');
             $table->index('merchant_name');

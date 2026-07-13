@@ -39,18 +39,19 @@ class IdentifyAllRecurringTransactions extends Command
 
         // Get all active budgets
         $budgets = Budget::all();
-        
+
         if ($budgets->isEmpty()) {
-            $this->info("No budgets found to analyze.");
+            $this->info('No budgets found to analyze.');
+
             return 0;
         }
 
-        $this->info("Found " . $budgets->count() . " budgets to analyze.");
+        $this->info('Found '.$budgets->count().' budgets to analyze.');
         $totalTemplates = 0;
 
         foreach ($budgets as $budget) {
             $this->info("Analyzing budget: {$budget->name} (ID: {$budget->id})");
-            
+
             try {
                 // Run the identify-recurring command for this budget
                 $exitCode = Artisan::call('transactions:identify-recurring', [
@@ -59,30 +60,31 @@ class IdentifyAllRecurringTransactions extends Command
                     '--min-occurrences' => $minOccurrences,
                     '--similarity-threshold' => $similarityThreshold,
                 ]);
-                
+
                 // Get command output and display
                 $output = Artisan::output();
                 $this->line($output);
-                
+
                 // Count templates created
                 if (preg_match('/Created (\d+) recurring transaction templates/', $output, $matches)) {
                     $totalTemplates += (int) $matches[1];
                 }
-                
+
                 if ($exitCode !== 0) {
                     $this->warn("Command returned non-zero exit code {$exitCode} for budget {$budget->id}");
                 }
             } catch (\Exception $e) {
-                $this->error("Error processing budget {$budget->id}: " . $e->getMessage());
-                Log::error("Error in identify-all-recurring command", [
+                $this->error("Error processing budget {$budget->id}: ".$e->getMessage());
+                Log::error('Error in identify-all-recurring command', [
                     'budget_id' => $budget->id,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
             }
         }
 
         $this->info("Command completed. Created {$totalTemplates} recurring transaction templates across all budgets.");
+
         return 0;
     }
-} 
+}

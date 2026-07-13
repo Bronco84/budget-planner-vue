@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Budget;
 use App\Services\RecurringTransactionAnalysisService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +24,7 @@ class RecurringTransactionAnalysisController extends Controller
             if ($budget) {
                 $this->authorize('view', $budget);
             }
+
             return $next($request);
         });
     }
@@ -88,8 +89,8 @@ class RecurringTransactionAnalysisController extends Controller
                     'message' => $result['message'] ?? null,
                     'patterns' => $result['patterns'],
                     'account' => $account,
-                    'analysis_summary' => $result['analysis_summary']
-                ]
+                    'analysis_summary' => $result['analysis_summary'],
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -97,10 +98,10 @@ class RecurringTransactionAnalysisController extends Controller
                 'error' => $e->getMessage(),
                 'budget_id' => $budget->id,
                 'account_id' => $account->id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            return redirect()->back()->with('error', 'Analysis failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Analysis failed: '.$e->getMessage());
         }
     }
 
@@ -135,11 +136,11 @@ class RecurringTransactionAnalysisController extends Controller
                 'templates' => $result['templates'],
             ];
 
-            if (!empty($result['errors'])) {
+            if (! empty($result['errors'])) {
                 $response['errors'] = $result['errors'];
                 $response['message'] = 'Some templates could not be created. See errors for details.';
             } else {
-                $response['message'] = 'Successfully created ' . $result['created_templates'] . ' recurring transaction templates.';
+                $response['message'] = 'Successfully created '.$result['created_templates'].' recurring transaction templates.';
             }
 
             return redirect()->route('recurring-transactions.index', $budget->id)
@@ -153,8 +154,7 @@ class RecurringTransactionAnalysisController extends Controller
                 'account_id' => $account->id,
             ]);
 
-            return redirect()->back()->with('error', 'Template creation failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Template creation failed: '.$e->getMessage());
         }
     }
-
 }

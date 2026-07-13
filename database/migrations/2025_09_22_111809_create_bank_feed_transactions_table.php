@@ -29,13 +29,13 @@ return new class extends Migration
             $table->json('metadata')->nullable(); // Additional source-specific data
             $table->timestamp('processed_at')->nullable(); // When this was converted to a Transaction
             $table->timestamps();
-            
+
             // Indexes
             $table->index(['bank_feed_id', 'date']);
             $table->index(['source_transaction_id', 'bank_feed_id']);
             $table->index(['status', 'processed_at']);
             $table->index('date');
-            
+
             // Unique constraint: one transaction per external ID per feed
             $table->unique(['bank_feed_id', 'source_transaction_id']);
         });

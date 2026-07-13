@@ -10,9 +10,9 @@ interface ContextBuilderInterface
     /**
      * Build context data for this module.
      *
-     * @param User $user The authenticated user
-     * @param Budget $budget The active budget
-     * @param array $options Additional options for building context
+     * @param  User  $user  The authenticated user
+     * @param  Budget  $budget  The active budget
+     * @param  array  $options  Additional options for building context
      * @return array The context data
      */
     public function build(User $user, Budget $budget, array $options = []): array;
@@ -27,7 +27,7 @@ interface ContextBuilderInterface
     /**
      * Estimate token count for this context.
      *
-     * @param Budget $budget The budget to estimate for
+     * @param  Budget  $budget  The budget to estimate for
      * @return int Estimated token count
      */
     public function getTokenEstimate(Budget $budget): int;

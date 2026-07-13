@@ -20,7 +20,7 @@ return new class extends Migration
                 'recurring_expense',
                 'debt_paydown',
                 'savings_contribution',
-                'modify_existing'
+                'modify_existing',
             ]);
             $table->bigInteger('amount_in_cents');
             $table->date('start_date');

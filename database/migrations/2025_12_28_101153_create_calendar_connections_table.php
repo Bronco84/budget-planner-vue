@@ -24,7 +24,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->json('settings')->nullable(); // Store sync preferences, filters, etc.
             $table->timestamps();
-            
+
             $table->index(['user_id', 'is_active']);
         });
     }

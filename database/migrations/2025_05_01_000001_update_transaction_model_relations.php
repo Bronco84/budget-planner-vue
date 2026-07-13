@@ -13,15 +13,15 @@ return new class extends Migration
     {
         // Ensure the transactions table has a proper foreign key to plaid_transactions if needed
         Schema::table('transactions', function (Blueprint $table) {
-            if (!Schema::hasColumn('transactions', 'plaid_transaction_id')) {
+            if (! Schema::hasColumn('transactions', 'plaid_transaction_id')) {
                 $table->string('plaid_transaction_id')->nullable()->after('id')->index();
             }
         });
-        
+
         // Add foreign key constraint if it doesn't exist already
         Schema::table('plaid_transactions', function (Blueprint $table) {
             // Add foreign key constraint to account_id if it doesn't exist
-            if (!Schema::hasColumn('plaid_transactions', 'account_id_foreign')) {
+            if (! Schema::hasColumn('plaid_transactions', 'account_id_foreign')) {
                 $table->foreign('account_id')->references('id')->on('accounts')->onDelete('cascade');
             }
         });
@@ -36,8 +36,8 @@ return new class extends Migration
         Schema::table('plaid_transactions', function (Blueprint $table) {
             $table->dropForeign(['account_id']);
         });
-        
+
         // We don't need to drop the plaid_transaction_id column from transactions
         // as it might be used elsewhere
     }
-}; 
+};

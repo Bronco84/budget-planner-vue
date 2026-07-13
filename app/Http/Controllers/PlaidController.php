@@ -10,14 +10,14 @@ use App\Services\PlaidService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Facades\Log;
 
 class PlaidController extends Controller
 {
     protected PlaidService $plaidService;
-    
+
     /**
      * Create a new controller instance.
      */
@@ -31,15 +31,16 @@ class PlaidController extends Controller
             if ($budget) {
                 $this->authorize('view', $budget);
             }
+
             return $next($request);
         });
     }
 
     /**
      * Fetch institution details from Plaid, with fallback to search by name.
-     * 
-     * @param string|null $institutionId The Plaid institution ID (may be null)
-     * @param string $institutionName The institution name to search by if ID is missing
+     *
+     * @param  string|null  $institutionId  The Plaid institution ID (may be null)
+     * @param  string  $institutionName  The institution name to search by if ID is missing
      * @return array Institution details with keys: institution_id, logo, url, primary_color
      */
     private function fetchInstitutionDetails(?string $institutionId, string $institutionName): array
@@ -49,8 +50,9 @@ class PlaidController extends Controller
         // First try with institution ID if available
         if ($institutionId) {
             $details = $this->plaidService->getInstitutionDetails($institutionId) ?? [];
-            if (!empty($details)) {
+            if (! empty($details)) {
                 $details['institution_id'] = $institutionId;
+
                 return $details;
             }
         }
@@ -61,16 +63,17 @@ class PlaidController extends Controller
         ]);
 
         $searchResult = $this->plaidService->searchInstitutions($institutionName);
-        
-        if ($searchResult && !empty($searchResult['institution_id'])) {
+
+        if ($searchResult && ! empty($searchResult['institution_id'])) {
             // Found institution by name, now get full details including URL
             $fullDetails = $this->plaidService->getInstitutionDetails($searchResult['institution_id']);
-            
+
             if ($fullDetails) {
                 $fullDetails['institution_id'] = $searchResult['institution_id'];
+
                 return $fullDetails;
             }
-            
+
             // If getInstitutionDetails failed, return search result (has logo but not URL)
             return $searchResult;
         }
@@ -82,7 +85,7 @@ class PlaidController extends Controller
 
         return [];
     }
-    
+
     /**
      * Show the form for linking a Plaid account.
      */
@@ -104,7 +107,7 @@ class PlaidController extends Controller
             );
         } catch (\Exception $e) {
             Log::error('Failed to create link token', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
@@ -137,7 +140,7 @@ class PlaidController extends Controller
             'existingConnectionInstitution' => null,
         ]);
     }
-    
+
     /**
      * Discover all available accounts from Plaid for a budget.
      */
@@ -154,10 +157,10 @@ class PlaidController extends Controller
                     'institution_name' => $connection->institution_name,
                     'account_count' => $connection->getAccountCount(),
                     'last_sync_at' => $connection->last_sync_at,
-                    'accounts' => $connection->plaidAccounts->map(fn($pa) => [
+                    'accounts' => $connection->plaidAccounts->map(fn ($pa) => [
                         'name' => $pa->account->name ?? $pa->account_name,
                         'type' => $pa->account->type ?? 'unknown',
-                    ])
+                    ]),
                 ];
             });
 
@@ -166,7 +169,7 @@ class PlaidController extends Controller
             $linkToken = $this->plaidService->createLinkToken((string) Auth::id());
         } catch (\Exception $e) {
             Log::error('Failed to create link token for discovery', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
@@ -176,7 +179,7 @@ class PlaidController extends Controller
             'existingConnections' => $existingConnections,
         ]);
     }
-    
+
     /**
      * Import multiple accounts from Plaid.
      */
@@ -190,27 +193,28 @@ class PlaidController extends Controller
             'selected_accounts' => 'required|array',
             'selected_accounts.*' => 'required|string',
         ]);
-        
+
         try {
             // Exchange the public token for an access token
             $accessToken = $this->plaidService->exchangePublicToken($validated['public_token']);
-            
-            if (!$accessToken) {
+
+            if (! $accessToken) {
                 return redirect()->back()->with('error', 'Failed to connect to Plaid.');
             }
-            
+
             // Get all accounts from Plaid
             $plaidAccounts = $this->plaidService->getAccounts($accessToken);
-            $selectedPlaidAccounts = array_filter($plaidAccounts, function($account) use ($validated) {
+            $selectedPlaidAccounts = array_filter($plaidAccounts, function ($account) use ($validated) {
                 // Use 'id' field for Plaid metadata accounts, 'account_id' for API accounts
                 $accountId = $account['id'] ?? $account['account_id'];
+
                 return in_array($accountId, $validated['selected_accounts']);
             });
-            
+
             $importedCount = 0;
             $itemId = $validated['metadata']['item']['id'] ??
                      $validated['metadata']['item_id'] ??
-                     'plaid-item-' . uniqid();
+                     'plaid-item-'.uniqid();
 
             // Prepare account data for batch linking
             $accountData = [];
@@ -229,7 +233,7 @@ class PlaidController extends Controller
 
                 $accountData[] = [
                     'local_account' => $localAccount,
-                    'plaid_account_data' => $plaidAccount
+                    'plaid_account_data' => $plaidAccount,
                 ];
 
                 $importedCount++;
@@ -259,17 +263,17 @@ class PlaidController extends Controller
             foreach ($plaidAccounts as $plaidAccount) {
                 $this->plaidService->syncTransactions($plaidAccount);
             }
-            
+
             return redirect()->route('budgets.show', $budget)
                 ->with('message', "Successfully imported {$importedCount} accounts from Plaid.");
-                
+
         } catch (\Exception $e) {
             Log::error('Plaid import failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
-            return redirect()->back()->with('error', 'Failed to import accounts: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Failed to import accounts: '.$e->getMessage());
         }
     }
 
@@ -286,24 +290,24 @@ class PlaidController extends Controller
             'metadata.account' => 'required|array',
             'metadata.account.id' => 'required|string',
         ]);
-        
+
         try {
             // Exchange the public token for an access token
             $accessToken = $this->plaidService->exchangePublicToken($validated['public_token']);
-            
-            if (!$accessToken) {
+
+            if (! $accessToken) {
                 return redirect()->back()->with('error', 'Failed to connect to Plaid.');
             }
-            
+
             $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
             $institutionName = $validated['metadata']['institution']['name'];
-            $itemId = $validated['metadata']['item']['id'] ?? 
-                    $validated['metadata']['item_id'] ?? 
+            $itemId = $validated['metadata']['item']['id'] ??
+                    $validated['metadata']['item_id'] ??
                     null;
-            
+
             // CHECK: Does this account already have a PlaidAccount?
             $existingPlaidAccount = PlaidAccount::where('account_id', $account->id)->first();
-            
+
             if ($existingPlaidAccount) {
                 // Account was previously linked - update it instead of creating new
                 return $this->relinkExistingAccount(
@@ -314,7 +318,7 @@ class PlaidController extends Controller
                     $account
                 );
             }
-            
+
             // CHECK: Do we already have a connection for this Plaid Item?
             // Use plaid_item_id (unique per Plaid connection) instead of institution_id
             $existingConnection = null;
@@ -324,52 +328,52 @@ class PlaidController extends Controller
                     ->where('status', PlaidConnection::STATUS_ACTIVE)
                     ->first();
             }
-            
+
             // If no match by item_id, check by institution_id (but only if institution_id is not null)
-            if (!$existingConnection && $institutionId) {
+            if (! $existingConnection && $institutionId) {
                 $existingConnection = PlaidConnection::where('budget_id', $budget->id)
                     ->where('institution_id', $institutionId)
                     ->where('status', PlaidConnection::STATUS_ACTIVE)
                     ->first();
             }
-            
+
             if ($existingConnection) {
                 // Reuse existing connection instead of creating new one
                 Log::info('Reusing existing Plaid connection', [
                     'connection_id' => $existingConnection->id,
                     'institution' => $institutionName,
                 ]);
-                
+
                 // Get account data from the NEW access token
                 $plaidAccounts = $this->plaidService->getAccounts($accessToken);
                 $plaidAccountData = collect($plaidAccounts)
                     ->firstWhere('account_id', $validated['metadata']['account']['id']);
-                
-                if (!$plaidAccountData) {
+
+                if (! $plaidAccountData) {
                     throw new \Exception('Account not found in Plaid response');
                 }
-                
+
                 // Link this account to the existing connection
                 $plaidAccount = $this->plaidService->linkAccountToConnection(
                     $existingConnection,
                     $account,
                     $plaidAccountData
                 );
-                
+
                 // Sync transactions
                 $this->plaidService->syncTransactions($plaidAccount);
-                
+
                 return redirect()->route('budgets.show', $budget)
                     ->with('message', "Account linked successfully to existing {$institutionName} connection.");
             }
-            
+
             // No existing connection - create new one (original logic)
             // Fetch institution logo and URL
             $institutionDetails = $this->fetchInstitutionDetails($institutionId, $institutionName);
             $institutionId = $institutionDetails['institution_id'] ?? $institutionId;
             $institutionLogo = $institutionDetails['logo'] ?? null;
             $institutionUrl = $institutionDetails['url'] ?? null;
-                    
+
             // Link the account
             $plaidAccount = $this->plaidService->linkAccount(
                 $budget,
@@ -382,22 +386,22 @@ class PlaidController extends Controller
                 $institutionLogo,
                 $institutionUrl
             );
-            
+
             // Sync transactions
             $this->plaidService->syncTransactions($plaidAccount);
-            
+
             return redirect()->route('budgets.show', $budget)
                 ->with('message', 'Account linked to Plaid successfully.');
         } catch (\Exception $e) {
             Log::error('Plaid linking failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
-            return redirect()->back()->with('error', 'Failed to link account: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Failed to link account: '.$e->getMessage());
         }
     }
-    
+
     /**
      * Re-link an existing PlaidAccount that was orphaned or needs updating.
      */
@@ -413,10 +417,10 @@ class PlaidController extends Controller
             // Find if we have an active connection for this institution
             $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
             $institutionName = $validated['metadata']['institution']['name'];
-            $itemId = $validated['metadata']['item']['id'] ?? 
-                    $validated['metadata']['item_id'] ?? 
+            $itemId = $validated['metadata']['item']['id'] ??
+                    $validated['metadata']['item_id'] ??
                     null;
-            
+
             // Check for existing connection by Item ID first (most reliable)
             $existingConnection = null;
             if ($itemId) {
@@ -425,25 +429,25 @@ class PlaidController extends Controller
                     ->where('status', PlaidConnection::STATUS_ACTIVE)
                     ->first();
             }
-            
+
             // Fallback to institution_id only if not null
-            if (!$existingConnection && $institutionId) {
+            if (! $existingConnection && $institutionId) {
                 $existingConnection = PlaidConnection::where('budget_id', $budget->id)
                     ->where('institution_id', $institutionId)
                     ->where('status', PlaidConnection::STATUS_ACTIVE)
                     ->first();
             }
-            
+
             if ($existingConnection) {
                 // Reuse existing connection
                 $plaidAccounts = $this->plaidService->getAccounts($accessToken);
                 $plaidAccountData = collect($plaidAccounts)
                     ->firstWhere('account_id', $validated['metadata']['account']['id']);
-                
-                if (!$plaidAccountData) {
+
+                if (! $plaidAccountData) {
                     throw new \Exception('Account not found in Plaid response');
                 }
-                
+
                 // Update the existing PlaidAccount to point to the active connection
                 $existingPlaidAccount->update([
                     'plaid_connection_id' => $existingConnection->id,
@@ -460,22 +464,22 @@ class PlaidController extends Controller
                         : null,
                     'balance_updated_at' => now(),
                 ]);
-                
+
                 Log::info('Re-linked orphaned account to existing connection', [
                     'account_id' => $account->id,
                     'connection_id' => $existingConnection->id,
                 ]);
-                
+
                 // Sync transactions
                 $this->plaidService->syncTransactions($existingPlaidAccount);
-                
+
                 return redirect()->route('budgets.show', $budget)
                     ->with('message', "Account re-linked successfully to existing {$institutionName} connection.");
             }
-            
+
             // No existing connection - create new one and update PlaidAccount
-            $itemId = $validated['metadata']['item']['id'] ?? 
-                    $validated['metadata']['item_id'] ?? 
+            $itemId = $validated['metadata']['item']['id'] ??
+                    $validated['metadata']['item_id'] ??
                     null;
 
             // Fetch institution logo and URL
@@ -483,7 +487,7 @@ class PlaidController extends Controller
             $institutionId = $institutionDetails['institution_id'] ?? $institutionId;
             $institutionLogo = $institutionDetails['logo'] ?? null;
             $institutionUrl = $institutionDetails['url'] ?? null;
-            
+
             // Create new connection
             $plaidConnection = $this->plaidService->createOrFindConnection(
                 $budget,
@@ -494,16 +498,16 @@ class PlaidController extends Controller
                 $institutionLogo,
                 $institutionUrl
             );
-            
+
             // Get account data from Plaid
             $plaidAccounts = $this->plaidService->getAccounts($accessToken);
             $plaidAccountData = collect($plaidAccounts)
                 ->firstWhere('account_id', $validated['metadata']['account']['id']);
-            
-            if (!$plaidAccountData) {
+
+            if (! $plaidAccountData) {
                 throw new \Exception('Account not found in Plaid response');
             }
-            
+
             // Update the existing PlaidAccount with new connection
             $existingPlaidAccount->update([
                 'plaid_connection_id' => $plaidConnection->id,
@@ -520,31 +524,31 @@ class PlaidController extends Controller
                     : null,
                 'balance_updated_at' => now(),
             ]);
-            
+
             Log::info('Re-linked orphaned account to new connection', [
                 'account_id' => $account->id,
                 'connection_id' => $plaidConnection->id,
             ]);
-            
+
             // Sync transactions
             $this->plaidService->syncTransactions($existingPlaidAccount);
-            
+
             return redirect()->route('budgets.show', $budget)
                 ->with('message', 'Account re-linked to Plaid successfully.');
-                
+
         } catch (\Exception $e) {
             Log::error('Account re-linking failed', [
                 'error' => $e->getMessage(),
                 'account_id' => $account->id,
             ]);
-            
-            return redirect()->back()->with('error', 'Failed to re-link account: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Failed to re-link account: '.$e->getMessage());
         }
     }
-    
+
     /**
      * Sync transactions for a specific Plaid-linked account.
-     * 
+     *
      * This is the primary sync method that handles all data updates:
      * - Transactions sync
      * - Balance update
@@ -555,7 +559,7 @@ class PlaidController extends Controller
     {
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
-        if (!$plaidAccount) {
+        if (! $plaidAccount) {
             return $this->notLinkedToPlaidResponse();
         }
 
@@ -563,15 +567,15 @@ class PlaidController extends Controller
             $result = $this->plaidService->syncTransactions($plaidAccount);
 
             return redirect()->back()->with('message',
-                'Synced ' . $result['imported'] . ' new and updated ' . $result['updated'] . ' transactions.');
+                'Synced '.$result['imported'].' new and updated '.$result['updated'].' transactions.');
         } catch (\Exception $e) {
             return $this->handleSyncException($e, $account, $plaidAccount);
         }
     }
-    
+
     /**
      * Update the account balance from Plaid.
-     * 
+     *
      * Note: This is also done automatically by syncTransactions().
      * Use this endpoint for a quick balance-only refresh.
      */
@@ -579,7 +583,7 @@ class PlaidController extends Controller
     {
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
-        if (!$plaidAccount) {
+        if (! $plaidAccount) {
             return $this->notLinkedToPlaidResponse();
         }
 
@@ -594,7 +598,7 @@ class PlaidController extends Controller
 
     /**
      * Update liability data (statement balance, payment info) for a credit card account.
-     * 
+     *
      * Note: This is also done automatically by syncTransactions() for credit cards.
      * Use this endpoint for a quick liability-only refresh.
      */
@@ -606,12 +610,12 @@ class PlaidController extends Controller
 
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
-        if (!$plaidAccount) {
+        if (! $plaidAccount) {
             return $this->notLinkedToPlaidResponse();
         }
 
         // Verify this is a credit card account
-        if (!$plaidAccount->isCreditCard()) {
+        if (! $plaidAccount->isCreditCard()) {
             return redirect()->back()->with('error', 'Liability data is only available for credit card accounts.');
         }
 
@@ -626,7 +630,7 @@ class PlaidController extends Controller
 
     /**
      * Update investment data (holdings, securities) for an investment account.
-     * 
+     *
      * Note: This is also done automatically by syncTransactions() for investment accounts.
      * Use this endpoint for a quick investment-only refresh.
      */
@@ -634,12 +638,12 @@ class PlaidController extends Controller
     {
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
-        if (!$plaidAccount) {
+        if (! $plaidAccount) {
             return $this->notLinkedToPlaidResponse();
         }
 
         // Verify this is an investment account
-        if (!$plaidAccount->isInvestmentAccount()) {
+        if (! $plaidAccount->isInvestmentAccount()) {
             return redirect()->back()->with('error', 'Investment data is only available for investment accounts.');
         }
 
@@ -647,6 +651,7 @@ class PlaidController extends Controller
 
         if ($updated) {
             $holdingsCount = $plaidAccount->holdings()->count();
+
             return redirect()->back()->with('message', "Investment holdings updated successfully. {$holdingsCount} positions synced.");
         }
 
@@ -655,11 +660,6 @@ class PlaidController extends Controller
 
     /**
      * Handle exceptions from sync operations with consistent error messaging.
-     * 
-     * @param \Exception $e
-     * @param Account $account
-     * @param PlaidAccount $plaidAccount
-     * @return RedirectResponse
      */
     private function handleSyncException(\Exception $e, Account $account, PlaidAccount $plaidAccount): RedirectResponse
     {
@@ -672,12 +672,12 @@ class PlaidController extends Controller
         Log::error('Account sync error', [
             'account_id' => $account->id,
             'plaid_account_id' => $plaidAccount->id,
-            'error' => $e->getMessage()
+            'error' => $e->getMessage(),
         ]);
 
-        return redirect()->back()->with('error', 'Failed to sync transactions: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'Failed to sync transactions: '.$e->getMessage());
     }
-    
+
     /**
      * Generate an upgrade link token for re-authenticating a Plaid connection.
      * Used when ITEM_LOGIN_REQUIRED error occurs.
@@ -686,13 +686,13 @@ class PlaidController extends Controller
     {
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
-        if (!$plaidAccount) {
+        if (! $plaidAccount) {
             return response()->json(['error' => 'Account is not linked to Plaid.'], 404);
         }
 
         $accessToken = $plaidAccount->plaidConnection->access_token ?? null;
 
-        if (!$accessToken) {
+        if (! $accessToken) {
             return response()->json(['error' => 'No access token found for this connection.'], 400);
         }
 
@@ -714,7 +714,7 @@ class PlaidController extends Controller
                 'plaid_account_id' => $plaidAccount->id,
             ]);
 
-            return response()->json(['error' => 'Failed to create re-authentication link: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'Failed to create re-authentication link: '.$e->getMessage()], 500);
         }
     }
 
@@ -727,42 +727,42 @@ class PlaidController extends Controller
             'public_token' => 'required|string',
             'metadata' => 'required|array',
         ]);
-        
+
         $plaidAccount = $this->getPlaidAccountForAccount($account);
-        
-        if (!$plaidAccount || !$plaidAccount->plaidConnection) {
+
+        if (! $plaidAccount || ! $plaidAccount->plaidConnection) {
             return $this->notLinkedToPlaidResponse();
         }
-        
+
         try {
             // Exchange public token for new access token
             $newAccessToken = $this->plaidService->exchangePublicToken($validated['public_token']);
-            
-            if (!$newAccessToken) {
+
+            if (! $newAccessToken) {
                 return redirect()->back()->with('error', 'Failed to update connection.');
             }
-            
+
             // Update the EXISTING connection with new access token
             $plaidAccount->plaidConnection->update([
                 'access_token' => $newAccessToken,
                 'status' => PlaidConnection::STATUS_ACTIVE,
                 'error_message' => null,
             ]);
-            
+
             Log::info('Plaid connection re-authenticated successfully', [
                 'connection_id' => $plaidAccount->plaidConnection->id,
                 'institution' => $plaidAccount->plaidConnection->institution_name,
                 'accounts_count' => $plaidAccount->plaidConnection->plaidAccounts()->count(),
             ]);
-            
+
             return redirect()->back()->with('message', 'Connection re-authenticated successfully. All accounts under this connection have been updated.');
         } catch (\Exception $e) {
             Log::error('Re-authentication failed', [
                 'error' => $e->getMessage(),
                 'account_id' => $account->id,
             ]);
-            
-            return redirect()->back()->with('error', 'Failed to re-authenticate: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Failed to re-authenticate: '.$e->getMessage());
         }
     }
 
@@ -773,7 +773,7 @@ class PlaidController extends Controller
     {
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
-        if (!$plaidAccount) {
+        if (! $plaidAccount) {
             return $this->notLinkedToPlaidResponse();
         }
 
@@ -784,22 +784,22 @@ class PlaidController extends Controller
         $plaidAccount->delete();
 
         // Check if the connection has no remaining accounts and clean it up
-        if ($plaidConnection && !$plaidConnection->hasAccounts()) {
+        if ($plaidConnection && ! $plaidConnection->hasAccounts()) {
             Log::info('Cleaning up orphaned PlaidConnection', [
                 'connection_id' => $plaidConnection->id,
                 'institution_name' => $plaidConnection->institution_name,
-                'budget_id' => $budget->id
+                'budget_id' => $budget->id,
             ]);
 
             $plaidConnection->delete();
 
             return redirect()->back()->with('message',
-                'Account unlinked from Plaid. Connection to ' . $plaidConnection->institution_name . ' was also removed as it had no remaining accounts.');
+                'Account unlinked from Plaid. Connection to '.$plaidConnection->institution_name.' was also removed as it had no remaining accounts.');
         }
 
         return redirect()->back()->with('message', 'Account unlinked from Plaid.');
     }
-    
+
     /**
      * Sync transactions for all Plaid-connected accounts in a budget.
      */
@@ -808,14 +808,14 @@ class PlaidController extends Controller
         // Log that the method has been called
         Log::info('syncAllTransactions method called', [
             'budget_id' => $budget->id,
-            'budget_name' => $budget->name
+            'budget_name' => $budget->name,
         ]);
-    
+
         // Find all accounts in this budget that have Plaid connections
         $plaidAccounts = PlaidAccount::whereHas('account', function ($query) use ($budget) {
             $query->where('budget_id', $budget->id);
         })->get();
-        
+
         Log::info('Found Plaid accounts', [
             'count' => $plaidAccounts->count(),
             'accounts' => $plaidAccounts->map(function ($pa) {
@@ -826,24 +826,25 @@ class PlaidController extends Controller
                     'account_id' => $pa->account_id,
                     'institution_name' => $pa->institution_name,
                 ];
-            })
+            }),
         ]);
-        
+
         if ($plaidAccounts->isEmpty()) {
             Log::warning('No Plaid-connected accounts found for budget', ['budget_id' => $budget->id]);
+
             return redirect()->back()->with('error', 'No Plaid-connected accounts found.');
         }
-        
+
         $totalImported = 0;
         $totalUpdated = 0;
         $errors = [];
-        
+
         foreach ($plaidAccounts as $plaidAccount) {
             try {
                 Log::info('Starting sync for account', [
                     'plaid_account_id' => $plaidAccount->id,
                     'account_id' => $plaidAccount->account_id,
-                    'institution' => $plaidAccount->institution_name
+                    'institution' => $plaidAccount->institution_name,
                 ]);
 
                 $result = $this->plaidService->syncTransactions($plaidAccount);
@@ -853,7 +854,7 @@ class PlaidController extends Controller
                 Log::info('Sync successful', [
                     'plaid_account_id' => $plaidAccount->id,
                     'imported' => $result['imported'],
-                    'updated' => $result['updated']
+                    'updated' => $result['updated'],
                 ]);
             } catch (\Exception $e) {
                 $accountName = $plaidAccount->account ? $plaidAccount->account->name : 'Unknown';
@@ -863,8 +864,9 @@ class PlaidController extends Controller
                     Log::info('Account transaction data not ready yet', [
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $accountName,
-                        'institution' => $plaidAccount->institution_name
+                        'institution' => $plaidAccount->institution_name,
                     ]);
+
                     // Don't add to errors array for this specific case
                     continue;
                 }
@@ -876,35 +878,32 @@ class PlaidController extends Controller
                     'plaid_account_id' => $plaidAccount->id,
                     'account_id' => $plaidAccount->account_id,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
             }
         }
-        
+
         Log::info('Sync complete', [
             'total_imported' => $totalImported,
             'total_updated' => $totalUpdated,
-            'error_count' => count($errors)
+            'error_count' => count($errors),
         ]);
-        
-        if (!empty($errors)) {
+
+        if (! empty($errors)) {
             // Log errors but don't show them to the user unless there were no successful syncs
             Log::error('Plaid sync errors', $errors);
-            
+
             if ($totalImported === 0 && $totalUpdated === 0) {
                 return redirect()->back()->with('error', 'Failed to sync transactions. Please try again.');
             }
         }
-        
-        return redirect()->back()->with('message', 
+
+        return redirect()->back()->with('message',
             "Synced {$totalImported} new and updated {$totalUpdated} transactions.");
     }
 
     /**
      * Get the PlaidAccount for a given Account.
-     * 
-     * @param Account $account
-     * @return PlaidAccount|null
      */
     private function getPlaidAccountForAccount(Account $account): ?PlaidAccount
     {
@@ -915,11 +914,9 @@ class PlaidController extends Controller
 
     /**
      * Return a redirect response for when an account is not linked to Plaid.
-     * 
-     * @return RedirectResponse
      */
     private function notLinkedToPlaidResponse(): RedirectResponse
     {
         return redirect()->back()->with('error', 'Account is not linked to Plaid.');
     }
-} 
+}

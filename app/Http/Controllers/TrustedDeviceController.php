@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\TrustedDevice;
 use App\Services\DeviceFingerprintService;
-use Illuminate\Http\Request;
+use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Diglactic\Breadcrumbs\Breadcrumbs;
 
 class TrustedDeviceController extends Controller
 {

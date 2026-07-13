@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScenarioAdjustment extends Model
 {
@@ -15,9 +15,13 @@ class ScenarioAdjustment extends Model
      * Adjustment type constants.
      */
     const TYPE_ONE_TIME_EXPENSE = 'one_time_expense';
+
     const TYPE_RECURRING_EXPENSE = 'recurring_expense';
+
     const TYPE_DEBT_PAYDOWN = 'debt_paydown';
+
     const TYPE_SAVINGS_CONTRIBUTION = 'savings_contribution';
+
     const TYPE_MODIFY_EXISTING = 'modify_existing';
 
     /**
@@ -79,8 +83,6 @@ class ScenarioAdjustment extends Model
     /**
      * Generate projected transactions for this adjustment within the date range.
      *
-     * @param Carbon $startDate
-     * @param Carbon $endDate
      * @return array Array of transaction arrays
      */
     public function generateProjectedTransactions(Carbon $startDate, Carbon $endDate): array
@@ -88,12 +90,12 @@ class ScenarioAdjustment extends Model
         $transactions = [];
 
         // Ensure adjustment dates overlap with projection range
-        $adjustmentStart = $this->start_date->greaterThan($startDate) 
-            ? $this->start_date 
+        $adjustmentStart = $this->start_date->greaterThan($startDate)
+            ? $this->start_date
             : $startDate;
-        
-        $adjustmentEnd = $this->end_date && $this->end_date->lessThan($endDate) 
-            ? $this->end_date 
+
+        $adjustmentEnd = $this->end_date && $this->end_date->lessThan($endDate)
+            ? $this->end_date
             : $endDate;
 
         // If adjustment doesn't overlap with projection range, return empty
@@ -133,19 +135,15 @@ class ScenarioAdjustment extends Model
 
     /**
      * Generate recurring transactions based on frequency.
-     *
-     * @param Carbon $startDate
-     * @param Carbon $endDate
-     * @return array
      */
     protected function generateRecurringTransactions(Carbon $startDate, Carbon $endDate): array
     {
         $transactions = [];
-        
+
         // For monthly frequency with a specific day_of_month, start from the first valid occurrence
         if ($this->frequency === 'monthly' && $this->day_of_month !== null) {
             $currentDate = $startDate->copy();
-            
+
             // If start date is after the target day of month, move to next month
             if ($currentDate->day > $this->day_of_month) {
                 $currentDate->addMonth()->day($this->day_of_month);
@@ -156,12 +154,12 @@ class ScenarioAdjustment extends Model
         } else {
             $currentDate = $startDate->copy();
         }
-        
+
         $iterations = 0;
 
         while ($currentDate->lessThanOrEqualTo($endDate)) {
             $iterations++;
-            
+
             // For monthly with day_of_month, we've already set the correct day, so always generate
             if ($this->frequency === 'monthly' && $this->day_of_month !== null) {
                 if ($currentDate->greaterThanOrEqualTo($startDate)) {
@@ -187,12 +185,12 @@ class ScenarioAdjustment extends Model
             }
 
             $currentDate = $this->getNextDate($currentDate);
-            
+
             // Safety check to prevent infinite loops
             if ($currentDate->greaterThan($endDate->copy()->addYear())) {
                 break;
             }
-            
+
             if ($iterations > 1000) {
                 break;
             }
@@ -203,9 +201,6 @@ class ScenarioAdjustment extends Model
 
     /**
      * Determine if a transaction should be generated for the given date.
-     *
-     * @param Carbon $date
-     * @return bool
      */
     protected function shouldGenerateForDate(Carbon $date): bool
     {
@@ -223,8 +218,8 @@ class ScenarioAdjustment extends Model
                 return true;
 
             case 'weekly':
-                return $this->day_of_week !== null 
-                    ? $date->dayOfWeek === $this->day_of_week 
+                return $this->day_of_week !== null
+                    ? $date->dayOfWeek === $this->day_of_week
                     : true;
 
             case 'biweekly':
@@ -232,6 +227,7 @@ class ScenarioAdjustment extends Model
                     return false;
                 }
                 $weekDiff = (int) $this->start_date->diffInWeeks($date);
+
                 return $weekDiff % 2 === 0;
 
             case 'monthly':
@@ -242,20 +238,22 @@ class ScenarioAdjustment extends Model
                 if ($date->daysInMonth >= $this->day_of_month) {
                     return $date->day == $this->day_of_month;
                 }
+
                 // If target day doesn't exist, use last day of month
                 return $date->day == $date->daysInMonth;
 
             case 'quarterly':
                 if ($this->day_of_month !== null) {
                     $daysInMonth = $date->daysInMonth;
-                    $targetDay = $daysInMonth >= $this->day_of_month 
-                        ? $this->day_of_month 
+                    $targetDay = $daysInMonth >= $this->day_of_month
+                        ? $this->day_of_month
                         : $daysInMonth;
                     if ($date->day != $targetDay) {
                         return false;
                     }
                 }
                 $monthsSinceStart = (int) $this->start_date->diffInMonths($date);
+
                 return $monthsSinceStart % 3 === 0;
 
             case 'yearly':
@@ -265,6 +263,7 @@ class ScenarioAdjustment extends Model
                 $targetDay = $this->start_date->day;
                 $daysInMonth = $date->daysInMonth;
                 $actualTargetDay = $daysInMonth >= $targetDay ? $targetDay : $daysInMonth;
+
                 return $date->day === $actualTargetDay;
 
             default:
@@ -274,9 +273,6 @@ class ScenarioAdjustment extends Model
 
     /**
      * Get the next date based on frequency.
-     *
-     * @param Carbon $fromDate
-     * @return Carbon
      */
     protected function getNextDate(Carbon $fromDate): Carbon
     {
@@ -307,7 +303,6 @@ class ScenarioAdjustment extends Model
     /**
      * Apply this adjustment to an existing transaction (for modify_existing type).
      *
-     * @param array $transaction
      * @return array Modified transaction
      */
     public function applyToExistingTransaction(array $transaction): array

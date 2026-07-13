@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Budget;
 use App\Models\File;
 use App\Models\FileAttachment;
-use Illuminate\Http\Request;
+use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
-use Diglactic\Breadcrumbs\Breadcrumbs;
 
 class BudgetFilesController extends Controller
 {
@@ -22,6 +21,7 @@ class BudgetFilesController extends Controller
             ->get()
             ->map(function ($attachment) {
                 $file = $attachment->file;
+
                 return [
                     'id' => $attachment->id,
                     'original_filename' => $file->original_name,
@@ -48,7 +48,7 @@ class BudgetFilesController extends Controller
         }
 
         $file = $fileAttachment->file;
-        $path = 'files/' . $file->hash;
+        $path = 'files/'.$file->hash;
 
         return Storage::download($path, $file->original_name);
     }
@@ -62,7 +62,7 @@ class BudgetFilesController extends Controller
         }
 
         $file = $fileAttachment->file;
-        $path = 'files/' . $file->hash;
+        $path = 'files/'.$file->hash;
 
         // Delete the attachment record
         $fileAttachment->delete();
@@ -81,4 +81,3 @@ class BudgetFilesController extends Controller
         return redirect()->back()->with('success', 'File deleted successfully.');
     }
 }
-

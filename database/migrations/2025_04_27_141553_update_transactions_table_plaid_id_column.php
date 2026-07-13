@@ -16,7 +16,7 @@ return new class extends Migration
             if (Schema::hasColumn('transactions', 'plaid_transaction_id')) {
                 $table->dropColumn('plaid_transaction_id');
             }
-            
+
             // Add the column back as a string type with adequate length for Plaid IDs
             $table->string('plaid_transaction_id', 100)->nullable()->after('date');
         });
@@ -31,7 +31,7 @@ return new class extends Migration
             if (Schema::hasColumn('transactions', 'plaid_transaction_id')) {
                 $table->dropColumn('plaid_transaction_id');
             }
-            
+
             // Add it back as the original type
             $table->unsignedBigInteger('plaid_transaction_id')->nullable()->after('date');
         });

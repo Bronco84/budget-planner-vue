@@ -11,17 +11,21 @@ use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserPreference;
+use Carbon\Carbon;
+use Faker\Factory as Faker;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Faker\Factory as Faker;
-use Carbon\Carbon;
 
 class TestUserSeeder extends Seeder
 {
     private $faker;
+
     private $user;
+
     private $budget;
+
     private $accounts = [];
+
     private $categories = [];
 
     /**
@@ -43,9 +47,9 @@ class TestUserSeeder extends Seeder
         $this->command->info('✅ Test user created successfully!');
         $this->command->info('📧 Email: demo@example.com');
         $this->command->info('🔑 Password: password');
-        $this->command->info('💰 Budget: ' . $this->budget->name);
-        $this->command->info('🏦 Accounts: ' . count($this->accounts));
-        $this->command->info('📊 Transactions: ' . Transaction::where('budget_id', $this->budget->id)->count());
+        $this->command->info('💰 Budget: '.$this->budget->name);
+        $this->command->info('🏦 Accounts: '.count($this->accounts));
+        $this->command->info('📊 Transactions: '.Transaction::where('budget_id', $this->budget->id)->count());
     }
 
     /**
@@ -60,7 +64,7 @@ class TestUserSeeder extends Seeder
             'password' => Hash::make('password'),
         ]);
 
-        $this->command->info('Created user: ' . $this->user->email);
+        $this->command->info('Created user: '.$this->user->email);
     }
 
     /**
@@ -74,7 +78,7 @@ class TestUserSeeder extends Seeder
             'description' => 'A realistic budget with sample data for testing and demonstration purposes.',
         ]);
 
-        $this->command->info('Created budget: ' . $this->budget->name);
+        $this->command->info('Created budget: '.$this->budget->name);
     }
 
     /**
@@ -105,7 +109,7 @@ class TestUserSeeder extends Seeder
             ]);
         }
 
-        $this->command->info('Created ' . count($this->categories) . ' categories');
+        $this->command->info('Created '.count($this->categories).' categories');
     }
 
     /**
@@ -119,7 +123,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Chase Premier Checking',
             'type' => 'checking',
             'current_balance_cents' => 350000, // $3,500
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Chase Bank',
             'is_active' => true,
             'include_in_budget' => true,
@@ -133,7 +137,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Chase Savings Account',
             'type' => 'savings',
             'current_balance_cents' => 1200000, // $12,000
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Chase Bank',
             'is_active' => true,
             'include_in_budget' => true,
@@ -147,7 +151,7 @@ class TestUserSeeder extends Seeder
             'name' => 'American Express Blue Cash',
             'type' => 'credit card',
             'current_balance_cents' => -245000, // -$2,450 (liability)
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'American Express',
             'is_active' => true,
             'include_in_budget' => true,
@@ -161,7 +165,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Home Mortgage',
             'type' => 'mortgage',
             'current_balance_cents' => -28500000, // -$285,000 (liability)
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Wells Fargo',
             'is_active' => true,
             'include_in_budget' => false,
@@ -175,7 +179,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Toyota Camry Auto Loan',
             'type' => 'loan',
             'current_balance_cents' => -1850000, // -$18,500 (started at -$28,000)
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Capital One Auto Finance',
             'is_active' => true,
             'include_in_budget' => true,
@@ -189,7 +193,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Federal Student Loan',
             'type' => 'loan',
             'current_balance_cents' => -3240000, // -$32,400 (started at -$45,000)
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Navient',
             'is_active' => true,
             'include_in_budget' => true,
@@ -203,7 +207,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Personal Loan',
             'type' => 'loan',
             'current_balance_cents' => -120000, // -$1,200 (started at -$8,000)
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Marcus by Goldman Sachs',
             'is_active' => true,
             'include_in_budget' => true,
@@ -217,7 +221,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Discover It Card',
             'type' => 'credit card',
             'current_balance_cents' => -45000, // -$450 (liability, no plan)
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Discover',
             'is_active' => true,
             'include_in_budget' => true,
@@ -231,7 +235,7 @@ class TestUserSeeder extends Seeder
             'name' => 'Target REDcard',
             'type' => 'credit card',
             'current_balance_cents' => 0, // $0 (paid off!)
-            'account_number' => '****' . rand(1000, 9999),
+            'account_number' => '****'.rand(1000, 9999),
             'institution' => 'Target',
             'is_active' => true,
             'include_in_budget' => true,
@@ -239,7 +243,7 @@ class TestUserSeeder extends Seeder
             'balance_updated_at' => now(),
         ]);
 
-        $this->command->info('Created ' . count($this->accounts) . ' accounts');
+        $this->command->info('Created '.count($this->accounts).' accounts');
     }
 
     /**
@@ -477,7 +481,7 @@ class TestUserSeeder extends Seeder
                     'amount_in_cents' => 280000,
                     'date' => $date->copy(),
                     'is_reconciled' => true,
-                    'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                    'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                     'is_plaid_imported' => true,
                 ]);
                 $date->addWeeks(2);
@@ -511,7 +515,7 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => is_array($bill['amount']) ? rand($bill['amount'][0], $bill['amount'][1]) : $bill['amount'],
                         'date' => $billDate,
                         'is_reconciled' => true,
-                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                         'is_plaid_imported' => true,
                     ]);
                 }
@@ -533,12 +537,12 @@ class TestUserSeeder extends Seeder
                     Transaction::create([
                         'budget_id' => $this->budget->id,
                         'account_id' => rand(0, 1) ? $this->accounts['checking']->id : $this->accounts['credit_card']->id,
-                        'description' => $this->faker->randomElement($stores) . ' - Groceries',
+                        'description' => $this->faker->randomElement($stores).' - Groceries',
                         'category' => 'Food & Dining',
                         'amount_in_cents' => -rand(4500, 15000), // $45 - $150
                         'date' => $shopDate,
                         'is_reconciled' => true,
-                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                         'is_plaid_imported' => true,
                     ]);
                 }
@@ -560,12 +564,12 @@ class TestUserSeeder extends Seeder
                     Transaction::create([
                         'budget_id' => $this->budget->id,
                         'account_id' => $this->accounts['credit_card']->id,
-                        'description' => $this->faker->randomElement($stations) . ' Gas Station',
+                        'description' => $this->faker->randomElement($stations).' Gas Station',
                         'category' => 'Transportation',
                         'amount_in_cents' => -rand(3500, 6500), // $35 - $65
                         'date' => $gasDate,
                         'is_reconciled' => true,
-                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                         'is_plaid_imported' => true,
                     ]);
                 }
@@ -578,7 +582,7 @@ class TestUserSeeder extends Seeder
     {
         $restaurants = [
             'Chipotle', 'Panera Bread', 'Olive Garden', 'Chili\'s', 'Applebee\'s',
-            'Local Pizza Place', 'Thai Restaurant', 'Sushi Bar', 'McDonald\'s', 'Starbucks'
+            'Local Pizza Place', 'Thai Restaurant', 'Sushi Bar', 'McDonald\'s', 'Starbucks',
         ];
         $date = $start->copy();
 
@@ -595,7 +599,7 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => -rand(800, 8500), // $8 - $85
                         'date' => $dineDate,
                         'is_reconciled' => true,
-                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                         'is_plaid_imported' => true,
                     ]);
                 }
@@ -622,7 +626,7 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => -rand(2500, 20000), // $25 - $200
                         'date' => $shopDate,
                         'is_reconciled' => true,
-                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                         'is_plaid_imported' => true,
                     ]);
                 }
@@ -657,7 +661,7 @@ class TestUserSeeder extends Seeder
                         'amount_in_cents' => is_array($item['amount']) ? rand($item['amount'][0], $item['amount'][1]) : $item['amount'],
                         'date' => $miscDate,
                         'is_reconciled' => true,
-                        'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                        'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                         'is_plaid_imported' => true,
                     ]);
                 }
@@ -681,7 +685,7 @@ class TestUserSeeder extends Seeder
                     'amount_in_cents' => -rand(50000, 100000), // $500 - $1,000
                     'date' => $paymentDate,
                     'is_reconciled' => true,
-                    'plaid_transaction_id' => 'demo_' . $this->faker->uuid(),
+                    'plaid_transaction_id' => 'demo_'.$this->faker->uuid(),
                     'is_plaid_imported' => true,
                 ]);
             }
@@ -712,7 +716,7 @@ class TestUserSeeder extends Seeder
                     'loan',
                     'line of credit',
                     'mortgage',
-                    'other'
+                    'other',
                 ],
             ],
         ]);

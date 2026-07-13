@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
 use App\Services\PlaidService;
 use Illuminate\Http\RedirectResponse;
@@ -160,7 +159,7 @@ class PlaidLiabilitiesController extends Controller
             // (updateLiabilityData updates all cards from the same connection)
             $creditCard = $connection->plaidAccounts->first();
 
-            if (!$creditCard) {
+            if (! $creditCard) {
                 continue;
             }
 

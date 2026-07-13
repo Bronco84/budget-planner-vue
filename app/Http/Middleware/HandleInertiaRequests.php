@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
-use Diglactic\Breadcrumbs\Breadcrumbs;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -55,13 +55,13 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
         $activeBudget = $user->getActiveBudget();
 
-        if (!$activeBudget) {
+        if (! $activeBudget) {
             return null;
         }
 
@@ -74,7 +74,7 @@ class HandleInertiaRequests extends Middleware
             'description' => $activeBudget->description,
             'color' => $activeBudget->color,
             'starting_balance' => $activeBudget->starting_balance,
-            'accounts' => $activeBudget->accounts->map(fn($account) => [
+            'accounts' => $activeBudget->accounts->map(fn ($account) => [
                 'id' => $account->id,
                 'name' => $account->name,
                 'type' => $account->type,
@@ -89,13 +89,13 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
         $budgets = $user->accessibleBudgets();
 
-        return $budgets->map(fn($budget) => [
+        return $budgets->map(fn ($budget) => [
             'id' => $budget->id,
             'name' => $budget->name,
             'description' => $budget->description,
@@ -110,7 +110,7 @@ class HandleInertiaRequests extends Middleware
     {
         $routeName = $request->route()?->getName();
 
-        if (!$routeName) {
+        if (! $routeName) {
             return [];
         }
 

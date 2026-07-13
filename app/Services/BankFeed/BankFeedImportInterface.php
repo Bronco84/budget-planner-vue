@@ -10,7 +10,6 @@ interface BankFeedImportInterface
     /**
      * Connect to the bank feed source with provided credentials.
      *
-     * @param array $credentials
      * @return array Returns connection result with success status and config
      */
     public function connect(array $credentials): array;
@@ -18,7 +17,6 @@ interface BankFeedImportInterface
     /**
      * Test the connection to verify it's working.
      *
-     * @param BankFeed $bankFeed
      * @return array Returns test result with success status
      */
     public function testConnection(BankFeed $bankFeed): array;
@@ -26,9 +24,6 @@ interface BankFeedImportInterface
     /**
      * Get transactions from the bank feed source.
      *
-     * @param BankFeed $bankFeed
-     * @param Carbon $startDate
-     * @param Carbon $endDate
      * @return array Returns array of normalized transaction data
      */
     public function getTransactions(BankFeed $bankFeed, Carbon $startDate, Carbon $endDate): array;
@@ -36,7 +31,6 @@ interface BankFeedImportInterface
     /**
      * Update account balance from the bank feed source.
      *
-     * @param BankFeed $bankFeed
      * @return array Returns balance data (current_balance_cents, available_balance_cents)
      */
     public function updateBalance(BankFeed $bankFeed): array;
@@ -44,15 +38,12 @@ interface BankFeedImportInterface
     /**
      * Disconnect from the bank feed source.
      *
-     * @param BankFeed $bankFeed
      * @return bool Returns true if disconnected successfully
      */
     public function disconnect(BankFeed $bankFeed): bool;
 
     /**
      * Get the display name for this import source.
-     *
-     * @return string
      */
     public function getDisplayName(): string;
 
@@ -66,7 +57,6 @@ interface BankFeedImportInterface
     /**
      * Validate the provided credentials/config.
      *
-     * @param array $credentials
      * @return array Returns validation result
      */
     public function validateCredentials(array $credentials): array;
@@ -74,8 +64,6 @@ interface BankFeedImportInterface
     /**
      * Normalize transaction data from the source into a standard format.
      *
-     * @param array $sourceTransaction
-     * @param BankFeed $bankFeed
      * @return array Returns normalized transaction data
      */
     public function normalizeTransaction(array $sourceTransaction, BankFeed $bankFeed): array;

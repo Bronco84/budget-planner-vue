@@ -22,7 +22,7 @@ return new class extends Migration
             $table->timestamp('last_used_at')->nullable();
             $table->timestamp('expires_at'); // 90 days from creation
             $table->timestamps();
-            
+
             $table->index(['user_id', 'device_fingerprint']);
             $table->index('expires_at');
         });

@@ -26,12 +26,12 @@ return new class extends Migration
             $table->bigInteger('available_balance_cents')->nullable();
             $table->timestamp('balance_updated_at')->nullable();
             $table->timestamps();
-            
+
             // Indexes
             $table->index(['account_id', 'source_type']);
             $table->index(['budget_id', 'status']);
             $table->index('last_sync_at');
-            
+
             // Unique constraint: one connection per account per source type
             $table->unique(['account_id', 'source_type']);
         });

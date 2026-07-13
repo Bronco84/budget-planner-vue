@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
@@ -17,7 +16,7 @@ class PasskeyManagementController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        
+
         // Get all WebAuthn credentials for the user
         $passkeys = $user->webAuthnCredentials()
             ->orderBy('updated_at', 'desc')
@@ -74,7 +73,7 @@ class PasskeyManagementController extends Controller
 
         // Check if this is the user's last passkey
         $passkeyCount = $user->webAuthnCredentials()->count();
-        
+
         if ($passkeyCount <= 1) {
             return back()->withErrors([
                 'passkey' => 'You cannot delete your last passkey. Please add another passkey or authentication method first.',
@@ -86,4 +85,3 @@ class PasskeyManagementController extends Controller
         return back()->with('status', 'Passkey deleted successfully. Remember to remove it from your device\'s password manager if needed.');
     }
 }
-

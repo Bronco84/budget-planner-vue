@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PlaidHolding extends Model
@@ -84,7 +84,7 @@ class PlaidHolding extends Model
      */
     public function getCalculatedMarketValueAttribute(): ?float
     {
-        if (!$this->security || !$this->security->close_price_cents) {
+        if (! $this->security || ! $this->security->close_price_cents) {
             return null;
         }
 
@@ -113,16 +113,16 @@ class PlaidHolding extends Model
         }
 
         $gainLoss = $this->institution_value_cents - $this->cost_basis_cents;
+
         return ($gainLoss / $this->cost_basis_cents) * 100;
     }
 
     /**
      * Create or update a holding from Plaid API data.
      *
-     * @param PlaidAccount $plaidAccount The Plaid account this holding belongs to
-     * @param PlaidSecurity $security The security for this holding
-     * @param array $holdingData Raw holding data from Plaid
-     * @return self
+     * @param  PlaidAccount  $plaidAccount  The Plaid account this holding belongs to
+     * @param  PlaidSecurity  $security  The security for this holding
+     * @param  array  $holdingData  Raw holding data from Plaid
      */
     public static function createOrUpdateFromPlaid(
         PlaidAccount $plaidAccount,

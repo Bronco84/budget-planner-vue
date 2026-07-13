@@ -15,4 +15,4 @@ class VerifyCsrfToken extends Middleware
         'budget/*/account/*/plaid/store', // Exclude Plaid redirect callback from CSRF protection
         'webauthn/*', // Exclude WebAuthn routes from CSRF protection (uses challenge-response authentication)
     ];
-} 
+}

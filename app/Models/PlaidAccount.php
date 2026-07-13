@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use App\Services\BudgetService;
-use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
 
 class PlaidAccount extends Model
 {
@@ -117,7 +117,7 @@ class PlaidAccount extends Model
     public function budget(): BelongsTo
     {
         return $this->belongsTo(Budget::class, 'budget_id', 'id')
-                    ->through('plaidConnection');
+            ->through('plaidConnection');
     }
 
     /**
@@ -258,7 +258,7 @@ class PlaidAccount extends Model
      */
     public function getDaysUntilPaymentDue(): ?int
     {
-        if (!$this->next_payment_due_date) {
+        if (! $this->next_payment_due_date) {
             return null;
         }
 
@@ -288,7 +288,7 @@ class PlaidAccount extends Model
                 $current = Carbon::parse($statements[$i]->statement_issue_date);
                 $previous = Carbon::parse($statements[$i + 1]->statement_issue_date);
                 $daysBetween = (int) $previous->diffInDays($current);
-                
+
                 // Only count reasonable intervals (20-40 days)
                 if ($daysBetween >= 20 && $daysBetween <= 40) {
                     $totalDays += $daysBetween;
@@ -312,7 +312,7 @@ class PlaidAccount extends Model
      */
     public function getDaysSinceStatement(): ?int
     {
-        if (!$this->last_statement_issue_date) {
+        if (! $this->last_statement_issue_date) {
             return null;
         }
 
@@ -327,7 +327,7 @@ class PlaidAccount extends Model
     public function getDaysRemainingInCycle(): ?int
     {
         $daysSince = $this->getDaysSinceStatement();
-        
+
         if ($daysSince === null) {
             return null;
         }
@@ -341,16 +341,15 @@ class PlaidAccount extends Model
 
     /**
      * Get the estimated next statement close date.
-     *
-     * @return Carbon|null
      */
     public function getEstimatedNextStatementDate(): ?Carbon
     {
-        if (!$this->last_statement_issue_date) {
+        if (! $this->last_statement_issue_date) {
             return null;
         }
 
         $cycleLength = $this->getStatementCycleLength();
+
         return Carbon::parse($this->last_statement_issue_date)->addDays($cycleLength);
     }
-} 
+}

@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Budget;
 use App\Models\Transfer;
 use App\Services\TransferService;
-use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,6 +22,7 @@ class TransferController extends Controller
             if ($budget) {
                 $this->authorize('view', $budget);
             }
+
             return $next($request);
         });
     }

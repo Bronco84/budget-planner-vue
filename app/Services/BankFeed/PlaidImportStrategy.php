@@ -23,7 +23,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
     {
         try {
             // For Plaid, credentials contain public_token from Link
-            if (!isset($credentials['public_token'])) {
+            if (! isset($credentials['public_token'])) {
                 return [
                     'success' => false,
                     'error' => 'Missing public_token in credentials',
@@ -32,8 +32,8 @@ class PlaidImportStrategy implements BankFeedImportInterface
 
             // Exchange public token for access token
             $exchangeResult = $this->plaidService->exchangePublicToken($credentials['public_token']);
-            
-            if (!$exchangeResult['success']) {
+
+            if (! $exchangeResult['success']) {
                 return [
                     'success' => false,
                     'error' => $exchangeResult['error'] ?? 'Failed to exchange public token',
@@ -50,12 +50,12 @@ class PlaidImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             Log::error('Plaid connection failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
-                'error' => 'Failed to connect to Plaid: ' . $e->getMessage(),
+                'error' => 'Failed to connect to Plaid: '.$e->getMessage(),
             ];
         }
     }
@@ -67,8 +67,8 @@ class PlaidImportStrategy implements BankFeedImportInterface
     {
         try {
             $config = $bankFeed->connection_config;
-            
-            if (!isset($config['access_token'])) {
+
+            if (! isset($config['access_token'])) {
                 return [
                     'success' => false,
                     'error' => 'Missing access token in configuration',
@@ -77,7 +77,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
 
             // Test by fetching accounts
             $accounts = $this->plaidService->getAccounts($config['access_token']);
-            
+
             return [
                 'success' => true,
                 'message' => 'Connection test successful',
@@ -86,7 +86,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => 'Connection test failed: ' . $e->getMessage(),
+                'error' => 'Connection test failed: '.$e->getMessage(),
             ];
         }
     }
@@ -98,8 +98,8 @@ class PlaidImportStrategy implements BankFeedImportInterface
     {
         try {
             $config = $bankFeed->connection_config;
-            
-            if (!isset($config['access_token'])) {
+
+            if (! isset($config['access_token'])) {
                 throw new \Exception('Missing access token in bank feed configuration');
             }
 
@@ -126,7 +126,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
                 'bank_feed_id' => $bankFeed->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             throw $e;
         }
     }
@@ -138,17 +138,17 @@ class PlaidImportStrategy implements BankFeedImportInterface
     {
         try {
             $config = $bankFeed->connection_config;
-            
-            if (!isset($config['access_token'])) {
+
+            if (! isset($config['access_token'])) {
                 throw new \Exception('Missing access token in bank feed configuration');
             }
 
             $accounts = $this->plaidService->getAccounts($config['access_token']);
-            
+
             // Find the specific account
             $account = collect($accounts)->firstWhere('account_id', $bankFeed->source_account_id);
-            
-            if (!$account) {
+
+            if (! $account) {
                 throw new \Exception('Account not found in Plaid response');
             }
 
@@ -165,7 +165,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
                 'bank_feed_id' => $bankFeed->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             throw $e;
         }
     }
@@ -184,7 +184,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
                 'bank_feed_id' => $bankFeed->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             return false;
         }
     }
@@ -218,7 +218,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
      */
     public function validateCredentials(array $credentials): array
     {
-        if (!isset($credentials['public_token'])) {
+        if (! isset($credentials['public_token'])) {
             return [
                 'success' => false,
                 'errors' => ['public_token' => 'Public token is required'],

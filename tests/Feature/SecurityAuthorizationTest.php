@@ -1,23 +1,23 @@
 <?php
 
-use App\Models\User;
-use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Budget;
 use App\Models\Transaction;
+use App\Models\User;
 
 beforeEach(function () {
     // Create two users
     $this->user1 = User::factory()->create();
     $this->user2 = User::factory()->create();
-    
+
     // Create budgets for each user
     $this->budget1 = Budget::factory()->create(['user_id' => $this->user1->id]);
     $this->budget2 = Budget::factory()->create(['user_id' => $this->user2->id]);
-    
+
     // Create accounts for each budget
     $this->account1 = Account::factory()->create(['budget_id' => $this->budget1->id]);
     $this->account2 = Account::factory()->create(['budget_id' => $this->budget2->id]);
-    
+
     // Create transactions for each budget
     $this->transaction1 = Transaction::factory()->create([
         'budget_id' => $this->budget1->id,
@@ -66,7 +66,7 @@ test('user cannot delete another users account', function () {
     $this->actingAs($this->user1)
         ->delete(route('budgets.accounts.destroy', [$this->budget2, $this->account2]))
         ->assertForbidden();
-    
+
     // Verify account still exists
     expect(Account::find($this->account2->id))->not->toBeNull();
 });
@@ -99,7 +99,7 @@ test('user cannot delete another users transaction', function () {
     $this->actingAs($this->user1)
         ->delete(route('budget.transaction.destroy', [$this->budget2, $this->transaction2]))
         ->assertForbidden();
-    
+
     // Verify transaction still exists
     expect(Transaction::find($this->transaction2->id))->not->toBeNull();
 });
@@ -132,4 +132,3 @@ test('unauthenticated user cannot access transactions', function () {
     $this->get(route('budget.transaction.index', $this->budget1))
         ->assertRedirect(route('login'));
 });
-

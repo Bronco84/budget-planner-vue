@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
 {
@@ -52,7 +51,6 @@ class Category extends Model
         return $this->belongsTo(Budget::class);
     }
 
-
     /**
      * Scope a query to order categories by their order field.
      */
@@ -73,8 +71,6 @@ class Category extends Model
 
     /**
      * Get the percentage used of the category budget.
-     *
-     * @return float
      */
     public function getPercentUsedAttribute(): float
     {
@@ -85,15 +81,15 @@ class Category extends Model
                 ->where('amount_in_cents', '<', 0)
                 ->sum('amount_in_cents');
             $spentDollars = abs($spent) / 100; // Convert cents to dollars
+
             return ($spentDollars / $this->amount) * 100;
         }
+
         return 0;
     }
 
     /**
      * Get the remaining amount for the category.
-     *
-     * @return float
      */
     public function getRemainingAmountAttribute(): float
     {
@@ -103,6 +99,7 @@ class Category extends Model
             ->where('amount_in_cents', '<', 0)
             ->sum('amount_in_cents');
         $spentDollars = abs($spent) / 100; // Convert cents to dollars
+
         return $this->amount - $spentDollars;
     }
 }

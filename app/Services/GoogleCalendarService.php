@@ -16,7 +16,7 @@ class GoogleCalendarService
 
     public function __construct()
     {
-        $this->client = new GoogleClient();
+        $this->client = new GoogleClient;
         $this->client->setClientId(config('services.google.calendar.client_id'));
         $this->client->setClientSecret(config('services.google.calendar.client_secret'));
         $this->client->setRedirectUri(config('services.google.calendar.redirect_uri'));
@@ -31,6 +31,7 @@ class GoogleCalendarService
     public function getAuthorizationUrl(User $user): string
     {
         $this->client->setState(json_encode(['user_id' => $user->id]));
+
         return $this->client->createAuthUrl();
     }
 
@@ -42,7 +43,7 @@ class GoogleCalendarService
         $token = $this->client->fetchAccessTokenWithAuthCode($code);
 
         if (isset($token['error'])) {
-            throw new \Exception('Error fetching access token: ' . $token['error']);
+            throw new \Exception('Error fetching access token: '.$token['error']);
         }
 
         $this->client->setAccessToken($token);
@@ -62,8 +63,8 @@ class GoogleCalendarService
                 'calendar_name' => $calendarInfo->getSummary(),
                 'access_token' => $token['access_token'],
                 'refresh_token' => $token['refresh_token'] ?? null,
-                'token_expires_at' => isset($token['expires_in']) 
-                    ? now()->addSeconds($token['expires_in']) 
+                'token_expires_at' => isset($token['expires_in'])
+                    ? now()->addSeconds($token['expires_in'])
                     : null,
                 'is_active' => true,
             ]
@@ -80,11 +81,11 @@ class GoogleCalendarService
      */
     public function refreshTokenIfNeeded(CalendarConnection $connection): void
     {
-        if (!$connection->isTokenExpired()) {
+        if (! $connection->isTokenExpired()) {
             return;
         }
 
-        if (!$connection->refresh_token) {
+        if (! $connection->refresh_token) {
             throw new \Exception('No refresh token available');
         }
 
@@ -97,13 +98,13 @@ class GoogleCalendarService
             $token = $this->client->fetchAccessTokenWithRefreshToken($connection->refresh_token);
 
             if (isset($token['error'])) {
-                throw new \Exception('Error refreshing token: ' . $token['error']);
+                throw new \Exception('Error refreshing token: '.$token['error']);
             }
 
             $connection->update([
                 'access_token' => $token['access_token'],
-                'token_expires_at' => isset($token['expires_in']) 
-                    ? now()->addSeconds($token['expires_in']) 
+                'token_expires_at' => isset($token['expires_in'])
+                    ? now()->addSeconds($token['expires_in'])
                     : null,
             ]);
         }
@@ -165,7 +166,7 @@ class GoogleCalendarService
         $end = $googleEvent->getEnd();
 
         // Handle all-day events
-        $allDay = !empty($start->date);
+        $allDay = ! empty($start->date);
         $startDate = $allDay ? Carbon::parse($start->date) : Carbon::parse($start->dateTime);
         $endDate = $allDay && $end->date ? Carbon::parse($end->date) : ($end->dateTime ? Carbon::parse($end->dateTime) : null);
 
@@ -250,4 +251,3 @@ class GoogleCalendarService
         return $calendars;
     }
 }
-

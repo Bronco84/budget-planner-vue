@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\CalendarConnection;
 use App\Services\GoogleCalendarService;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -46,6 +46,7 @@ class CalendarConnectionController extends Controller
     public function connect(): RedirectResponse
     {
         $authUrl = $this->googleCalendarService->getAuthorizationUrl(auth()->user());
+
         return redirect()->away($authUrl);
     }
 
@@ -69,7 +70,7 @@ class CalendarConnectionController extends Controller
                 ->with('success', "Successfully connected to {$connection->calendar_name}!");
         } catch (\Exception $e) {
             return redirect()->route('calendar.connections.index')
-                ->with('error', 'Failed to connect calendar: ' . $e->getMessage());
+                ->with('error', 'Failed to connect calendar: '.$e->getMessage());
         }
     }
 
@@ -87,7 +88,7 @@ class CalendarConnectionController extends Controller
                 ->with('success', "Synced {$count} events from {$connection->calendar_name}");
         } catch (\Exception $e) {
             return redirect()->back()
-                ->with('error', 'Sync failed: ' . $e->getMessage());
+                ->with('error', 'Sync failed: '.$e->getMessage());
         }
     }
 
@@ -98,9 +99,10 @@ class CalendarConnectionController extends Controller
     {
         $this->authorize('update', $connection);
 
-        $connection->update(['is_active' => !$connection->is_active]);
+        $connection->update(['is_active' => ! $connection->is_active]);
 
         $status = $connection->is_active ? 'enabled' : 'disabled';
+
         return redirect()->back()
             ->with('success', "Calendar connection {$status}");
     }

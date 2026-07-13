@@ -2,18 +2,19 @@
 
 namespace App\Models;
 
+use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
 use Laragear\WebAuthn\WebAuthnAuthentication;
 
 class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, WebAuthnAuthentication;
 
     /**
@@ -37,7 +38,7 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
         'loan',
         'line of credit',
         'mortgage',
-        'other'
+        'other',
     ];
 
     /**
@@ -220,6 +221,7 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
             // Only set if budget exists and user has access
             if ($budget && $this->hasBudget($budget)) {
                 UserPreference::setActiveBudgetId($this->id, $budgetId);
+
                 return;
             }
         }

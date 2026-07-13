@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChatConversation;
 use App\Services\ChatService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ChatController extends Controller
 {
@@ -27,7 +28,7 @@ class ChatController extends Controller
             budgetId: $validated['budget_id'] ?? null
         );
 
-        if (!$response['success']) {
+        if (! $response['success']) {
             return response()->json($response, 500);
         }
 
@@ -80,7 +81,7 @@ class ChatController extends Controller
 
     public function show(Request $request, int $id): JsonResponse
     {
-        $conversation = \App\Models\ChatConversation::where('user_id', $request->user()->id)
+        $conversation = ChatConversation::where('user_id', $request->user()->id)
             ->with('messages')
             ->findOrFail($id);
 

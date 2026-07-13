@@ -2,13 +2,17 @@
 
 namespace App\Nova;
 
-use Illuminate\Http\Request;
+use Laravel\Nova\Actions\Action;
+use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Date;
+use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Number;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Filters\Filter;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use Laravel\Nova\Lenses\Lens;
 
 class PlaidHolding extends Resource
 {
@@ -26,7 +30,7 @@ class PlaidHolding extends Resource
      */
     public function title()
     {
-        return $this->security?->ticker_symbol ?? $this->security?->name ?? 'Holding #' . $this->id;
+        return $this->security?->ticker_symbol ?? $this->security?->name ?? 'Holding #'.$this->id;
     }
 
     /**
@@ -57,7 +61,7 @@ class PlaidHolding extends Resource
     /**
      * Get the fields displayed by the resource.
      *
-     * @return array<int, \Laravel\Nova\Fields\Field>
+     * @return array<int, Field>
      */
     public function fields(NovaRequest $request): array
     {
@@ -77,27 +81,31 @@ class PlaidHolding extends Resource
 
             Number::make('Cost Basis', 'cost_basis_cents')
                 ->sortable()
-                ->displayUsing(fn ($value) => $value ? '$' . number_format($value / 100, 2) : '-'),
+                ->displayUsing(fn ($value) => $value ? '$'.number_format($value / 100, 2) : '-'),
 
             Number::make('Current Price', 'institution_price_cents')
                 ->sortable()
-                ->displayUsing(fn ($value) => $value ? '$' . number_format($value / 100, 2) : '-'),
+                ->displayUsing(fn ($value) => $value ? '$'.number_format($value / 100, 2) : '-'),
 
             Number::make('Market Value', 'institution_value_cents')
                 ->sortable()
-                ->displayUsing(fn ($value) => $value ? '$' . number_format($value / 100, 2) : '-'),
+                ->displayUsing(fn ($value) => $value ? '$'.number_format($value / 100, 2) : '-'),
 
             // Computed gain/loss field
             Number::make('Gain/Loss', function () {
                 if ($this->institution_value_cents === null || $this->cost_basis_cents === null) {
                     return null;
                 }
+
                 return $this->institution_value_cents - $this->cost_basis_cents;
             })
                 ->sortable()
                 ->displayUsing(function ($value) {
-                    if ($value === null) return '-';
-                    $formatted = '$' . number_format(abs($value) / 100, 2);
+                    if ($value === null) {
+                        return '-';
+                    }
+                    $formatted = '$'.number_format(abs($value) / 100, 2);
+
                     return $value >= 0 ? "+{$formatted}" : "-{$formatted}";
                 }),
 
@@ -116,7 +124,7 @@ class PlaidHolding extends Resource
     /**
      * Get the cards available for the resource.
      *
-     * @return array<int, \Laravel\Nova\Card>
+     * @return array<int, Card>
      */
     public function cards(NovaRequest $request): array
     {
@@ -126,7 +134,7 @@ class PlaidHolding extends Resource
     /**
      * Get the filters available for the resource.
      *
-     * @return array<int, \Laravel\Nova\Filters\Filter>
+     * @return array<int, Filter>
      */
     public function filters(NovaRequest $request): array
     {
@@ -136,7 +144,7 @@ class PlaidHolding extends Resource
     /**
      * Get the lenses available for the resource.
      *
-     * @return array<int, \Laravel\Nova\Lenses\Lens>
+     * @return array<int, Lens>
      */
     public function lenses(NovaRequest $request): array
     {
@@ -146,7 +154,7 @@ class PlaidHolding extends Resource
     /**
      * Get the actions available for the resource.
      *
-     * @return array<int, \Laravel\Nova\Actions\Action>
+     * @return array<int, Action>
      */
     public function actions(NovaRequest $request): array
     {

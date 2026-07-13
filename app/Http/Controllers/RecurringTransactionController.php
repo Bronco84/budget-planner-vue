@@ -10,6 +10,7 @@ use App\Services\RecurringTransactionService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -65,7 +66,7 @@ class RecurringTransactionController extends Controller
 
         // If creating from an existing transaction, fetch its data
         if ($request->has('from_transaction')) {
-            $sourceTransaction = \App\Models\Transaction::where('id', $request->input('from_transaction'))
+            $sourceTransaction = Transaction::where('id', $request->input('from_transaction'))
                 ->where('budget_id', $budget->id)
                 ->first();
         }
@@ -83,6 +84,7 @@ class RecurringTransactionController extends Controller
 
     /**
      * Store a newly created recurring transaction in storage.
+     *
      * @throws AuthorizationException
      */
     public function store(Request $request, Budget $budget): RedirectResponse
@@ -95,7 +97,7 @@ class RecurringTransactionController extends Controller
             \Log::error('Authorization failed for recurring transaction store:', [
                 'user_id' => auth()->id(),
                 'budget_id' => $budget->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
@@ -104,7 +106,7 @@ class RecurringTransactionController extends Controller
             'request_keys' => array_keys($request->all()),
             'has_account_id' => $request->has('account_id'),
             'account_id_value' => $request->get('account_id'),
-            'budget_id' => $budget->id
+            'budget_id' => $budget->id,
         ]);
 
         $validated = $request->validate([
@@ -136,15 +138,15 @@ class RecurringTransactionController extends Controller
         // Additional validation for bimonthly frequency
         if ($validated['frequency'] === 'bimonthly') {
             // Check if both fields are present and equal
-            if (isset($validated['first_day_of_month']) && isset($validated['day_of_month']) 
+            if (isset($validated['first_day_of_month']) && isset($validated['day_of_month'])
                 && $validated['first_day_of_month'] === $validated['day_of_month']) {
                 return back()->withErrors([
                     'first_day_of_month' => 'The first day of month must be different from the day of month for bimonthly frequency.',
                 ]);
             }
-            
+
             // Ensure first_day_of_month is present for bimonthly
-            if (!isset($validated['first_day_of_month'])) {
+            if (! isset($validated['first_day_of_month'])) {
                 return back()->withErrors([
                     'first_day_of_month' => 'The first day of month is required for bimonthly frequency.',
                 ]);
@@ -160,27 +162,27 @@ class RecurringTransactionController extends Controller
         // Extract rules from validated data
         $rules = $validated['rules'] ?? [];
         unset($validated['rules']);
-        
+
         // Extract source transaction ID if provided (for linking after creation)
         $fromTransactionId = $validated['from_transaction_id'] ?? null;
         unset($validated['from_transaction_id']);
-        
+
         // Ensure budget_id is set
         $validated['budget_id'] = $budget->id;
 
         // Create the recurring transaction
         try {
             $recurringTransaction = $budget->recurringTransactionTemplates()->create($validated);
-            
+
             \Log::debug('RecurringTransaction created:', [
                 'id' => $recurringTransaction->id,
-                'validated_data' => $validated
+                'validated_data' => $validated,
             ]);
         } catch (\Exception $e) {
             \Log::error('Failed to create recurring transaction:', [
                 'validated_data' => $validated,
                 'error' => $e->getMessage(),
-                'stack_trace' => $e->getTraceAsString()
+                'stack_trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }
@@ -191,11 +193,11 @@ class RecurringTransactionController extends Controller
                 ->where('budget_id', $budget->id)
                 ->whereNull('recurring_transaction_template_id')
                 ->first();
-            
+
             if ($sourceTransaction) {
                 $sourceTransaction->recurring_transaction_template_id = $recurringTransaction->id;
                 $sourceTransaction->save();
-                
+
                 \Log::debug('Linked source transaction to new recurring template:', [
                     'transaction_id' => $sourceTransaction->id,
                     'template_id' => $recurringTransaction->id,
@@ -204,21 +206,21 @@ class RecurringTransactionController extends Controller
         }
 
         // Create rules if provided (rules can be used for both dynamic and fixed amount templates)
-        if (!empty($rules)) {
+        if (! empty($rules)) {
             foreach ($rules as $index => $ruleData) {
                 // Add priority based on the order of rules
                 $ruleData['priority'] = $index + 1;
                 $recurringTransaction->rules()->create($ruleData);
             }
-            
+
             // Link existing transactions that match the rules
             $recurringService = app(RecurringTransactionService::class);
             $linkedCount = $recurringService->linkMatchingTransactionsByRules($recurringTransaction);
-            
+
             \Log::debug('Linked matching transactions by rules:', [
                 'template_id' => $recurringTransaction->id,
                 'linked_count' => $linkedCount,
-                'is_dynamic_amount' => $validated['is_dynamic_amount']
+                'is_dynamic_amount' => $validated['is_dynamic_amount'],
             ]);
         }
 
@@ -251,8 +253,8 @@ class RecurringTransactionController extends Controller
             'recurringTransaction' => $recurring_transaction->load(['account', 'linkedCreditCard']),
             'rules' => $rules,
             'linkedTransactions' => $linkedTransactions,
-            'fieldOptions' => \App\Models\RecurringTransactionRule::getFieldOptions(),
-            'operatorOptions' => \App\Models\RecurringTransactionRule::getOperatorOptions(),
+            'fieldOptions' => RecurringTransactionRule::getFieldOptions(),
+            'operatorOptions' => RecurringTransactionRule::getOperatorOptions(),
             'eligibleCreditCards' => $eligibleCreditCards,
         ]);
     }
@@ -299,15 +301,15 @@ class RecurringTransactionController extends Controller
         // Additional validation for bimonthly frequency
         if ($validated['frequency'] === 'bimonthly') {
             // Check if both fields are present and equal
-            if (isset($validated['first_day_of_month']) && isset($validated['day_of_month']) 
+            if (isset($validated['first_day_of_month']) && isset($validated['day_of_month'])
                 && $validated['first_day_of_month'] === $validated['day_of_month']) {
                 return back()->withErrors([
                     'first_day_of_month' => 'The first day of month must be different from the day of month for bimonthly frequency.',
                 ]);
             }
-            
+
             // Ensure first_day_of_month is present for bimonthly
-            if (!isset($validated['first_day_of_month'])) {
+            if (! isset($validated['first_day_of_month'])) {
                 return back()->withErrors([
                     'first_day_of_month' => 'The first day of month is required for bimonthly frequency.',
                 ]);
@@ -387,7 +389,7 @@ class RecurringTransactionController extends Controller
 
         // Delete rules that weren't in the update (removed by user)
         $toDelete = array_diff($existingRuleIds, $updatedRuleIds);
-        if (!empty($toDelete)) {
+        if (! empty($toDelete)) {
             $recurring_transaction->rules()->whereIn('id', $toDelete)->delete();
             Log::debug('Deleted rules:', ['deleted_rule_ids' => $toDelete]);
         }
@@ -425,7 +427,7 @@ class RecurringTransactionController extends Controller
 
         // Create a copy of the recurring transaction
         $duplicated = $recurring_transaction->replicate();
-        $duplicated->description = 'Copy of ' . $recurring_transaction->description;
+        $duplicated->description = 'Copy of '.$recurring_transaction->description;
 
         // Ensure is_dynamic_amount is properly copied
         $duplicated->is_dynamic_amount = $recurring_transaction->is_dynamic_amount;
@@ -436,53 +438,48 @@ class RecurringTransactionController extends Controller
             ->with('message', 'Recurring transaction duplicated successfully');
     }
 
-    /**
-     * @param array $validated
-     * @return array
-     */
     public function getArr(array $validated): array
     {
         Log::debug('getArr - Input:', ['validated' => $validated]);
-        
+
         // Handle amount conversion - set to 0 for dynamic amount transactions
         if (isset($validated['amount']) && $validated['amount'] !== null) {
-            $validated['amount_in_cents'] = (int)($validated['amount'] * 100);
+            $validated['amount_in_cents'] = (int) ($validated['amount'] * 100);
             Log::debug('getArr - Converted amount:', [
                 'original' => $validated['amount'],
-                'converted' => $validated['amount_in_cents']
+                'converted' => $validated['amount_in_cents'],
             ]);
         } else {
             $validated['amount_in_cents'] = 0; // Default for dynamic amount transactions
             Log::debug('getArr - No amount provided, setting to 0');
         }
-        
+
         // Determine if this is an expense (negative) or income (positive)
         $isExpense = ($validated['amount_in_cents'] ?? 0) < 0;
-        
+
         unset($validated['amount']);
 
         // Convert dynamic amount values to cents if provided
         // Ensure min/max have the same sign as the main amount
         if (isset($validated['min_amount']) && $validated['min_amount'] !== null) {
-            $minCents = (int)(abs($validated['min_amount']) * 100);
+            $minCents = (int) (abs($validated['min_amount']) * 100);
             $validated['min_amount'] = $isExpense ? -$minCents : $minCents;
         }
 
         if (isset($validated['max_amount']) && $validated['max_amount'] !== null) {
-            $maxCents = (int)(abs($validated['max_amount']) * 100);
+            $maxCents = (int) (abs($validated['max_amount']) * 100);
             $validated['max_amount'] = $isExpense ? -$maxCents : $maxCents;
         }
-        
+
         Log::debug('getArr - Output:', ['validated' => $validated]);
-        
+
         return $validated;
     }
 
     /**
      * Get credit cards in the budget that have active autopay configured.
      *
-     * @param Budget $budget
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     protected function getAutopayEligibleCreditCards(Budget $budget)
     {
@@ -506,7 +503,7 @@ class RecurringTransactionController extends Controller
             })
             ->values();
     }
-    
+
     /**
      * Get matching diagnostics for a recurring transaction template.
      * Useful for debugging and understanding how transactions are matched.
@@ -514,9 +511,9 @@ class RecurringTransactionController extends Controller
     public function diagnostics(Budget $budget, RecurringTransactionTemplate $recurring_transaction)
     {
         $this->authorize('view', $budget);
-        
+
         $diagnostics = $this->recurringTransactionService->getMatchingDiagnostics($recurring_transaction);
-        
+
         return response()->json($diagnostics);
     }
 
@@ -527,10 +524,10 @@ class RecurringTransactionController extends Controller
     public function testMatching(Budget $budget, RecurringTransactionTemplate $recurring_transaction)
     {
         $this->authorize('view', $budget);
-        
+
         $account = $recurring_transaction->account;
         $rules = $recurring_transaction->rules()->where('is_active', true)->get();
-        
+
         // Get recent unlinked transactions (last 90 days)
         $recentTransactions = Transaction::where('account_id', $account->id)
             ->whereNull('recurring_transaction_template_id')
@@ -538,63 +535,63 @@ class RecurringTransactionController extends Controller
             ->orderBy('date', 'desc')
             ->with('plaidTransaction')
             ->get();
-        
+
         $matches = [];
-        
+
         foreach ($recentTransactions as $transaction) {
             $matchMethod = null;
             $matchDetails = null;
-            
+
             // Test entity ID matching
             if ($recurring_transaction->plaid_entity_id && $transaction->plaidTransaction) {
                 $counterparties = $transaction->plaidTransaction->counterparties ?? '';
                 if (is_string($counterparties) && str_contains($counterparties, $recurring_transaction->plaid_entity_id)) {
                     $matchMethod = 'entity_id';
-                    $matchDetails = 'Matched by Plaid entity ID: ' . $recurring_transaction->plaid_entity_name;
+                    $matchDetails = 'Matched by Plaid entity ID: '.$recurring_transaction->plaid_entity_name;
                 }
             }
-            
+
             // Test rules matching (only if no entity match)
-            if (!$matchMethod && $rules->isNotEmpty()) {
+            if (! $matchMethod && $rules->isNotEmpty()) {
                 $matchesAllRules = true;
-                
+
                 foreach ($rules as $rule) {
-                    if (!$rule->matchesTransaction($transaction)) {
+                    if (! $rule->matchesTransaction($transaction)) {
                         $matchesAllRules = false;
                         break;
                     }
                 }
-                
+
                 if ($matchesAllRules) {
                     $matchMethod = 'rules';
-                    $matchDetails = 'Matched all ' . $rules->count() . ' active rules';
+                    $matchDetails = 'Matched all '.$rules->count().' active rules';
                 }
             }
-            
+
             // Test description matching (only if no entity or rules match)
-            if (!$matchMethod && $recurring_transaction->description) {
+            if (! $matchMethod && $recurring_transaction->description) {
                 // Use the improved matching algorithm
                 // Use Plaid transaction's original description if available, otherwise use transaction description
                 $templateDesc = strtolower(trim($recurring_transaction->description));
                 $transactionDesc = $transaction->plaidTransaction && $transaction->plaidTransaction->name
                     ? strtolower(trim($transaction->plaidTransaction->name))
                     : strtolower(trim($transaction->description));
-                
+
                 if ($transactionDesc === $templateDesc) {
                     $matchMethod = 'description_exact';
                     $matchDetails = 'Exact description match';
                 } elseif (strlen($templateDesc) >= 5 && str_contains($transactionDesc, $templateDesc)) {
                     $matchMethod = 'description_contains';
-                    $matchDetails = 'Description contains "' . $recurring_transaction->description . '"';
+                    $matchDetails = 'Description contains "'.$recurring_transaction->description.'"';
                 } else {
                     similar_text($templateDesc, $transactionDesc, $percent);
                     if ($percent >= 70) {
                         $matchMethod = 'description_fuzzy';
-                        $matchDetails = 'Fuzzy match (' . round($percent) . '% similarity)';
+                        $matchDetails = 'Fuzzy match ('.round($percent).'% similarity)';
                     }
                 }
             }
-            
+
             if ($matchMethod) {
                 $plaidName = $transaction->plaidTransaction ? $transaction->plaidTransaction->name : null;
                 $matches[] = [
@@ -611,7 +608,7 @@ class RecurringTransactionController extends Controller
                 ];
             }
         }
-        
+
         return response()->json([
             'total_tested' => $recentTransactions->count(),
             'matches_found' => count($matches),
@@ -619,7 +616,7 @@ class RecurringTransactionController extends Controller
             'template' => [
                 'description' => $recurring_transaction->description,
                 'category' => $recurring_transaction->category,
-                'has_entity_id' => !empty($recurring_transaction->plaid_entity_id),
+                'has_entity_id' => ! empty($recurring_transaction->plaid_entity_id),
                 'entity_name' => $recurring_transaction->plaid_entity_name,
                 'active_rules_count' => $rules->count(),
             ],
@@ -632,9 +629,9 @@ class RecurringTransactionController extends Controller
     public function findMatchingTransactions(Budget $budget): Response
     {
         $this->authorize('view', $budget);
-        
+
         $matchingData = $this->recurringTransactionService->findMatchingTransactionsForTemplates($budget);
-        
+
         return Inertia::render('RecurringTransactions/FindMatchingTransactions', [
             'budget' => $budget,
             'templatesWithMatches' => $matchingData['templates_with_matches'],
@@ -649,28 +646,28 @@ class RecurringTransactionController extends Controller
     public function linkSelectedTransactions(Request $request, Budget $budget): RedirectResponse
     {
         $this->authorize('update', $budget);
-        
+
         $validated = $request->validate([
             'selections' => 'required|array',
             'selections.*.template_id' => 'required|integer|exists:recurring_transaction_templates,id',
             'selections.*.transaction_ids' => 'required|array',
             'selections.*.transaction_ids.*' => 'integer|exists:transactions,id',
         ]);
-        
+
         $result = $this->recurringTransactionService->linkSelectedTransactions($validated['selections']);
-        
+
         if ($result['linked_count'] > 0) {
             $message = sprintf(
                 'Successfully linked %d transaction%s to recurring templates.',
                 $result['linked_count'],
                 $result['linked_count'] === 1 ? '' : 's'
             );
-            
+
             return redirect()
                 ->route('recurring-transactions.index', $budget->id)
                 ->with('success', $message);
         }
-        
+
         return redirect()
             ->route('recurring-transactions.index', $budget->id)
             ->with('info', 'No transactions were linked.');

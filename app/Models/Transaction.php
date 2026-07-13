@@ -4,14 +4,12 @@ namespace App\Models;
 
 use App\Services\BudgetService;
 use App\Services\RecurringTransactionService;
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Query\Builder;
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Transaction extends Model
 {
@@ -186,7 +184,7 @@ class Transaction extends Model
      */
     public function getImportSourceDisplayAttribute(): string
     {
-        return match($this->import_source) {
+        return match ($this->import_source) {
             'plaid' => 'Plaid',
             'airtable' => 'Airtable',
             'csv' => 'CSV Import',
@@ -209,15 +207,15 @@ class Transaction extends Model
      */
     public function getFormattedAmountAttribute(): string
     {
-        return '$' . number_format($this->amount_in_cents / 100, 2);
+        return '$'.number_format($this->amount_in_cents / 100, 2);
     }
 
     public function scopeFromFuture(\Illuminate\Database\Eloquent\Builder $query, ?string $date = null): \Illuminate\Database\Eloquent\Builder
     {
         return $query->when(
             isset($date),
-            fn($query) => $query->where('date', '>=', $date),
-            fn($query) => $query->where('date', '>=', now()->toDate()->format('Y-m-d'))
+            fn ($query) => $query->where('date', '>=', $date),
+            fn ($query) => $query->where('date', '>=', now()->toDate()->format('Y-m-d'))
         );
     }
 
@@ -234,12 +232,12 @@ class Transaction extends Model
                 'category',
                 'account_id',
                 'notes',
-                'is_reconciled'
+                'is_reconciled',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('transaction')
-            ->setDescriptionForEvent(fn(string $eventName) => match($eventName) {
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
                 'created' => 'Transaction created',
                 'updated' => 'Transaction updated',
                 'deleted' => 'Transaction deleted',

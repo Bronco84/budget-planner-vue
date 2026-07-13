@@ -28,7 +28,7 @@ class BackfillInstitutionUrls extends Command
     public function handle(PlaidService $plaidService)
     {
         $dryRun = $this->option('dry-run');
-        
+
         if ($dryRun) {
             $this->info('Running in dry-run mode. No changes will be made.');
         }
@@ -37,12 +37,13 @@ class BackfillInstitutionUrls extends Command
         $connections = PlaidConnection::whereNotNull('institution_id')
             ->where(function ($query) {
                 $query->whereNull('institution_url')
-                      ->orWhere('institution_url', '');
+                    ->orWhere('institution_url', '');
             })
             ->get();
 
         if ($connections->isEmpty()) {
             $this->info('No connections found that need URL backfilling.');
+
             return Command::SUCCESS;
         }
 
@@ -59,14 +60,14 @@ class BackfillInstitutionUrls extends Command
             try {
                 // Fetch institution details from Plaid
                 $institutionDetails = $plaidService->getInstitutionDetails($connection->institution_id);
-                
-                if ($institutionDetails && isset($institutionDetails['url']) && !empty($institutionDetails['url'])) {
-                    if (!$dryRun) {
+
+                if ($institutionDetails && isset($institutionDetails['url']) && ! empty($institutionDetails['url'])) {
+                    if (! $dryRun) {
                         $connection->update([
-                            'institution_url' => $institutionDetails['url']
+                            'institution_url' => $institutionDetails['url'],
                         ]);
                     }
-                    
+
                     $this->newLine();
                     $this->line("✓ Updated {$connection->institution_name}: {$institutionDetails['url']}");
                     $updated++;

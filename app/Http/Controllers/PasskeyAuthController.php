@@ -3,16 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
 use App\Services\DeviceTokenService;
+use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
-use Diglactic\Breadcrumbs\Breadcrumbs;
 
 class PasskeyAuthController extends Controller
 {
@@ -50,8 +48,8 @@ class PasskeyAuthController extends Controller
         $user = Auth::user();
         $hasExistingPasskeys = $user ? $user->webAuthnCredentials()->exists() : false;
         // Check if this is a new user from query param or if they have no passkeys
-        $isNewUser = $request->query('new_user', false) || ($user && !$hasExistingPasskeys);
-        
+        $isNewUser = $request->query('new_user', false) || ($user && ! $hasExistingPasskeys);
+
         return Inertia::render('Auth/PasskeyRegister', [
             'hasExistingPasskeys' => $hasExistingPasskeys,
             'isNewUser' => $isNewUser,
@@ -67,7 +65,7 @@ class PasskeyAuthController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:' . User::class,
+            'email' => 'required|string|email|max:255|unique:'.User::class,
         ]);
 
         // Restrict registration to specific email only
@@ -94,7 +92,7 @@ class PasskeyAuthController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         $user = Auth::user();
-        
+
         // Revoke the current device token if it exists
         if ($user) {
             $token = $request->cookie($this->deviceTokenService->getCookieName());

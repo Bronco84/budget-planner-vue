@@ -15,6 +15,7 @@ class FirstUserSeeder extends Seeder
         // Check if user already exists
         if (User::where('email', 'admin@budget-planner.test')->exists()) {
             $this->command->info('User already exists!');
+
             return;
         }
 

@@ -27,13 +27,13 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
 
         // Get account projections
         $accountProjections = $this->buildAccountProjections($budget, $startDate, $endDate);
-        
+
         // Get upcoming transactions
         $upcomingTransactions = $this->buildUpcomingTransactions($budget, $startDate, $endDate);
-        
+
         // Get autopay projections
         $autopayProjections = $this->buildAutopayProjections($budget, $startDate, $endDate);
-        
+
         // Calculate monthly cash flow
         $monthlyCashFlow = $this->calculateMonthlyCashFlow($budget);
 
@@ -59,7 +59,7 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
 
         foreach ($budget->accounts as $account) {
             $currentBalance = $account->current_balance_cents / 100;
-            
+
             // Get projected transactions for this account
             $accountTransactions = $this->recurringService->projectTransactions(
                 $account,
@@ -70,30 +70,31 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
             // Calculate monthly projected balances
             $monthlyBalances = [];
             $runningBalance = $currentBalance;
-            
+
             $currentMonth = $startDate->copy()->startOfMonth();
             while ($currentMonth <= $endDate) {
                 $monthEnd = $currentMonth->copy()->endOfMonth();
-                
+
                 // Sum transactions for this month
                 $monthTransactions = $accountTransactions->filter(function ($t) use ($currentMonth, $monthEnd) {
                     $date = Carbon::parse($t->date ?? $t['date'] ?? now());
+
                     return $date >= $currentMonth && $date <= $monthEnd;
                 });
-                
+
                 $monthNet = $monthTransactions->sum(function ($t) {
                     return ($t->amount_in_cents ?? $t['amount_in_cents'] ?? 0) / 100;
                 });
-                
+
                 $runningBalance += $monthNet;
-                
+
                 $monthlyBalances[] = [
                     'month' => $currentMonth->format('F Y'),
                     'date' => $currentMonth->format('Y-m-01'),
                     'projected_balance' => round($runningBalance, 2),
                     'change' => round($monthNet, 2),
                 ];
-                
+
                 $currentMonth->addMonth();
             }
 
@@ -137,8 +138,8 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
         }
 
         // Sort by date and limit
-        usort($transactions, fn($a, $b) => strcmp($a['date'], $b['date']));
-        
+        usort($transactions, fn ($a, $b) => strcmp($a['date'], $b['date']));
+
         return array_slice($transactions, 0, $limit);
     }
 
@@ -180,7 +181,7 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
             try {
                 $cashFlow = $this->budgetService->calculateMonthlyProjectedCashFlow($account);
                 $totalCashFlow += $cashFlow;
-                
+
                 if ($cashFlow != 0) {
                     $accountBreakdown[] = [
                         'account' => $account->name,

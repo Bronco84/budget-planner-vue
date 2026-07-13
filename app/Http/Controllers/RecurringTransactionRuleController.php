@@ -52,8 +52,8 @@ class RecurringTransactionRuleController extends Controller
         $this->authorize('update', $budget);
 
         $validated = $request->validate([
-            'field' => 'required|string|in:' . implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
-            'operator' => 'required|string|in:' . implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
+            'field' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
+            'operator' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
             'value' => 'required|string|max:255',
             'is_case_sensitive' => 'boolean',
             'priority' => 'integer|min:1',
@@ -65,7 +65,7 @@ class RecurringTransactionRuleController extends Controller
         $validated['is_active'] = $validated['is_active'] ?? true;
 
         // If priority is not set, make it higher than the highest existing priority
-        if (!isset($validated['priority'])) {
+        if (! isset($validated['priority'])) {
             $maxPriority = $recurring_transaction->rules()->max('priority') ?? 0;
             $validated['priority'] = $maxPriority + 1;
         }
@@ -89,8 +89,8 @@ class RecurringTransactionRuleController extends Controller
         }
 
         $validated = $request->validate([
-            'field' => 'required|string|in:' . implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
-            'operator' => 'required|string|in:' . implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
+            'field' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
+            'operator' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
             'value' => 'required|string|max:255',
             'is_case_sensitive' => 'boolean',
             'priority' => 'integer|min:1',
@@ -145,8 +145,8 @@ class RecurringTransactionRuleController extends Controller
         $this->authorize('view', $budget);
 
         $validated = $request->validate([
-            'field' => 'required|string|in:' . implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
-            'operator' => 'required|string|in:' . implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
+            'field' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
+            'operator' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
             'value' => 'required|string|max:255',
             'is_case_sensitive' => 'boolean',
         ]);
@@ -211,7 +211,7 @@ class RecurringTransactionRuleController extends Controller
             // Transaction must match ALL rules (AND logic) to be considered a match
             $matchesAllRules = true;
             $matchedRules = [];
-            
+
             foreach ($rules as $rule) {
                 if ($rule->matchesTransaction($transaction)) {
                     $matchedRules[] = $rule;
@@ -220,7 +220,7 @@ class RecurringTransactionRuleController extends Controller
                     break; // Stop checking if any rule fails
                 }
             }
-            
+
             if ($matchesAllRules) {
                 $matchingTransactions[] = [
                     'transaction' => $transaction,
@@ -268,15 +268,15 @@ class RecurringTransactionRuleController extends Controller
             // Transaction must match ALL rules (AND logic) to be linked
             $matchesAllRules = true;
             foreach ($rules as $rule) {
-                if (!$rule->matchesTransaction($transaction)) {
+                if (! $rule->matchesTransaction($transaction)) {
                     $matchesAllRules = false;
                     break; // Stop checking if any rule fails
                 }
             }
-            
+
             if ($matchesAllRules) {
                 $transaction->update([
-                    'recurring_transaction_template_id' => $recurring_transaction->id
+                    'recurring_transaction_template_id' => $recurring_transaction->id,
                 ]);
                 $matchCount++;
             }
@@ -284,7 +284,7 @@ class RecurringTransactionRuleController extends Controller
 
         $message = $matchCount > 0
             ? "Successfully linked {$matchCount} transactions to this recurring transaction."
-            : "No matching transactions found.";
+            : 'No matching transactions found.';
 
         return redirect()->route('recurring-transactions.rules.index', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
             ->with('message', $message);
@@ -314,7 +314,7 @@ class RecurringTransactionRuleController extends Controller
         }
 
         $transaction->update([
-            'recurring_transaction_template_id' => null
+            'recurring_transaction_template_id' => null,
         ]);
 
         return back()->with('message', 'Transaction unlinked successfully');
@@ -338,4 +338,4 @@ class RecurringTransactionRuleController extends Controller
             'linkedTransactions' => $linkedTransactions,
         ]);
     }
-} 
+}

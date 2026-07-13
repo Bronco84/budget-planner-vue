@@ -5,7 +5,6 @@ namespace App\Services\Chat\ContextBuilders;
 use App\Contracts\ContextBuilderInterface;
 use App\Models\Budget;
 use App\Models\User;
-use Carbon\Carbon;
 
 class StatisticsContextBuilder implements ContextBuilderInterface
 {
@@ -31,7 +30,7 @@ class StatisticsContextBuilder implements ContextBuilderInterface
         $stats = $budget->getMonthlyStatistics();
 
         $byCategory = collect($stats['by_category'] ?? [])
-            ->map(fn($cat) => [
+            ->map(fn ($cat) => [
                 'category' => $cat->category ?? 'Uncategorized',
                 'amount' => ($cat->total ?? 0) / 100,
             ])
@@ -40,7 +39,7 @@ class StatisticsContextBuilder implements ContextBuilderInterface
             ->toArray();
 
         return [
-            'period' => $stats['month_name'] . ' ' . $stats['year'],
+            'period' => $stats['month_name'].' '.$stats['year'],
             'total_income' => ($stats['total_income'] ?? 0) / 100,
             'total_expenses' => abs($stats['total_expenses'] ?? 0) / 100,
             'net' => (($stats['total_income'] ?? 0) + ($stats['total_expenses'] ?? 0)) / 100,

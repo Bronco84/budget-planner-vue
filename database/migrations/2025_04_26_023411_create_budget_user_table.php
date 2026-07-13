@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('access_level')->default('viewer'); // viewer, editor, admin
             $table->timestamps();
-            
+
             $table->unique(['budget_id', 'user_id']);
         });
     }

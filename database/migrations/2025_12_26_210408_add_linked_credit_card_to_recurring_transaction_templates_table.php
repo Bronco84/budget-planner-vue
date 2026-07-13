@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::table('recurring_transaction_templates', function (Blueprint $table) {
             // Link to a credit card account for autopay override
-            if (!Schema::hasColumn('recurring_transaction_templates', 'linked_credit_card_account_id')) {
+            if (! Schema::hasColumn('recurring_transaction_templates', 'linked_credit_card_account_id')) {
                 $table->unsignedBigInteger('linked_credit_card_account_id')->nullable()->after('account_id');
             }
-            
+
             $table->foreign('linked_credit_card_account_id', 'rtt_linked_cc_account_id_fk')
                 ->references('id')
                 ->on('accounts')

@@ -26,7 +26,7 @@ return new class extends Migration
             $table->unsignedBigInteger('pattern_id')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
-            
+
             $table->index('date');
             $table->index('category');
         });

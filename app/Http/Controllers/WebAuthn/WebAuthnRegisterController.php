@@ -27,7 +27,7 @@ class WebAuthnRegisterController
     public function options(AttestationRequest $request): Responsable
     {
         // Ensure user is authenticated
-        if (!Auth::check()) {
+        if (! Auth::check()) {
             abort(401, 'You must be logged in to register a passkey.');
         }
 
@@ -43,7 +43,7 @@ class WebAuthnRegisterController
     {
         try {
             // Ensure user is authenticated
-            if (!Auth::check()) {
+            if (! Auth::check()) {
                 \Log::error('Passkey registration attempted without authentication');
                 abort(401, 'You must be logged in to register a passkey.');
             }
@@ -64,7 +64,7 @@ class WebAuthnRegisterController
 
             // Refresh the user to ensure the relationship is loaded
             $user->refresh();
-            
+
             // Clear any cached relationship data
             $user->unsetRelation('webAuthnCredentials');
 
@@ -92,9 +92,9 @@ class WebAuthnRegisterController
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
-                'message' => 'Failed to register passkey: ' . $e->getMessage(),
+                'message' => 'Failed to register passkey: '.$e->getMessage(),
             ], 500);
         }
     }

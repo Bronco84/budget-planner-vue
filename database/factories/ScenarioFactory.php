@@ -3,11 +3,12 @@
 namespace Database\Factories;
 
 use App\Models\Budget;
+use App\Models\Scenario;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Scenario>
+ * @extends Factory<Scenario>
  */
 class ScenarioFactory extends Factory
 {
@@ -19,7 +20,7 @@ class ScenarioFactory extends Factory
     public function definition(): array
     {
         $colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-        
+
         return [
             'budget_id' => Budget::factory(),
             'user_id' => User::factory(),

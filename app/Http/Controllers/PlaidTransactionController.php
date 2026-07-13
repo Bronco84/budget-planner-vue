@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Budget;
 use App\Models\PlaidTransaction;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Http\JsonResponse;
 
 class PlaidTransactionController extends Controller
 {
@@ -23,6 +23,7 @@ class PlaidTransactionController extends Controller
             if ($budget) {
                 $this->authorize('view', $budget);
             }
+
             return $next($request);
         });
     }
@@ -88,10 +89,10 @@ class PlaidTransactionController extends Controller
 
         if (isset($validated['search'])) {
             $search = $validated['search'];
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('merchant_name', 'like', "%{$search}%")
-                  ->orWhere('category', 'like', "%{$search}%");
+                    ->orWhere('merchant_name', 'like', "%{$search}%")
+                    ->orWhere('category', 'like', "%{$search}%");
             });
         }
 
@@ -120,10 +121,10 @@ class PlaidTransactionController extends Controller
             ->where('plaid_transaction_id', $plaidTransactionId)
             ->first();
 
-        if (!$plaidTransaction) {
+        if (! $plaidTransaction) {
             return response()->json(['error' => 'Plaid transaction not found'], 404);
         }
 
         return response()->json($plaidTransaction);
     }
-} 
+}

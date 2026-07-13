@@ -5,7 +5,6 @@ namespace App\Services\Chat\ContextBuilders;
 use App\Contracts\ContextBuilderInterface;
 use App\Models\Budget;
 use App\Models\User;
-use Carbon\Carbon;
 
 class GoalsContextBuilder implements ContextBuilderInterface
 {
@@ -22,13 +21,13 @@ class GoalsContextBuilder implements ContextBuilderInterface
                 return $plan->goals->map(function ($goal) {
                     $targetAmount = $goal->target_amount_cents / 100;
                     $monthlyContribution = $goal->monthly_contribution_cents / 100;
-                    
+
                     // Calculate progress (this would need actual tracking in a real implementation)
                     // For now, estimate based on months since creation
                     $monthsSinceCreation = $goal->created_at->diffInMonths(now());
                     $estimatedProgress = min($monthsSinceCreation * $monthlyContribution, $targetAmount);
                     $percentComplete = $targetAmount > 0 ? round(($estimatedProgress / $targetAmount) * 100, 1) : 0;
-                    
+
                     // Calculate months to goal
                     $remaining = $targetAmount - $estimatedProgress;
                     $monthsToGoal = $monthlyContribution > 0 ? ceil($remaining / $monthlyContribution) : null;
@@ -54,8 +53,8 @@ class GoalsContextBuilder implements ContextBuilderInterface
                 'total_goals' => count($goals),
                 'total_target_amount' => collect($goals)->sum('target_amount'),
                 'total_monthly_contributions' => collect($goals)->sum('monthly_contribution'),
-                'average_progress' => count($goals) > 0 
-                    ? round(collect($goals)->avg('percent_complete'), 1) 
+                'average_progress' => count($goals) > 0
+                    ? round(collect($goals)->avg('percent_complete'), 1)
                     : 0,
             ],
         ];
@@ -77,7 +76,7 @@ class GoalsContextBuilder implements ContextBuilderInterface
         $goalCount = $budget->payoffPlans()
             ->with('goals')
             ->get()
-            ->flatMap(fn($p) => $p->goals)
+            ->flatMap(fn ($p) => $p->goals)
             ->count();
 
         // ~50 tokens per goal + 30 for summary

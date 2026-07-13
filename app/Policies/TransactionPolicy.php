@@ -66,4 +66,3 @@ class TransactionPolicy
         return $user->id === $transaction->budget->user_id;
     }
 }
-

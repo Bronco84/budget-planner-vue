@@ -2,21 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Budget;
 use App\Models\Account;
-use App\Models\Transaction;
-use App\Services\ProjectionService;
-use App\Services\RecurringTransactionService;
-use App\Services\PlaidService;
+use App\Models\Budget;
 use App\Services\BudgetService;
+use App\Services\PlaidService;
+use App\Services\RecurringTransactionService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
-use Carbon\Carbon;
-use App\Http\Controllers\Controller;
 
 class BudgetController extends Controller
 {
@@ -37,7 +33,7 @@ class BudgetController extends Controller
         $activeBudget = $user->getActiveBudget();
 
         // If no budgets exist, redirect to create page
-        if (!$activeBudget) {
+        if (! $activeBudget) {
             return redirect()->route('budgets.create');
         }
 
@@ -75,7 +71,7 @@ class BudgetController extends Controller
         ]);
 
         // Set as active budget if user has no active budget
-        if (!$user->getActiveBudget()) {
+        if (! $user->getActiveBudget()) {
             $user->setActiveBudget($budget->id);
         }
 
@@ -103,7 +99,7 @@ class BudgetController extends Controller
             $linkToken = null;
             \Log::warning('Failed to create Plaid link token for setup', [
                 'error' => $e->getMessage(),
-                'budget_id' => $budget->id
+                'budget_id' => $budget->id,
             ]);
         }
 
@@ -115,6 +111,7 @@ class BudgetController extends Controller
 
     /**
      * Display the specified resource.
+     *
      * @throws \Exception
      */
     public function show(Budget $budget, Request $request): Response|RedirectResponse
@@ -154,7 +151,7 @@ class BudgetController extends Controller
                 $user->getAccountTypeOrder()
             );
 
-            if (!$account) {
+            if (! $account) {
                 throw new \Exception('No accounts found for this budget.');
             }
 
@@ -233,7 +230,7 @@ class BudgetController extends Controller
     public function edit(Budget $budget): Response
     {
         return Inertia::render('Budgets/Edit', [
-            'budget' => $budget
+            'budget' => $budget,
         ]);
     }
 

@@ -16,10 +16,10 @@ class AccountDetailsContextBuilder implements ContextBuilderInterface
         $liabilityAccounts = $budget->accounts()
             ->with(['plaidAccount.statementHistory'])
             ->get()
-            ->filter(fn($account) => $account->isLiability())
+            ->filter(fn ($account) => $account->isLiability())
             ->map(function ($account) {
                 $plaid = $account->plaidAccount;
-                
+
                 $details = [
                     'name' => $account->name,
                     'type' => $account->type,
@@ -65,7 +65,7 @@ class AccountDetailsContextBuilder implements ContextBuilderInterface
         return [
             'liability_accounts' => $liabilityAccounts,
             'total_debt' => collect($liabilityAccounts)->sum('balance'),
-            'accounts_with_apr' => collect($liabilityAccounts)->filter(fn($a) => isset($a['apr']))->count(),
+            'accounts_with_apr' => collect($liabilityAccounts)->filter(fn ($a) => isset($a['apr']))->count(),
         ];
     }
 
@@ -84,7 +84,7 @@ class AccountDetailsContextBuilder implements ContextBuilderInterface
     {
         $liabilityCount = $budget->accounts()
             ->get()
-            ->filter(fn($a) => $a->isLiability())
+            ->filter(fn ($a) => $a->isLiability())
             ->count();
 
         // ~80 tokens per liability account + 20 for summary

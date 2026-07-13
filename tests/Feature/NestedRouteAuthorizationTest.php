@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\User;
-use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Budget;
+use App\Models\User;
 
 /*
  * Regression tests for nested {budget}/{account} routes that previously resolved

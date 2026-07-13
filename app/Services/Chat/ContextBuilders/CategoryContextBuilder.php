@@ -76,6 +76,7 @@ class CategoryContextBuilder implements ContextBuilderInterface
     public function getTokenEstimate(Budget $budget): int
     {
         $categoryCount = $budget->categories()->count();
+
         // ~30 tokens per category + 40 for summary
         return ($categoryCount * 30) + 40;
     }

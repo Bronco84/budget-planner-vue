@@ -2,17 +2,17 @@
 
 namespace App\Services;
 
-use App\Models\RecurringTransactionTemplate;
-use App\Models\RecurringTransactionRule;
-use App\Models\Transaction;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Category;
 use App\Models\PlaidAccount;
+use App\Models\RecurringTransactionRule;
+use App\Models\RecurringTransactionTemplate;
+use App\Models\Transaction;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Collection;
 
 class RecurringTransactionService
 {
@@ -33,11 +33,11 @@ class RecurringTransactionService
         foreach ($templates as $template) {
             // End at the earlier of endDate or template's end_date
             $templateEndDate = $template->end_date ? min($endDate, $template->end_date) : $endDate;
-            
+
             // Use optimized occurrence date generation instead of day-by-day iteration
             // This changes O(days) to O(occurrences), a significant improvement for multi-month projections
             $occurrenceDates = $this->generateOccurrenceDates($template, $startDate, $templateEndDate);
-            
+
             // Calculate dynamic amount once per template (not per occurrence) if applicable
             $dynamicAmount = null;
             if ($template->is_dynamic_amount) {
@@ -72,7 +72,7 @@ class RecurringTransactionService
                     'recurring_transaction_template_id' => $template->id,
                     'is_dynamic_amount' => $template->is_dynamic_amount,
                     'created_by' => $template->created_by ?? null,
-                    'is_projected' => true
+                    'is_projected' => true,
                 ]);
             }
         }
@@ -84,9 +84,6 @@ class RecurringTransactionService
      * Generate occurrence dates for a template within a date range.
      * Uses direct date calculation instead of day-by-day iteration for O(occurrences) performance.
      *
-     * @param RecurringTransactionTemplate $template
-     * @param Carbon $startDate
-     * @param Carbon $endDate
      * @return array<Carbon>
      */
     protected function generateOccurrenceDates(RecurringTransactionTemplate $template, Carbon $startDate, Carbon $endDate): array
@@ -99,7 +96,7 @@ class RecurringTransactionService
                 // For daily, iterate by day (every day is a hit, no optimization needed)
                 $date = $effectiveStart->copy();
                 while ($date <= $endDate) {
-                    if (!$template->hasTransactionForDate($date)) {
+                    if (! $template->hasTransactionForDate($date)) {
                         $occurrences[] = $date->copy();
                     }
                     $date->addDay();
@@ -114,7 +111,7 @@ class RecurringTransactionService
                 }
                 // Then jump by weeks
                 while ($date <= $endDate) {
-                    if (!$template->hasTransactionForDate($date)) {
+                    if (! $template->hasTransactionForDate($date)) {
                         $occurrences[] = $date->copy();
                     }
                     $date->addWeek();
@@ -134,7 +131,7 @@ class RecurringTransactionService
                 }
                 // Then jump by 2 weeks
                 while ($date <= $endDate) {
-                    if (!$template->hasTransactionForDate($date)) {
+                    if (! $template->hasTransactionForDate($date)) {
                         $occurrences[] = $date->copy();
                     }
                     $date->addWeeks(2);
@@ -144,14 +141,14 @@ class RecurringTransactionService
             case RecurringTransactionTemplate::FREQUENCY_MONTHLY:
                 $targetDay = $template->day_of_month ?? $template->start_date->day;
                 $date = $effectiveStart->copy()->startOfMonth();
-                
+
                 while ($date <= $endDate) {
                     // Calculate actual day for this month (handle 29th-31st in shorter months)
                     $actualDay = min($targetDay, $date->daysInMonth);
                     $occurrenceDate = $date->copy()->setDay($actualDay);
-                    
+
                     if ($occurrenceDate >= $effectiveStart && $occurrenceDate <= $endDate) {
-                        if (!$template->hasTransactionForDate($occurrenceDate)) {
+                        if (! $template->hasTransactionForDate($occurrenceDate)) {
                             $occurrences[] = $occurrenceDate;
                         }
                     }
@@ -166,27 +163,27 @@ class RecurringTransactionService
                 if ($firstDay > $secondDay) {
                     [$firstDay, $secondDay] = [$secondDay, $firstDay];
                 }
-                
+
                 $date = $effectiveStart->copy()->startOfMonth();
                 while ($date <= $endDate) {
                     $daysInMonth = $date->daysInMonth;
-                    
+
                     // First occurrence of the month
                     $firstOccurrence = $date->copy()->setDay(min($firstDay, $daysInMonth));
                     if ($firstOccurrence >= $effectiveStart && $firstOccurrence <= $endDate) {
-                        if (!$template->hasTransactionForDate($firstOccurrence)) {
+                        if (! $template->hasTransactionForDate($firstOccurrence)) {
                             $occurrences[] = $firstOccurrence;
                         }
                     }
-                    
+
                     // Second occurrence of the month
                     $secondOccurrence = $date->copy()->setDay(min($secondDay, $daysInMonth));
                     if ($secondOccurrence >= $effectiveStart && $secondOccurrence <= $endDate) {
-                        if (!$template->hasTransactionForDate($secondOccurrence)) {
+                        if (! $template->hasTransactionForDate($secondOccurrence)) {
                             $occurrences[] = $secondOccurrence;
                         }
                     }
-                    
+
                     $date->addMonth();
                 }
                 break;
@@ -194,20 +191,20 @@ class RecurringTransactionService
             case RecurringTransactionTemplate::FREQUENCY_QUARTERLY:
                 $targetDay = $template->day_of_month ?? $template->start_date->day;
                 $date = $effectiveStart->copy()->startOfMonth();
-                
+
                 // Align to quarter from template start
                 $monthsSinceStart = (int) $template->start_date->diffInMonths($date);
                 $monthsToNextQuarter = $monthsSinceStart % 3;
                 if ($monthsToNextQuarter !== 0) {
                     $date->addMonths(3 - $monthsToNextQuarter);
                 }
-                
+
                 while ($date <= $endDate) {
                     $actualDay = min($targetDay, $date->daysInMonth);
                     $occurrenceDate = $date->copy()->setDay($actualDay);
-                    
+
                     if ($occurrenceDate >= $effectiveStart && $occurrenceDate <= $endDate) {
-                        if (!$template->hasTransactionForDate($occurrenceDate)) {
+                        if (! $template->hasTransactionForDate($occurrenceDate)) {
                             $occurrences[] = $occurrenceDate;
                         }
                     }
@@ -219,15 +216,15 @@ class RecurringTransactionService
                 $targetMonth = $template->start_date->month;
                 $targetDay = $template->start_date->day;
                 $date = $effectiveStart->copy()->startOfYear();
-                
+
                 while ($date <= $endDate) {
                     $occurrenceDate = $date->copy()->setMonth($targetMonth);
                     $daysInMonth = $occurrenceDate->daysInMonth;
                     $actualDay = min($targetDay, $daysInMonth);
                     $occurrenceDate->setDay($actualDay);
-                    
+
                     if ($occurrenceDate >= $effectiveStart && $occurrenceDate <= $endDate) {
-                        if (!$template->hasTransactionForDate($occurrenceDate)) {
+                        if (! $template->hasTransactionForDate($occurrenceDate)) {
                             $occurrences[] = $occurrenceDate;
                         }
                     }
@@ -241,10 +238,6 @@ class RecurringTransactionService
 
     /**
      * Get transaction for a specific date from template's preloaded transactions.
-     *
-     * @param RecurringTransactionTemplate $template
-     * @param Carbon $date
-     * @return Transaction|null
      */
     protected function getTransactionForDate(RecurringTransactionTemplate $template, Carbon $date): ?Transaction
     {
@@ -272,7 +265,6 @@ class RecurringTransactionService
      * if it exceeds the calculated average (reflecting current spending trajectory).
      * Results are cached for 30 minutes.
      *
-     * @param RecurringTransactionTemplate $template
      * @return int|null The calculated amount in cents or null if not calculable
      */
     protected function calculateDynamicAmount(RecurringTransactionTemplate $template): ?int
@@ -292,9 +284,6 @@ class RecurringTransactionService
      * 1. If rules exist, find matching transactions via rules and calculate average
      * 2. If no rules but has linked transactions, use those for averaging
      * 3. Fall back to stored average_amount or amount_in_cents
-     *
-     * @param RecurringTransactionTemplate $template
-     * @return int|null
      */
     protected function computeDynamicAmount(RecurringTransactionTemplate $template): ?int
     {
@@ -342,9 +331,11 @@ class RecurringTransactionService
             ]);
 
             if ($template->average_amount !== null) {
-                $calculatedAmount = (int)($template->average_amount * 100);
+                $calculatedAmount = (int) ($template->average_amount * 100);
+
                 return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
             }
+
             return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
         }
 
@@ -380,7 +371,8 @@ class RecurringTransactionService
             ]);
 
             if ($template->average_amount !== null) {
-                $calculatedAmount = (int)($template->average_amount * 100);
+                $calculatedAmount = (int) ($template->average_amount * 100);
+
                 return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
             }
 
@@ -389,7 +381,7 @@ class RecurringTransactionService
 
         // Calculate average of only the valid transactions
         $totalAmount = $filteredTransactions->sum('amount_in_cents');
-        $averageAmount = (int)($totalAmount / $filteredTransactions->count());
+        $averageAmount = (int) ($totalAmount / $filteredTransactions->count());
 
         Log::debug('computeDynamicAmount: Calculated average from transactions', [
             'template_id' => $template->id,
@@ -404,16 +396,12 @@ class RecurringTransactionService
     /**
      * If the template is linked to a credit card, check if the card's spending since
      * the last statement exceeds the calculated amount. If so, use that instead.
-     * 
+     *
      * Logic:
      * - Current balance includes: statement balance + new spending since statement
      * - Statement balance will be paid by the upcoming autopay
      * - New spending = current balance - statement balance
      * - If new spending > calculated average, use new spending for next month's projection
-     *
-     * @param RecurringTransactionTemplate $template
-     * @param int|null $calculatedAmount
-     * @return int|null
      */
     protected function applyLinkedCreditCardBalance(RecurringTransactionTemplate $template, ?int $calculatedAmount): ?int
     {
@@ -422,61 +410,53 @@ class RecurringTransactionService
         }
 
         // Only apply if template is linked to a credit card
-        if (!$template->linked_credit_card_account_id) {
+        if (! $template->linked_credit_card_account_id) {
             return $calculatedAmount;
         }
 
         // Load the linked credit card with plaidAccount if not already loaded
-        if (!$template->relationLoaded('linkedCreditCard')) {
+        if (! $template->relationLoaded('linkedCreditCard')) {
             $template->load('linkedCreditCard.plaidAccount');
         }
 
         $creditCard = $template->linkedCreditCard;
-        if (!$creditCard) {
+        if (! $creditCard) {
             return $calculatedAmount;
         }
 
         $currentBalanceCents = $creditCard->current_balance_cents ?? 0;
-        
+
         // Get the statement balance that will be paid by autopay
         $statementBalanceCents = $creditCard->plaidAccount?->last_statement_balance_cents ?? 0;
-        
+
         // Calculate new spending since the statement was generated
         // New spending = current balance - statement balance
         $newSpendingSinceStatement = $currentBalanceCents - $statementBalanceCents;
-        
+
         // Only use new spending if it's positive (there's actually new spending)
         // and if it exceeds the calculated average
         if ($newSpendingSinceStatement > 0 && abs($newSpendingSinceStatement) > abs($calculatedAmount)) {
             // Return as negative (expense) matching the sign of the calculated amount
             $sign = $calculatedAmount < 0 ? -1 : 1;
+
             return $sign * abs($newSpendingSinceStatement);
         }
 
         return $calculatedAmount;
     }
 
-
-
     /**
      * Find transactions that match all the provided rules for a template.
      * If the template has a plaid_entity_id, use that for matching first.
-     *
-     * @param RecurringTransactionTemplate $template
-     * @param \Illuminate\Support\Collection $rules
-     * @return \Illuminate\Support\Collection
      */
     /**
      * Find transactions that match all the provided rules for a template.
      * If the template has a plaid_entity_id, use that for matching first.
      *
-     * @param RecurringTransactionTemplate $template
-     * @param Collection $rules
-     * @param Collection|null $preloadedTransactions Optional pre-fetched transactions to avoid N+1 queries
-     * @return Collection
+     * @param  Collection|null  $preloadedTransactions  Optional pre-fetched transactions to avoid N+1 queries
      */
     protected function findTransactionsMatchingAllRules(
-        RecurringTransactionTemplate $template, 
+        RecurringTransactionTemplate $template,
         Collection $rules,
         ?Collection $preloadedTransactions = null
     ): Collection {
@@ -486,38 +466,39 @@ class RecurringTransactionService
         // Priority 1: If template has a plaid_entity_id, use entity-based matching
         if ($template->plaid_entity_id) {
             $entityId = $template->plaid_entity_id;
-            
+
             Log::debug('RecurringTransactionService: Entity-based matching', [
                 'template_id' => $template->id,
                 'template_description' => $template->description,
                 'plaid_entity_id' => $entityId,
             ]);
-            
+
             // Use preloaded transactions if available, otherwise query
             if ($preloadedTransactions !== null) {
                 $entityMatches = $preloadedTransactions->filter(function (Transaction $transaction) use ($entityId) {
-                    if (!$transaction->plaidTransaction) {
+                    if (! $transaction->plaidTransaction) {
                         return false;
                     }
                     $counterparties = $transaction->plaidTransaction->counterparties ?? '';
+
                     return is_string($counterparties) && str_contains($counterparties, $entityId);
                 });
             } else {
                 $entityMatches = Transaction::where('budget_id', $budgetId)
                     ->whereHas('plaidTransaction', function ($query) use ($entityId) {
                         // Simple LIKE search - entity_id is unique enough
-                        $query->where('counterparties', 'like', '%' . $entityId . '%');
+                        $query->where('counterparties', 'like', '%'.$entityId.'%');
                     })
                     ->with('plaidTransaction')
                     ->get();
             }
-            
+
             Log::debug('RecurringTransactionService: Entity matching results', [
                 'template_id' => $template->id,
                 'matches_found' => $entityMatches->count(),
                 'matched_transaction_ids' => $entityMatches->pluck('id')->toArray(),
             ]);
-            
+
             // If we found matches by entity, return them (rules are optional refinement)
             if ($entityMatches->isNotEmpty()) {
                 // Still apply rules as additional filters if any
@@ -527,21 +508,23 @@ class RecurringTransactionService
                             $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
                             $ruleValue = $rule->value;
                             $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue);
-                            if (!$matches) {
+                            if (! $matches) {
                                 return false;
                             }
                         }
+
                         return true;
                     });
-                    
+
                     Log::debug('RecurringTransactionService: After rule filtering', [
                         'template_id' => $template->id,
                         'original_count' => $entityMatches->count(),
                         'filtered_count' => $filteredMatches->count(),
                     ]);
-                    
+
                     return $filteredMatches;
                 }
+
                 return $entityMatches;
             }
         }
@@ -552,7 +535,7 @@ class RecurringTransactionService
             'template_description' => $template->description,
             'rules_count' => $rules->count(),
         ]);
-        
+
         // Use preloaded transactions if available, otherwise query
         $transactions = $preloadedTransactions ?? Transaction::where('budget_id', $budgetId)->with('plaidTransaction')->get();
 
@@ -564,14 +547,14 @@ class RecurringTransactionService
                 $ruleValue = $rule->value;
                 $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue);
 
-                if (!$matches) {
+                if (! $matches) {
                     return false;
                 }
             }
 
             return true;
         });
-        
+
         Log::debug('RecurringTransactionService: Rule-based matching results', [
             'template_id' => $template->id,
             'total_transactions_scanned' => $transactions->count(),
@@ -585,7 +568,7 @@ class RecurringTransactionService
      * Link existing transactions that match the template
      * This is useful for identifying historical transactions that should be considered
      * when calculating dynamic amounts
-     * 
+     *
      * Matching priority:
      * 1. Match by Plaid entity_id (most reliable)
      * 2. Match by description (fallback)
@@ -595,11 +578,11 @@ class RecurringTransactionService
         Log::info('RecurringTransactionService: Linking transactions to template', [
             'template_id' => $template->id,
             'template_description' => $template->description,
-            'has_plaid_entity_id' => !empty($template->plaid_entity_id),
+            'has_plaid_entity_id' => ! empty($template->plaid_entity_id),
             'plaid_entity_id' => $template->plaid_entity_id,
             'plaid_entity_name' => $template->plaid_entity_name,
         ]);
-        
+
         // Find transactions that match the template but aren't linked yet
         $query = Transaction::where('budget_id', $template->budget_id)
             ->where('recurring_transaction_template_id', null)
@@ -611,12 +594,12 @@ class RecurringTransactionService
                 'template_id' => $template->id,
                 'entity_id' => $template->plaid_entity_id,
             ]);
-            
+
             $matchingTransactions = $this->findTransactionsByEntityId(
                 $template->budget_id,
                 $template->plaid_entity_id
             );
-            
+
             Log::debug('RecurringTransactionService: Entity matching found transactions', [
                 'template_id' => $template->id,
                 'count' => $matchingTransactions->count(),
@@ -629,15 +612,15 @@ class RecurringTransactionService
                 'description' => $template->description,
                 'category' => $template->category,
             ]);
-            
+
             // Get all unlinked transactions for the budget
             $allTransactions = $query->get();
-            
+
             // Filter using improved matching algorithm
-            $matchingTransactions = $allTransactions->filter(function($transaction) use ($template) {
+            $matchingTransactions = $allTransactions->filter(function ($transaction) use ($template) {
                 return $this->matchesDescription($transaction, $template);
             });
-            
+
             Log::debug('RecurringTransactionService: Description matching found transactions', [
                 'template_id' => $template->id,
                 'count' => $matchingTransactions->count(),
@@ -653,7 +636,7 @@ class RecurringTransactionService
                 $linkedCount++;
             }
         }
-        
+
         Log::info('RecurringTransactionService: Finished linking transactions', [
             'template_id' => $template->id,
             'transactions_linked' => $linkedCount,
@@ -667,10 +650,6 @@ class RecurringTransactionService
      * Find transactions that match a Plaid entity_id.
      * Searches the counterparties field in the related PlaidTransaction.
      * Uses simple LIKE search since the entity_id is unique.
-     *
-     * @param int $budgetId
-     * @param string $entityId
-     * @return \Illuminate\Support\Collection
      */
     protected function findTransactionsByEntityId(int $budgetId, string $entityId): Collection
     {
@@ -678,18 +657,15 @@ class RecurringTransactionService
             ->where('recurring_transaction_template_id', null)
             ->whereHas('plaidTransaction', function ($query) use ($entityId) {
                 // Simple LIKE search - entity_id is unique enough
-                $query->where('counterparties', 'like', '%' . $entityId . '%');
+                $query->where('counterparties', 'like', '%'.$entityId.'%');
             })
             ->with('plaidTransaction')
             ->get();
     }
-    
+
     /**
      * Get detailed diagnostics about how a template matches transactions.
      * Useful for debugging and displaying in the UI.
-     *
-     * @param RecurringTransactionTemplate $template
-     * @return array
      */
     public function getMatchingDiagnostics(RecurringTransactionTemplate $template): array
     {
@@ -704,7 +680,7 @@ class RecurringTransactionService
             'rules_summary' => [],
             'linked_credit_card' => null,
         ];
-        
+
         // Linked credit card info
         if ($template->linked_credit_card_account_id) {
             $creditCard = $template->linkedCreditCard;
@@ -718,46 +694,46 @@ class RecurringTransactionService
                 ];
             }
         }
-        
+
         // Get currently linked transactions
         $linkedTransactions = Transaction::where('recurring_transaction_template_id', $template->id)
             ->orderBy('date', 'desc')
             ->limit(20)
             ->get();
-            
-        $diagnostics['linked_transactions'] = $linkedTransactions->map(fn($t) => [
+
+        $diagnostics['linked_transactions'] = $linkedTransactions->map(fn ($t) => [
             'id' => $t->id,
             'date' => $t->date->format('Y-m-d'),
             'description' => $t->description,
             'amount' => $t->amount_in_cents / 100,
-            'has_plaid' => !is_null($t->plaid_transaction_id),
+            'has_plaid' => ! is_null($t->plaid_transaction_id),
         ])->toArray();
-        
+
         // Get rules summary
         $rules = $template->rules()->get();
-        $diagnostics['rules_summary'] = $rules->map(fn($r) => [
+        $diagnostics['rules_summary'] = $rules->map(fn ($r) => [
             'id' => $r->id,
             'field' => $r->field,
             'operator' => $r->operator,
             'value' => $r->value,
             'is_active' => $r->is_active,
         ])->toArray();
-        
+
         // Determine matching method and find potential matches
         if ($template->plaid_entity_id) {
             $diagnostics['matching_method'] = 'plaid_entity_id';
-            
+
             // Find all transactions with this entity ID (including already linked ones)
             $potentialMatches = Transaction::where('budget_id', $template->budget_id)
                 ->whereHas('plaidTransaction', function ($query) use ($template) {
-                    $query->where('counterparties', 'like', '%' . $template->plaid_entity_id . '%');
+                    $query->where('counterparties', 'like', '%'.$template->plaid_entity_id.'%');
                 })
                 ->with('plaidTransaction')
                 ->orderBy('date', 'desc')
                 ->limit(30)
                 ->get();
-                
-            $diagnostics['potential_matches'] = $potentialMatches->map(fn($t) => [
+
+            $diagnostics['potential_matches'] = $potentialMatches->map(fn ($t) => [
                 'id' => $t->id,
                 'date' => $t->date->format('Y-m-d'),
                 'description' => $t->description,
@@ -770,7 +746,7 @@ class RecurringTransactionService
         } else {
             $diagnostics['matching_method'] = 'description';
         }
-        
+
         return $diagnostics;
     }
 
@@ -817,6 +793,7 @@ class RecurringTransactionService
         if ($rules->isEmpty()) {
             $unlinkedCount = Transaction::where('recurring_transaction_template_id', $template->id)
                 ->update(['recurring_transaction_template_id' => null]);
+
             return ['unlinked' => $unlinkedCount, 'linked' => 0];
         }
 
@@ -830,7 +807,7 @@ class RecurringTransactionService
         // Unlink transactions that no longer match
         $unlinkedCount = 0;
         foreach ($currentlyLinked as $transaction) {
-            if (!in_array($transaction->id, $matchingIds)) {
+            if (! in_array($transaction->id, $matchingIds)) {
                 $transaction->recurring_transaction_template_id = null;
                 $transaction->save();
                 $unlinkedCount++;
@@ -854,14 +831,13 @@ class RecurringTransactionService
     /**
      * Automatically link new unlinked transactions to existing recurring templates for an account.
      * This is called after new transactions are synced from Plaid.
-     * 
+     *
      * Uses a multi-strategy approach:
      * 1. Plaid entity_id matching (most reliable)
      * 2. Rule-based matching (for templates with active rules)
      * 3. Description matching (fallback)
      *
-     * @param Account $account
-     * @param int $daysBack Number of days back to look for unlinked transactions
+     * @param  int  $daysBack  Number of days back to look for unlinked transactions
      * @return array Stats about linked transactions
      */
     public function autoLinkTransactionsForAccount(Account $account, int $daysBack = 30): array
@@ -870,14 +846,14 @@ class RecurringTransactionService
         $linkedByEntity = 0;
         $linkedByRules = 0;
         $linkedByDescription = 0;
-        
+
         // Get unlinked transactions for this account from the specified period
         $unlinkedTransactions = Transaction::where('account_id', $account->id)
             ->whereNull('recurring_transaction_template_id')
             ->where('date', '>=', now()->subDays($daysBack)->toDateString())
             ->with('plaidTransaction')
             ->get();
-        
+
         if ($unlinkedTransactions->isEmpty()) {
             return [
                 'total_linked' => 0,
@@ -886,12 +862,12 @@ class RecurringTransactionService
                 'by_description' => 0,
             ];
         }
-        
+
         // Get all recurring templates for this account
         $templates = RecurringTransactionTemplate::where('account_id', $account->id)
             ->with('rules')
             ->get();
-        
+
         if ($templates->isEmpty()) {
             return [
                 'total_linked' => 0,
@@ -900,16 +876,16 @@ class RecurringTransactionService
                 'by_description' => 0,
             ];
         }
-        
+
         foreach ($unlinkedTransactions as $transaction) {
             // Skip if already linked (might have been linked in a previous iteration)
             if ($transaction->recurring_transaction_template_id !== null) {
                 continue;
             }
-            
+
             $matchedTemplate = null;
             $matchMethod = null;
-            
+
             foreach ($templates as $template) {
                 // Strategy 1: Match by Plaid entity_id
                 if ($template->plaid_entity_id && $transaction->plaidTransaction) {
@@ -920,7 +896,7 @@ class RecurringTransactionService
                         break;
                     }
                 }
-                
+
                 // Strategy 2: Match by rules (all rules must match - AND logic)
                 $rules = $template->rules->where('is_active', true);
                 if ($rules->isNotEmpty()) {
@@ -928,19 +904,19 @@ class RecurringTransactionService
                     foreach ($rules as $rule) {
                         $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
                         $ruleValue = $rule->value;
-                        if (!$this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue)) {
+                        if (! $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue)) {
                             $matchesAllRules = false;
                             break;
                         }
                     }
-                    
+
                     if ($matchesAllRules) {
                         $matchedTemplate = $template;
                         $matchMethod = 'rules';
                         break;
                     }
                 }
-                
+
                 // Strategy 3: Match by description with improved algorithm
                 if ($template->description && $this->matchesDescription($transaction, $template)) {
                     $matchedTemplate = $template;
@@ -948,13 +924,13 @@ class RecurringTransactionService
                     break;
                 }
             }
-            
+
             // Link the transaction if a match was found
             if ($matchedTemplate) {
                 $transaction->recurring_transaction_template_id = $matchedTemplate->id;
                 $transaction->save();
                 $linkedCount++;
-                
+
                 switch ($matchMethod) {
                     case 'entity':
                         $linkedByEntity++;
@@ -968,7 +944,7 @@ class RecurringTransactionService
                 }
             }
         }
-        
+
         if ($linkedCount > 0) {
             Log::info('RecurringTransactionService: Auto-linked transactions for account', [
                 'account_id' => $account->id,
@@ -979,7 +955,7 @@ class RecurringTransactionService
                 'by_description' => $linkedByDescription,
             ]);
         }
-        
+
         return [
             'total_linked' => $linkedCount,
             'by_entity' => $linkedByEntity,
@@ -991,8 +967,6 @@ class RecurringTransactionService
     /**
      * Get the value of a transaction field for comparison with a rule
      *
-     * @param Transaction $transaction
-     * @param string $field
      * @return mixed
      */
     protected function getTransactionFieldValue(Transaction $transaction, string $field)
@@ -1016,10 +990,8 @@ class RecurringTransactionService
     /**
      * Evaluate if a transaction field value matches a rule condition
      *
-     * @param mixed $fieldValue
-     * @param string $operator
-     * @param mixed $ruleValue
-     * @return bool
+     * @param  mixed  $fieldValue
+     * @param  mixed  $ruleValue
      */
     protected function evaluateRuleCondition($fieldValue, string $operator, $ruleValue): bool
     {
@@ -1052,16 +1024,17 @@ class RecurringTransactionService
                 return is_string($fieldValue) && is_string($ruleValue) &&
                     stripos($fieldValue, $ruleValue, max(0, strlen($fieldValue) - strlen($ruleValue))) !== false;
             case 'regex':
-                if (!is_string($fieldValue) || !is_string($ruleValue)) {
+                if (! is_string($fieldValue) || ! is_string($ruleValue)) {
                     return false;
                 }
                 try {
-                    return preg_match('/' . $ruleValue . '/i', $fieldValue) === 1;
+                    return preg_match('/'.$ruleValue.'/i', $fieldValue) === 1;
                 } catch (\Exception $e) {
                     Log::warning('Invalid regex pattern in rule evaluation', [
                         'pattern' => $ruleValue,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
+
                     return false;
                 }
             default:
@@ -1071,9 +1044,6 @@ class RecurringTransactionService
 
     /**
      * Find a recurring transaction template by ID
-     *
-     * @param int $id
-     * @return RecurringTransactionTemplate|null
      */
     public function find(int $id): ?RecurringTransactionTemplate
     {
@@ -1082,9 +1052,6 @@ class RecurringTransactionService
 
     /**
      * Get active rules for a recurring transaction template
-     *
-     * @param RecurringTransactionTemplate $template
-     * @return Collection
      */
     public function getRules(RecurringTransactionTemplate $template): Collection
     {
@@ -1095,19 +1062,18 @@ class RecurringTransactionService
      * Find unlinked transactions that match existing recurring transaction templates.
      * Returns structured data for UI display with manual approval.
      *
-     * @param Budget $budget
      * @return array Array of templates with their matching unlinked transactions
      */
     public function findMatchingTransactionsForTemplates(Budget $budget): array
     {
         $results = [];
-        
+
         // Get all recurring templates for this budget
         $templates = RecurringTransactionTemplate::where('budget_id', $budget->id)
             ->with(['account', 'transactions'])
             ->orderBy('description')
             ->get();
-        
+
         if ($templates->isEmpty()) {
             return [
                 'templates_with_matches' => [],
@@ -1115,7 +1081,7 @@ class RecurringTransactionService
                 'total_matches' => 0,
             ];
         }
-        
+
         // Get all unlinked Plaid transactions for this budget
         $unlinkedTransactions = Transaction::where('budget_id', $budget->id)
             ->whereNull('recurring_transaction_template_id')
@@ -1123,12 +1089,12 @@ class RecurringTransactionService
             ->with('plaidTransaction', 'account')
             ->orderBy('date', 'desc')
             ->get();
-        
+
         $totalMatches = 0;
-        
+
         foreach ($templates as $template) {
             // Find transactions that match this template
-            $matchingTransactions = $unlinkedTransactions->filter(function($transaction) use ($template) {
+            $matchingTransactions = $unlinkedTransactions->filter(function ($transaction) use ($template) {
                 // First check entity ID match if available
                 if ($template->plaid_entity_id && $transaction->plaidTransaction) {
                     $counterparties = $transaction->plaidTransaction->counterparties;
@@ -1144,11 +1110,11 @@ class RecurringTransactionService
                         return true;
                     }
                 }
-                
+
                 // Fallback to description matching
                 return $this->matchesDescription($transaction, $template);
             });
-            
+
             if ($matchingTransactions->isNotEmpty()) {
                 $results[] = [
                     'template' => [
@@ -1162,7 +1128,7 @@ class RecurringTransactionService
                         'plaid_entity_id' => $template->plaid_entity_id,
                         'plaid_entity_name' => $template->plaid_entity_name,
                     ],
-                    'matching_transactions' => $matchingTransactions->map(function($transaction) {
+                    'matching_transactions' => $matchingTransactions->map(function ($transaction) {
                         return [
                             'id' => $transaction->id,
                             'description' => $transaction->description,
@@ -1175,11 +1141,11 @@ class RecurringTransactionService
                         ];
                     })->values()->toArray(),
                 ];
-                
+
                 $totalMatches += $matchingTransactions->count();
             }
         }
-        
+
         return [
             'templates_with_matches' => $results,
             'total_templates' => count($results),
@@ -1190,35 +1156,37 @@ class RecurringTransactionService
     /**
      * Link selected transactions to their matching templates.
      *
-     * @param array $selections Array of ['template_id' => int, 'transaction_ids' => int[]]
+     * @param  array  $selections  Array of ['template_id' => int, 'transaction_ids' => int[]]
      * @return array Stats about linked transactions
      */
     public function linkSelectedTransactions(array $selections): array
     {
         $linkedCount = 0;
         $errors = [];
-        
+
         foreach ($selections as $selection) {
             $templateId = $selection['template_id'] ?? null;
             $transactionIds = $selection['transaction_ids'] ?? [];
-            
-            if (!$templateId || empty($transactionIds)) {
+
+            if (! $templateId || empty($transactionIds)) {
                 continue;
             }
-            
+
             $template = RecurringTransactionTemplate::find($templateId);
-            if (!$template) {
+            if (! $template) {
                 $errors[] = "Template {$templateId} not found";
+
                 continue;
             }
-            
+
             foreach ($transactionIds as $transactionId) {
                 $transaction = Transaction::find($transactionId);
-                if (!$transaction) {
+                if (! $transaction) {
                     $errors[] = "Transaction {$transactionId} not found";
+
                     continue;
                 }
-                
+
                 // Only link if not already linked
                 if ($transaction->recurring_transaction_template_id === null) {
                     $transaction->recurring_transaction_template_id = $templateId;
@@ -1227,7 +1195,7 @@ class RecurringTransactionService
                 }
             }
         }
-        
+
         return [
             'linked_count' => $linkedCount,
             'errors' => $errors,
@@ -1236,28 +1204,24 @@ class RecurringTransactionService
 
     /**
      * Check if a transaction matches a template's description using improved matching algorithm.
-     * 
+     *
      * Uses the Plaid transaction's original description (name field) if available,
      * otherwise falls back to the transaction's description field. This preserves
      * user-friendly descriptions while matching against the original Plaid data.
-     * 
+     *
      * Matching strategy (in order of priority):
      * 1. Exact match (case-insensitive)
      * 2. Contains match with minimum length requirement (5+ chars) + category check
      * 3. Fuzzy match with 70% similarity threshold + category check
-     *
-     * @param Transaction $transaction
-     * @param RecurringTransactionTemplate $template
-     * @return bool
      */
     protected function matchesDescription(Transaction $transaction, RecurringTransactionTemplate $template): bool
     {
-        if (!$template->description) {
+        if (! $template->description) {
             return false;
         }
 
         $templateDesc = strtolower(trim($template->description));
-        
+
         // Use Plaid transaction's original description if available, otherwise use transaction description
         $transactionDesc = $transaction->plaidTransaction && $transaction->plaidTransaction->name
             ? strtolower(trim($transaction->plaidTransaction->name))
@@ -1290,15 +1254,11 @@ class RecurringTransactionService
 
     /**
      * Evaluate a single rule against sample transactions and return detailed results
-     *
-     * @param RecurringTransactionTemplate $template
-     * @param RecurringTransactionRule $rule
-     * @return array
      */
     public function evaluateRule(RecurringTransactionTemplate $template, RecurringTransactionRule $rule): array
     {
         $budgetId = $template->budget_id;
-        
+
         // Get sample transactions from the budget
         $transactions = Transaction::where('budget_id', $budgetId)
             ->orderBy('date', 'desc')
@@ -1312,7 +1272,7 @@ class RecurringTransactionService
         foreach ($transactions as $transaction) {
             $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
             $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $rule->value);
-            
+
             if ($matches) {
                 $matchingTransactions->push($transaction);
                 $matchCount++;
@@ -1321,14 +1281,14 @@ class RecurringTransactionService
 
         // Generate human-readable description
         $description = $this->generateRuleDescription($rule);
-        
+
         // Calculate statistics
         $matchPercentage = $totalTransactions > 0 ? round(($matchCount / $totalTransactions) * 100, 1) : 0;
-        
+
         $details = [];
         $details[] = "Tested against {$totalTransactions} recent transactions";
         $details[] = "Found {$matchCount} matching transactions ({$matchPercentage}%)";
-        
+
         $amountStats = null;
         if ($matchingTransactions->isNotEmpty()) {
             $amounts = $matchingTransactions->pluck('amount_in_cents');
@@ -1337,26 +1297,26 @@ class RecurringTransactionService
             $maxAmount = $amounts->max();
             $medianAmount = $amounts->median();
             $stdDev = $this->calculateStandardDeviation($amounts->toArray());
-            
+
             $amountStats = [
                 'average' => $avgAmount,
                 'median' => $medianAmount,
                 'min' => $minAmount,
                 'max' => $maxAmount,
                 'std_dev' => $stdDev,
-                'count' => $matchCount
+                'count' => $matchCount,
             ];
-            
-            $details[] = "Amount range: $" . number_format($minAmount / 100, 2) . " to $" . number_format($maxAmount / 100, 2);
-            $details[] = "Average amount: $" . number_format($avgAmount / 100, 2);
-            $details[] = "Median amount: $" . number_format($medianAmount / 100, 2);
-            $details[] = "Standard deviation: $" . number_format($stdDev / 100, 2);
-            
+
+            $details[] = 'Amount range: $'.number_format($minAmount / 100, 2).' to $'.number_format($maxAmount / 100, 2);
+            $details[] = 'Average amount: $'.number_format($avgAmount / 100, 2);
+            $details[] = 'Median amount: $'.number_format($medianAmount / 100, 2);
+            $details[] = 'Standard deviation: $'.number_format($stdDev / 100, 2);
+
             // Show a few example matches
             $examples = $matchingTransactions->take(3);
-            $details[] = "Recent matches:";
+            $details[] = 'Recent matches:';
             foreach ($examples as $example) {
-                $details[] = "  - {$example->description} ($" . number_format($example->amount_in_cents / 100, 2) . ") on {$example->date->format('Y-m-d')}";
+                $details[] = "  - {$example->description} ($".number_format($example->amount_in_cents / 100, 2).") on {$example->date->format('Y-m-d')}";
             }
         }
 
@@ -1368,35 +1328,29 @@ class RecurringTransactionService
             'match_percentage' => $matchPercentage,
             'matching_transactions' => $matchingTransactions,
             'amount_stats' => $amountStats,
-            'details' => implode("\n", $details)
+            'details' => implode("\n", $details),
         ];
     }
 
     /**
      * Generate a human-readable description of a rule
-     *
-     * @param RecurringTransactionRule $rule
-     * @return string
      */
     protected function generateRuleDescription(RecurringTransactionRule $rule): string
     {
         $field = ucfirst($rule->field);
         $operator = $this->getOperatorDescription($rule->operator);
         $value = $rule->value;
-        
+
         // Format value based on field type
         if ($rule->field === 'amount') {
-            $value = '$' . number_format($value / 100, 2);
+            $value = '$'.number_format($value / 100, 2);
         }
-        
+
         return "{$field} {$operator} '{$value}'";
     }
 
     /**
      * Get human-readable operator description
-     *
-     * @param string $operator
-     * @return string
      */
     protected function getOperatorDescription(string $operator): string
     {
@@ -1406,7 +1360,7 @@ class RecurringTransactionService
             '!=' => 'does not equal',
             '>' => 'is greater than',
             'greater_than' => 'is greater than',
-            '<' => 'is less than', 
+            '<' => 'is less than',
             'less_than' => 'is less than',
             '>=' => 'is greater than or equal to',
             '<=' => 'is less than or equal to',
@@ -1414,63 +1368,58 @@ class RecurringTransactionService
             'not_contains' => 'does not contain',
             'starts_with' => 'starts with',
             'ends_with' => 'ends with',
-            'regex' => 'matches pattern'
+            'regex' => 'matches pattern',
         ];
-        
+
         return $descriptions[$operator] ?? $operator;
     }
 
     /**
      * Calculate the standard deviation of an array of values
-     *
-     * @param array $values
-     * @return float
      */
     protected function calculateStandardDeviation(array $values): float
     {
         if (count($values) <= 1) {
             return 0;
         }
-        
+
         $mean = array_sum($values) / count($values);
-        $squaredDifferences = array_map(function($value) use ($mean) {
+        $squaredDifferences = array_map(function ($value) use ($mean) {
             return pow($value - $mean, 2);
         }, $values);
-        
+
         $variance = array_sum($squaredDifferences) / count($values);
+
         return sqrt($variance);
     }
 
     /**
      * Detect outliers in transaction amounts using IQR method
-     *
-     * @param Collection $amounts
-     * @return array
      */
     protected function detectOutliers(Collection $amounts): array
     {
         if ($amounts->count() < 4) {
             return ['outliers' => [], 'clean_amounts' => $amounts];
         }
-        
+
         $sorted = $amounts->sort()->values();
         $count = $sorted->count();
-        
+
         // Calculate quartiles
-        $q1Index = (int)floor(($count - 1) * 0.25);
-        $q3Index = (int)floor(($count - 1) * 0.75);
-        
+        $q1Index = (int) floor(($count - 1) * 0.25);
+        $q3Index = (int) floor(($count - 1) * 0.75);
+
         $q1 = $sorted[$q1Index];
         $q3 = $sorted[$q3Index];
         $iqr = $q3 - $q1;
-        
+
         // Define outlier bounds
         $lowerBound = $q1 - (1.5 * $iqr);
         $upperBound = $q3 + (1.5 * $iqr);
-        
+
         $outliers = [];
         $cleanAmounts = collect();
-        
+
         foreach ($amounts as $amount) {
             if ($amount < $lowerBound || $amount > $upperBound) {
                 $outliers[] = $amount;
@@ -1478,19 +1427,16 @@ class RecurringTransactionService
                 $cleanAmounts->push($amount);
             }
         }
-        
+
         return [
             'outliers' => $outliers,
             'clean_amounts' => $cleanAmounts,
-            'outlier_bounds' => ['lower' => $lowerBound, 'upper' => $upperBound]
+            'outlier_bounds' => ['lower' => $lowerBound, 'upper' => $upperBound],
         ];
     }
-    
+
     /**
      * Calculate trend analysis for transaction amounts over time
-     *
-     * @param Collection $transactions
-     * @return array
      */
     protected function calculateTrendAnalysis(Collection $transactions): array
     {
@@ -1499,20 +1445,20 @@ class RecurringTransactionService
                 'trend' => 'insufficient_data',
                 'trend_direction' => 'stable',
                 'trend_strength' => 0,
-                'monthly_change_percent' => 0
+                'monthly_change_percent' => 0,
             ];
         }
-        
+
         // Sort by date ascending
         $sortedTransactions = $transactions->sortBy('date');
         $amounts = $sortedTransactions->pluck('amount_in_cents')->values();
         $dates = $sortedTransactions->pluck('date')->values();
-        
+
         // Simple linear regression to detect trend
         $n = $amounts->count();
         $x = collect(range(1, $n)); // Time indices
         $y = $amounts;
-        
+
         $sumX = $x->sum();
         $sumY = $y->sum();
         $sumXY = $x->zip($y)->map(function ($pair) {
@@ -1521,130 +1467,125 @@ class RecurringTransactionService
         $sumX2 = $x->map(function ($val) {
             return $val * $val;
         })->sum();
-        
+
         $slope = ($n * $sumXY - $sumX * $sumY) / ($n * $sumX2 - $sumX * $sumX);
         $intercept = ($sumY - $slope * $sumX) / $n;
-        
+
         // Calculate correlation coefficient for trend strength
         $meanX = $sumX / $n;
         $meanY = $sumY / $n;
-        
+
         $numerator = $x->zip($y)->map(function ($pair) use ($meanX, $meanY) {
             return ($pair[0] - $meanX) * ($pair[1] - $meanY);
         })->sum();
-        
+
         $denomX = sqrt($x->map(function ($val) use ($meanX) {
             return pow($val - $meanX, 2);
         })->sum());
-        
+
         $denomY = sqrt($y->map(function ($val) use ($meanY) {
             return pow($val - $meanY, 2);
         })->sum());
-        
+
         $correlation = $denomX > 0 && $denomY > 0 ? $numerator / ($denomX * $denomY) : 0;
-        
+
         // Determine trend direction and strength
         $trendDirection = 'stable';
         if (abs($slope) > abs($meanY) * 0.01) { // If slope is more than 1% of mean
             $trendDirection = $slope > 0 ? 'increasing' : 'decreasing';
         }
-        
+
         // Calculate monthly change percentage
         $firstDate = $dates->first();
         $lastDate = $dates->last();
         $daysDiff = (int) $firstDate->diffInDays($lastDate);
         $monthlyChangePercent = 0;
-        
+
         if ($daysDiff > 0) {
             $totalChangePercent = (($amounts->last() - $amounts->first()) / abs($amounts->first())) * 100;
             $monthlyChangePercent = ($totalChangePercent / $daysDiff) * 30; // Approximate monthly change
         }
-        
+
         return [
             'trend' => $trendDirection,
             'trend_direction' => $trendDirection,
             'trend_strength' => abs($correlation),
             'slope' => $slope,
             'correlation' => $correlation,
-            'monthly_change_percent' => $monthlyChangePercent
+            'monthly_change_percent' => $monthlyChangePercent,
         ];
     }
-    
+
     /**
      * Calculate confidence score for amount prediction
-     *
-     * @param Collection $transactions
-     * @param array $outlierAnalysis
-     * @param array $trendAnalysis
-     * @return array
      */
     protected function calculateConfidenceScore(Collection $transactions, array $outlierAnalysis, array $trendAnalysis): array
     {
         $score = 100; // Start with perfect confidence
         $factors = [];
-        
+
         // Factor 1: Sample size
         $sampleSize = $transactions->count();
         if ($sampleSize < 3) {
             $score -= 50;
-            $factors[] = 'Very small sample size (' . $sampleSize . ' transactions)';
+            $factors[] = 'Very small sample size ('.$sampleSize.' transactions)';
         } elseif ($sampleSize < 6) {
             $score -= 25;
-            $factors[] = 'Small sample size (' . $sampleSize . ' transactions)';
+            $factors[] = 'Small sample size ('.$sampleSize.' transactions)';
         } elseif ($sampleSize < 12) {
             $score -= 10;
-            $factors[] = 'Moderate sample size (' . $sampleSize . ' transactions)';
+            $factors[] = 'Moderate sample size ('.$sampleSize.' transactions)';
         }
-        
+
         // Factor 2: Data age (transactions older than 6 months get lower confidence)
         $oldestTransaction = $transactions->min('date');
         $newestTransaction = $transactions->max('date');
         $daysSinceNewest = (int) now()->diffInDays($newestTransaction);
         $dataSpanDays = (int) $oldestTransaction->diffInDays($newestTransaction);
-        
+
         if ($daysSinceNewest > 90) {
             $score -= 20;
-            $factors[] = 'Data is outdated (newest transaction is ' . $daysSinceNewest . ' days old)';
+            $factors[] = 'Data is outdated (newest transaction is '.$daysSinceNewest.' days old)';
         } elseif ($daysSinceNewest > 30) {
             $score -= 10;
-            $factors[] = 'Somewhat outdated data (newest transaction is ' . $daysSinceNewest . ' days old)';
+            $factors[] = 'Somewhat outdated data (newest transaction is '.$daysSinceNewest.' days old)';
         }
-        
+
         // Factor 3: Outliers
         $outlierCount = count($outlierAnalysis['outliers']);
         $outlierPercent = $sampleSize > 0 ? ($outlierCount / $sampleSize) * 100 : 0;
         if ($outlierPercent > 20) {
             $score -= 25;
-            $factors[] = 'High outlier rate (' . round($outlierPercent, 1) . '%)';
+            $factors[] = 'High outlier rate ('.round($outlierPercent, 1).'%)';
         } elseif ($outlierPercent > 10) {
             $score -= 15;
-            $factors[] = 'Moderate outlier rate (' . round($outlierPercent, 1) . '%)';
+            $factors[] = 'Moderate outlier rate ('.round($outlierPercent, 1).'%)';
         }
-        
+
         // Factor 4: Trend volatility
         if ($trendAnalysis['trend_strength'] > 0.7) {
             if ($trendAnalysis['trend_direction'] !== 'stable') {
                 $score -= 15;
-                $factors[] = 'Strong ' . $trendAnalysis['trend_direction'] . ' trend detected';
+                $factors[] = 'Strong '.$trendAnalysis['trend_direction'].' trend detected';
             }
         }
-        
+
         // Factor 5: Data consistency (coefficient of variation)
         $amounts = $transactions->pluck('amount_in_cents');
         $mean = $amounts->avg();
         $stdDev = $this->calculateStandardDeviation($amounts->toArray());
         $coefficientOfVariation = $mean != 0 ? ($stdDev / abs($mean)) * 100 : 0;
-        
+
         if ($coefficientOfVariation > 50) {
             $score -= 20;
-            $factors[] = 'High amount variability (CV: ' . round($coefficientOfVariation, 1) . '%)';
+            $factors[] = 'High amount variability (CV: '.round($coefficientOfVariation, 1).'%)';
         } elseif ($coefficientOfVariation > 25) {
             $score -= 10;
-            $factors[] = 'Moderate amount variability (CV: ' . round($coefficientOfVariation, 1) . '%)';
+            $factors[] = 'Moderate amount variability (CV: '.round($coefficientOfVariation, 1).'%)';
         }
-        
+
         $score = max(0, min(100, $score)); // Clamp between 0-100
-        
+
         return [
             'score' => $score,
             'level' => $score >= 80 ? 'high' : ($score >= 60 ? 'medium' : 'low'),
@@ -1654,11 +1595,11 @@ class RecurringTransactionService
                 'data_age_days' => $daysSinceNewest,
                 'outlier_percentage' => $outlierPercent,
                 'coefficient_of_variation' => $coefficientOfVariation,
-                'trend_strength' => $trendAnalysis['trend_strength']
-            ]
+                'trend_strength' => $trendAnalysis['trend_strength'],
+            ],
         ];
     }
-    
+
     /**
      * Calculate improved dynamic amount using advanced analytics
      *
@@ -1666,105 +1607,102 @@ class RecurringTransactionService
      * 1. If rules exist, find matching transactions via rules
      * 2. If no rules but has linked transactions, use those
      * 3. Fall back to stored average_amount or amount_in_cents
-     *
-     * @param RecurringTransactionTemplate $template
-     * @return array
      */
     protected function calculateImprovedDynamicAmount(RecurringTransactionTemplate $template): array
     {
         $rules = $template->rules()->where('is_active', true)->get();
         $matchingTransactions = collect();
         $matchMethod = 'none';
-        
+
         // Priority 1: If rules exist, use rule-based matching
         if ($rules->isNotEmpty()) {
             $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
             $matchMethod = 'rules';
         }
-        
+
         // Priority 2: If no rules or no rule matches, check linked transactions
         if ($matchingTransactions->isEmpty()) {
             $linkedTransactions = $template->transactions()->get();
-            
+
             if ($linkedTransactions->isNotEmpty()) {
                 $matchingTransactions = $linkedTransactions;
                 $matchMethod = 'linked_transactions';
             }
         }
-        
+
         // Priority 3: If still no transactions, fall back to stored values
         if ($matchingTransactions->isEmpty()) {
-            $factors = $rules->isEmpty() 
-                ? ['No rules configured and no linked transactions'] 
+            $factors = $rules->isEmpty()
+                ? ['No rules configured and no linked transactions']
                 : ['No matching transactions found'];
-            
+
             return [
-                'amount' => $template->average_amount ? (int)($template->average_amount * 100) : $template->amount_in_cents,
+                'amount' => $template->average_amount ? (int) ($template->average_amount * 100) : $template->amount_in_cents,
                 'method' => 'fallback',
-                'confidence' => ['score' => 0, 'level' => 'low', 'factors' => $factors]
+                'confidence' => ['score' => 0, 'level' => 'low', 'factors' => $factors],
             ];
         }
-        
+
         // Apply min/max filtering
         $filteredTransactions = $matchingTransactions->filter(function ($transaction) use ($template) {
             $amount = $transaction->amount_in_cents;
             $absAmount = abs($amount);
-            
+
             if ($template->min_amount !== null && $absAmount < abs($template->min_amount)) {
                 return false;
             }
-            
+
             if ($template->max_amount !== null && $absAmount > abs($template->max_amount)) {
                 return false;
             }
-            
+
             return true;
         });
-        
+
         if ($filteredTransactions->isEmpty()) {
             return [
-                'amount' => $template->average_amount ? (int)($template->average_amount * 100) : $template->amount_in_cents,
+                'amount' => $template->average_amount ? (int) ($template->average_amount * 100) : $template->amount_in_cents,
                 'method' => 'fallback',
-                'confidence' => ['score' => 0, 'level' => 'low', 'factors' => ['All transactions filtered out by constraints']]
+                'confidence' => ['score' => 0, 'level' => 'low', 'factors' => ['All transactions filtered out by constraints']],
             ];
         }
-        
+
         $amounts = $filteredTransactions->pluck('amount_in_cents');
-        
+
         // Advanced analytics
         $outlierAnalysis = $this->detectOutliers($amounts);
         $trendAnalysis = $this->calculateTrendAnalysis($filteredTransactions);
         $confidenceAnalysis = $this->calculateConfidenceScore($filteredTransactions, $outlierAnalysis, $trendAnalysis);
-        
+
         // Choose calculation method based on data quality
         $cleanAmounts = $outlierAnalysis['clean_amounts'];
         $projectedAmount = 0;
         $method = 'basic_average';
-        
+
         if ($cleanAmounts->count() >= 3 && $confidenceAnalysis['score'] >= 60) {
             // Use weighted average favoring recent transactions
             $weightedSum = 0;
             $weightSum = 0;
-            
+
             foreach ($filteredTransactions as $index => $transaction) {
                 $amount = $transaction->amount_in_cents;
-                
+
                 // Skip outliers for weighted calculation
                 if (in_array($amount, $outlierAnalysis['outliers'])) {
                     continue;
                 }
-                
+
                 // Weight more recent transactions higher
                 $daysAgo = (int) now()->diffInDays($transaction->date);
                 $weight = 1 / (1 + $daysAgo / 30); // Exponential decay over months
-                
+
                 $weightedSum += $amount * $weight;
                 $weightSum += $weight;
             }
-            
-            $projectedAmount = $weightSum > 0 ? (int)($weightedSum / $weightSum) : $cleanAmounts->avg();
+
+            $projectedAmount = $weightSum > 0 ? (int) ($weightedSum / $weightSum) : $cleanAmounts->avg();
             $method = 'weighted_average_no_outliers';
-            
+
             // Apply trend adjustment if trend is strong
             if ($trendAnalysis['trend_strength'] > 0.6 && abs($trendAnalysis['monthly_change_percent']) > 5) {
                 $trendAdjustment = $projectedAmount * ($trendAnalysis['monthly_change_percent'] / 100);
@@ -1776,38 +1714,35 @@ class RecurringTransactionService
             $projectedAmount = $cleanAmounts->isEmpty() ? $amounts->avg() : $cleanAmounts->avg();
             $method = $cleanAmounts->isEmpty() ? 'basic_average' : 'outlier_filtered_average';
         }
-        
+
         return [
-            'amount' => (int)$projectedAmount,
+            'amount' => (int) $projectedAmount,
             'method' => $method,
             'confidence' => $confidenceAnalysis,
             'outlier_analysis' => $outlierAnalysis,
             'trend_analysis' => $trendAnalysis,
             'sample_size' => $filteredTransactions->count(),
-            'clean_sample_size' => $cleanAmounts->count()
+            'clean_sample_size' => $cleanAmounts->count(),
         ];
     }
-    
+
     /**
      * Get comprehensive amount analysis for a template based on all its rules
-     *
-     * @param RecurringTransactionTemplate $template
-     * @return array
      */
     public function getAmountAnalysis(RecurringTransactionTemplate $template): array
     {
-        if (!$template->is_dynamic_amount) {
+        if (! $template->is_dynamic_amount) {
             return [
                 'is_dynamic' => false,
                 'fixed_amount' => $template->amount_in_cents,
-                'projected_amount' => $template->amount_in_cents
+                'projected_amount' => $template->amount_in_cents,
             ];
         }
-        
+
         // Use the improved calculation method
         $improvedCalculation = $this->calculateImprovedDynamicAmount($template);
         $rules = $this->getRules($template);
-        
+
         $baseResult = [
             'is_dynamic' => true,
             'has_rules' => $rules->isNotEmpty(),
@@ -1815,33 +1750,34 @@ class RecurringTransactionService
             'projected_amount' => $improvedCalculation['amount'],
             'calculation_method' => $improvedCalculation['method'],
             'confidence' => $improvedCalculation['confidence'],
-            'fallback_used' => $improvedCalculation['method'] === 'fallback'
+            'fallback_used' => $improvedCalculation['method'] === 'fallback',
         ];
-        
+
         if ($improvedCalculation['method'] === 'fallback') {
             $baseResult['fallback_type'] = $template->average_amount ? 'stored_average' : 'template_default';
+
             return $baseResult;
         }
-        
+
         // Add detailed analytics for successful calculations
         $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
         $filteredTransactions = $matchingTransactions->filter(function ($transaction) use ($template) {
             $amount = $transaction->amount_in_cents;
             $absAmount = abs($amount);
-            
+
             if ($template->min_amount !== null && $absAmount < abs($template->min_amount)) {
                 return false;
             }
-            
+
             if ($template->max_amount !== null && $absAmount > abs($template->max_amount)) {
                 return false;
             }
-            
+
             return true;
         });
-        
+
         $amounts = $filteredTransactions->pluck('amount_in_cents');
-        
+
         return array_merge($baseResult, [
             'matching_transactions_count' => $matchingTransactions->count(),
             'filtered_transactions_count' => $filteredTransactions->count(),
@@ -1853,21 +1789,18 @@ class RecurringTransactionService
                 'min' => $amounts->min(),
                 'max' => $amounts->max(),
                 'std_dev' => $this->calculateStandardDeviation($amounts->toArray()),
-                'count' => $amounts->count()
+                'count' => $amounts->count(),
             ],
             'constraints' => [
                 'min_amount' => $template->min_amount,
                 'max_amount' => $template->max_amount,
-                'stored_average' => $template->average_amount
-            ]
+                'stored_average' => $template->average_amount,
+            ],
         ]);
     }
-    
+
     /**
      * Get the next occurrence date for a recurring transaction template
-     *
-     * @param RecurringTransactionTemplate $template
-     * @return Carbon|null
      */
     public function getNextOccurrenceDate(RecurringTransactionTemplate $template): ?Carbon
     {
@@ -1877,7 +1810,6 @@ class RecurringTransactionService
     /**
      * Calculate projected monthly cash flow for an account based on recurring transactions
      *
-     * @param Account $account
      * @return int Cash flow in cents (positive = net income, negative = net expense)
      */
     public function calculateMonthlyProjectedCashFlow(Account $account): int
@@ -1906,8 +1838,7 @@ class RecurringTransactionService
      * large purchases typically represent planned one-off expenses covered by
      * savings transfers, not the regular daily spending pattern.
      *
-     * @param Account $creditCard
-     * @param int $oneTimePurchaseThresholdCents Threshold for one-time purchases (default $500 = 50000 cents)
+     * @param  int  $oneTimePurchaseThresholdCents  Threshold for one-time purchases (default $500 = 50000 cents)
      * @return array{amount: int, metadata: array}
      */
     protected function calculateProjectedStatementBalance(
@@ -1916,8 +1847,8 @@ class RecurringTransactionService
     ): array {
         /** @var PlaidAccount|null $plaidAccount */
         $plaidAccount = $creditCard->plaidAccount;
-        
-        if (!$plaidAccount) {
+
+        if (! $plaidAccount) {
             return [
                 'amount' => $creditCard->current_balance_cents ?? 0,
                 'metadata' => ['projection_method' => 'fallback_current_balance'],
@@ -1937,6 +1868,7 @@ class RecurringTransactionService
         if ($daysSinceStatement <= 0) {
             // Statement just closed, use historical average instead
             $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
+
             return [
                 'amount' => $historicalResult['amount'],
                 'metadata' => array_merge($historicalResult['metadata'], [
@@ -1949,6 +1881,7 @@ class RecurringTransactionService
         if ($rawSpendingSinceStatement <= 0) {
             // Use historical average when no net spending
             $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
+
             return [
                 'amount' => $historicalResult['amount'],
                 'metadata' => array_merge($historicalResult['metadata'], [
@@ -1965,7 +1898,7 @@ class RecurringTransactionService
             $plaidAccount->last_statement_issue_date,
             $oneTimePurchaseThresholdCents
         );
-        
+
         // Calculate "regular" spending by excluding large one-time purchases
         // This is used only for computing the per-day average, not the base total
         $regularSpendingForAverage = $rawSpendingSinceStatement - $oneTimePurchaseData['total_excluded_cents'];
@@ -1976,13 +1909,13 @@ class RecurringTransactionService
             // All spending was one-time purchases, so assume minimal regular spending going forward
             // Use historical average for the projection instead
             $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
-            
+
             // But still add the actual spending so far to the historical projection rate
             // The projection is: what we've spent so far + historical average for remaining days
             $historicalDailyAverage = $historicalResult['amount'] / $cycleLength;
             $projectedRemainder = (int) round($historicalDailyAverage * $daysRemainingInCycle);
             $projectedBalance = $rawSpendingSinceStatement + $projectedRemainder;
-            
+
             return [
                 'amount' => $projectedBalance,
                 'metadata' => [
@@ -2034,16 +1967,16 @@ class RecurringTransactionService
      * Trace autopay projection calculation for debugging.
      * Call from tinker: app(RecurringTransactionService::class)->traceAutopayProjection($account)
      *
-     * @param Account $creditCard The credit card account to trace
+     * @param  Account  $creditCard  The credit card account to trace
      * @return array Detailed calculation breakdown with tagged identifiers
      */
     public function traceAutopayProjection(Account $creditCard): array
     {
-        $tag = 'AUTOPAY_TRACE_' . $creditCard->id;
-        
+        $tag = 'AUTOPAY_TRACE_'.$creditCard->id;
+
         /** @var PlaidAccount|null $plaidAccount */
         $plaidAccount = $creditCard->plaidAccount;
-        
+
         $trace = [
             'tag' => $tag,
             'timestamp' => now()->toIso8601String(),
@@ -2055,20 +1988,21 @@ class RecurringTransactionService
                 'autopay_source_id' => $creditCard->autopay_source_account_id,
             ],
         ];
-        
-        if (!$plaidAccount) {
+
+        if (! $plaidAccount) {
             $trace['error'] = 'No PlaidAccount linked';
             $trace['result'] = $creditCard->current_balance_cents / 100;
+
             return $trace;
         }
-        
+
         $currentBalance = $creditCard->current_balance_cents ?? 0;
         $statementBalance = $plaidAccount->last_statement_balance_cents ?? 0;
         $spendingSinceStatement = $currentBalance - $statementBalance;
         $daysSinceStatement = $plaidAccount->getDaysSinceStatement() ?? 0;
         $daysRemainingInCycle = $plaidAccount->getDaysRemainingInCycle() ?? 0;
         $cycleLength = $plaidAccount->getStatementCycleLength();
-        
+
         $trace['plaid_account'] = [
             'id' => $plaidAccount->id,
             'last_statement_balance' => $statementBalance / 100,
@@ -2077,41 +2011,41 @@ class RecurringTransactionService
             'days_remaining_in_cycle' => $daysRemainingInCycle,
             'cycle_length' => $cycleLength,
         ];
-        
+
         $trace['inputs'] = [
             'current_balance' => $currentBalance / 100,
             'statement_balance' => $statementBalance / 100,
             'spending_since_statement' => $spendingSinceStatement / 100,
         ];
-        
+
         // Check for one-time purchase adjustments
         $oneTimePurchases = $this->calculateOneTimePurchaseAdjustment(
             $creditCard,
             $plaidAccount->last_statement_issue_date,
             50000 // $500 threshold
         );
-        
+
         $regularSpending = $spendingSinceStatement - $oneTimePurchases['total_excluded_cents'];
-        
+
         $trace['one_time_purchases'] = [
             'total_excluded' => $oneTimePurchases['total_excluded_cents'] / 100,
             'count' => $oneTimePurchases['count'],
-            'transactions' => array_map(fn($t) => [
+            'transactions' => array_map(fn ($t) => [
                 'description' => $t['description'],
                 'amount' => abs($t['amount_cents']) / 100,
                 'date' => $t['date'],
             ], $oneTimePurchases['transactions'] ?? []),
         ];
-        
+
         $trace['calculation'] = [
             'regular_spending_for_average' => $regularSpending / 100,
         ];
-        
+
         if ($daysSinceStatement > 0 && $regularSpending > 0) {
             $dailyAverage = $regularSpending / $daysSinceStatement;
             $projectedRemainder = $dailyAverage * $daysRemainingInCycle;
             $projectedTotal = $spendingSinceStatement + $projectedRemainder;
-            
+
             $trace['calculation']['daily_average'] = round($dailyAverage / 100, 2);
             $trace['calculation']['projected_remainder'] = round($projectedRemainder / 100, 2);
             $trace['calculation']['formula'] = sprintf(
@@ -2126,13 +2060,13 @@ class RecurringTransactionService
         } else {
             // Would use historical average
             $historicalResult = $this->calculateWeightedHistoricalAverage($creditCard);
-            $trace['calculation']['fallback_reason'] = $daysSinceStatement <= 0 
-                ? 'days_since_statement <= 0' 
+            $trace['calculation']['fallback_reason'] = $daysSinceStatement <= 0
+                ? 'days_since_statement <= 0'
                 : 'regular_spending <= 0';
             $trace['result'] = $historicalResult['amount'] / 100;
             $trace['method'] = $historicalResult['metadata']['projection_method'] ?? 'historical_average';
         }
-        
+
         // Also get what generateAutopayProjections would return
         $budget = $creditCard->budget;
         if ($budget) {
@@ -2140,29 +2074,28 @@ class RecurringTransactionService
                 $budget,
                 Carbon::now(),
                 Carbon::now()->addMonths(3)
-            )->filter(fn($p) => str_contains($p->description, $creditCard->name) || 
+            )->filter(fn ($p) => str_contains($p->description, $creditCard->name) ||
                                 $p->description === $creditCard->name);
-            
-            $trace['generated_projections'] = $projections->map(fn($p) => [
+
+            $trace['generated_projections'] = $projections->map(fn ($p) => [
                 'date' => $p->date->format('Y-m-d'),
                 'amount' => abs($p->amount_in_cents) / 100,
                 'method' => $p->metadata['projection_method'] ?? 'unknown',
             ])->values()->toArray();
         }
-        
+
         return $trace;
     }
 
     /**
      * Calculate the total of large one-time purchases to exclude from spending projections.
-     * 
+     *
      * These are typically planned purchases (electronics, appliances, etc.) that are
      * covered by a transfer from savings and shouldn't affect the regular monthly
      * spending projection.
      *
-     * @param Account $creditCard
-     * @param Carbon|string|null $statementIssueDate
-     * @param int $thresholdCents Minimum amount to consider as one-time purchase (as positive value)
+     * @param  Carbon|string|null  $statementIssueDate
+     * @param  int  $thresholdCents  Minimum amount to consider as one-time purchase (as positive value)
      * @return array{total_excluded_cents: int, count: int, transactions: array}
      */
     protected function calculateOneTimePurchaseAdjustment(
@@ -2170,7 +2103,7 @@ class RecurringTransactionService
         $statementIssueDate,
         int $thresholdCents
     ): array {
-        if (!$statementIssueDate) {
+        if (! $statementIssueDate) {
             return [
                 'total_excluded_cents' => 0,
                 'count' => 0,
@@ -2179,8 +2112,8 @@ class RecurringTransactionService
             ];
         }
 
-        $statementDate = $statementIssueDate instanceof Carbon 
-            ? $statementIssueDate 
+        $statementDate = $statementIssueDate instanceof Carbon
+            ? $statementIssueDate
             : Carbon::parse($statementIssueDate);
 
         // Query transactions on this credit card since the statement date
@@ -2188,7 +2121,7 @@ class RecurringTransactionService
         // (e.g., a $1,500 purchase is stored as -150000 cents)
         // So we look for amounts <= -threshold (large negative = large expense)
         $negativeThreshold = -1 * abs($thresholdCents);
-        
+
         $largeTransactions = Transaction::where('account_id', $creditCard->id)
             ->where('date', '>', $statementDate)
             ->where('amount_in_cents', '<=', $negativeThreshold)
@@ -2206,7 +2139,7 @@ class RecurringTransactionService
             'negative_threshold' => $negativeThreshold,
             'large_transactions_count' => $largeTransactions->count(),
             'total_excluded_cents' => $totalExcluded,
-            'transactions' => $largeTransactions->map(fn($t) => [
+            'transactions' => $largeTransactions->map(fn ($t) => [
                 'description' => $t->description,
                 'amount_cents' => $t->amount_in_cents,
                 'date' => $t->date->format('Y-m-d'),
@@ -2217,7 +2150,7 @@ class RecurringTransactionService
             'total_excluded_cents' => $totalExcluded,
             'count' => $largeTransactions->count(),
             'threshold_cents' => $thresholdCents,
-            'transactions' => $largeTransactions->map(fn($t) => [
+            'transactions' => $largeTransactions->map(fn ($t) => [
                 'id' => $t->id,
                 'description' => $t->description,
                 'amount_cents' => $t->amount_in_cents,
@@ -2229,13 +2162,12 @@ class RecurringTransactionService
     /**
      * Calculate average monthly spending from credit card transaction history.
      * This is used as a fallback when statement history is not available.
-     * 
+     *
      * Groups transactions by calendar month, sums spending (negative amounts),
      * applies outlier detection, and calculates weighted average.
      *
-     * @param Account $creditCard
-     * @param int $maxMonths Maximum months of history to consider
-     * @param float $decayFactor Weight decay per month (default 0.7)
+     * @param  int  $maxMonths  Maximum months of history to consider
+     * @param  float  $decayFactor  Weight decay per month (default 0.7)
      * @return array{amount: int, months_used: int, metadata: array}
      */
     protected function calculateMonthlySpendingFromTransactions(
@@ -2246,7 +2178,7 @@ class RecurringTransactionService
         // Query transactions from the credit card account
         // Only include expenses (negative amounts) from the past N months
         $startDate = Carbon::now()->subMonths($maxMonths)->startOfMonth();
-        
+
         $transactions = Transaction::where('account_id', $creditCard->id)
             ->where('amount_in_cents', '<', 0) // Only expenses
             ->where('date', '>=', $startDate)
@@ -2289,7 +2221,7 @@ class RecurringTransactionService
         $monthlyAmounts = collect($monthlyTotals->values());
         $outlierAnalysis = $this->detectOutliers($monthlyAmounts);
         $cleanAmounts = $outlierAnalysis['clean_amounts'];
-        
+
         // If all months were filtered as outliers, use all data
         if ($cleanAmounts->isEmpty()) {
             $cleanAmounts = $monthlyAmounts;
@@ -2303,13 +2235,13 @@ class RecurringTransactionService
 
         foreach ($monthlyTotals as $month => $amount) {
             // Skip if this month was identified as an outlier
-            if (!$cleanAmounts->contains($amount) && $outlierAnalysis['outliers']) {
+            if (! $cleanAmounts->contains($amount) && $outlierAnalysis['outliers']) {
                 continue;
             }
 
             $index = array_search($month, $monthKeys);
             $weight = pow($decayFactor, $index); // 1.0, 0.7, 0.49, 0.34, ...
-            
+
             $weightedSum += $amount * $weight;
             $totalWeight += $weight;
             $weights[] = [
@@ -2322,7 +2254,7 @@ class RecurringTransactionService
 
         // Add excluded months to metadata
         foreach ($monthlyTotals as $month => $amount) {
-            if (!$cleanAmounts->contains($amount) && $outlierAnalysis['outliers']) {
+            if (! $cleanAmounts->contains($amount) && $outlierAnalysis['outliers']) {
                 $weights[] = [
                     'month' => $month,
                     'spending_cents' => $amount,
@@ -2370,36 +2302,36 @@ class RecurringTransactionService
      * Calculate weighted historical average from statement history.
      * Uses exponential decay weighting (more recent = higher weight).
      *
-     * @param Account $creditCard
-     * @param float $decayFactor Weight decay per month (default 0.7)
-     * @param int $maxMonths Maximum months of history to consider
+     * @param  float  $decayFactor  Weight decay per month (default 0.7)
+     * @param  int  $maxMonths  Maximum months of history to consider
      * @return array{amount: int, metadata: array}
      */
     protected function calculateWeightedHistoricalAverage(
-        Account $creditCard, 
-        float $decayFactor = 0.7, 
+        Account $creditCard,
+        float $decayFactor = 0.7,
         int $maxMonths = 6
     ): array {
         /** @var PlaidAccount|null $plaidAccount */
         $plaidAccount = $creditCard->plaidAccount;
-        
-        if (!$plaidAccount) {
+
+        if (! $plaidAccount) {
             // No Plaid account - try transaction-based calculation first
             $transactionResult = $this->calculateMonthlySpendingFromTransactions(
-                $creditCard, 
-                $maxMonths, 
+                $creditCard,
+                $maxMonths,
                 $decayFactor
             );
-            
+
             if ($transactionResult['months_used'] > 0) {
                 return [
                     'amount' => $transactionResult['amount'],
                     'metadata' => $transactionResult['metadata'],
                 ];
             }
-            
+
             // Fallback to current balance
             $fallbackAmount = $creditCard->current_balance_cents ?? 0;
+
             return [
                 'amount' => $fallbackAmount,
                 'metadata' => [
@@ -2419,11 +2351,11 @@ class RecurringTransactionService
         // A single statement isn't enough for a meaningful weighted average
         if ($statements->count() < 2) {
             $transactionResult = $this->calculateMonthlySpendingFromTransactions(
-                $creditCard, 
-                $maxMonths, 
+                $creditCard,
+                $maxMonths,
                 $decayFactor
             );
-            
+
             if ($transactionResult['months_used'] >= 2) {
                 // Transaction-based has more data points, use it
                 return [
@@ -2434,7 +2366,7 @@ class RecurringTransactionService
                     ]),
                 ];
             }
-            
+
             // If we have 1 statement and transaction-based doesn't have enough data,
             // fall through to use the statement data below
             if ($statements->isEmpty()) {
@@ -2445,11 +2377,12 @@ class RecurringTransactionService
                         'metadata' => $transactionResult['metadata'],
                     ];
                 }
-                
+
                 // Final fallback: use current statement balance
-                $fallbackAmount = $plaidAccount->last_statement_balance_cents 
-                    ?? $creditCard->current_balance_cents 
+                $fallbackAmount = $plaidAccount->last_statement_balance_cents
+                    ?? $creditCard->current_balance_cents
                     ?? 0;
+
                 return [
                     'amount' => $fallbackAmount,
                     'metadata' => [
@@ -2468,7 +2401,7 @@ class RecurringTransactionService
         foreach ($statements as $index => $statement) {
             $weight = pow($decayFactor, $index); // 1.0, 0.7, 0.49, 0.34, ...
             $balance = $statement->statement_balance_cents ?? 0;
-            
+
             $weightedSum += $balance * $weight;
             $totalWeight += $weight;
             $weights[] = [
@@ -2494,9 +2427,6 @@ class RecurringTransactionService
     /**
      * Generate autopay deduction projections for all autopay-enabled credit cards.
      *
-     * @param Budget $budget
-     * @param Carbon $startDate
-     * @param Carbon $endDate
      * @return Collection Collection of projected transactions (not persisted)
      */
     public function generateAutopayProjections(Budget $budget, Carbon $startDate, Carbon $endDate): Collection
@@ -2512,7 +2442,7 @@ class RecurringTransactionService
             ->get();
 
         foreach ($autopayAccounts as $creditCard) {
-            if (!$creditCard->hasActiveAutopay()) {
+            if (! $creditCard->hasActiveAutopay()) {
                 continue;
             }
 
@@ -2520,7 +2450,7 @@ class RecurringTransactionService
             $firstPaymentAmount = $creditCard->getAutopayAmountCents();
 
             // Skip if no payment date or amount
-            if (!$firstPaymentDate || !$firstPaymentAmount) {
+            if (! $firstPaymentDate || ! $firstPaymentAmount) {
                 continue;
             }
 
@@ -2531,7 +2461,7 @@ class RecurringTransactionService
             // Generate autopay projections for all future months within the date range
             $currentPaymentDate = $firstPaymentDate->copy();
             $paymentNumber = 1;
-            
+
             while ($currentPaymentDate <= $endDate) {
                 // Only include if payment falls within projection window
                 if ($currentPaymentDate >= $startDate) {
@@ -2551,7 +2481,7 @@ class RecurringTransactionService
                         $paymentAmount = $futurePaymentProjection['amount'];
                         $projectionMetadata = $futurePaymentProjection['metadata'];
                     }
-                    
+
                     // Create deduction from source account
                     $projections->push($this->createAutopayProjection(
                         $creditCard->autopaySourceAccount,
@@ -2563,7 +2493,7 @@ class RecurringTransactionService
                         $projectionMetadata
                     ));
                 }
-                
+
                 // Move to next month's payment date
                 $currentPaymentDate->addMonth();
                 $paymentNumber++;
@@ -2576,14 +2506,8 @@ class RecurringTransactionService
     /**
      * Create a single autopay projection transaction.
      *
-     * @param Account $sourceAccount
-     * @param Account $creditCard
-     * @param Carbon $paymentDate
-     * @param int $amountCents
-     * @param bool $isFirstPayment
-     * @param int $paymentNumber The sequence number of this payment (1 = first, 2 = second, etc.)
-     * @param array $projectionMetadata Additional metadata about how the amount was calculated
-     * @return object
+     * @param  int  $paymentNumber  The sequence number of this payment (1 = first, 2 = second, etc.)
+     * @param  array  $projectionMetadata  Additional metadata about how the amount was calculated
      */
     private function createAutopayProjection(
         Account $sourceAccount,
@@ -2596,7 +2520,7 @@ class RecurringTransactionService
     ): object {
         $category = $this->getAutopayCategory($sourceAccount->budget);
         $description = $this->buildAutopayDescription($creditCard);
-        
+
         // Build comprehensive metadata
         $metadata = array_merge([
             'credit_card_id' => $creditCard->id,
@@ -2605,7 +2529,7 @@ class RecurringTransactionService
             'payment_due_date' => $paymentDate->format('Y-m-d'),
             'payment_number' => $paymentNumber,
         ], $projectionMetadata);
-        
+
         return (object) [
             'id' => null, // Not persisted
             'account_id' => $sourceAccount->id,
@@ -2628,9 +2552,6 @@ class RecurringTransactionService
 
     /**
      * Build a descriptive autopay description using institution and account mask.
-     *
-     * @param Account $creditCard
-     * @return string
      */
     private function buildAutopayDescription(Account $creditCard): string
     {
@@ -2640,9 +2561,6 @@ class RecurringTransactionService
 
     /**
      * Get or create "Credit Card Payment" category for autopay transactions.
-     *
-     * @param Budget $budget
-     * @return Category|null
      */
     private function getAutopayCategory(Budget $budget): ?Category
     {
@@ -2653,20 +2571,20 @@ class RecurringTransactionService
                 return $category;
             }
         }
-        
+
         // Fallback to query if not loaded
         $category = $budget->categories()
             ->where('name', 'Credit Card Payment')
             ->first();
 
-        if (!$category) {
+        if (! $category) {
             // Create if doesn't exist
             $category = $budget->categories()->create([
                 'name' => 'Credit Card Payment',
                 'amount' => 0, // Autopay amounts vary based on statement balance
                 'color' => '#EF4444', // Red
             ]);
-            
+
             // Add to loaded relationship if it exists
             if ($budget->relationLoaded('categories')) {
                 $budget->categories->push($category);
@@ -2697,5 +2615,4 @@ class RecurringTransactionService
             Cache::forget("template:{$templateId}:dynamic_amount");
         }
     }
-
 }

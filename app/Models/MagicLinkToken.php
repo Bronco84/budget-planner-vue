@@ -48,7 +48,7 @@ class MagicLinkToken extends Model
      */
     public function isValid(): bool
     {
-        return !$this->isExpired() && !$this->isUsed();
+        return ! $this->isExpired() && ! $this->isUsed();
     }
 
     /**
@@ -65,7 +65,7 @@ class MagicLinkToken extends Model
     public function scopeValid($query)
     {
         return $query->where('expires_at', '>', now())
-                     ->whereNull('used_at');
+            ->whereNull('used_at');
     }
 
     /**
@@ -84,4 +84,3 @@ class MagicLinkToken extends Model
         return $query->whereNotNull('used_at');
     }
 }
-

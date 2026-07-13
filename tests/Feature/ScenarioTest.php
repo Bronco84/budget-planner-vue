@@ -1,10 +1,10 @@
 <?php
 
-use App\Models\User;
-use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Budget;
 use App\Models\Scenario;
 use App\Models\ScenarioAdjustment;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -320,7 +320,3 @@ test('scenario adjustment generates correct recurring transactions', function ()
     expect($transactions)->toHaveCount(4);
     expect($transactions[0]['amount_in_cents'])->toBe(-100000);
 });
-
-
-
-

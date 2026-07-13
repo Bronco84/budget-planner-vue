@@ -39,7 +39,7 @@ class PayoffContextBuilder implements ContextBuilderInterface
                 $projection = null;
                 try {
                     $projectionData = $this->payoffPlanService->calculatePayoffProjection($plan);
-                    if (!empty($projectionData['timeline'])) {
+                    if (! empty($projectionData['timeline'])) {
                         $lastMonth = end($projectionData['timeline']);
                         $projection = [
                             'months_to_payoff' => count($projectionData['timeline']),
@@ -104,6 +104,7 @@ class PayoffContextBuilder implements ContextBuilderInterface
     public function getTokenEstimate(Budget $budget): int
     {
         $planCount = $budget->payoffPlans()->count();
+
         // ~100 tokens per plan + 20 for summary
         return ($planCount * 100) + 20;
     }

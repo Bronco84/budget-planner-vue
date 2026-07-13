@@ -1,32 +1,35 @@
 <?php
 
 use App\Http\Controllers\AccountController;
-use App\Models\Budget;
+use App\Http\Controllers\Api\UserPreferencesController;
 use App\Http\Controllers\BudgetController;
-use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\BudgetFilesController;
 use App\Http\Controllers\CalendarConnectionController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\FileController;
-use App\Http\Controllers\BudgetFilesController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\TransactionController;
-use App\Http\Controllers\TransferController;
-use App\Http\Controllers\RecurringTransactionController;
-use App\Http\Controllers\RecurringTransactionRuleController;
+use App\Http\Controllers\PayoffPlanController;
 use App\Http\Controllers\PlaidController;
 use App\Http\Controllers\PlaidLiabilitiesController;
 use App\Http\Controllers\PlaidStatementHistoryController;
 use App\Http\Controllers\PlaidTransactionController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectionsController;
+use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\RecurringTransactionAnalysisController;
-use App\Http\Controllers\PayoffPlanController;
+use App\Http\Controllers\RecurringTransactionController;
+use App\Http\Controllers\RecurringTransactionRuleController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ScenarioController;
-use Illuminate\Foundation\Application;
+use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\TransferController;
+use App\Http\Controllers\WebAuthn\WebAuthnLoginController;
+use App\Http\Controllers\WebAuthn\WebAuthnRegisterController;
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Models\Budget;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -35,24 +38,24 @@ Route::get('/', function () {
 // CSRF token refresh endpoint for auto-retry functionality
 Route::get('/csrf-token', function () {
     return response()->json([
-        'csrf_token' => csrf_token()
+        'csrf_token' => csrf_token(),
     ]);
 })->middleware('web');
 
 // WebAuthn routes (passkey authentication)
 // These routes need to bypass Inertia middleware to return pure JSON
 // We use withoutMiddleware to exclude HandleInertiaRequests
-Route::withoutMiddleware([\App\Http\Middleware\HandleInertiaRequests::class])->group(function () {
-    Route::post('webauthn/login/options', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'options'])
+Route::withoutMiddleware([HandleInertiaRequests::class])->group(function () {
+    Route::post('webauthn/login/options', [WebAuthnLoginController::class, 'options'])
         ->name('webauthn.login.options');
-    
-    Route::middleware('guest')->post('webauthn/login', [\App\Http\Controllers\WebAuthn\WebAuthnLoginController::class, 'login'])
+
+    Route::middleware('guest')->post('webauthn/login', [WebAuthnLoginController::class, 'login'])
         ->name('webauthn.login');
-    
+
     Route::middleware('auth')->group(function () {
-        Route::post('webauthn/register/options', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'options'])
+        Route::post('webauthn/register/options', [WebAuthnRegisterController::class, 'options'])
             ->name('webauthn.register.options');
-        Route::post('webauthn/register', [\App\Http\Controllers\WebAuthn\WebAuthnRegisterController::class, 'register'])
+        Route::post('webauthn/register', [WebAuthnRegisterController::class, 'register'])
             ->name('webauthn.register');
     });
 });
@@ -69,7 +72,7 @@ Route::middleware('auth')->group(function () {
 
     // Calendar routes
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
-    
+
     // Calendar connection routes
     Route::prefix('calendar')->name('calendar.')->group(function () {
         Route::get('/connections', [CalendarConnectionController::class, 'index'])->name('connections.index');
@@ -83,18 +86,20 @@ Route::middleware('auth')->group(function () {
     // Transactions redirect route - redirects to active budget's transactions
     Route::get('/transactions', function () {
         $activeBudget = auth()->user()->getActiveBudget();
-        if (!$activeBudget) {
+        if (! $activeBudget) {
             return redirect()->route('budgets.create');
         }
+
         return redirect()->route('budget.transaction.index', $activeBudget->id);
     })->name('transactions.index');
 
     // Recurring transactions redirect route - redirects to active budget's recurring transactions
     Route::get('/recurring-transactions', function () {
         $activeBudget = auth()->user()->getActiveBudget();
-        if (!$activeBudget) {
+        if (! $activeBudget) {
             return redirect()->route('budgets.create');
         }
+
         return redirect()->route('recurring-transactions.index', $activeBudget->id);
     })->name('recurring-transactions.redirect');
 
@@ -120,11 +125,11 @@ Route::middleware('auth')->group(function () {
         ->name('budget.account.projections');
     Route::get('budget/{budget}/account/{account}/balance-projection', [ProjectionsController::class, 'showBalanceProjection'])
         ->name('budget.account.balance-projection');
-    
+
     // Multi-account projection with scenarios
     Route::get('budget/{budget}/projections/multi-account', [ProjectionsController::class, 'showMultiAccountProjection'])
         ->name('budget.projections.multi-account');
-    
+
     // Scenario management routes
     Route::get('budgets/{budget}/scenarios', [ScenarioController::class, 'index'])
         ->name('budgets.scenarios.index');
@@ -152,12 +157,12 @@ Route::middleware('auth')->group(function () {
         ->name('accounts.clearLogo');
 
     // Property routes
-    Route::resource('budgets.properties', App\Http\Controllers\PropertyController::class);
+    Route::resource('budgets.properties', PropertyController::class);
 
     Route::resource('budgets.categories', CategoryController::class);
     Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])
         ->name('budgets.categories.reorder');
-    
+
     Route::get('budget/{budget}/transactions', [TransactionController::class, 'index'])
         ->name('budget.transaction.index');
     Route::get('budget/{budget}/transactions/create', [TransactionController::class, 'create'])
@@ -188,7 +193,7 @@ Route::middleware('auth')->group(function () {
         ->name('budget.transfers.update');
     Route::delete('budget/{budget}/transfers/{transfer}', [TransferController::class, 'destroy'])
         ->name('budget.transfers.destroy');
-        
+
     // Routes for recurring transactions
     Route::get('budget/{budget}/recurring-transactions', [RecurringTransactionController::class, 'index'])
         ->name('recurring-transactions.index');
@@ -212,7 +217,7 @@ Route::middleware('auth')->group(function () {
         ->name('recurring-transactions.diagnostics');
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/test-matching', [RecurringTransactionController::class, 'testMatching'])
         ->name('recurring-transactions.test-matching');
-    
+
     // Routes for recurring transaction rules
     Route::get('budget/{budget}/recurring-transactions/{recurring_transaction}/rules', [RecurringTransactionRuleController::class, 'index'])
         ->name('recurring-transactions.rules.index');
@@ -298,12 +303,12 @@ Route::middleware('auth')->group(function () {
         ->name('plaid.statement-history');
     Route::delete('budget/{budget}/account/{account}/plaid', [PlaidController::class, 'destroy'])
         ->name('plaid.destroy');
-    
+
     // New route for syncing all Plaid accounts in a budget
     Route::post('budget/{budget}/plaid/sync-all', [PlaidController::class, 'syncAllTransactions'])
         ->middleware('throttle:3,1')
         ->name('plaid.sync-all');
-    
+
     // Plaid transactions routes
     Route::get('budget/{budget}/account/{account}/plaid-transactions', [PlaidTransactionController::class, 'index'])
         ->name('plaid-transactions.index');
@@ -311,14 +316,14 @@ Route::middleware('auth')->group(function () {
         ->name('plaid-transactions.api');
     Route::get('budget/{budget}/account/{account}/plaid-transactions/{plaidTransactionId}', [PlaidTransactionController::class, 'show'])
         ->name('plaid-transactions.show');
-    
+
     // File attachment routes
     Route::post('transactions/{transaction}/files', [FileController::class, 'uploadToTransaction'])
         ->middleware('throttle:10,1')
         ->name('transactions.files.upload');
     Route::get('transactions/{transaction}/files', [FileController::class, 'getTransactionAttachments'])
         ->name('transactions.files.index');
-    
+
     // Budget files routes
     Route::get('budgets/{budget}/files', [BudgetFilesController::class, 'index'])
         ->name('budgets.files.index');
@@ -329,7 +334,7 @@ Route::middleware('auth')->group(function () {
         ->name('budgets.files.download');
     Route::delete('budgets/{budget}/files/{fileAttachment}', [BudgetFilesController::class, 'destroy'])
         ->name('budgets.files.destroy');
-    
+
     // Legacy file routes
     Route::get('files/{attachment}/download', [FileController::class, 'download'])
         ->name('files.download');
@@ -337,17 +342,17 @@ Route::middleware('auth')->group(function () {
         ->name('files.delete');
 
     // User preferences routes (JSON API but accessible from frontend)
-    Route::get('/api/preferences/account-type-order', [App\Http\Controllers\Api\UserPreferencesController::class, 'getAccountTypeOrder'])
+    Route::get('/api/preferences/account-type-order', [UserPreferencesController::class, 'getAccountTypeOrder'])
         ->name('preferences.account-type-order.get');
-    Route::post('/api/preferences/account-type-order', [App\Http\Controllers\Api\UserPreferencesController::class, 'updateAccountTypeOrder'])
+    Route::post('/api/preferences/account-type-order', [UserPreferencesController::class, 'updateAccountTypeOrder'])
         ->name('preferences.account-type-order.update');
-    Route::get('/api/preferences/active-budget', [App\Http\Controllers\Api\UserPreferencesController::class, 'getActiveBudget'])
+    Route::get('/api/preferences/active-budget', [UserPreferencesController::class, 'getActiveBudget'])
         ->name('preferences.active-budget.get');
-    Route::post('/api/preferences/active-budget', [App\Http\Controllers\Api\UserPreferencesController::class, 'setActiveBudget'])
+    Route::post('/api/preferences/active-budget', [UserPreferencesController::class, 'setActiveBudget'])
         ->name('preferences.active-budget.set');
-    Route::get('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'show'])
+    Route::get('/api/preferences/{key}', [UserPreferencesController::class, 'show'])
         ->name('preferences.show');
-    Route::post('/api/preferences/{key}', [App\Http\Controllers\Api\UserPreferencesController::class, 'update'])
+    Route::post('/api/preferences/{key}', [UserPreferencesController::class, 'update'])
         ->name('preferences.update');
 
     // Chat routes with rate limiting

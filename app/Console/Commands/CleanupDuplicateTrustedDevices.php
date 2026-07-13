@@ -37,6 +37,7 @@ class CleanupDuplicateTrustedDevices extends Command
 
         if ($duplicates->isEmpty()) {
             $this->info('No duplicate devices found.');
+
             return 0;
         }
 
@@ -51,7 +52,7 @@ class CleanupDuplicateTrustedDevices extends Command
 
             // Keep the most recently used device, delete the rest
             $devicesToDelete = $devices->slice(1);
-            
+
             foreach ($devicesToDelete as $device) {
                 $this->line("Removing duplicate device: {$device->device_name} (ID: {$device->id})");
                 $device->delete();
@@ -60,7 +61,7 @@ class CleanupDuplicateTrustedDevices extends Command
         }
 
         $this->info("Cleanup complete! Removed {$totalRemoved} duplicate device(s).");
-        
+
         return 0;
     }
 }

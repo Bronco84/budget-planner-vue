@@ -18,10 +18,10 @@ class PropertyContextBuilder implements ContextBuilderInterface
             ->get()
             ->map(function ($property) {
                 $currentValue = $property->current_value_cents / 100;
-                
+
                 // Calculate total mortgage balance from linked accounts
                 $linkedMortgages = $property->linkedAccounts
-                    ->filter(fn($account) => in_array($account->type, ['mortgage', 'loan']))
+                    ->filter(fn ($account) => in_array($account->type, ['mortgage', 'loan']))
                     ->map(function ($account) {
                         return [
                             'name' => $account->name,
@@ -60,8 +60,8 @@ class PropertyContextBuilder implements ContextBuilderInterface
                 'total_property_value' => $totalPropertyValue,
                 'total_mortgage_balance' => $totalMortgages,
                 'total_equity' => $totalEquity,
-                'average_equity_percent' => count($properties) > 0 
-                    ? round(collect($properties)->avg('equity_percent'), 1) 
+                'average_equity_percent' => count($properties) > 0
+                    ? round(collect($properties)->avg('equity_percent'), 1)
                     : 0,
             ],
         ];
@@ -81,6 +81,7 @@ class PropertyContextBuilder implements ContextBuilderInterface
     public function getTokenEstimate(Budget $budget): int
     {
         $propertyCount = $budget->properties()->count();
+
         // ~60 tokens per property + 30 for summary
         return ($propertyCount * 60) + 30;
     }

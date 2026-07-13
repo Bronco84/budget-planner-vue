@@ -41,7 +41,7 @@ class ContextNegotiatorService
     /**
      * Negotiate with the AI to determine what context is needed for the user's question.
      *
-     * @param string $message The user's question
+     * @param  string  $message  The user's question
      * @return array List of context types needed
      */
     public function negotiate(string $message): array
@@ -114,7 +114,7 @@ PROMPT;
     /**
      * Parse the AI's response to extract context types.
      *
-     * @param string $response The AI's response text
+     * @param  string  $response  The AI's response text
      * @return array List of valid context types
      */
     protected function parseNegotiationResponse(string $response): array
@@ -128,10 +128,11 @@ PROMPT;
         // Try to parse as JSON
         $decoded = json_decode($cleaned, true);
 
-        if (!is_array($decoded)) {
+        if (! is_array($decoded)) {
             Log::warning('Failed to parse negotiation response as JSON', [
                 'response' => $response,
             ]);
+
             return self::FALLBACK_CONTEXT_TYPES;
         }
 
@@ -145,8 +146,6 @@ PROMPT;
 
     /**
      * Get all available context types with descriptions.
-     *
-     * @return array
      */
     public function getAvailableContextTypes(): array
     {

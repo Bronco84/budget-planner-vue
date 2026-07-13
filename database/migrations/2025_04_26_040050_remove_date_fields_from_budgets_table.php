@@ -15,11 +15,11 @@ return new class extends Migration
             if (Schema::hasColumn('budgets', 'start_date')) {
                 $table->dropColumn('start_date');
             }
-            
+
             if (Schema::hasColumn('budgets', 'end_date')) {
                 $table->dropColumn('end_date');
             }
-            
+
             if (Schema::hasColumn('budgets', 'total_amount')) {
                 $table->dropColumn('total_amount');
             }
@@ -32,15 +32,15 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('budgets', function (Blueprint $table) {
-            if (!Schema::hasColumn('budgets', 'total_amount')) {
+            if (! Schema::hasColumn('budgets', 'total_amount')) {
                 $table->decimal('total_amount', 10, 2)->nullable();
             }
-            
-            if (!Schema::hasColumn('budgets', 'start_date')) {
+
+            if (! Schema::hasColumn('budgets', 'start_date')) {
                 $table->date('start_date')->nullable();
             }
-            
-            if (!Schema::hasColumn('budgets', 'end_date')) {
+
+            if (! Schema::hasColumn('budgets', 'end_date')) {
                 $table->date('end_date')->nullable();
             }
         });

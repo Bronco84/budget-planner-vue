@@ -27,7 +27,7 @@ return new class extends Migration
             $table->timestamp('google_updated_at'); // Last update timestamp from Google
             $table->json('metadata')->nullable(); // Store additional Google Calendar data
             $table->timestamps();
-            
+
             $table->index(['user_id', 'start_date']);
             $table->index(['calendar_connection_id', 'google_updated_at']);
         });

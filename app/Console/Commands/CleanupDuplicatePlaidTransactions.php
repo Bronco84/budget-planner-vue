@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class CleanupDuplicatePlaidTransactions extends Command
 {
@@ -30,10 +29,10 @@ class CleanupDuplicatePlaidTransactions extends Command
     {
         $dryRun = $this->option('dry-run');
         $dateTolerance = (int) $this->option('days');
-        
+
         $this->info('Searching for duplicate pending Plaid transactions...');
         $this->info("Date tolerance: ±{$dateTolerance} days");
-        
+
         if ($dryRun) {
             $this->warn('DRY RUN MODE - No changes will be made');
         }
@@ -49,7 +48,7 @@ class CleanupDuplicatePlaidTransactions extends Command
 
         foreach ($accounts as $accountId) {
             $this->line("\nProcessing account ID: {$accountId}");
-            
+
             // Get all transactions for this account
             $transactions = Transaction::where('account_id', $accountId)
                 ->where('is_plaid_imported', true)
@@ -75,18 +74,18 @@ class CleanupDuplicatePlaidTransactions extends Command
                     // Match amount within $1 tolerance
                     ->whereBetween('amount_in_cents', [
                         $transaction->amount_in_cents - 100,
-                        $transaction->amount_in_cents + 100
+                        $transaction->amount_in_cents + 100,
                     ])
                     // Match date within tolerance
                     ->whereBetween('date', [
                         Carbon::parse($transaction->date)->subDays($dateTolerance),
-                        Carbon::parse($transaction->date)->addDays($dateTolerance)
+                        Carbon::parse($transaction->date)->addDays($dateTolerance),
                     ])
                     // Match description similarity
                     ->where(function ($query) use ($transaction) {
                         // Extract numeric identifiers
                         preg_match_all('/\d{4,}/', $transaction->description, $matches);
-                        if (!empty($matches[0])) {
+                        if (! empty($matches[0])) {
                             foreach ($matches[0] as $identifier) {
                                 $query->orWhere('description', 'LIKE', "%{$identifier}%");
                             }
@@ -100,16 +99,16 @@ class CleanupDuplicatePlaidTransactions extends Command
 
                 if ($duplicates->isNotEmpty()) {
                     $totalDuplicatesFound += $duplicates->count();
-                    
-                    $this->warn("  Found duplicate group:");
+
+                    $this->warn('  Found duplicate group:');
                     $originalAmount = number_format($transaction->amount_in_cents / 100, 2);
                     $this->line("    Original: ID {$transaction->id} | {$transaction->date} | \${$originalAmount} | {$transaction->description}");
-                    
+
                     foreach ($duplicates as $duplicate) {
                         $duplicateAmount = number_format($duplicate->amount_in_cents / 100, 2);
                         $this->line("    Duplicate: ID {$duplicate->id} | {$duplicate->date} | \${$duplicateAmount} | {$duplicate->description}");
-                        
-                        if (!$dryRun) {
+
+                        if (! $dryRun) {
                             // Keep the most recent transaction (by created_at)
                             if ($duplicate->created_at > $transaction->created_at) {
                                 // The duplicate is newer, so delete the original and keep the duplicate
@@ -133,13 +132,13 @@ class CleanupDuplicatePlaidTransactions extends Command
         }
 
         $this->newLine();
-        $this->info("Summary:");
+        $this->info('Summary:');
         $this->info("  Total duplicates found: {$totalDuplicatesFound}");
-        
+
         if ($dryRun) {
-            $this->warn("  No changes made (dry run mode)");
+            $this->warn('  No changes made (dry run mode)');
             $this->info("\nRun without --dry-run to actually merge duplicates:");
-            $this->comment("  php artisan plaid:cleanup-duplicates");
+            $this->comment('  php artisan plaid:cleanup-duplicates');
         } else {
             $this->info("  Total duplicates merged: {$totalMerged}");
         }

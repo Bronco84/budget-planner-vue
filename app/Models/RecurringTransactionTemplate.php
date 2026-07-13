@@ -4,8 +4,10 @@ namespace App\Models;
 
 use App\Services\BudgetService;
 use App\Services\RecurringTransactionService;
-use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -30,7 +32,7 @@ class RecurringTransactionTemplate extends Model
         static::updated(function (RecurringTransactionTemplate $template) {
             // Clear dynamic amount cache for this template
             RecurringTransactionService::clearDynamicAmountCache($template->id);
-            
+
             // Clear projection caches for affected account(s)
             if ($template->account_id) {
                 BudgetService::clearAccountCaches($template->account_id);
@@ -48,7 +50,7 @@ class RecurringTransactionTemplate extends Model
             if ($template->account_id) {
                 BudgetService::clearAccountCaches($template->account_id);
             }
-            
+
             // Clear the recurring_transaction_template_id on all linked transactions
             Transaction::where('recurring_transaction_template_id', $template->id)
                 ->update(['recurring_transaction_template_id' => null]);
@@ -117,11 +119,17 @@ class RecurringTransactionTemplate extends Model
      * Frequency options.
      */
     const FREQUENCY_DAILY = 'daily';
+
     const FREQUENCY_WEEKLY = 'weekly';
+
     const FREQUENCY_BIWEEKLY = 'biweekly';
+
     const FREQUENCY_MONTHLY = 'monthly';
+
     const FREQUENCY_BIMONTHLY = 'bimonthly'; // Twice per month
+
     const FREQUENCY_QUARTERLY = 'quarterly';
+
     const FREQUENCY_YEARLY = 'yearly';
 
     /**
@@ -168,23 +176,20 @@ class RecurringTransactionTemplate extends Model
 
     /**
      * Check if autopay should override the projection for a given date.
-     * 
+     *
      * Returns true if:
      * - This template has a linked credit card
      * - The linked credit card has active autopay
      * - The projection date is in the future (autopay will handle all future payments)
-     *
-     * @param \Carbon\Carbon $date
-     * @return bool
      */
-    public function shouldAutopayOverrideFor(\Carbon\Carbon $date): bool
+    public function shouldAutopayOverrideFor(Carbon $date): bool
     {
-        if (!$this->linked_credit_card_account_id) {
+        if (! $this->linked_credit_card_account_id) {
             return false;
         }
 
         $linkedCard = $this->linkedCreditCard;
-        if (!$linkedCard?->hasActiveAutopay()) {
+        if (! $linkedCard?->hasActiveAutopay()) {
             return false;
         }
 
@@ -213,12 +218,12 @@ class RecurringTransactionTemplate extends Model
      * Limit to templates that are active as of the given date (default: today).
      * A template is active when it has started and has not ended.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \Carbon\Carbon|string|null $asOf
+     * @param  Builder  $query
+     * @param  Carbon|string|null  $asOf
      */
     public function scopeActive($query, $asOf = null)
     {
-        $asOf = $asOf ? \Carbon\Carbon::parse($asOf) : \Carbon\Carbon::today();
+        $asOf = $asOf ? Carbon::parse($asOf) : Carbon::today();
 
         return $query
             ->where('start_date', '<=', $asOf)
@@ -231,8 +236,8 @@ class RecurringTransactionTemplate extends Model
     /**
      * Calculate the next occurrence date based on frequency and other parameters.
      *
-     * @param \Carbon\Carbon|null $fromDate The date to calculate from, defaults to now
-     * @return \Carbon\Carbon|null The next occurrence date, or null if no more occurrences
+     * @param  Carbon|null  $fromDate  The date to calculate from, defaults to now
+     * @return Carbon|null The next occurrence date, or null if no more occurrences
      */
     public function calculateNextOccurrence($fromDate = null)
     {
@@ -257,8 +262,10 @@ class RecurringTransactionTemplate extends Model
                     while ($nextDate->dayOfWeek != $this->day_of_week) {
                         $nextDate->addDay();
                     }
+
                     return $nextDate;
                 }
+
                 return $baseDate->copy()->addWeek();
 
             case self::FREQUENCY_BIWEEKLY:
@@ -275,6 +282,7 @@ class RecurringTransactionTemplate extends Model
 
                     return $nextDate->setDay($day);
                 }
+
                 return $baseDate->copy()->addMonth();
 
             case self::FREQUENCY_BIMONTHLY:
@@ -313,6 +321,7 @@ class RecurringTransactionTemplate extends Model
                 $nextMonthDate = $nextDate->addMonth();
                 $nextMonthDays = $nextMonthDate->daysInMonth;
                 $nextMonthFirstDay = min($firstDay, $nextMonthDays);
+
                 return $nextMonthDate->setDay($nextMonthFirstDay);
 
             case self::FREQUENCY_QUARTERLY:
@@ -321,14 +330,16 @@ class RecurringTransactionTemplate extends Model
                     $daysInMonth = $nextDate->daysInMonth;
                     // Handle edge cases where target day doesn't exist (29th-31st → Feb 28th/29th, etc.)
                     $day = min($this->day_of_month, $daysInMonth);
+
                     return $nextDate->setDay($day);
                 }
+
                 return $baseDate->copy()->addMonths(3);
 
             case self::FREQUENCY_YEARLY:
                 $nextDate = $baseDate->copy()->addYear();
                 // Handle leap year edge case (Feb 29th on non-leap years)
-                if ($this->start_date->month == 2 && $this->start_date->day == 29 && !$nextDate->isLeapYear()) {
+                if ($this->start_date->month == 2 && $this->start_date->day == 29 && ! $nextDate->isLeapYear()) {
                     return $nextDate->setMonth(2)->setDay(28);
                 }
                 // Handle day-of-month edge cases (29th-31st in shorter months)
@@ -337,6 +348,7 @@ class RecurringTransactionTemplate extends Model
                 $nextDate->setMonth($targetMonth);
                 $daysInMonth = $nextDate->daysInMonth;
                 $day = min($targetDay, $daysInMonth);
+
                 return $nextDate->setDay($day);
 
             default:
@@ -349,38 +361,32 @@ class RecurringTransactionTemplate extends Model
      */
     public function getFormattedAmountAttribute(): string
     {
-        return '$' . number_format($this->amount_in_cents / 100, 2);
+        return '$'.number_format($this->amount_in_cents / 100, 2);
     }
 
     /**
      * Check if a transaction exists for the given date.
      * Uses preloaded relationship if available, otherwise falls back to query.
-     *
-     * @param \Carbon\Carbon $date
-     * @return bool
      */
-    public function hasTransactionForDate(\Carbon\Carbon $date): bool
+    public function hasTransactionForDate(Carbon $date): bool
     {
         $dateString = $date->copy()->format('Y-m-d');
-        
+
         // If transactions are loaded, use the collection
         if ($this->relationLoaded('transactions')) {
             return $this->transactions->contains(function ($transaction) use ($dateString) {
                 return $transaction->date && $transaction->date->format('Y-m-d') === $dateString;
             });
         }
-        
+
         // Fallback to database query if relationship not loaded
         return $this->transactions()->where('date', $dateString)->exists();
     }
 
     /**
      * Determine if a transaction should be generated for the given date.
-     *
-     * @param \Carbon\Carbon $date
-     * @return bool
      */
-    public function shouldGenerateForDate(\Carbon\Carbon $date): bool
+    public function shouldGenerateForDate(Carbon $date): bool
     {
         // Don't generate if before start date or after end date
         if (
@@ -406,6 +412,7 @@ class RecurringTransactionTemplate extends Model
 
                 // Must be an even number of weeks from the start date
                 $weekDiff = (int) $this->start_date->diffInWeeks($date);
+
                 return $weekDiff % 2 === 0;
 
             case self::FREQUENCY_MONTHLY:
@@ -467,6 +474,7 @@ class RecurringTransactionTemplate extends Model
 
                 // Check if it's a quarter month (Jan, Apr, Jul, Oct)
                 $monthsSinceStart = (int) $this->start_date->diffInMonths($date);
+
                 return $monthsSinceStart % 3 === 0;
 
             case self::FREQUENCY_YEARLY:
@@ -490,8 +498,8 @@ class RecurringTransactionTemplate extends Model
     /**
      * Get the next date for this template based on frequency and the given date.
      *
-     * @param \Carbon\Carbon $fromDate The date to calculate from
-     * @return \Carbon\Carbon The next date
+     * @param  Carbon  $fromDate  The date to calculate from
+     * @return Carbon The next date
      */
     public function getNextDate($fromDate)
     {
@@ -542,6 +550,7 @@ class RecurringTransactionTemplate extends Model
                 $nextMonthDate = $nextDate->addMonth();
                 $nextMonthDays = $nextMonthDate->daysInMonth;
                 $nextMonthFirstDay = min($firstDay, $nextMonthDays);
+
                 return $nextMonthDate->setDay($nextMonthFirstDay);
 
             case self::FREQUENCY_QUARTERLY:
@@ -563,13 +572,14 @@ class RecurringTransactionTemplate extends Model
     public function calculateDynamicAmount(): float
     {
         // If average_amount is set, use it (assume it's stored in dollars)
-        if (!is_null($this->average_amount)) {
+        if (! is_null($this->average_amount)) {
             return (float) $this->average_amount;
         }
         // If both min and max are set, use their midpoint (assume stored in dollars)
-        if (!is_null($this->min_amount) && !is_null($this->max_amount)) {
+        if (! is_null($this->min_amount) && ! is_null($this->max_amount)) {
             return (float) (($this->min_amount + $this->max_amount) / 2);
         }
+
         // Fallback to static amount (convert from cents to dollars)
         return $this->amount_in_cents / 100;
     }

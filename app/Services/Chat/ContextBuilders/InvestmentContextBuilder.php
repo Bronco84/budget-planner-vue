@@ -36,7 +36,7 @@ class InvestmentContextBuilder implements ContextBuilderInterface
 
         foreach ($investmentAccounts as $account) {
             $accountHoldings = $account->plaidAccount?->holdings ?? collect();
-            
+
             foreach ($accountHoldings as $holding) {
                 $security = $holding->security;
                 $value = $holding->value_cents / 100;
@@ -58,10 +58,10 @@ class InvestmentContextBuilder implements ContextBuilderInterface
             if ($accountHoldings->isEmpty() && $account->current_balance_cents > 0) {
                 $value = $account->current_balance_cents / 100;
                 $totalValue += $value;
-                
+
                 $holdings[] = [
                     'account' => $account->name,
-                    'name' => $account->name . ' (Total)',
+                    'name' => $account->name.' (Total)',
                     'ticker' => null,
                     'type' => 'account_total',
                     'quantity' => null,
@@ -75,7 +75,7 @@ class InvestmentContextBuilder implements ContextBuilderInterface
         // Group holdings by type for summary
         $byType = collect($holdings)
             ->groupBy('type')
-            ->map(fn($group) => [
+            ->map(fn ($group) => [
                 'type' => $group->first()['type'],
                 'count' => $group->count(),
                 'total_value' => $group->sum('value'),

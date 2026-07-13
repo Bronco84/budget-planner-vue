@@ -57,7 +57,7 @@ class UserPreferencesController extends Controller
 
         $validated = $request->validate([
             'order' => 'required|array',
-            'order.*' => 'required|string|in:' . implode(',', User::ACCOUNT_TYPES),
+            'order.*' => 'required|string|in:'.implode(',', User::ACCOUNT_TYPES),
         ]);
 
         $user->setAccountTypeOrder($validated['order']);
@@ -90,7 +90,7 @@ class UserPreferencesController extends Controller
             'account_type_order' => [
                 'required',
                 'array',
-                Rule::in(User::ACCOUNT_TYPES)
+                Rule::in(User::ACCOUNT_TYPES),
             ],
             default => ['nullable'],
         };
@@ -104,7 +104,7 @@ class UserPreferencesController extends Controller
         $user = Auth::user();
         $activeBudget = $user->getActiveBudget();
 
-        if (!$activeBudget) {
+        if (! $activeBudget) {
             return response()->json([
                 'active_budget' => null,
                 'message' => 'No active budget set',
@@ -135,7 +135,7 @@ class UserPreferencesController extends Controller
                 'exists:budgets,id',
                 function ($attribute, $value, $fail) use ($user) {
                     $budget = Budget::find($value);
-                    if ($budget && !$user->hasBudget($budget)) {
+                    if ($budget && ! $user->hasBudget($budget)) {
                         $fail('You do not have access to this budget.');
                     }
                 },

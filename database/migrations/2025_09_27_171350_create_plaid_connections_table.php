@@ -22,7 +22,7 @@ return new class extends Migration
             $table->text('error_message')->nullable();
             $table->timestamp('last_sync_at')->nullable();
             $table->timestamps();
-            
+
             // Ensure one connection per item per budget
             $table->unique(['budget_id', 'plaid_item_id']);
         });

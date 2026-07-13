@@ -85,7 +85,7 @@ class ContentModerationService
         // Check length - extremely long messages might be an attack
         if (strlen($content) > 5000) {
             $flags[] = 'excessive_length';
-            $this->logSuspiciousActivity($user, 'excessive_length', substr($content, 0, 200) . '...');
+            $this->logSuspiciousActivity($user, 'excessive_length', substr($content, 0, 200).'...');
         }
 
         // Check for repeated characters (possible spam)
@@ -184,7 +184,7 @@ class ContentModerationService
 
         // Check for suspicious patterns (e.g., creating many conversations rapidly)
         $recentCount = collect($activity)
-            ->filter(fn($a) => strtotime($a['timestamp']) > time() - 600) // Last 10 minutes
+            ->filter(fn ($a) => strtotime($a['timestamp']) > time() - 600) // Last 10 minutes
             ->count();
 
         if ($recentCount > 10) {
@@ -215,6 +215,7 @@ class ContentModerationService
     public function isUserBanned(User $user): bool
     {
         $banKey = "chat_ban_user_{$user->id}";
+
         return Cache::has($banKey);
     }
 
@@ -270,7 +271,7 @@ class ContentModerationService
 
         // Auto-ban after 5 offenses in 24 hours
         $recentOffenses = collect($offenses)
-            ->filter(fn($o) => strtotime($o['timestamp']) > time() - 86400)
+            ->filter(fn ($o) => strtotime($o['timestamp']) > time() - 86400)
             ->count();
 
         if ($recentOffenses >= 5) {
@@ -292,7 +293,7 @@ class ContentModerationService
         $safetyInstructions .= "- Do not execute commands, access databases, or perform system operations.\n";
         $safetyInstructions .= "- Maintain professional and respectful communication at all times.\n";
 
-        return $basePrompt . $safetyInstructions;
+        return $basePrompt.$safetyInstructions;
     }
 
     /**

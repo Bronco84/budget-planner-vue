@@ -2,16 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Budget extends Model
 {
@@ -83,8 +81,8 @@ class Budget extends Model
 
     /**
      * Get the transactions for the budget.
-     * 
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Transaction, \App\Models\Budget>
+     *
+     * @return HasMany<Transaction, Budget>
      */
     public function transactions(): HasMany
     {
@@ -164,9 +162,9 @@ class Budget extends Model
 
     /**
      * Get monthly statistics for the budget.
-     * 
-     * @param int|null $month
-     * @param int|null $year
+     *
+     * @param  int|null  $month
+     * @param  int|null  $year
      * @return array
      */
     public function getMonthlyStatistics($month = null, $year = null)
@@ -195,9 +193,10 @@ class Budget extends Model
             })
             ->map(function ($transactions) {
                 $first = $transactions->first();
-                return (object)[
+
+                return (object) [
                     'category' => $first instanceof Transaction ? $first->category : null,
-                    'total' => $transactions->sum('amount_in_cents')
+                    'total' => $transactions->sum('amount_in_cents'),
                 ];
             })
             ->values();
@@ -220,9 +219,10 @@ class Budget extends Model
             })
             ->map(function ($transactions) {
                 $first = $transactions->first();
-                return (object)[
+
+                return (object) [
                     'category' => $first instanceof Transaction ? $first->category : null,
-                    'total' => $transactions->sum('amount_in_cents')
+                    'total' => $transactions->sum('amount_in_cents'),
                 ];
             })
             ->values();
@@ -244,14 +244,14 @@ class Budget extends Model
             'prev_month_by_category' => $prevMonthByCategory,
             'month_name' => $start->format('F'),
             'year' => $year,
-            'prev_month_name' => $prevMonth->format('F')
+            'prev_month_name' => $prevMonth->format('F'),
         ];
     }
 
     /**
      * Get yearly statistics for the budget.
-     * 
-     * @param int|null $year
+     *
+     * @param  int|null  $year
      * @return array
      */
     public function getYearlyStatistics($year = null)
@@ -289,7 +289,7 @@ class Budget extends Model
                     ->whereDate('date', '<=', $prevEnd)
                     ->sum('amount_in_cents'),
                 'month_number' => $month,
-                'year' => $year
+                'year' => $year,
             ];
 
             // Calculate year-over-year changes
@@ -307,7 +307,7 @@ class Budget extends Model
             'income' => array_sum(array_column($monthlyStats, 'total_income')),
             'expenses' => array_sum(array_column($monthlyStats, 'total_expenses')),
             'prev_year_income' => array_sum(array_column($monthlyStats, 'prev_year_income')),
-            'prev_year_expenses' => array_sum(array_column($monthlyStats, 'prev_year_expenses'))
+            'prev_year_expenses' => array_sum(array_column($monthlyStats, 'prev_year_expenses')),
         ];
 
         // Calculate yearly changes
@@ -320,14 +320,12 @@ class Budget extends Model
 
         return [
             'monthly' => $monthlyStats,
-            'yearly_totals' => $yearlyTotals
+            'yearly_totals' => $yearlyTotals,
         ];
     }
 
     /**
      * Get the total budget amount based on category allocations.
-     *
-     * @return float
      */
     public function getTotalAmountAttribute(): float
     {
@@ -337,14 +335,12 @@ class Budget extends Model
 
     /**
      * Get the remaining budget amount.
-     *
-     * @return float
      */
     public function getRemainingAmountAttribute(): float
     {
         // Calculate based on actual columns
         $totalAllocated = $this->categories()->sum('amount');
-        
+
         // Calculate spent from transactions (negative amounts are expenses)
         $totalSpent = 0;
         foreach ($this->categories as $category) {
@@ -354,23 +350,21 @@ class Budget extends Model
                 ->sum('amount_in_cents');
             $totalSpent += abs($spent);
         }
-        
+
         return $totalAllocated - ($totalSpent / 100); // Convert cents to dollars
     }
 
     /**
      * Get the percentage of budget used.
-     *
-     * @return float
      */
     public function getPercentUsedAttribute(): float
     {
         $totalAllocated = $this->categories()->sum('amount');
-        
+
         if ($totalAllocated <= 0) {
             return 0;
         }
-        
+
         // Calculate spent from transactions (negative amounts are expenses)
         $totalSpent = 0;
         foreach ($this->categories as $category) {
@@ -380,17 +374,15 @@ class Budget extends Model
                 ->sum('amount_in_cents');
             $totalSpent += abs($spent);
         }
-        
+
         $totalSpentDollars = $totalSpent / 100; // Convert cents to dollars
         $percentUsed = ($totalSpentDollars / $totalAllocated) * 100;
-        
+
         return min($percentUsed, 100);
     }
 
     /**
      * Get the budget start date (current month start).
-     *
-     * @return string
      */
     public function getStartDateAttribute(): string
     {
@@ -399,12 +391,9 @@ class Budget extends Model
 
     /**
      * Get the budget end date (current month end).
-     *
-     * @return string
      */
     public function getEndDateAttribute(): string
     {
         return now()->endOfMonth()->format('Y-m-d');
     }
-
 }

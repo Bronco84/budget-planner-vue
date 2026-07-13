@@ -4,14 +4,10 @@ namespace App\Console\Commands;
 
 use App\Models\Account;
 use App\Models\Budget;
-use App\Models\Transaction;
 use App\Models\RecurringTransactionTemplate;
-use Illuminate\Console\Command;
-use Illuminate\Support\Collection;
+use App\Models\Transaction;
 use Carbon\Carbon;
-use Carbon\CarbonPeriod;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Console\Command;
 
 class IdentifyRecurringTransactions extends Command
 {
@@ -77,7 +73,7 @@ class IdentifyRecurringTransactions extends Command
             // Determine if it's monthly or weekly based on average interval
             $intervals = [];
             for ($i = 1; $i < $dates->count(); $i++) {
-                $intervals[] = (int) $dates[$i]->diffInDays($dates[$i-1]);
+                $intervals[] = (int) $dates[$i]->diffInDays($dates[$i - 1]);
             }
             $avgInterval = array_sum($intervals) / count($intervals);
 
@@ -92,28 +88,28 @@ class IdentifyRecurringTransactions extends Command
             }
 
             // Format date pattern for display
-            $datePattern = match($frequency) {
+            $datePattern = match ($frequency) {
                 'monthly' => "Day {$dayOfMonth} of each month",
-                'weekly' => "Every " . Carbon::now()->startOfWeek()->addDays($dayOfWeek)->format('l'),
-                'biweekly' => "Every other " . Carbon::now()->startOfWeek()->addDays($dayOfWeek)->format('l'),
-                default => "Unknown pattern"
+                'weekly' => 'Every '.Carbon::now()->startOfWeek()->addDays($dayOfWeek)->format('l'),
+                'biweekly' => 'Every other '.Carbon::now()->startOfWeek()->addDays($dayOfWeek)->format('l'),
+                default => 'Unknown pattern'
             };
 
             $templateInfo = [
                 'description' => $description,
-                'amount' => '$' . number_format(abs($medianAmount / 100), 2),
+                'amount' => '$'.number_format(abs($medianAmount / 100), 2),
                 'frequency' => $frequency,
                 'occurrences' => $group->count(),
                 'date_pattern' => $datePattern,
-                'amount_range' => '$' . number_format(abs($amounts->min() / 100), 2) . ' - $' . number_format(abs($amounts->max() / 100), 2),
+                'amount_range' => '$'.number_format(abs($amounts->min() / 100), 2).' - $'.number_format(abs($amounts->max() / 100), 2),
             ];
 
             if ($this->confirm(
-                "Create recurring template?\n" .
-                "Description: {$templateInfo['description']}\n" .
-                "Amount: {$templateInfo['amount']} (Range: {$templateInfo['amount_range']})\n" .
-                "Frequency: {$templateInfo['frequency']}\n" .
-                "Pattern: {$templateInfo['date_pattern']}\n" .
+                "Create recurring template?\n".
+                "Description: {$templateInfo['description']}\n".
+                "Amount: {$templateInfo['amount']} (Range: {$templateInfo['amount_range']})\n".
+                "Frequency: {$templateInfo['frequency']}\n".
+                "Pattern: {$templateInfo['date_pattern']}\n".
                 "Occurrences: {$templateInfo['occurrences']}"
             )) {
                 $sample = $group->first();
@@ -142,30 +138,28 @@ class IdentifyRecurringTransactions extends Command
             }
         }
 
-        $this->info("Created " . count($templates) . " recurring transaction templates.");
+        $this->info('Created '.count($templates).' recurring transaction templates.');
     }
 
     /**
      * Select an account from the budget either via command option or interactive selection.
-     *
-     * @param Budget $budget
-     * @return Account
      */
     protected function selectAccount(Budget $budget): Account
     {
         // If account_id option is provided, use it
         if ($accountId = $this->option('account_id')) {
             $account = $budget->accounts()->where('id', $accountId)->first();
-            if (!$account) {
+            if (! $account) {
                 $this->error("Account with ID {$accountId} not found in budget {$budget->name}");
                 exit(1);
             }
+
             return $account;
         }
 
         // Load all accounts for this budget
         $accounts = $budget->accounts()->orderBy('name')->get();
-        
+
         if ($accounts->isEmpty()) {
             $this->error("No accounts found in budget {$budget->name}");
             exit(1);
@@ -174,6 +168,7 @@ class IdentifyRecurringTransactions extends Command
         // If only one account, use it automatically
         if ($accounts->count() === 1) {
             $this->info("Using the only available account: {$accounts->first()->name}");
+
             return $accounts->first();
         }
 
@@ -186,7 +181,7 @@ class IdentifyRecurringTransactions extends Command
                     $account->id,
                     $account->name,
                     ucfirst($account->type),
-                    '$' . number_format($account->current_balance_cents / 100, 2)
+                    '$'.number_format($account->current_balance_cents / 100, 2),
                 ];
             })->toArray()
         );

@@ -29,32 +29,33 @@ class WebAuthnLoginController
     {
         $validated = $request->validate(['email' => 'sometimes|email|string']);
         $responsable = $request->toVerify($validated);
-        
+
         // Convert the Responsable to a Response to inspect/modify the data
         $response = $responsable->toResponse($request);
         $data = json_decode($response->getContent(), true);
-        
+
         // Filter out any credentials with null or empty IDs
         if (isset($data['allowCredentials']) && is_array($data['allowCredentials'])) {
             $originalCount = count($data['allowCredentials']);
             $data['allowCredentials'] = array_values(array_filter($data['allowCredentials'], function ($cred) {
                 $isValid = isset($cred['id']) && is_string($cred['id']) && trim($cred['id']) !== '';
-                if (!$isValid) {
+                if (! $isValid) {
                     Log::warning('Filtered out invalid WebAuthn credential', ['credential' => $cred]);
                 }
+
                 return $isValid;
             }));
-            
+
             $filteredCount = count($data['allowCredentials']);
             if ($originalCount !== $filteredCount) {
-                Log::warning("Filtered out invalid credentials", [
+                Log::warning('Filtered out invalid credentials', [
                     'original_count' => $originalCount,
                     'filtered_count' => $filteredCount,
-                    'email' => $validated['email'] ?? 'not provided'
+                    'email' => $validated['email'] ?? 'not provided',
                 ]);
             }
         }
-        
+
         return response()->json($data);
     }
 

@@ -31,6 +31,7 @@ class DiagnosePlaidAccounts extends Command
 
         if ($plaidAccounts->isEmpty()) {
             $this->error('❌ No Plaid connections found.');
+
             return 1;
         }
 
@@ -48,9 +49,9 @@ class DiagnosePlaidAccounts extends Command
             try {
                 // Get all accounts from this Plaid connection
                 $accounts = $plaidService->getAccounts($plaidAccount->access_token);
-                
-                $this->info("📊 Total accounts found: " . count($accounts));
-                
+
+                $this->info('📊 Total accounts found: '.count($accounts));
+
                 // Also check for liabilities (mortgages, credit cards, loans)
                 try {
                     $liabilities = $plaidService->getLiabilities($plaidAccount->access_token);
@@ -58,56 +59,56 @@ class DiagnosePlaidAccounts extends Command
                     $mortgages = $liabilities['mortgage'] ?? [];
                     $studentLoans = $liabilities['student'] ?? [];
                     $otherLiabilities = $liabilities['other'] ?? [];
-                    
+
                     $totalLiabilities = count($creditCards) + count($mortgages) + count($studentLoans) + count($otherLiabilities);
-                    $this->info("💳 Total liabilities found: " . $totalLiabilities);
-                    
+                    $this->info('💳 Total liabilities found: '.$totalLiabilities);
+
                     if ($totalLiabilities > 0) {
-                        $this->info("  • Credit Cards: " . count($creditCards));
-                        $this->info("  • Mortgages: " . count($mortgages));
-                        $this->info("  • Student Loans: " . count($studentLoans));
-                        $this->info("  • Other Liabilities: " . count($otherLiabilities));
+                        $this->info('  • Credit Cards: '.count($creditCards));
+                        $this->info('  • Mortgages: '.count($mortgages));
+                        $this->info('  • Student Loans: '.count($studentLoans));
+                        $this->info('  • Other Liabilities: '.count($otherLiabilities));
                     }
                 } catch (\Exception $e) {
-                    $this->warn("⚠️  Could not fetch liabilities: " . $e->getMessage());
+                    $this->warn('⚠️  Could not fetch liabilities: '.$e->getMessage());
                 }
-                
+
                 $this->newLine();
 
                 foreach ($accounts as $index => $account) {
                     $isLinked = $account['account_id'] === $plaidAccount->plaid_account_id;
                     $status = $isLinked ? '✅ LINKED' : '⭕ AVAILABLE';
-                    
-                    $this->line("Account #" . ($index + 1) . " {$status}");
+
+                    $this->line('Account #'.($index + 1)." {$status}");
                     $this->line("  Name: {$account['name']}");
                     $this->line("  Type: {$account['type']}");
-                    $this->line("  Subtype: " . ($account['subtype'] ?? 'none'));
-                    $this->line("  Mask: " . ($account['mask'] ?? 'none'));
-                    
+                    $this->line('  Subtype: '.($account['subtype'] ?? 'none'));
+                    $this->line('  Mask: '.($account['mask'] ?? 'none'));
+
                     if (isset($account['balances']['current'])) {
                         $balance = number_format($account['balances']['current'], 2);
                         $this->line("  Balance: \${$balance}");
                     }
-                    
+
                     if (isset($account['balances']['available']) && $account['balances']['available'] !== $account['balances']['current']) {
                         $available = number_format($account['balances']['available'], 2);
                         $this->line("  Available: \${$available}");
                     }
-                    
+
                     // Map the account type
                     $mappedType = $plaidService->mapPlaidAccountType($account);
                     $this->line("  Mapped Type: {$mappedType}");
-                    
+
                     $this->newLine();
                 }
 
                 // Show unlinked accounts summary
-                $unlinkedAccounts = array_filter($accounts, function($account) use ($plaidAccount) {
+                $unlinkedAccounts = array_filter($accounts, function ($account) use ($plaidAccount) {
                     return $account['account_id'] !== $plaidAccount->plaid_account_id;
                 });
 
-                if (!empty($unlinkedAccounts)) {
-                    $this->warn("🔄 " . count($unlinkedAccounts) . " accounts are available but not imported:");
+                if (! empty($unlinkedAccounts)) {
+                    $this->warn('🔄 '.count($unlinkedAccounts).' accounts are available but not imported:');
                     foreach ($unlinkedAccounts as $account) {
                         $type = $account['subtype'] ?? $account['type'];
                         $this->line("  • {$account['name']} ({$type})");
@@ -116,10 +117,10 @@ class DiagnosePlaidAccounts extends Command
                 }
 
             } catch (\Exception $e) {
-                $this->error("❌ Error fetching accounts: " . $e->getMessage());
+                $this->error('❌ Error fetching accounts: '.$e->getMessage());
             }
 
-            $this->line("---");
+            $this->line('---');
             $this->newLine();
         }
 

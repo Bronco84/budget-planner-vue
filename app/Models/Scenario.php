@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
 
 class Scenario extends Model
 {
@@ -75,10 +75,7 @@ class Scenario extends Model
     /**
      * Calculate projection for a specific account with this scenario applied.
      *
-     * @param Account $account
-     * @param Carbon $startDate
-     * @param Carbon $endDate
-     * @param array $baseProjectedTransactions Base transactions without scenario
+     * @param  array  $baseProjectedTransactions  Base transactions without scenario
      * @return array Projection data with 'days' key
      */
     public function calculateProjectionForAccount(
@@ -122,8 +119,9 @@ class Scenario extends Model
      */
     public function toggle(): bool
     {
-        $this->is_active = !$this->is_active;
+        $this->is_active = ! $this->is_active;
         $this->save();
+
         return $this->is_active;
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Nova;
 
-use Illuminate\Http\Request;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\ID;
@@ -13,7 +12,9 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 class RecurringTransactionRule extends Resource
 {
     public static $model = \App\Models\RecurringTransactionRule::class;
+
     public static $title = 'field';
+
     public static $search = ['id', 'field', 'value'];
 
     public function fields(NovaRequest $request): array
@@ -30,8 +31,23 @@ class RecurringTransactionRule extends Resource
         ];
     }
 
-    public function cards(NovaRequest $request): array { return []; }
-    public function filters(NovaRequest $request): array { return []; }
-    public function lenses(NovaRequest $request): array { return []; }
-    public function actions(NovaRequest $request): array { return []; }
+    public function cards(NovaRequest $request): array
+    {
+        return [];
+    }
+
+    public function filters(NovaRequest $request): array
+    {
+        return [];
+    }
+
+    public function lenses(NovaRequest $request): array
+    {
+        return [];
+    }
+
+    public function actions(NovaRequest $request): array
+    {
+        return [];
+    }
 }

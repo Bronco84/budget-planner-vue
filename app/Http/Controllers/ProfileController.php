@@ -26,7 +26,7 @@ class ProfileController extends Controller
             'passkeys' => $user->webAuthnCredentials()
                 ->orderBy('updated_at', 'desc')
                 ->get()
-                ->map(fn($credential) => [
+                ->map(fn ($credential) => [
                     'id' => $credential->id,
                     'name' => $credential->alias ?? 'Passkey',
                     'created_at' => $credential->created_at,
@@ -35,7 +35,7 @@ class ProfileController extends Controller
             'trustedDevices' => $user->trustedDevices()
                 ->orderBy('last_used_at', 'desc')
                 ->get()
-                ->map(fn($device) => [
+                ->map(fn ($device) => [
                     'id' => $device->id,
                     'device_name' => $device->device_name,
                     'browser' => $device->browser,

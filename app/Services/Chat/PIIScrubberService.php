@@ -2,8 +2,6 @@
 
 namespace App\Services\Chat;
 
-use Illuminate\Support\Facades\Log;
-
 class PIIScrubberService
 {
     /**
@@ -51,7 +49,7 @@ class PIIScrubberService
     /**
      * Scrub PII from context data.
      *
-     * @param array $context The raw context data
+     * @param  array  $context  The raw context data
      * @return array The scrubbed context data
      */
     public function scrub(array $context): array
@@ -62,8 +60,8 @@ class PIIScrubberService
     /**
      * Recursively scrub an array of PII.
      *
-     * @param mixed $data The data to scrub
-     * @param string $currentKey The current key being processed (for logging)
+     * @param  mixed  $data  The data to scrub
+     * @param  string  $currentKey  The current key being processed (for logging)
      * @return mixed The scrubbed data
      */
     protected function scrubRecursive(mixed $data, string $currentKey = ''): mixed
@@ -79,6 +77,7 @@ class PIIScrubberService
                 // Recursively scrub nested arrays
                 $scrubbed[$key] = $this->scrubRecursive($value, (string) $key);
             }
+
             return $scrubbed;
         }
 
@@ -93,7 +92,7 @@ class PIIScrubberService
     /**
      * Check if a key should be completely removed.
      *
-     * @param string|int $key The key to check
+     * @param  string|int  $key  The key to check
      * @return bool True if the key should be removed
      */
     protected function shouldRemoveKey(string|int $key): bool
@@ -124,8 +123,8 @@ class PIIScrubberService
     /**
      * Scrub a string value for potential PII.
      *
-     * @param string $value The string to scrub
-     * @param string $key The key this value belongs to
+     * @param  string  $value  The string to scrub
+     * @param  string  $key  The key this value belongs to
      * @return string The scrubbed string
      */
     protected function scrubString(string $value, string $key): string
@@ -164,23 +163,24 @@ class PIIScrubberService
     /**
      * Extract only the first name from a full name.
      *
-     * @param string|null $fullName The full name
+     * @param  string|null  $fullName  The full name
      * @return string|null The first name only
      */
     public function extractFirstName(?string $fullName): ?string
     {
-        if (!$fullName) {
+        if (! $fullName) {
             return null;
         }
 
         $parts = explode(' ', trim($fullName));
+
         return $parts[0] ?? null;
     }
 
     /**
      * Prepare user context with PII removed.
      *
-     * @param array $userContext Raw user context
+     * @param  array  $userContext  Raw user context
      * @return array Scrubbed user context
      */
     public function prepareUserContext(array $userContext): array

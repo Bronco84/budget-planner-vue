@@ -2,7 +2,6 @@
 
 namespace App\Services\Chat;
 
-use App\Contracts\ContextBuilderInterface;
 use App\Models\Budget;
 use App\Models\User;
 use App\Services\Chat\ContextBuilders\AccountContextBuilder;
@@ -62,16 +61,16 @@ class SmartContextLoaderService
     /**
      * Load context based on requested types.
      *
-     * @param User $user The authenticated user
-     * @param int|null $budgetId The budget ID (or null to use active budget)
-     * @param array $requestedTypes Array of context type identifiers
+     * @param  User  $user  The authenticated user
+     * @param  int|null  $budgetId  The budget ID (or null to use active budget)
+     * @param  array  $requestedTypes  Array of context type identifiers
      * @return array The loaded and scrubbed context
      */
     public function load(User $user, ?int $budgetId, array $requestedTypes): array
     {
         $budget = $this->getBudget($user, $budgetId);
 
-        if (!$budget) {
+        if (! $budget) {
             return $this->buildMinimalContext($user);
         }
 
@@ -83,8 +82,9 @@ class SmartContextLoaderService
 
         // Load requested context types
         foreach ($requestedTypes as $type) {
-            if (!isset($this->builders[$type])) {
+            if (! isset($this->builders[$type])) {
                 Log::warning("Unknown context type requested: {$type}");
+
                 continue;
             }
 
@@ -93,17 +93,18 @@ class SmartContextLoaderService
             // Check token budget
             $typeTokens = $builder->getTokenEstimate($budget);
             if ($estimatedTokens + $typeTokens > self::MAX_CONTEXT_TOKENS) {
-                Log::info("Skipping context type due to token budget", [
+                Log::info('Skipping context type due to token budget', [
                     'type' => $type,
                     'estimated_tokens' => $typeTokens,
                     'current_total' => $estimatedTokens,
                 ]);
+
                 continue;
             }
 
             // Build context with appropriate options
             $options = $this->getOptionsForType($type);
-            
+
             try {
                 $typeContext = $builder->build($user, $budget, $options);
                 $context[$type] = $typeContext;
@@ -120,7 +121,7 @@ class SmartContextLoaderService
 
         Log::info('Context loaded successfully', [
             'requested_types' => $requestedTypes,
-            'loaded_types' => array_keys(array_filter($context, fn($v, $k) => !in_array($k, ['user', 'budget']), ARRAY_FILTER_USE_BOTH)),
+            'loaded_types' => array_keys(array_filter($context, fn ($v, $k) => ! in_array($k, ['user', 'budget']), ARRAY_FILTER_USE_BOTH)),
             'estimated_tokens' => $estimatedTokens,
         ]);
 

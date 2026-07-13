@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Budget;
 use App\Models\Transaction;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,8 +15,11 @@ class TransactionFilterTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Budget $budget;
+
     protected Account $account1;
+
     protected Account $account2;
 
     protected function setUp(): void
@@ -100,7 +103,7 @@ class TransactionFilterTest extends TestCase
             ->actingAs($this->user)
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
-                'account_id' => $this->account1->id
+                'account_id' => $this->account1->id,
             ]));
 
         $response->assertOk();
@@ -114,7 +117,7 @@ class TransactionFilterTest extends TestCase
             ->actingAs($this->user)
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
-                'account_id' => $this->account2->id
+                'account_id' => $this->account2->id,
             ]));
 
         $response->assertOk();
@@ -144,7 +147,7 @@ class TransactionFilterTest extends TestCase
             ->actingAs($this->user)
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
-                'category' => 'Groceries'
+                'category' => 'Groceries',
             ]));
 
         $response->assertOk();
@@ -174,7 +177,7 @@ class TransactionFilterTest extends TestCase
             ->actingAs($this->user)
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
-                'timeframe' => 'this_month'
+                'timeframe' => 'this_month',
             ]));
 
         $response->assertOk();
@@ -204,7 +207,7 @@ class TransactionFilterTest extends TestCase
             ->actingAs($this->user)
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
-                'timeframe' => 'last_month'
+                'timeframe' => 'last_month',
             ]));
 
         $response->assertOk();
@@ -234,7 +237,7 @@ class TransactionFilterTest extends TestCase
             ->actingAs($this->user)
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
-                'timeframe' => 'last_3_months'
+                'timeframe' => 'last_3_months',
             ]));
 
         $response->assertOk();
@@ -264,7 +267,7 @@ class TransactionFilterTest extends TestCase
             ->actingAs($this->user)
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
-                'timeframe' => 'this_year'
+                'timeframe' => 'this_year',
             ]));
 
         $response->assertOk();
@@ -309,7 +312,7 @@ class TransactionFilterTest extends TestCase
                 'account_id' => $this->account1->id,
                 'category' => 'Groceries',
                 'search' => 'Whole',
-                'timeframe' => 'this_month'
+                'timeframe' => 'this_month',
             ]));
 
         $response->assertOk();
@@ -329,7 +332,7 @@ class TransactionFilterTest extends TestCase
                 'search' => 'test',
                 'account_id' => $this->account1->id,
                 'category' => 'Groceries',
-                'timeframe' => 'this_month'
+                'timeframe' => 'this_month',
             ]));
 
         $response->assertOk();
@@ -358,7 +361,7 @@ class TransactionFilterTest extends TestCase
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
                 'category' => 'Groceries',
-                'page' => 1
+                'page' => 1,
             ]));
 
         $response->assertOk();
@@ -375,7 +378,7 @@ class TransactionFilterTest extends TestCase
             ->get(route('budget.transaction.index', [
                 'budget' => $this->budget->id,
                 'category' => 'Groceries',
-                'page' => 2
+                'page' => 2,
             ]));
 
         $response->assertOk();

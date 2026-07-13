@@ -3,21 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Budget;
-use App\Models\Transaction;
 use App\Models\FileAttachment;
+use App\Models\Transaction;
 use App\Services\FileService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 
 class FileController extends Controller
 {
-    public function __construct(private FileService $fileService)
-    {
-    }
+    public function __construct(private FileService $fileService) {}
 
     /**
      * Upload file and attach to transaction.
@@ -25,7 +22,7 @@ class FileController extends Controller
     public function uploadToTransaction(Request $request, Transaction $transaction): JsonResponse
     {
         // Check if user can access this transaction
-        if (!$this->canUserAccessTransaction($transaction, Auth::id())) {
+        if (! $this->canUserAccessTransaction($transaction, Auth::id())) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -55,7 +52,7 @@ class FileController extends Controller
                     'description' => $attachment->description,
                     'attached_by' => $attachment->attachedBy->name,
                     'created_at' => $attachment->created_at,
-                ]
+                ],
             ], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
@@ -68,7 +65,7 @@ class FileController extends Controller
     public function uploadToBudget(Request $request, Budget $budget): JsonResponse
     {
         // Check if user can access this budget
-        if (!$this->canUserAccessBudget($budget, Auth::id())) {
+        if (! $this->canUserAccessBudget($budget, Auth::id())) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -98,7 +95,7 @@ class FileController extends Controller
                     'description' => $attachment->description,
                     'attached_by' => $attachment->attachedBy->name,
                     'created_at' => $attachment->created_at,
-                ]
+                ],
             ], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 400);
@@ -111,7 +108,7 @@ class FileController extends Controller
     public function getTransactionAttachments(Transaction $transaction): JsonResponse
     {
         // Check if user can access this transaction
-        if (!$this->canUserAccessTransaction($transaction, Auth::id())) {
+        if (! $this->canUserAccessTransaction($transaction, Auth::id())) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -142,7 +139,7 @@ class FileController extends Controller
     public function getBudgetAttachments(Budget $budget): JsonResponse
     {
         // Check if user can access this budget
-        if (!$this->canUserAccessBudget($budget, Auth::id())) {
+        if (! $this->canUserAccessBudget($budget, Auth::id())) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -173,7 +170,7 @@ class FileController extends Controller
     public function download(FileAttachment $attachment): Response
     {
         // Check if user can access this attachment
-        if (!$this->fileService->canUserAccessAttachment($attachment, Auth::id())) {
+        if (! $this->fileService->canUserAccessAttachment($attachment, Auth::id())) {
             abort(403, 'Unauthorized');
         }
 
@@ -192,17 +189,17 @@ class FileController extends Controller
             // Stream file from S3 through Laravel
             $file = $attachment->file;
             $fileContents = Storage::disk('s3')->get($file->hash);
-            
+
             // Get properly formatted Content-Disposition header with original filename
             $contentDisposition = $this->fileService->getContentDispositionHeader($file->original_name);
-            
+
             return response($fileContents, 200, [
                 'Content-Type' => $file->mime_type,
                 'Content-Disposition' => $contentDisposition,
                 'Content-Length' => $file->size_bytes,
                 'Cache-Control' => 'no-cache, no-store, must-revalidate',
                 'Pragma' => 'no-cache',
-                'Expires' => '0'
+                'Expires' => '0',
             ]);
         } catch (\Exception $e) {
             abort(500, 'Failed to download file');
@@ -211,9 +208,9 @@ class FileController extends Controller
 
     /**
      * Alternative: Stream large files efficiently (for files > 50MB)
-     * 
+     *
      * For very large files, consider using this approach instead:
-     * 
+     *
      * return response()->streamDownload(function() use ($file) {
      *     $stream = Storage::disk('s3')->readStream($file->hash);
      *     fpassthru($stream);
@@ -224,15 +221,13 @@ class FileController extends Controller
      * ]);
      */
 
-
-
     /**
      * Delete file attachment.
      */
     public function delete(FileAttachment $attachment): JsonResponse
     {
         // Check if user can access this attachment
-        if (!$this->fileService->canUserAccessAttachment($attachment, Auth::id())) {
+        if (! $this->fileService->canUserAccessAttachment($attachment, Auth::id())) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 

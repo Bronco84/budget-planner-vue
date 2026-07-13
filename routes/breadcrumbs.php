@@ -1,10 +1,9 @@
 <?php
 
+use App\Models\Account;
+use App\Models\Budget;
 use Diglactic\Breadcrumbs\Breadcrumbs;
 use Diglactic\Breadcrumbs\Generator as BreadcrumbTrail;
-use App\Models\Budget;
-use App\Models\Account;
-use App\Models\Property;
 
 // ============================================================
 // ROOT LEVEL PAGES
@@ -72,7 +71,7 @@ Breadcrumbs::for('budgets.accounts.create', function (BreadcrumbTrail $trail, Bu
 
 Breadcrumbs::for('budgets.accounts.edit', function (BreadcrumbTrail $trail, Budget $budget, Account $account) {
     $trail->parent('budgets.show', $budget);
-    $trail->push('Edit Account: ' . $account->name, route('budgets.accounts.edit', [$budget, $account]));
+    $trail->push('Edit Account: '.$account->name, route('budgets.accounts.edit', [$budget, $account]));
 });
 
 // ============================================================
@@ -91,7 +90,7 @@ Breadcrumbs::for('budgets.properties.create', function (BreadcrumbTrail $trail, 
 
 Breadcrumbs::for('budgets.properties.edit', function (BreadcrumbTrail $trail, Budget $budget, $property) {
     $trail->parent('budgets.properties.index', $budget);
-    $trail->push('Edit: ' . $property->name, route('budgets.properties.edit', [$budget, $property]));
+    $trail->push('Edit: '.$property->name, route('budgets.properties.edit', [$budget, $property]));
 });
 
 Breadcrumbs::for('budgets.properties.show', function (BreadcrumbTrail $trail, Budget $budget, $property) {
@@ -101,12 +100,12 @@ Breadcrumbs::for('budgets.properties.show', function (BreadcrumbTrail $trail, Bu
 
 Breadcrumbs::for('budget.account.projections', function (BreadcrumbTrail $trail, Budget $budget, Account $account) {
     $trail->parent('budgets.show', $budget);
-    $trail->push($account->name . ' Projections', route('budget.account.projections', [$budget, $account]));
+    $trail->push($account->name.' Projections', route('budget.account.projections', [$budget, $account]));
 });
 
 Breadcrumbs::for('budget.account.balance-projection', function (BreadcrumbTrail $trail, Budget $budget, Account $account) {
     $trail->parent('budgets.show', $budget);
-    $trail->push($account->name . ' Balance Chart', route('budget.account.balance-projection', [$budget, $account]));
+    $trail->push($account->name.' Balance Chart', route('budget.account.balance-projection', [$budget, $account]));
 });
 
 // ============================================================
@@ -139,7 +138,7 @@ Breadcrumbs::for('budgets.categories.create', function (BreadcrumbTrail $trail, 
 
 Breadcrumbs::for('budgets.categories.edit', function (BreadcrumbTrail $trail, Budget $budget, $category) {
     $trail->parent('budgets.categories.index', $budget);
-    $trail->push('Edit Category: ' . $category->name, route('budgets.categories.edit', [$budget, $category]));
+    $trail->push('Edit Category: '.$category->name, route('budgets.categories.edit', [$budget, $category]));
 });
 
 // ============================================================
@@ -177,7 +176,7 @@ Breadcrumbs::for('recurring-transactions.create', function (BreadcrumbTrail $tra
 
 Breadcrumbs::for('recurring-transactions.edit', function (BreadcrumbTrail $trail, Budget $budget, $recurringTransaction) {
     $trail->parent('recurring-transactions.index', $budget);
-    $trail->push('Edit: ' . $recurringTransaction->description, route('recurring-transactions.edit', [$budget, $recurringTransaction]));
+    $trail->push('Edit: '.$recurringTransaction->description, route('recurring-transactions.edit', [$budget, $recurringTransaction]));
 });
 
 Breadcrumbs::for('recurring-transactions.analysis', function (BreadcrumbTrail $trail, Budget $budget) {

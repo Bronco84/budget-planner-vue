@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Property;
 use App\Models\Budget;
-use Illuminate\Http\Request;
+use App\Models\Property;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -66,10 +65,10 @@ class PropertyController extends Controller
             'bedrooms' => 'nullable|integer|min:0',
             'bathrooms' => 'nullable|numeric|min:0',
             'square_feet' => 'nullable|integer|min:0',
-            'year_built' => 'nullable|integer|min:1800|max:' . (date('Y') + 1),
+            'year_built' => 'nullable|integer|min:1800|max:'.(date('Y') + 1),
             'vehicle_make' => 'nullable|string|max:255',
             'vehicle_model' => 'nullable|string|max:255',
-            'vehicle_year' => 'nullable|integer|min:1900|max:' . (date('Y') + 1),
+            'vehicle_year' => 'nullable|integer|min:1900|max:'.(date('Y') + 1),
             'vin' => 'nullable|string|max:17',
             'mileage' => 'nullable|integer|min:0',
             'notes' => 'nullable|string',
@@ -128,7 +127,7 @@ class PropertyController extends Controller
         // Get liability accounts that could be linked to this asset
         $liabilityAccounts = $budget->accounts()
             ->whereIn('type', ['mortgage', 'loan', 'line of credit'])
-            ->where(function($query) use ($property) {
+            ->where(function ($query) use ($property) {
                 $query->whereNull('property_id')
                     ->orWhere('property_id', $property->id);
             })
@@ -162,10 +161,10 @@ class PropertyController extends Controller
             'bedrooms' => 'nullable|integer|min:0',
             'bathrooms' => 'nullable|numeric|min:0',
             'square_feet' => 'nullable|integer|min:0',
-            'year_built' => 'nullable|integer|min:1800|max:' . (date('Y') + 1),
+            'year_built' => 'nullable|integer|min:1800|max:'.(date('Y') + 1),
             'vehicle_make' => 'nullable|string|max:255',
             'vehicle_model' => 'nullable|string|max:255',
-            'vehicle_year' => 'nullable|integer|min:1900|max:' . (date('Y') + 1),
+            'vehicle_year' => 'nullable|integer|min:1900|max:'.(date('Y') + 1),
             'vin' => 'nullable|string|max:17',
             'mileage' => 'nullable|integer|min:0',
             'notes' => 'nullable|string',
@@ -184,9 +183,9 @@ class PropertyController extends Controller
         if ($request->has('linked_account_ids')) {
             // Clear existing links
             $budget->accounts()->where('property_id', $property->id)->update(['property_id' => null]);
-            
+
             // Set new links
-            if (!empty($request->linked_account_ids)) {
+            if (! empty($request->linked_account_ids)) {
                 $budget->accounts()
                     ->whereIn('id', $request->linked_account_ids)
                     ->update(['property_id' => $property->id]);

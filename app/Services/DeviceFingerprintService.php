@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class DeviceFingerprintService
 {
@@ -51,7 +50,7 @@ class DeviceFingerprintService
         if (str_contains($userAgent, 'Chrome')) {
             return 'Chrome';
         }
-        if (str_contains($userAgent, 'Safari') && !str_contains($userAgent, 'Chrome')) {
+        if (str_contains($userAgent, 'Safari') && ! str_contains($userAgent, 'Chrome')) {
             return 'Safari';
         }
         if (str_contains($userAgent, 'Firefox')) {
@@ -116,4 +115,3 @@ class DeviceFingerprintService
         return null;
     }
 }
-

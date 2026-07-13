@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -53,7 +53,9 @@ class BankFeedTransaction extends Model
      * Status constants.
      */
     const STATUS_PENDING = 'pending';
+
     const STATUS_CLEARED = 'cleared';
+
     const STATUS_CANCELLED = 'cancelled';
 
     /**
@@ -107,7 +109,7 @@ class BankFeedTransaction extends Model
      */
     public function isCleared(): bool
     {
-        return $this->status === self::STATUS_CLEARED && !$this->pending;
+        return $this->status === self::STATUS_CLEARED && ! $this->pending;
     }
 
     /**
@@ -123,7 +125,7 @@ class BankFeedTransaction extends Model
      */
     public function getFormattedAmountAttribute(): string
     {
-        return '$' . number_format($this->amount, 2);
+        return '$'.number_format($this->amount, 2);
     }
 
     /**
@@ -148,13 +150,13 @@ class BankFeedTransaction extends Model
     public function getSafeRawData(): array
     {
         $rawData = $this->raw_data ?? [];
-        
+
         // Remove potentially sensitive keys
         $sensitiveKeys = ['account_id', 'access_token', 'secret'];
         foreach ($sensitiveKeys as $key) {
             unset($rawData[$key]);
         }
-        
+
         return $rawData;
     }
 
@@ -224,7 +226,7 @@ class BankFeedTransaction extends Model
     {
         return $query->where(function ($q) {
             $q->where('status', self::STATUS_PENDING)
-              ->orWhere('pending', true);
+                ->orWhere('pending', true);
         });
     }
 
@@ -234,6 +236,6 @@ class BankFeedTransaction extends Model
     public function scopeCleared($query)
     {
         return $query->where('status', self::STATUS_CLEARED)
-                     ->where('pending', false);
+            ->where('pending', false);
     }
 }

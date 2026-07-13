@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -57,17 +57,24 @@ class BankFeed extends Model
      * Source type constants.
      */
     const SOURCE_PLAID = 'plaid';
+
     const SOURCE_AIRTABLE = 'airtable';
+
     const SOURCE_CSV = 'csv';
+
     const SOURCE_OFX = 'ofx';
+
     const SOURCE_MANUAL = 'manual';
 
     /**
      * Status constants.
      */
     const STATUS_ACTIVE = 'active';
+
     const STATUS_ERROR = 'error';
+
     const STATUS_DISCONNECTED = 'disconnected';
+
     const STATUS_PENDING = 'pending';
 
     /**
@@ -166,7 +173,7 @@ class BankFeed extends Model
     public function getSafeConnectionConfig(): array
     {
         $config = $this->connection_config ?? [];
-        
+
         // Remove sensitive keys
         $sensitiveKeys = ['access_token', 'secret', 'api_key', 'password'];
         foreach ($sensitiveKeys as $key) {
@@ -174,7 +181,7 @@ class BankFeed extends Model
                 $config[$key] = '[HIDDEN]';
             }
         }
-        
+
         return $config;
     }
 
@@ -186,8 +193,8 @@ class BankFeed extends Model
         if ($this->current_balance_cents === null) {
             return 'N/A';
         }
-        
-        return '$' . number_format($this->current_balance_cents / 100, 2);
+
+        return '$'.number_format($this->current_balance_cents / 100, 2);
     }
 
     /**
@@ -198,8 +205,8 @@ class BankFeed extends Model
         if ($this->available_balance_cents === null) {
             return 'N/A';
         }
-        
-        return '$' . number_format($this->available_balance_cents / 100, 2);
+
+        return '$'.number_format($this->available_balance_cents / 100, 2);
     }
 
     /**

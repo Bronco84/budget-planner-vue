@@ -7,7 +7,7 @@ use App\Models\RecurringTransactionTemplate;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\RecurringTransactionTemplate>
+ * @extends Factory<RecurringTransactionTemplate>
  */
 class RecurringTransactionTemplateFactory extends Factory
 {

@@ -35,14 +35,14 @@ class TransactionContextBuilder implements ContextBuilderInterface
     protected function buildRecentTransactions(Budget $budget): array
     {
         $startDate = Carbon::now()->subDays(30);
-        
+
         $transactions = $budget->transactions()
             ->with('account')
             ->where('date', '>=', $startDate)
             ->orderBy('date', 'desc')
             ->limit(self::MAX_TRANSACTIONS)
             ->get()
-            ->map(fn($t) => $this->formatTransaction($t))
+            ->map(fn ($t) => $this->formatTransaction($t))
             ->toArray();
 
         $totalIncome = collect($transactions)->where('amount', '>', 0)->sum('amount');
@@ -67,14 +67,14 @@ class TransactionContextBuilder implements ContextBuilderInterface
     {
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
-        
+
         $transactions = $budget->transactions()
             ->with('account')
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->orderBy('date', 'desc')
             ->limit(self::MAX_TRANSACTIONS)
             ->get()
-            ->map(fn($t) => $this->formatTransaction($t))
+            ->map(fn ($t) => $this->formatTransaction($t))
             ->toArray();
 
         $totalIncome = collect($transactions)->where('amount', '>', 0)->sum('amount');
@@ -98,7 +98,7 @@ class TransactionContextBuilder implements ContextBuilderInterface
     protected function buildByCategory(Budget $budget): array
     {
         $startOfMonth = Carbon::now()->startOfMonth();
-        
+
         $transactions = $budget->transactions()
             ->where('date', '>=', $startOfMonth)
             ->get();
@@ -107,6 +107,7 @@ class TransactionContextBuilder implements ContextBuilderInterface
             ->groupBy('category')
             ->map(function ($categoryTransactions, $category) {
                 $total = $categoryTransactions->sum('amount_in_cents') / 100;
+
                 return [
                     'category' => $category ?: 'Uncategorized',
                     'total' => $total,

@@ -2,12 +2,13 @@
 
 namespace Database\Factories;
 
-use App\Models\Scenario;
 use App\Models\Account;
+use App\Models\Scenario;
+use App\Models\ScenarioAdjustment;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ScenarioAdjustment>
+ * @extends Factory<ScenarioAdjustment>
  */
 class ScenarioAdjustmentFactory extends Factory
 {
@@ -21,7 +22,7 @@ class ScenarioAdjustmentFactory extends Factory
         $types = ['one_time_expense', 'recurring_expense', 'debt_paydown', 'savings_contribution'];
         $type = fake()->randomElement($types);
         $isRecurring = $type !== 'one_time_expense';
-        
+
         return [
             'scenario_id' => Scenario::factory(),
             'account_id' => Account::factory(),

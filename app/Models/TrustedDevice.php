@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
 
 class TrustedDevice extends Model
 {
@@ -46,7 +45,7 @@ class TrustedDevice extends Model
      */
     public function isValid(): bool
     {
-        return !$this->isExpired();
+        return ! $this->isExpired();
     }
 
     /**
@@ -78,7 +77,7 @@ class TrustedDevice extends Model
      */
     public function getLastUsedHumanAttribute(): string
     {
-        if (!$this->last_used_at) {
+        if (! $this->last_used_at) {
             return 'Never';
         }
 
@@ -93,4 +92,3 @@ class TrustedDevice extends Model
         return $this->device_fingerprint === $fingerprint;
     }
 }
-

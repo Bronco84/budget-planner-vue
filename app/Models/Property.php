@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Property extends Model
 {
@@ -16,7 +16,9 @@ class Property extends Model
      * Property types (real estate, vehicles, etc.)
      */
     public const TYPE_PROPERTY = 'property';
+
     public const TYPE_VEHICLE = 'vehicle';
+
     public const TYPE_OTHER = 'other';
 
     /**
@@ -163,11 +165,11 @@ class Property extends Model
     public function getDisplayName(): string
     {
         if ($this->isProperty() && $this->address) {
-            return $this->name . ' (' . $this->address . ')';
+            return $this->name.' ('.$this->address.')';
         }
 
         if ($this->isVehicle() && $this->vehicle_year && $this->vehicle_make && $this->vehicle_model) {
-            return $this->vehicle_year . ' ' . $this->vehicle_make . ' ' . $this->vehicle_model;
+            return $this->vehicle_year.' '.$this->vehicle_make.' '.$this->vehicle_model;
         }
 
         return $this->name;
@@ -178,7 +180,7 @@ class Property extends Model
      */
     public function getPropertyTypeDisplay(): ?string
     {
-        if (!$this->isProperty() || !$this->property_type) {
+        if (! $this->isProperty() || ! $this->property_type) {
             return null;
         }
 
@@ -190,7 +192,7 @@ class Property extends Model
      */
     public function needsValueUpdate(): bool
     {
-        if (!$this->value_updated_at) {
+        if (! $this->value_updated_at) {
             return true;
         }
 

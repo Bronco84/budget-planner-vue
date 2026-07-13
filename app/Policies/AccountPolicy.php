@@ -66,4 +66,3 @@ class AccountPolicy
         return $user->id === $account->budget->user_id;
     }
 }
-

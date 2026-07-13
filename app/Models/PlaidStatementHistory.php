@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PlaidStatementHistory extends Model
@@ -51,25 +51,20 @@ class PlaidStatementHistory extends Model
 
     /**
      * Calculate credit utilization percentage.
-     *
-     * @param int $statementBalanceCents
-     * @param int|null $creditLimitCents
-     * @return float|null
      */
     public static function calculateCreditUtilization(int $statementBalanceCents, ?int $creditLimitCents): ?float
     {
-        if (!$creditLimitCents || $creditLimitCents <= 0) {
+        if (! $creditLimitCents || $creditLimitCents <= 0) {
             return null;
         }
 
         $utilization = ($statementBalanceCents / $creditLimitCents) * 100;
+
         return round($utilization, 2);
     }
 
     /**
      * Get credit utilization percentage for this statement.
-     *
-     * @return float|null
      */
     public function getCreditUtilization(): ?float
     {

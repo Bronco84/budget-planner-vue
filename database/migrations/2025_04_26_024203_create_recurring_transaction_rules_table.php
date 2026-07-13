@@ -21,7 +21,7 @@ return new class extends Migration
             $table->integer('priority')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            
+
             $table->foreign('recurring_transaction_template_id', 'rec_trans_template_fk')
                 ->references('id')
                 ->on('recurring_transaction_templates')

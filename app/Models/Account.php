@@ -6,12 +6,12 @@ use App\Enums\AccountStatus;
 use App\Services\BudgetService;
 use App\Traits\InstitutionDomainMapping;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Account extends Model
 {
@@ -30,24 +30,24 @@ class Account extends Model
             // Check if autopay-related fields changed
             $autopayFields = ['autopay_enabled', 'autopay_source_account_id', 'autopay_amount_override_cents', 'current_balance_cents'];
             $autopayChanged = false;
-            
+
             foreach ($autopayFields as $field) {
                 if ($account->isDirty($field)) {
                     $autopayChanged = true;
                     break;
                 }
             }
-            
+
             if ($autopayChanged) {
                 // Clear caches for this account
                 BudgetService::clearAccountCaches($account->id);
-                
+
                 // If this account has autopay configured to a source account, clear that cache too
                 // This ensures the source account's projection cache is refreshed when credit card data changes
                 if ($account->autopay_source_account_id) {
                     BudgetService::clearAccountCaches($account->autopay_source_account_id);
                 }
-                
+
                 // If the autopay_source_account_id itself changed, also clear the old source's cache
                 if ($account->isDirty('autopay_source_account_id')) {
                     $oldSourceId = $account->getOriginal('autopay_source_account_id');
@@ -67,7 +67,7 @@ class Account extends Model
         'line of credit',
         'credit',
         'credit card',
-        'loan'
+        'loan',
     ];
 
     /**
@@ -246,7 +246,7 @@ class Account extends Model
      */
     public function isAsset(): bool
     {
-        return !$this->isLiability();
+        return ! $this->isLiability();
     }
 
     /**
@@ -264,7 +264,7 @@ class Account extends Model
      */
     public function getAutopayAmountCents(): ?int
     {
-        if (!$this->hasActiveAutopay()) {
+        if (! $this->hasActiveAutopay()) {
             return null;
         }
 
@@ -278,7 +278,7 @@ class Account extends Model
      */
     public function getNextAutopayDate(): ?Carbon
     {
-        if (!$this->hasActiveAutopay()) {
+        if (! $this->hasActiveAutopay()) {
             return null;
         }
 
@@ -325,8 +325,9 @@ class Account extends Model
                     if (str_starts_with($this->custom_logo, 'http') || str_starts_with($this->custom_logo, 'data:')) {
                         return $this->custom_logo;
                     }
+
                     // Otherwise assume it's base64
-                    return 'data:image/png;base64,' . $this->custom_logo;
+                    return 'data:image/png;base64,'.$this->custom_logo;
                 }
 
                 // 2. External logo URL (fetched from Clearbit, etc.)
@@ -376,14 +377,14 @@ class Account extends Model
             get: function () {
                 $name = $this->resolveInstitutionName();
 
-                if (!$name) {
+                if (! $name) {
                     return '?';
                 }
 
                 $words = preg_split('/\s+/', trim($name));
 
                 if (count($words) >= 2) {
-                    return strtoupper(substr($words[0], 0, 1) . substr($words[1], 0, 1));
+                    return strtoupper(substr($words[0], 0, 1).substr($words[1], 0, 1));
                 }
 
                 return strtoupper(substr($name, 0, 2));
@@ -413,10 +414,10 @@ class Account extends Model
 
                 // Simple hash of the name to get consistent color
                 $name = $this->resolveInstitutionName() ?? '';
-                
+
                 // Use a simple string hash that won't overflow
                 $hash = crc32($name);
-                
+
                 // crc32 can return negative values, so use abs
                 return $colors[abs($hash) % count($colors)];
             }

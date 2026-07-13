@@ -1,16 +1,11 @@
 <?php
 
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
-use App\Http\Controllers\Auth\NewPasswordController;
-use App\Http\Controllers\Auth\PasswordController;
-use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
-use App\Http\Controllers\PasskeyAuthController;
 use App\Http\Controllers\MagicLinkController;
+use App\Http\Controllers\PasskeyAuthController;
+use App\Http\Controllers\PasskeyManagementController;
 use App\Http\Controllers\TrustedDeviceController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,14 +13,14 @@ Route::middleware('guest')->group(function () {
     // Passkey Authentication (Primary)
     Route::get('login', [PasskeyAuthController::class, 'create'])
         ->name('login');
-    
+
     // Magic Link Fallback
     Route::get('magic-link', [MagicLinkController::class, 'create'])
         ->name('magic-link.request');
-    
+
     Route::post('magic-link', [MagicLinkController::class, 'store'])
         ->name('magic-link.store');
-    
+
     Route::get('magic-link/authenticate', [MagicLinkController::class, 'authenticate'])
         ->name('magic-link.authenticate');
 
@@ -40,17 +35,17 @@ Route::middleware('auth')->group(function () {
     // Passkey Management
     Route::get('passkey/register', [PasskeyAuthController::class, 'registerCreate'])
         ->name('passkey.register');
-    
-    Route::patch('settings/passkeys/{credential}', [\App\Http\Controllers\PasskeyManagementController::class, 'update'])
+
+    Route::patch('settings/passkeys/{credential}', [PasskeyManagementController::class, 'update'])
         ->name('passkeys.update');
-    
-    Route::delete('settings/passkeys/{credential}', [\App\Http\Controllers\PasskeyManagementController::class, 'destroy'])
+
+    Route::delete('settings/passkeys/{credential}', [PasskeyManagementController::class, 'destroy'])
         ->name('passkeys.destroy');
-    
+
     // Trusted Devices Management
     Route::delete('settings/trusted-devices/{device}', [TrustedDeviceController::class, 'revoke'])
         ->name('trusted-devices.revoke');
-    
+
     Route::post('settings/trusted-devices/revoke-all', [TrustedDeviceController::class, 'revokeAll'])
         ->name('trusted-devices.revoke-all');
 

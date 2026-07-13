@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PlaidSecurity extends Model
@@ -58,8 +58,7 @@ class PlaidSecurity extends Model
     /**
      * Create or update a security from Plaid API data.
      *
-     * @param array $securityData Raw security data from Plaid
-     * @return self
+     * @param  array  $securityData  Raw security data from Plaid
      */
     public static function createOrUpdateFromPlaid(array $securityData): self
     {

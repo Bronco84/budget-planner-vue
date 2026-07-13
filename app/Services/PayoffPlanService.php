@@ -37,7 +37,7 @@ class PayoffPlanService
         $startDate = Carbon::now();
         $endDate = Carbon::now()->addDays(30);
         $autopayProjections = $this->recurringTransactionService->generateAutopayProjections($budget, $startDate, $endDate);
-        
+
         foreach ($autopayProjections as $projection) {
             // Autopay amounts are already negative (deductions), so add them directly
             $totalProjectedCashFlow += $projection->amount_in_cents;
@@ -53,7 +53,7 @@ class PayoffPlanService
     {
         return $budget->accounts()
             ->get()
-            ->filter(fn(Account $account) => $account->isLiability() && $account->current_balance_cents > 0);
+            ->filter(fn (Account $account) => $account->isLiability() && $account->current_balance_cents > 0);
     }
 
     /**
@@ -90,7 +90,7 @@ class PayoffPlanService
         $month = 0;
         $maxMonths = 600; // 50 years maximum to prevent infinite loops
 
-        while (count(array_filter($debtData, fn($d) => $d['balance'] > 0)) > 0 && $month < $maxMonths) {
+        while (count(array_filter($debtData, fn ($d) => $d['balance'] > 0)) > 0 && $month < $maxMonths) {
             $month++;
             $monthData = [
                 'month' => $month,
@@ -105,7 +105,7 @@ class PayoffPlanService
             foreach ($debtData as &$debt) {
                 if ($debt['balance'] > 0) {
                     $monthlyInterestRate = $debt['interest_rate'] / 100 / 12;
-                    $interestCharge = (int)round($debt['balance'] * $monthlyInterestRate);
+                    $interestCharge = (int) round($debt['balance'] * $monthlyInterestRate);
                     $debt['balance'] += $interestCharge;
                     $debt['total_interest_paid'] += $interestCharge;
                 }
@@ -171,17 +171,17 @@ class PayoffPlanService
         switch ($strategy) {
             case 'snowball':
                 // Sort by balance (smallest first)
-                usort($debts, fn($a, $b) => $a['balance'] <=> $b['balance']);
+                usort($debts, fn ($a, $b) => $a['balance'] <=> $b['balance']);
                 break;
 
             case 'avalanche':
                 // Sort by interest rate (highest first)
-                usort($debts, fn($a, $b) => $b['interest_rate'] <=> $a['interest_rate']);
+                usort($debts, fn ($a, $b) => $b['interest_rate'] <=> $a['interest_rate']);
                 break;
 
             case 'custom':
                 // Sort by user-defined priority
-                usort($debts, fn($a, $b) => $a['priority'] <=> $b['priority']);
+                usort($debts, fn ($a, $b) => $a['priority'] <=> $b['priority']);
                 break;
         }
 
@@ -258,10 +258,11 @@ class PayoffPlanService
                     'months_to_complete' => null,
                     'completion_date' => null,
                 ];
+
                 continue;
             }
 
-            $monthsToComplete = (int)ceil($targetAmount / $monthlyContribution);
+            $monthsToComplete = (int) ceil($targetAmount / $monthlyContribution);
             $completionDate = $plan->start_date->copy()->addMonths($monthsToComplete);
 
             $projections[] = [

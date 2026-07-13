@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 class AirtableImportStrategy implements BankFeedImportInterface
 {
     protected Client $client;
+
     protected string $baseUrl;
 
     public function __construct()
@@ -33,7 +34,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
             // Validate required credentials
             $required = ['api_key', 'base_id', 'table_name'];
             foreach ($required as $field) {
-                if (!isset($credentials[$field]) || empty($credentials[$field])) {
+                if (! isset($credentials[$field]) || empty($credentials[$field])) {
                     return [
                         'success' => false,
                         'error' => "Missing required field: {$field}",
@@ -43,8 +44,8 @@ class AirtableImportStrategy implements BankFeedImportInterface
 
             // Test the connection by fetching table schema
             $testResult = $this->testAirtableConnection($credentials);
-            
-            if (!$testResult['success']) {
+
+            if (! $testResult['success']) {
                 return $testResult;
             }
 
@@ -61,12 +62,12 @@ class AirtableImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             Log::error('Airtable connection failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
-                'error' => 'Failed to connect to Airtable: ' . $e->getMessage(),
+                'error' => 'Failed to connect to Airtable: '.$e->getMessage(),
             ];
         }
     }
@@ -78,11 +79,12 @@ class AirtableImportStrategy implements BankFeedImportInterface
     {
         try {
             $config = $bankFeed->connection_config;
+
             return $this->testAirtableConnection($config);
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => 'Connection test failed: ' . $e->getMessage(),
+                'error' => 'Connection test failed: '.$e->getMessage(),
             ];
         }
     }
@@ -94,13 +96,13 @@ class AirtableImportStrategy implements BankFeedImportInterface
     {
         try {
             $config = $bankFeed->connection_config;
-            
-            if (!isset($config['api_key'], $config['base_id'], $config['table_name'])) {
+
+            if (! isset($config['api_key'], $config['base_id'], $config['table_name'])) {
                 throw new \Exception('Missing required Airtable configuration');
             }
 
             $url = "/{$config['base_id']}/{$config['table_name']}";
-            
+
             // Build query parameters
             $params = [
                 'filterByFormula' => $this->buildDateFilter($config, $startDate, $endDate),
@@ -114,14 +116,14 @@ class AirtableImportStrategy implements BankFeedImportInterface
 
             $response = $this->client->get($url, [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $config['api_key'],
+                    'Authorization' => 'Bearer '.$config['api_key'],
                 ],
                 'query' => $params,
             ]);
 
             $data = json_decode($response->getBody()->getContents(), true);
-            
-            if (!isset($data['records'])) {
+
+            if (! isset($data['records'])) {
                 throw new \Exception('Invalid response format from Airtable');
             }
 
@@ -137,7 +139,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
                 'bank_feed_id' => $bankFeed->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             throw $e;
         }
     }
@@ -217,21 +219,21 @@ class AirtableImportStrategy implements BankFeedImportInterface
     {
         $errors = [];
 
-        if (!isset($credentials['api_key']) || empty($credentials['api_key'])) {
+        if (! isset($credentials['api_key']) || empty($credentials['api_key'])) {
             $errors['api_key'] = 'API key is required';
         }
 
-        if (!isset($credentials['base_id']) || empty($credentials['base_id'])) {
+        if (! isset($credentials['base_id']) || empty($credentials['base_id'])) {
             $errors['base_id'] = 'Base ID is required';
-        } elseif (!str_starts_with($credentials['base_id'], 'app')) {
+        } elseif (! str_starts_with($credentials['base_id'], 'app')) {
             $errors['base_id'] = 'Base ID should start with "app"';
         }
 
-        if (!isset($credentials['table_name']) || empty($credentials['table_name'])) {
+        if (! isset($credentials['table_name']) || empty($credentials['table_name'])) {
             $errors['table_name'] = 'Table name is required';
         }
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             return [
                 'success' => false,
                 'errors' => $errors,
@@ -285,10 +287,10 @@ class AirtableImportStrategy implements BankFeedImportInterface
     {
         try {
             $url = "/{$config['base_id']}/{$config['table_name']}";
-            
+
             $response = $this->client->get($url, [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $config['api_key'],
+                    'Authorization' => 'Bearer '.$config['api_key'],
                 ],
                 'query' => [
                     'maxRecords' => 1, // Just test with 1 record
@@ -296,7 +298,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
             ]);
 
             $data = json_decode($response->getBody()->getContents(), true);
-            
+
             return [
                 'success' => true,
                 'message' => 'Connection test successful',
@@ -305,7 +307,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => 'Connection test failed: ' . $e->getMessage(),
+                'error' => 'Connection test failed: '.$e->getMessage(),
             ];
         }
     }
@@ -329,11 +331,11 @@ class AirtableImportStrategy implements BankFeedImportInterface
     protected function buildDateFilter(array $config, Carbon $startDate, Carbon $endDate): string
     {
         $dateField = $config['field_mapping']['date'] ?? 'Date';
-        
-        return "AND(" .
-            "IS_AFTER({{$dateField}}, '" . $startDate->format('Y-m-d') . "'), " .
-            "IS_BEFORE({{$dateField}}, '" . $endDate->addDay()->format('Y-m-d') . "')" .
-            ")";
+
+        return 'AND('.
+            "IS_AFTER({{$dateField}}, '".$startDate->format('Y-m-d')."'), ".
+            "IS_BEFORE({{$dateField}}, '".$endDate->addDay()->format('Y-m-d')."')".
+            ')';
     }
 
     /**
@@ -349,7 +351,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
      */
     protected function parseDate(mixed $dateValue): ?string
     {
-        if (!$dateValue) {
+        if (! $dateValue) {
             return null;
         }
 
@@ -360,6 +362,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
                 'date_value' => $dateValue,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -369,7 +372,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
      */
     protected function parseDateTime(mixed $dateValue): ?string
     {
-        if (!$dateValue) {
+        if (! $dateValue) {
             return null;
         }
 

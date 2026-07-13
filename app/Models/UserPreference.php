@@ -36,7 +36,7 @@ class UserPreference extends Model
     {
         $preference = static::where('user_id', $userId)->first();
 
-        if (!$preference) {
+        if (! $preference) {
             return $default;
         }
 
@@ -47,6 +47,7 @@ class UserPreference extends Model
 
         // Check other_preferences JSON column
         $otherPrefs = $preference->other_preferences ?? [];
+
         return $otherPrefs[$key] ?? $default;
     }
 
@@ -61,6 +62,7 @@ class UserPreference extends Model
         if (in_array($key, ['theme', 'notifications_enabled', 'show_balance_projection'])) {
             $preference->{$key} = $value;
             $preference->save();
+
             return;
         }
 
@@ -77,6 +79,7 @@ class UserPreference extends Model
     public static function getActiveBudgetId(int $userId): ?int
     {
         $value = static::getUserPreference($userId, 'active_budget_id');
+
         return $value ? (int) $value : null;
     }
 

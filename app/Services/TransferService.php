@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\Transfer;
-use App\Models\Transaction;
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\Transaction;
+use App\Models\Transfer;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,8 +16,7 @@ class TransferService
     /**
      * Create a new transfer with its paired transactions.
      *
-     * @param array $data Transfer data (budget_id, from_account_id, to_account_id, amount_in_cents, date, description, notes)
-     * @return Transfer
+     * @param  array  $data  Transfer data (budget_id, from_account_id, to_account_id, amount_in_cents, date, description, notes)
      */
     public function create(array $data): Transfer
     {
@@ -41,10 +41,6 @@ class TransferService
 
     /**
      * Update a transfer and sync its paired transactions.
-     *
-     * @param Transfer $transfer
-     * @param array $data
-     * @return Transfer
      */
     public function update(Transfer $transfer, array $data): Transfer
     {
@@ -68,9 +64,6 @@ class TransferService
 
     /**
      * Delete a transfer and its paired transactions.
-     *
-     * @param Transfer $transfer
-     * @return bool
      */
     public function delete(Transfer $transfer): bool
     {
@@ -85,9 +78,6 @@ class TransferService
 
     /**
      * Create the paired transactions for a transfer.
-     *
-     * @param Transfer $transfer
-     * @return void
      */
     protected function createPairedTransactions(Transfer $transfer): void
     {
@@ -120,9 +110,6 @@ class TransferService
 
     /**
      * Sync the paired transactions when a transfer is updated.
-     *
-     * @param Transfer $transfer
-     * @return void
      */
     protected function syncPairedTransactions(Transfer $transfer): void
     {
@@ -178,11 +165,6 @@ class TransferService
 
     /**
      * Get all future (projected) transfers for a budget.
-     *
-     * @param Budget $budget
-     * @param Carbon|null $startDate
-     * @param Carbon|null $endDate
-     * @return Collection
      */
     public function getFutureTransfers(Budget $budget, ?Carbon $startDate = null, ?Carbon $endDate = null): Collection
     {
@@ -199,11 +181,6 @@ class TransferService
     /**
      * Get projected transfer transactions for an account.
      * Returns array of transaction-like data for inclusion in projections.
-     *
-     * @param Account $account
-     * @param Carbon $startDate
-     * @param Carbon $endDate
-     * @return Collection
      */
     public function getProjectedTransferTransactions(Account $account, Carbon $startDate, Carbon $endDate): Collection
     {
@@ -241,9 +218,7 @@ class TransferService
     /**
      * Get all transfers for a budget with pagination.
      *
-     * @param Budget $budget
-     * @param int $perPage
-     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     * @return LengthAwarePaginator
      */
     public function getTransfersForBudget(Budget $budget, int $perPage = 25)
     {

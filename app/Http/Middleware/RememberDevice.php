@@ -17,7 +17,7 @@ class RememberDevice
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -33,17 +33,17 @@ class RememberDevice
 
         // Check for device token cookie
         $token = $request->cookie($this->deviceTokenService->getCookieName());
-        
+
         if ($token) {
             $device = $this->deviceTokenService->verifyDeviceToken($token, $request);
-            
+
             if ($device && $device->isValid()) {
                 // Auto-login the user
                 Auth::loginUsingId($device->user_id);
-                
+
                 // Update last used timestamp
                 $device->markAsUsed();
-                
+
                 return $next($request);
             }
         }

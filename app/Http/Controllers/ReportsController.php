@@ -8,8 +8,6 @@ use App\Models\PayoffPlanDebt;
 use App\Models\RecurringTransactionTemplate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,16 +25,16 @@ class ReportsController extends Controller
             'accounts',
             'categories',
             'recurringTransactionTemplates',
-            'payoffPlans'
+            'payoffPlans',
         ]);
 
         // Get selected account ID from request (null = all accounts)
         $selectedAccountId = $request->input('account_id');
         $selectedAccount = null;
-        
+
         if ($selectedAccountId) {
             $selectedAccount = $budget->accounts()->find($selectedAccountId);
-            if (!$selectedAccount) {
+            if (! $selectedAccount) {
                 // Invalid account ID, reset to all accounts
                 $selectedAccountId = null;
             }
@@ -60,7 +58,7 @@ class ReportsController extends Controller
 
         return Inertia::render('Reports/Index', [
             'budget' => $budget,
-            'accounts' => $budget->accounts->map(fn($account) => [
+            'accounts' => $budget->accounts->map(fn ($account) => [
                 'id' => $account->id,
                 'name' => $account->name,
                 'type' => $account->type,
@@ -90,7 +88,7 @@ class ReportsController extends Controller
             return Carbon::parse($customStartDate);
         }
 
-        return match($dateRange) {
+        return match ($dateRange) {
             '30days' => now()->subDays(30),
             '3months' => now()->subMonths(3),
             '6months' => now()->subMonths(6),
@@ -107,7 +105,7 @@ class ReportsController extends Controller
     private function getNetWorthData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
         // If a specific account is selected, only use that account
-        $accounts = $selectedAccount 
+        $accounts = $selectedAccount
             ? collect([$selectedAccount->load('transactions')])
             : $budget->accounts()->with('transactions')->get();
 
@@ -117,7 +115,7 @@ class ReportsController extends Controller
 
         // Determine interval based on date range
         $daysDiff = (int) $startDate->diffInDays($endDate);
-        $interval = match(true) {
+        $interval = match (true) {
             $daysDiff <= 31 => 1, // Daily for 1 month
             $daysDiff <= 90 => 3, // Every 3 days for 3 months
             $daysDiff <= 180 => 7, // Weekly for 6 months
@@ -213,12 +211,12 @@ class ReportsController extends Controller
         $transactionsQuery = $budget->transactions()
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'));
-        
+
         // Filter by account if selected
         if ($selectedAccount) {
             $transactionsQuery->where('account_id', $selectedAccount->id);
         }
-        
+
         $transactions = $transactionsQuery->orderBy('date')->get();
 
         // Group by month
@@ -227,7 +225,7 @@ class ReportsController extends Controller
 
         while ($currentMonth <= $endDate) {
             $monthKey = $currentMonth->format('Y-m');
-            $monthTransactions = $transactions->filter(function($transaction) use ($currentMonth) {
+            $monthTransactions = $transactions->filter(function ($transaction) use ($currentMonth) {
                 return Carbon::parse($transaction->date)->format('Y-m') === $currentMonth->format('Y-m');
             });
 
@@ -272,12 +270,12 @@ class ReportsController extends Controller
         $transactionsQuery = $budget->transactions()
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'));
-        
+
         // Filter by account if selected
         if ($selectedAccount) {
             $transactionsQuery->where('account_id', $selectedAccount->id);
         }
-        
+
         $transactions = $transactionsQuery->get();
 
         $categoryPerformance = [];
@@ -299,7 +297,7 @@ class ReportsController extends Controller
         }
 
         // Sort by spending (highest first)
-        usort($categoryPerformance, fn($a, $b) => $b['spent'] <=> $a['spent']);
+        usort($categoryPerformance, fn ($a, $b) => $b['spent'] <=> $a['spent']);
 
         return [
             'categories' => $categoryPerformance,
@@ -322,16 +320,16 @@ class ReportsController extends Controller
             ->where('date', '<=', $endDate->format('Y-m-d'))
             ->where('amount_in_cents', '<', 0)
             ->with('plaidTransaction');
-        
+
         // Filter by account if selected
         if ($selectedAccount) {
             $transactionsQuery->where('account_id', $selectedAccount->id);
         }
-        
+
         $transactions = $transactionsQuery->get();
 
         // Group by category
-        $byCategory = $transactions->groupBy('category')->map(function($categoryTransactions, $category) {
+        $byCategory = $transactions->groupBy('category')->map(function ($categoryTransactions, $category) {
             return [
                 'category' => $category ?: 'Uncategorized',
                 'total' => abs($categoryTransactions->sum('amount_in_cents')),
@@ -341,11 +339,11 @@ class ReportsController extends Controller
         })->sortByDesc('total')->values()->take(10)->toArray();
 
         // Group by merchant (from Plaid data)
-        $byMerchant = $transactions->filter(function($transaction) {
+        $byMerchant = $transactions->filter(function ($transaction) {
             return $transaction->plaidTransaction && $transaction->plaidTransaction->merchant_name;
-        })->groupBy(function($transaction) {
+        })->groupBy(function ($transaction) {
             return $transaction->plaidTransaction->merchant_name;
-        })->map(function($merchantTransactions, $merchant) {
+        })->map(function ($merchantTransactions, $merchant) {
             return [
                 'merchant' => $merchant,
                 'total' => abs($merchantTransactions->sum('amount_in_cents')),
@@ -369,16 +367,16 @@ class ReportsController extends Controller
     private function getDebtPayoffData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
         // Get all PayoffPlanDebts for ACTIVE plans in this budget, with the related PayoffPlan and Account
-        $payoffPlanDebtsQuery = PayoffPlanDebt::whereHas('payoffPlan', function($query) use ($budget) {
+        $payoffPlanDebtsQuery = PayoffPlanDebt::whereHas('payoffPlan', function ($query) use ($budget) {
             $query->where('budget_id', $budget->id)
-                  ->where('is_active', true);
+                ->where('is_active', true);
         })->with(['payoffPlan', 'account']);
-        
+
         // Filter by account if selected
         if ($selectedAccount) {
             $payoffPlanDebtsQuery->where('account_id', $selectedAccount->id);
         }
-        
+
         $payoffPlanDebts = $payoffPlanDebtsQuery->get();
 
         $debtSummary = [];
@@ -493,7 +491,7 @@ class ReportsController extends Controller
             ->whereNotNull('autopay_source_account_id')
             ->with(['plaidAccount', 'autopaySourceAccount'])
             ->get()
-            ->filter(fn($account) => $account->hasActiveAutopay())
+            ->filter(fn ($account) => $account->hasActiveAutopay())
             ->map(function ($account) {
                 return [
                     'id' => $account->id,

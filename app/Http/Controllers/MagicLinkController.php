@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\MagicLinkService;
-use App\Services\DeviceTokenService;
 use App\Services\DeviceFingerprintService;
+use App\Services\DeviceTokenService;
+use App\Services\MagicLinkService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -73,7 +73,7 @@ class MagicLinkController extends Controller
             $hasPasskeys = $user->webAuthnCredentials()->exists();
 
             // Redirect with appropriate message
-            if (!$hasPasskeys) {
+            if (! $hasPasskeys) {
                 return redirect()->route('passkey.register')
                     ->with('status', 'Welcome! Please register a passkey for secure access to your account.');
             }

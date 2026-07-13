@@ -18,7 +18,7 @@ return new class extends Migration
             $table->timestamp('expires_at'); // 15 minutes from creation
             $table->timestamp('used_at')->nullable();
             $table->timestamps();
-            
+
             $table->index(['token', 'expires_at']);
         });
     }

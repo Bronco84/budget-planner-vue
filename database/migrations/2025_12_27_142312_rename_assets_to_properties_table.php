@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::rename('assets', 'properties');
-        
+
         // Rename the foreign key column in accounts table
         Schema::table('accounts', function (Blueprint $table) {
             $table->renameColumn('asset_id', 'property_id');
@@ -27,7 +27,7 @@ return new class extends Migration
         Schema::table('accounts', function (Blueprint $table) {
             $table->renameColumn('property_id', 'asset_id');
         });
-        
+
         Schema::rename('properties', 'assets');
     }
 };

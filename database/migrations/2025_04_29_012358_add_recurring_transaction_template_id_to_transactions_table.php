@@ -12,11 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('transactions', function (Blueprint $table) {
-            if (!Schema::hasColumn('transactions', 'recurring_transaction_template_id')) {
+            if (! Schema::hasColumn('transactions', 'recurring_transaction_template_id')) {
                 $table->foreignId('recurring_transaction_template_id')
-                      ->nullable()
-                      ->constrained('recurring_transaction_templates')
-                      ->onDelete('set null');
+                    ->nullable()
+                    ->constrained('recurring_transaction_templates')
+                    ->onDelete('set null');
             }
         });
     }

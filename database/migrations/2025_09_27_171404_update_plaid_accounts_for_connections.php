@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -40,21 +39,21 @@ return new class extends Migration
             // For MySQL/PostgreSQL, use the normal approach
             Schema::table('plaid_accounts', function (Blueprint $table) {
                 // Add reference to PlaidConnection if it doesn't exist
-                if (!Schema::hasColumn('plaid_accounts', 'plaid_connection_id')) {
+                if (! Schema::hasColumn('plaid_accounts', 'plaid_connection_id')) {
                     $table->foreignId('plaid_connection_id')->nullable()->after('id')->constrained()->onDelete('cascade');
                 }
 
                 // Add account-specific fields if they don't exist
-                if (!Schema::hasColumn('plaid_accounts', 'account_name')) {
+                if (! Schema::hasColumn('plaid_accounts', 'account_name')) {
                     $table->string('account_name')->after('plaid_account_id');
                 }
-                if (!Schema::hasColumn('plaid_accounts', 'account_type')) {
+                if (! Schema::hasColumn('plaid_accounts', 'account_type')) {
                     $table->string('account_type')->nullable()->after('account_name');
                 }
-                if (!Schema::hasColumn('plaid_accounts', 'account_subtype')) {
+                if (! Schema::hasColumn('plaid_accounts', 'account_subtype')) {
                     $table->string('account_subtype')->nullable()->after('account_type');
                 }
-                if (!Schema::hasColumn('plaid_accounts', 'account_mask')) {
+                if (! Schema::hasColumn('plaid_accounts', 'account_mask')) {
                     $table->string('account_mask')->nullable()->after('account_subtype');
                 }
             });
@@ -86,18 +85,18 @@ return new class extends Migration
             // Remove the new fields
             $table->dropColumn([
                 'account_name',
-                'account_type', 
+                'account_type',
                 'account_subtype',
                 'account_mask',
             ]);
-            
+
             // Add back the old fields
             $table->foreignId('budget_id')->after('id')->constrained()->onDelete('cascade');
             $table->string('plaid_item_id')->after('plaid_account_id');
             $table->string('institution_name')->after('plaid_item_id');
             $table->string('access_token')->after('institution_name');
             $table->timestamp('last_sync_at')->nullable()->after('balance_updated_at');
-            
+
             // Remove the PlaidConnection reference
             if (Schema::hasColumn('plaid_accounts', 'plaid_connection_id')) {
                 $table->dropForeign(['plaid_connection_id']);

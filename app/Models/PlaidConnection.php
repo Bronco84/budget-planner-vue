@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -38,8 +38,11 @@ class PlaidConnection extends Model
     ];
 
     const STATUS_ACTIVE = 'active';
+
     const STATUS_ERROR = 'error';
+
     const STATUS_DISCONNECTED = 'disconnected';
+
     const STATUS_EXPIRED = 'expired';
 
     /**
@@ -110,8 +113,8 @@ class PlaidConnection extends Model
     public function scopeForInstitution($query, Budget $budget, string $institutionName)
     {
         return $query->where('budget_id', $budget->id)
-                    ->where('institution_name', $institutionName)
-                    ->where('status', self::STATUS_ACTIVE);
+            ->where('institution_name', $institutionName)
+            ->where('status', self::STATUS_ACTIVE);
     }
 
     /**

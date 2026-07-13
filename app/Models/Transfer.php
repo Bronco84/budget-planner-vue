@@ -3,9 +3,8 @@
 namespace App\Models;
 
 use App\Services\BudgetService;
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -29,7 +28,7 @@ class Transfer extends Model
         static::updated(function (Transfer $transfer) {
             BudgetService::clearAccountCaches($transfer->from_account_id);
             BudgetService::clearAccountCaches($transfer->to_account_id);
-            
+
             // Also clear for old accounts if they changed
             if ($transfer->isDirty('from_account_id') && $transfer->getOriginal('from_account_id')) {
                 BudgetService::clearAccountCaches($transfer->getOriginal('from_account_id'));
@@ -115,7 +114,7 @@ class Transfer extends Model
      */
     public function getFormattedAmountAttribute(): string
     {
-        return '$' . number_format($this->amount_in_cents / 100, 2);
+        return '$'.number_format($this->amount_in_cents / 100, 2);
     }
 
     /**

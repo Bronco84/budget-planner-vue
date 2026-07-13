@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('bank_feed_transaction_id')->nullable()->constrained()->onDelete('set null');
             $table->enum('import_source', ['manual', 'plaid', 'airtable', 'csv', 'ofx'])->default('manual');
             $table->index(['import_source', 'bank_feed_transaction_id']);
-            
+
             // Note: Keep existing plaid_transaction_id and is_plaid_imported for backwards compatibility
             // during migration. These will be removed in a future migration after data migration.
         });

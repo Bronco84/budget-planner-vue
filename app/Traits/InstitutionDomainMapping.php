@@ -74,9 +74,6 @@ trait InstitutionDomainMapping
 
     /**
      * Get the domain for an institution name by searching the mapping.
-     *
-     * @param string $institutionName
-     * @return string|null
      */
     protected static function getDomainForInstitution(string $institutionName): ?string
     {
@@ -93,10 +90,6 @@ trait InstitutionDomainMapping
 
     /**
      * Get a Google S2 favicon URL for a domain.
-     *
-     * @param string $domain
-     * @param int $size
-     * @return string
      */
     protected static function getGoogleFaviconUrl(string $domain, int $size = 128): string
     {
@@ -105,16 +98,12 @@ trait InstitutionDomainMapping
 
     /**
      * Get a Google S2 favicon URL for an institution name.
-     *
-     * @param string $institutionName
-     * @param int $size
-     * @return string|null
      */
     protected static function getFaviconUrlForInstitution(string $institutionName, int $size = 128): ?string
     {
         $domain = static::getDomainForInstitution($institutionName);
 
-        if (!$domain) {
+        if (! $domain) {
             return null;
         }
 
@@ -123,15 +112,12 @@ trait InstitutionDomainMapping
 
     /**
      * Extract domain from a URL.
-     *
-     * @param string $url
-     * @return string|null
      */
     protected static function extractDomainFromUrl(string $url): ?string
     {
         $parsed = parse_url($url);
 
-        if (!isset($parsed['host'])) {
+        if (! isset($parsed['host'])) {
             return null;
         }
 

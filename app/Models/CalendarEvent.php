@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Carbon\Carbon;
 
 class CalendarEvent extends Model
 {
@@ -58,11 +58,11 @@ class CalendarEvent extends Model
     {
         return $query->where(function ($q) use ($startDate, $endDate) {
             $q->whereBetween('start_date', [$startDate, $endDate])
-              ->orWhereBetween('end_date', [$startDate, $endDate])
-              ->orWhere(function ($q2) use ($startDate, $endDate) {
-                  $q2->where('start_date', '<=', $startDate)
-                     ->where('end_date', '>=', $endDate);
-              });
+                ->orWhereBetween('end_date', [$startDate, $endDate])
+                ->orWhere(function ($q2) use ($startDate, $endDate) {
+                    $q2->where('start_date', '<=', $startDate)
+                        ->where('end_date', '>=', $endDate);
+                });
         });
     }
 
@@ -72,8 +72,8 @@ class CalendarEvent extends Model
     public function scopeUpcoming($query, int $days = 30)
     {
         return $query->where('start_date', '>=', now())
-                     ->where('start_date', '<=', now()->addDays($days))
-                     ->orderBy('start_date');
+            ->where('start_date', '<=', now()->addDays($days))
+            ->orderBy('start_date');
     }
 
     /**

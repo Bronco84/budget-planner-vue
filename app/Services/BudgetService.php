@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Budget;
 use App\Models\Account;
+use App\Models\Budget;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -76,14 +76,14 @@ class BudgetService
                 'transactions.*',
                 'plaid_transactions.pending as pending',
             )
-            ->selectRaw("transactions.date > ? as is_projected", [now()->toDateString()])
+            ->selectRaw('transactions.date > ? as is_projected', [now()->toDateString()])
             ->selectRaw('false as is_recurring')
             ->with(['account', 'plaidTransaction'])
             ->leftJoin('plaid_transactions', 'transactions.plaid_transaction_id', '=', 'plaid_transactions.plaid_transaction_id')
-            ->where(function($query) use ($startDate, $endDate) {
+            ->where(function ($query) use ($startDate, $endDate) {
                 $query->where('transactions.date', '>=', $startDate)
                     ->where('transactions.date', '<=', $endDate)
-                    ->orWhereHas('plaidTransaction', function($q) {
+                    ->orWhereHas('plaidTransaction', function ($q) {
                         // pending transactions should always be included
                         // since they are technically "future" transactions without a date
                         $q->where('pending', true);
@@ -91,11 +91,11 @@ class BudgetService
             })
             // Remove any transaction that doesn't have a plaid ID if trx date is in the past
             // We consider plaid feed as the source of truth for transactions in the past
-            ->where(function($query) {
-                $query->where(function($q) {
+            ->where(function ($query) {
+                $query->where(function ($q) {
                     $q->where('transactions.date', '>', now())->whereNull('transactions.plaid_transaction_id');
                 });
-                $query->orWhere(function($q) {
+                $query->orWhere(function ($q) {
                     $q->where('transactions.date', '<=', now())->whereNotNull('transactions.plaid_transaction_id');
                 });
             });
@@ -151,6 +151,7 @@ class BudgetService
             $model->is_first_autopay = $transactionData['is_first_autopay'] ?? null;
             $model->transfer_from_account = $transactionData['transfer_from_account'] ?? null;
             $model->transfer_to_account = $transactionData['transfer_to_account'] ?? null;
+
             return $model;
         });
     }
@@ -184,9 +185,9 @@ class BudgetService
 
         // Get autopay projections for the entire budget
         // Load budget with categories to avoid N+1 in autopay category lookup
-        if (!$account->relationLoaded('budget')) {
+        if (! $account->relationLoaded('budget')) {
             $account->load('budget.categories');
-        } elseif (!$account->budget->relationLoaded('categories')) {
+        } elseif (! $account->budget->relationLoaded('categories')) {
             $account->budget->load('categories');
         }
         $budget = $account->budget;
@@ -258,14 +259,14 @@ class BudgetService
         // Generate cache keys for common projection date ranges (1-12 months)
         // This ensures we clear all cached projections regardless of cache driver
         $today = Carbon::now();
-        
+
         for ($months = 1; $months <= 12; $months++) {
             $startDate = $today->copy()->addDay()->startOfDay()->format('Y-m-d');
             $endDate = $today->copy()->addMonths($months)->endOfMonth()->format('Y-m-d');
             $cacheKey = "account:{$accountId}:projections:{$startDate}:{$endDate}";
             Cache::forget($cacheKey);
         }
-        
+
         // Also try Redis pattern matching for Redis/Memcached drivers
         self::forgetCachePattern("account:{$accountId}:projections:*");
     }
@@ -277,7 +278,7 @@ class BudgetService
     protected static function forgetCachePattern(string $pattern): void
     {
         $cacheDriver = config('cache.default');
-        
+
         if (in_array($cacheDriver, ['redis', 'memcached'])) {
             // These drivers support pattern-based deletion
             try {
@@ -285,8 +286,8 @@ class BudgetService
                 if (method_exists($store, 'getRedis')) {
                     $redis = $store->getRedis()->connection();
                     $prefix = config('cache.prefix', 'laravel_cache');
-                    $keys = $redis->keys($prefix . ':' . str_replace('*', '*', $pattern));
-                    if (!empty($keys)) {
+                    $keys = $redis->keys($prefix.':'.str_replace('*', '*', $pattern));
+                    if (! empty($keys)) {
                         $redis->del($keys);
                     }
                 }
@@ -299,10 +300,10 @@ class BudgetService
 
     /**
      * Calculate running balances for all transactions.
-     * 
+     *
      * For asset accounts (checking, savings): balance += transaction amount
      * For liability accounts (credit cards, loans): balance -= transaction amount
-     * 
+     *
      * This is because:
      * - Asset: positive transaction (deposit) increases balance
      * - Liability: negative transaction (purchase) increases debt (balance)
@@ -314,21 +315,21 @@ class BudgetService
         $accountId = $account->id;
         $currentBalanceCents = $account->current_balance_cents;
         $isLiability = $account->isLiability();
-        
+
         // Split transactions into actual, pending, and projected for this account
         $accountTransactions = $allTransactions->where('account_id', $accountId);
 
         // Get actual (non-pending) transactions
         $actualTransactions = $allTransactions
             ->where('is_projected', false)
-            ->filter(function($transaction) {
-                return !$transaction->pending;
+            ->filter(function ($transaction) {
+                return ! $transaction->pending;
             });
 
         // Get pending transactions
         $pendingTransactions = $accountTransactions
             ->where('is_projected', false)
-            ->filter(function($transaction) {
+            ->filter(function ($transaction) {
                 return $transaction->pending;
             });
 
@@ -341,7 +342,7 @@ class BudgetService
         // Process actual transactions in reverse chronological order (going backwards in time)
         foreach ($actualTransactions->reverse() as $transaction) {
             $transaction->running_balance = $runningBalance;
-            
+
             // To find the PREVIOUS balance (going backwards):
             // Assets: previous = current - transaction (deposit added to get current, so subtract to go back)
             // Liabilities: previous = current + transaction (purchase subtracted to get current, so add to go back)
@@ -412,7 +413,7 @@ class BudgetService
         // Calculate net worth: assets minus liabilities
         // Excluded accounts (exclude_from_total_balance = true) are ignored.
         $accountsBalance = $budget->accounts
-            ->filter(fn($account) => !$account->exclude_from_total_balance)
+            ->filter(fn ($account) => ! $account->exclude_from_total_balance)
             ->sum(function ($account) {
                 // Liabilities (credit cards, mortgages, loans, etc.) are subtracted
                 // Assets (checking, savings, investments, etc.) are added
@@ -445,7 +446,7 @@ class BudgetService
      */
     public function parseDateRange(string $dateRange, ?string $customStartDate = null): Carbon
     {
-        return match($dateRange) {
+        return match ($dateRange) {
             '7' => now()->subDays(7),
             '30' => now()->subDays(30),
             '90' => now()->subDays(90),
@@ -454,4 +455,3 @@ class BudgetService
         };
     }
 }
-

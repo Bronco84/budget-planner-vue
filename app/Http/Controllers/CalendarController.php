@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Budget;
-use App\Models\Transaction;
 use App\Models\RecurringTransactionTemplate;
+use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,9 +19,9 @@ class CalendarController extends Controller
 
         // Get user's active budget
         $activeBudget = auth()->user()->getActiveBudget();
-        
+
         // If no budgets exist, redirect to create page
-        if (!$activeBudget) {
+        if (! $activeBudget) {
             return redirect()->route('budgets.create')
                 ->with('message', 'Please create a budget to use the calendar.');
         }
@@ -40,7 +40,7 @@ class CalendarController extends Controller
         // Get calendar events for this month
         $startOfMonth = Carbon::create($year, $month, 1)->startOfDay();
         $endOfMonth = $startOfMonth->copy()->endOfMonth()->endOfDay();
-        
+
         $calendarEvents = auth()->user()->calendarEvents()
             ->with('calendarConnection')
             ->whereHas('calendarConnection', function ($query) {
@@ -86,7 +86,7 @@ class CalendarController extends Controller
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->with('account')
             ->get()
-            ->groupBy(function($transaction) {
+            ->groupBy(function ($transaction) {
                 return Carbon::parse($transaction->date)->format('Y-m-d');
             });
 
@@ -122,7 +122,7 @@ class CalendarController extends Controller
                 'isToday' => $currentDate->isToday(),
                 'isWeekend' => $currentDate->isWeekend(),
                 'transactions' => [
-                    'posted' => $posted->map(function($t) {
+                    'posted' => $posted->map(function ($t) {
                         return [
                             'id' => $t->id,
                             'description' => $t->description,
@@ -173,7 +173,7 @@ class CalendarController extends Controller
 
                 $dateKey = $date->format('Y-m-d');
 
-                if (!$projected->has($dateKey)) {
+                if (! $projected->has($dateKey)) {
                     $projected->put($dateKey, collect());
                 }
 

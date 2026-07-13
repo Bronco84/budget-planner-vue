@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Transaction;
-use App\Models\Account;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,6 +23,7 @@ class TransactionController extends Controller
             if ($budget) {
                 $this->authorize('view', $budget);
             }
+
             return $next($request);
         });
     }
@@ -40,7 +41,7 @@ class TransactionController extends Controller
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('description', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%");
+                    ->orWhere('notes', 'like', "%{$search}%");
             });
         }
 
@@ -61,13 +62,13 @@ class TransactionController extends Controller
             switch ($timeframe) {
                 case 'this_month':
                     $query->whereMonth('date', now()->month)
-                          ->whereYear('date', now()->year);
+                        ->whereYear('date', now()->year);
                     break;
 
                 case 'last_month':
                     $lastMonth = now()->subMonth();
                     $query->whereMonth('date', $lastMonth->month)
-                          ->whereYear('date', $lastMonth->year);
+                        ->whereYear('date', $lastMonth->year);
                     break;
 
                 case 'last_3_months':
@@ -271,7 +272,7 @@ class TransactionController extends Controller
         $activityLog = $transaction->getActivityLogFormatted();
 
         return response()->json([
-            'activities' => $activityLog
+            'activities' => $activityLog,
         ]);
     }
 }

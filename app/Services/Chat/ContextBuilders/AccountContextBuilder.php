@@ -30,12 +30,12 @@ class AccountContextBuilder implements ContextBuilderInterface
 
         // Calculate summary totals
         $totalAssets = collect($accounts)
-            ->filter(fn($a) => !$a['is_liability'] && !$a['exclude_from_total'])
+            ->filter(fn ($a) => ! $a['is_liability'] && ! $a['exclude_from_total'])
             ->sum('balance');
 
         $totalLiabilities = collect($accounts)
-            ->filter(fn($a) => $a['is_liability'] && !$a['exclude_from_total'])
-            ->sum(fn($a) => abs($a['balance']));
+            ->filter(fn ($a) => $a['is_liability'] && ! $a['exclude_from_total'])
+            ->sum(fn ($a) => abs($a['balance']));
 
         $netWorth = $totalAssets - $totalLiabilities;
 
@@ -64,6 +64,7 @@ class AccountContextBuilder implements ContextBuilderInterface
     public function getTokenEstimate(Budget $budget): int
     {
         $accountCount = $budget->accounts()->count();
+
         // ~50 tokens per account + 30 for summary
         return ($accountCount * 50) + 30;
     }

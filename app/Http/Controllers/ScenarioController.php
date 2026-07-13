@@ -4,18 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Budget;
 use App\Models\Scenario;
-use App\Models\ScenarioAdjustment;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 
 class ScenarioController extends Controller
 {
     /**
      * Display a listing of scenarios for a budget.
      *
-     * @param Budget $budget
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function index(Budget $budget)
     {
@@ -35,9 +33,7 @@ class ScenarioController extends Controller
     /**
      * Store a newly created scenario.
      *
-     * @param Request $request
-     * @param Budget $budget
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function store(Request $request, Budget $budget)
     {
@@ -65,7 +61,7 @@ class ScenarioController extends Controller
         // Validate that all accounts belong to this budget
         $accountIds = collect($validated['adjustments'])->pluck('account_id')->unique();
         $validAccountIds = $budget->accounts()->whereIn('id', $accountIds)->pluck('id');
-        
+
         if ($accountIds->count() !== $validAccountIds->count()) {
             return response()->json([
                 'message' => 'One or more accounts do not belong to this budget.',
@@ -99,7 +95,7 @@ class ScenarioController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'message' => 'Failed to create scenario.',
                 'error' => $e->getMessage(),
@@ -110,9 +106,7 @@ class ScenarioController extends Controller
     /**
      * Display the specified scenario.
      *
-     * @param Budget $budget
-     * @param Scenario $scenario
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function show(Budget $budget, Scenario $scenario)
     {
@@ -134,10 +128,7 @@ class ScenarioController extends Controller
     /**
      * Update the specified scenario.
      *
-     * @param Request $request
-     * @param Budget $budget
-     * @param Scenario $scenario
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function update(Request $request, Budget $budget, Scenario $scenario)
     {
@@ -172,7 +163,7 @@ class ScenarioController extends Controller
         if (isset($validated['adjustments'])) {
             $accountIds = collect($validated['adjustments'])->pluck('account_id')->unique();
             $validAccountIds = $budget->accounts()->whereIn('id', $accountIds)->pluck('id');
-            
+
             if ($accountIds->count() !== $validAccountIds->count()) {
                 return response()->json([
                     'message' => 'One or more accounts do not belong to this budget.',
@@ -213,7 +204,7 @@ class ScenarioController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'message' => 'Failed to update scenario.',
                 'error' => $e->getMessage(),
@@ -224,9 +215,7 @@ class ScenarioController extends Controller
     /**
      * Remove the specified scenario.
      *
-     * @param Budget $budget
-     * @param Scenario $scenario
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function destroy(Budget $budget, Scenario $scenario)
     {
@@ -255,9 +244,7 @@ class ScenarioController extends Controller
     /**
      * Toggle the active state of a scenario.
      *
-     * @param Budget $budget
-     * @param Scenario $scenario
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function toggle(Budget $budget, Scenario $scenario)
     {
@@ -273,7 +260,7 @@ class ScenarioController extends Controller
             $isActive = $scenario->toggle();
 
             return response()->json([
-                'message' => 'Scenario ' . ($isActive ? 'activated' : 'deactivated') . ' successfully.',
+                'message' => 'Scenario '.($isActive ? 'activated' : 'deactivated').' successfully.',
                 'is_active' => $isActive,
             ]);
         } catch (\Exception $e) {

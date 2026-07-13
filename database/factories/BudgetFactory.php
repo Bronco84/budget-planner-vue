@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Budget>
+ * @extends Factory<Budget>
  */
 class BudgetFactory extends Factory
 {
@@ -16,13 +16,13 @@ class BudgetFactory extends Factory
     /**
      * Define the model's default state.
      *
-     * @return array<model-property<\App\Models\Budget>, mixed>
+     * @return array<model-property<Budget>, mixed>
      */
     public function definition(): array
     {
         return [
             'user_id' => User::factory(),
-            'name' => fake()->words(2, true) . ' Budget',
+            'name' => fake()->words(2, true).' Budget',
             'description' => fake()->optional()->sentence(),
         ];
     }

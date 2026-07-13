@@ -5,16 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PlaidConnection;
-use App\Models\Transaction;
 use App\Services\PlaidService;
 use App\Traits\InstitutionDomainMapping;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Http\RedirectResponse;
 
 class AccountController extends Controller
 {
     use InstitutionDomainMapping;
+
     /**
      * Create the controller instance.
      */
@@ -26,6 +26,7 @@ class AccountController extends Controller
             if ($budget) {
                 $this->authorize('view', $budget);
             }
+
             return $next($request);
         });
     }
@@ -54,7 +55,7 @@ class AccountController extends Controller
             $plaidService = app(PlaidService::class);
             $linkToken = $plaidService->createLinkToken($budget);
         } catch (\Exception $e) {
-            \Log::error('Failed to create Plaid link token: ' . $e->getMessage());
+            \Log::error('Failed to create Plaid link token: '.$e->getMessage());
         }
 
         return Inertia::render('Accounts/CreateOrImport', [
@@ -86,7 +87,7 @@ class AccountController extends Controller
             'balance_updated_at' => now(),
             'include_in_budget' => $includeInBudget,
             // Auto-sync: excluded accounts are also excluded from total balance
-            'exclude_from_total_balance' => !$includeInBudget,
+            'exclude_from_total_balance' => ! $includeInBudget,
         ]);
 
         return redirect()->route('budgets.show', $budget)
@@ -107,10 +108,10 @@ class AccountController extends Controller
 
         // Load the Plaid account and connection relationships
         $account->load('plaidAccount.plaidConnection');
-        
+
         return Inertia::render('Accounts/Edit', [
             'budget' => $budget,
-            'account' => $account
+            'account' => $account,
         ]);
     }
 
@@ -136,7 +137,7 @@ class AccountController extends Controller
 
         // Auto-sync: excluded accounts are also excluded from total balance
         if (isset($validated['include_in_budget'])) {
-            $validated['exclude_from_total_balance'] = !$validated['include_in_budget'];
+            $validated['exclude_from_total_balance'] = ! $validated['include_in_budget'];
         }
 
         $account->update($validated);
@@ -162,7 +163,7 @@ class AccountController extends Controller
 
         // Get institution name from Plaid connection or account name
         $institutionName = $account->plaidAccount?->plaidConnection?->institution_name ?? $account->name;
-        
+
         \Log::info('Fetching logo for account', [
             'account_id' => $account->id,
             'account_name' => $account->name,
@@ -170,7 +171,7 @@ class AccountController extends Controller
             'has_plaid_account' => $account->plaidAccount !== null,
             'plaid_institution_name' => $account->plaidAccount?->plaidConnection?->institution_name,
         ]);
-        
+
         // Try to find a matching domain for the institution
         $logoUrl = $this->getLogoUrlForInstitution($institutionName);
 
@@ -220,10 +221,11 @@ class AccountController extends Controller
     {
         $faviconUrl = static::getFaviconUrlForInstitution($institutionName);
 
-        if (!$faviconUrl) {
+        if (! $faviconUrl) {
             \Log::info('Could not find domain mapping for institution', [
                 'institution_name' => $institutionName,
             ]);
+
             return null;
         }
 
@@ -252,7 +254,7 @@ class AccountController extends Controller
         if ($account->transactions()->count() > 0) {
             return back()->with('error', 'Cannot delete account with existing transactions.');
         }
-        
+
         // Delete the account
         $account->delete();
 
@@ -271,7 +273,7 @@ class AccountController extends Controller
         }
 
         // Validate account is a credit card
-        if (!$account->isAutopayEligible()) {
+        if (! $account->isAutopayEligible()) {
             return redirect()->back()->with('error', 'Autopay is only available for credit card accounts with statement data.');
         }
 
@@ -283,7 +285,7 @@ class AccountController extends Controller
         ]);
 
         // Additional validation: source account must be specified if autopay enabled
-        if ($validated['autopay_enabled'] && !$validated['autopay_source_account_id']) {
+        if ($validated['autopay_enabled'] && ! $validated['autopay_source_account_id']) {
             return redirect()->back()->with('error', 'Please select a source account for autopay.');
         }
 
@@ -295,7 +297,7 @@ class AccountController extends Controller
                 return redirect()->back()->with('error', 'Source account must be in the same budget.');
             }
 
-            if (!$sourceAccount->canBeAutopaySource()) {
+            if (! $sourceAccount->canBeAutopaySource()) {
                 return redirect()->back()->with('error', 'Source account must be a checking or savings account.');
             }
 
@@ -312,9 +314,9 @@ class AccountController extends Controller
         ]);
 
         $message = $validated['autopay_enabled']
-            ? 'Autopay enabled successfully. Statement balance will be automatically deducted from ' . $sourceAccount->name
+            ? 'Autopay enabled successfully. Statement balance will be automatically deducted from '.$sourceAccount->name
             : 'Autopay disabled successfully.';
 
         return redirect()->back()->with('message', $message);
     }
-} 
+}

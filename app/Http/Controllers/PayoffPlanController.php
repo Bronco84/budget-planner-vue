@@ -118,7 +118,7 @@ class PayoffPlanController extends Controller
         }
 
         // Create goals if provided
-        if (!empty($validated['goals'])) {
+        if (! empty($validated['goals'])) {
             foreach ($validated['goals'] as $goalData) {
                 $plan->goals()->create($goalData);
             }

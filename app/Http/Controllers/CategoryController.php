@@ -17,6 +17,7 @@ class CategoryController extends Controller
             if ($budget) {
                 $this->authorize('view', $budget);
             }
+
             return $next($request);
         });
     }

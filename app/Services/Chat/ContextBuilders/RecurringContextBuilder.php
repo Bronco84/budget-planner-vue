@@ -19,7 +19,7 @@ class RecurringContextBuilder implements ContextBuilderInterface
             ->get()
             ->map(function ($template) {
                 $amount = $template->amount_in_cents / 100;
-                
+
                 return [
                     'description' => $template->friendly_label ?: $template->description,
                     'amount' => $amount,
@@ -35,12 +35,12 @@ class RecurringContextBuilder implements ContextBuilderInterface
 
         // Calculate summaries
         $monthlyIncome = collect($recurringTransactions)
-            ->filter(fn($t) => !$t['is_expense'])
-            ->sum(fn($t) => $this->toMonthlyAmount($t['amount'], $t['frequency']));
+            ->filter(fn ($t) => ! $t['is_expense'])
+            ->sum(fn ($t) => $this->toMonthlyAmount($t['amount'], $t['frequency']));
 
         $monthlyExpenses = collect($recurringTransactions)
-            ->filter(fn($t) => $t['is_expense'])
-            ->sum(fn($t) => abs($this->toMonthlyAmount($t['amount'], $t['frequency'])));
+            ->filter(fn ($t) => $t['is_expense'])
+            ->sum(fn ($t) => abs($this->toMonthlyAmount($t['amount'], $t['frequency'])));
 
         return [
             'recurring_transactions' => $recurringTransactions,
@@ -103,6 +103,7 @@ class RecurringContextBuilder implements ContextBuilderInterface
     public function getTokenEstimate(Budget $budget): int
     {
         $count = $budget->recurringTransactionTemplates()->count();
+
         // ~25 tokens per recurring item + 40 for summary
         return ($count * 25) + 40;
     }

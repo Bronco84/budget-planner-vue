@@ -2,14 +2,14 @@
 
 namespace App\Services;
 
-use App\Models\User;
-use App\Models\TrustedDevice;
 use App\Mail\NewDeviceLogin;
+use App\Models\TrustedDevice;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
+use Symfony\Component\HttpFoundation\Cookie;
 
 class DeviceTokenService
 {
@@ -24,12 +24,12 @@ class DeviceTokenService
     {
         $fingerprint = $this->fingerprintService->generate($request);
         $deviceName = $this->fingerprintService->generateDeviceName($request);
-        
+
         // Check if a device with this fingerprint already exists for this user
         $device = $user->trustedDevices()
             ->where('device_fingerprint', $fingerprint)
             ->first();
-        
+
         if ($device) {
             // Update existing device
             $device->update([
@@ -40,13 +40,13 @@ class DeviceTokenService
                 'expires_at' => now()->addDays((int) config('auth.device_remember_days', 90)),
                 'auth_method' => $authMethod, // Update auth method
             ]);
-            
+
             return $device;
         }
-        
+
         // Create new device
         $token = Str::random(64);
-        
+
         $device = $user->trustedDevices()->create([
             'device_name' => $deviceName,
             'device_fingerprint' => $fingerprint,
@@ -57,10 +57,10 @@ class DeviceTokenService
             'expires_at' => now()->addDays((int) config('auth.device_remember_days', 90)),
             'auth_method' => $authMethod,
         ]);
-        
+
         // Send new device login notification email (queued for performance)
         Mail::to($user->email)->queue(new NewDeviceLogin($user, $device));
-        
+
         return $device;
     }
 
@@ -72,11 +72,11 @@ class DeviceTokenService
         try {
             // Find all devices and check each one
             $devices = TrustedDevice::valid()->get();
-            
+
             foreach ($devices as $device) {
                 try {
                     $decryptedToken = Crypt::decryptString($device->device_token);
-                    
+
                     if ($decryptedToken === $token) {
                         // Verify fingerprint matches
                         if ($this->fingerprintService->verify($request, $device->device_fingerprint)) {
@@ -87,7 +87,7 @@ class DeviceTokenService
                     continue;
                 }
             }
-            
+
             return null;
         } catch (\Exception $e) {
             return null;
@@ -105,10 +105,10 @@ class DeviceTokenService
     /**
      * Create a cookie with the device token.
      */
-    public function createCookie(TrustedDevice $device): \Symfony\Component\HttpFoundation\Cookie
+    public function createCookie(TrustedDevice $device): Cookie
     {
         $token = Crypt::decryptString($device->device_token);
-        
+
         return cookie(
             $this->getCookieName(),
             $token,
@@ -125,7 +125,7 @@ class DeviceTokenService
     /**
      * Remove the device token cookie.
      */
-    public function forgetCookie(): \Symfony\Component\HttpFoundation\Cookie
+    public function forgetCookie(): Cookie
     {
         return cookie()->forget($this->getCookieName());
     }
@@ -138,4 +138,3 @@ class DeviceTokenService
         return TrustedDevice::expired()->delete();
     }
 }
-

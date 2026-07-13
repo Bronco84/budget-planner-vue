@@ -3,10 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\PlaidAccount;
-use App\Models\PlaidConnection;
 use App\Services\PlaidService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 
 class EnablePlaidLiabilities extends Command
 {
@@ -35,7 +33,7 @@ class EnablePlaidLiabilities extends Command
         $dryRun = $this->option('dry-run');
         $connectionId = $this->option('connection-id');
         $autoUpdate = $this->option('auto-update');
-        
+
         if ($dryRun) {
             $this->info('Running in dry-run mode. No changes will be made.');
         }
@@ -56,6 +54,7 @@ class EnablePlaidLiabilities extends Command
 
         if ($affectedAccounts->isEmpty()) {
             $this->info('✓ No credit card accounts found without liability data.');
+
             return Command::SUCCESS;
         }
 
@@ -71,64 +70,65 @@ class EnablePlaidLiabilities extends Command
 
         foreach ($connectionGroups as $connectionId => $accounts) {
             $connection = $accounts->first()->plaidConnection;
-            
-            $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+            $this->line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             $this->line("Connection: {$connection->institution_name} (ID: {$connection->id})");
             $this->line("Item ID: {$connection->plaid_item_id}");
             $this->line("Budget: {$connection->budget->name}");
-            $this->line("Affected Accounts:");
-            
+            $this->line('Affected Accounts:');
+
             foreach ($accounts as $account) {
                 $this->line("  • {$account->account_name} (****{$account->account_mask})");
             }
-            
+
             $this->newLine();
 
             if ($dryRun) {
-                $this->info("  [DRY RUN] Would attempt to update liability data");
+                $this->info('  [DRY RUN] Would attempt to update liability data');
                 $skippedCount += $accounts->count();
+
                 continue;
             }
 
             if ($autoUpdate) {
-                $this->info("  Attempting to fetch liability data...");
-                
+                $this->info('  Attempting to fetch liability data...');
+
                 try {
                     // Try to update liability data for the first account (which updates all cards on connection)
                     $firstAccount = $accounts->first();
                     $success = $plaidService->updateLiabilityData($firstAccount);
-                    
+
                     if ($success) {
-                        $this->info("  ✓ Successfully updated liability data for all cards on this connection");
+                        $this->info('  ✓ Successfully updated liability data for all cards on this connection');
                         $successCount += $accounts->count();
                     } else {
-                        $this->warn("  ⚠ No liability data available from Plaid");
-                        $this->line("  → This connection may need to be re-authenticated with liabilities product");
+                        $this->warn('  ⚠ No liability data available from Plaid');
+                        $this->line('  → This connection may need to be re-authenticated with liabilities product');
                         $this->line("  → Users can do this via the 'Update Statement Balance' button in the UI");
                         $failCount += $accounts->count();
                     }
                 } catch (\Exception $e) {
                     $this->error("  ✗ Error: {$e->getMessage()}");
-                    
-                    if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY') || 
+
+                    if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY') ||
                         str_contains($e->getMessage(), 'PRODUCTS_NOT_SUPPORTED')) {
-                        $this->line("  → The liabilities product is not enabled for this Plaid Item");
-                        $this->line("  → Users must re-authenticate via Plaid Link in update mode");
+                        $this->line('  → The liabilities product is not enabled for this Plaid Item');
+                        $this->line('  → Users must re-authenticate via Plaid Link in update mode');
                     }
-                    
+
                     $failCount += $accounts->count();
                 }
             } else {
-                $this->line("  → Run with --auto-update to attempt fetching liability data");
+                $this->line('  → Run with --auto-update to attempt fetching liability data');
                 $this->line("  → Or have users click 'Update Statement Balance' in the UI");
                 $skippedCount += $accounts->count();
             }
-            
+
             $this->newLine();
         }
 
         // Summary
-        $this->line("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        $this->line('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         $this->info('Summary:');
         $this->table(
             ['Status', 'Count'],
@@ -159,4 +159,3 @@ class EnablePlaidLiabilities extends Command
         return Command::SUCCESS;
     }
 }
-

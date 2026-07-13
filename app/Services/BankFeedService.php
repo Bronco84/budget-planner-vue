@@ -6,9 +6,9 @@ use App\Models\Account;
 use App\Models\BankFeed;
 use App\Models\BankFeedTransaction;
 use App\Models\Transaction;
+use App\Services\BankFeed\AirtableImportStrategy;
 use App\Services\BankFeed\BankFeedImportInterface;
 use App\Services\BankFeed\PlaidImportStrategy;
-use App\Services\BankFeed\AirtableImportStrategy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +32,7 @@ class BankFeedService
      */
     public function getStrategy(string $sourceType): BankFeedImportInterface
     {
-        if (!isset($this->strategies[$sourceType])) {
+        if (! isset($this->strategies[$sourceType])) {
             throw new \InvalidArgumentException("Unsupported source type: {$sourceType}");
         }
 
@@ -48,6 +48,7 @@ class BankFeedService
         foreach ($this->strategies as $type => $strategy) {
             $sourceTypes[$type] = $strategy->getDisplayName();
         }
+
         return $sourceTypes;
     }
 
@@ -64,7 +65,7 @@ class BankFeedService
 
             // Validate credentials
             $validation = $strategy->validateCredentials($credentials);
-            if (!$validation['success']) {
+            if (! $validation['success']) {
                 return $validation;
             }
 
@@ -79,7 +80,7 @@ class BankFeedService
 
             // Attempt connection
             $connectionResult = $strategy->connect($credentials);
-            if (!$connectionResult['success']) {
+            if (! $connectionResult['success']) {
                 return $connectionResult;
             }
 
@@ -101,13 +102,14 @@ class BankFeedService
 
             // Test the connection
             $testResult = $strategy->testConnection($bankFeed);
-            if (!$testResult['success']) {
+            if (! $testResult['success']) {
                 $bankFeed->update([
                     'status' => BankFeed::STATUS_ERROR,
                     'error_message' => $testResult['error'],
                 ]);
-                
+
                 DB::rollBack();
+
                 return $testResult;
             }
 
@@ -132,7 +134,7 @@ class BankFeedService
             ];
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Failed to connect bank feed source', [
                 'account_id' => $account->id,
                 'source_type' => $sourceType,
@@ -141,7 +143,7 @@ class BankFeedService
 
             return [
                 'success' => false,
-                'error' => 'Failed to connect: ' . $e->getMessage(),
+                'error' => 'Failed to connect: '.$e->getMessage(),
             ];
         }
     }
@@ -152,7 +154,7 @@ class BankFeedService
     public function syncTransactions(BankFeed $bankFeed, int $days = 120): array
     {
         try {
-            if (!$bankFeed->isActive()) {
+            if (! $bankFeed->isActive()) {
                 return [
                     'success' => false,
                     'error' => 'Bank feed is not active',
@@ -160,7 +162,7 @@ class BankFeedService
             }
 
             $strategy = $this->getStrategy($bankFeed->source_type);
-            
+
             $endDate = Carbon::today();
             $startDate = Carbon::today()->subDays($days);
 
@@ -190,11 +192,11 @@ class BankFeedService
                 }
 
                 // Create Transaction if it doesn't exist and transaction is cleared
-                if (!$bankFeedTransaction->isProcessed() && $bankFeedTransaction->isCleared()) {
+                if (! $bankFeedTransaction->isProcessed() && $bankFeedTransaction->isCleared()) {
                     try {
                         $transaction = $bankFeedTransaction->createTransaction();
                         $processed++;
-                        
+
                         Log::info('Created transaction from bank feed', [
                             'transaction_id' => $transaction->id,
                             'bank_feed_transaction_id' => $bankFeedTransaction->id,
@@ -233,7 +235,7 @@ class BankFeedService
             ];
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             // Update bank feed status to error
             $bankFeed->update([
                 'status' => BankFeed::STATUS_ERROR,
@@ -247,7 +249,7 @@ class BankFeedService
 
             return [
                 'success' => false,
-                'error' => 'Sync failed: ' . $e->getMessage(),
+                'error' => 'Sync failed: '.$e->getMessage(),
                 'imported' => 0,
                 'updated' => 0,
                 'processed' => 0,
@@ -271,7 +273,7 @@ class BankFeedService
 
         foreach ($bankFeeds as $bankFeed) {
             $result = $this->syncTransactions($bankFeed, $days);
-            
+
             $results[] = [
                 'bank_feed_id' => $bankFeed->id,
                 'source_type' => $bankFeed->source_type,
@@ -303,10 +305,10 @@ class BankFeedService
     {
         try {
             $strategy = $this->getStrategy($bankFeed->source_type);
-            
+
             // Attempt to disconnect from source
             $disconnected = $strategy->disconnect($bankFeed);
-            
+
             // Update bank feed status regardless of source disconnection result
             $bankFeed->update([
                 'status' => BankFeed::STATUS_DISCONNECTED,
@@ -331,11 +333,12 @@ class BankFeedService
     {
         try {
             $strategy = $this->getStrategy($bankFeed->source_type);
+
             return $strategy->testConnection($bankFeed);
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => 'Connection test failed: ' . $e->getMessage(),
+                'error' => 'Connection test failed: '.$e->getMessage(),
             ];
         }
     }
@@ -347,6 +350,7 @@ class BankFeedService
     {
         try {
             $strategy = $this->getStrategy($sourceType);
+
             return $strategy->getConfigFields();
         } catch (\Exception $e) {
             return [];

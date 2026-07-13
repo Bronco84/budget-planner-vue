@@ -25,11 +25,11 @@ return new class extends Migration
             $table->string('iso_currency_code')->nullable()->after('pending_transaction_id');
             $table->string('unofficial_currency_code')->nullable()->after('iso_currency_code');
             $table->string('check_number')->nullable()->after('unofficial_currency_code');
-            
+
             // Rename primary_category and detailed_category to match the requested schema
             $table->renameColumn('primary_category', 'category');
             $table->renameColumn('detailed_category', 'category_id');
-            
+
             // Add additional JSON columns
             $table->json('counterparties')->nullable()->after('category_id');
             $table->json('personal_finance_category')->nullable()->after('payment_meta');
@@ -47,7 +47,7 @@ return new class extends Migration
             // Revert column renames
             $table->renameColumn('category', 'primary_category');
             $table->renameColumn('category_id', 'detailed_category');
-            
+
             // Drop added columns
             $table->dropColumn([
                 'account_id',
@@ -65,8 +65,8 @@ return new class extends Migration
                 'counterparties',
                 'personal_finance_category',
                 'personal_finance_category_icon_url',
-                'metadata'
+                'metadata',
             ]);
         });
     }
-}; 
+};

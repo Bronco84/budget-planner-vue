@@ -13,10 +13,6 @@ class PlaidStatementHistoryController extends Controller
 {
     /**
      * Get statement history for a Plaid-linked credit card account.
-     *
-     * @param Budget $budget
-     * @param Account $account
-     * @return JsonResponse
      */
     public function index(Budget $budget, Account $account): JsonResponse
     {
@@ -29,16 +25,16 @@ class PlaidStatementHistoryController extends Controller
         // Find the PlaidAccount
         $plaidAccount = PlaidAccount::where('account_id', $account->id)->first();
 
-        if (!$plaidAccount) {
+        if (! $plaidAccount) {
             return response()->json([
-                'error' => 'Account is not linked to Plaid.'
+                'error' => 'Account is not linked to Plaid.',
             ], 404);
         }
 
         // Verify this is a credit card account
-        if (!$plaidAccount->isCreditCard()) {
+        if (! $plaidAccount->isCreditCard()) {
             return response()->json([
-                'error' => 'Statement history is only available for credit card accounts.'
+                'error' => 'Statement history is only available for credit card accounts.',
             ], 400);
         }
 

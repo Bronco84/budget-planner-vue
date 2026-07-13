@@ -2,7 +2,6 @@
 
 namespace App\Nova;
 
-use Illuminate\Http\Request;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
@@ -13,7 +12,9 @@ use Laravel\Nova\Http\Requests\NovaRequest;
 class File extends Resource
 {
     public static $model = \App\Models\File::class;
+
     public static $title = 'original_name';
+
     public static $search = ['id', 'original_name', 'hash'];
 
     public function fields(NovaRequest $request): array
@@ -30,8 +31,23 @@ class File extends Resource
         ];
     }
 
-    public function cards(NovaRequest $request): array { return []; }
-    public function filters(NovaRequest $request): array { return []; }
-    public function lenses(NovaRequest $request): array { return []; }
-    public function actions(NovaRequest $request): array { return []; }
+    public function cards(NovaRequest $request): array
+    {
+        return [];
+    }
+
+    public function filters(NovaRequest $request): array
+    {
+        return [];
+    }
+
+    public function lenses(NovaRequest $request): array
+    {
+        return [];
+    }
+
+    public function actions(NovaRequest $request): array
+    {
+        return [];
+    }
 }

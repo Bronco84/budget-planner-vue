@@ -2,11 +2,11 @@
 
 namespace App\Console;
 
+use App\Console\Commands\CleanupDuplicatePlaidTransactions;
+use App\Console\Commands\IdentifyAllRecurringTransactions;
+use App\Console\Commands\IdentifyRecurringTransactions;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
-use App\Console\Commands\IdentifyRecurringTransactions;
-use App\Console\Commands\IdentifyAllRecurringTransactions;
-use App\Console\Commands\CleanupDuplicatePlaidTransactions;
 
 class Kernel extends ConsoleKernel
 {
@@ -27,7 +27,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
-        
+
         // Identify recurring transactions weekly
         $schedule->command('transactions:identify-all-recurring --months=3 --min-occurrences=2')
             ->weekly()
@@ -45,4 +45,4 @@ class Kernel extends ConsoleKernel
 
         require base_path('routes/console.php');
     }
-} 
+}

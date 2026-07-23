@@ -1,5 +1,18 @@
 # Budget Planner Vue - Project Documentation for Claude
 
+## Repository Workflow (Personal Project)
+
+This is a **personal project** with a single developer. Working directly on `main`
+locally is acceptable and expected — there is no need for a PR-based review flow or
+long-lived feature branches unless explicitly requested.
+
+- Feature branches may be used for isolation, but folding finished work back into
+  `main` and developing on `main` directly is fine.
+- Prefer keeping the local checkout aligned with `main` so the running site
+  (`http://budget_planner_vue.test`) always reflects the latest work.
+- When a branch is simply `main` plus new commits (a fast-forward), merge it into
+  `main` rather than treating it as a divergent line of development.
+
 ## Project Overview
 This is a budget planning application built with:
 - **Backend**: Laravel (PHP framework)

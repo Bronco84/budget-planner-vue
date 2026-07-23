@@ -17,15 +17,8 @@ class PlaidTransactionController extends Controller
      */
     public function __construct()
     {
-        // Authorize all actions through budget ownership
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**
@@ -33,11 +26,6 @@ class PlaidTransactionController extends Controller
      */
     public function index(Budget $budget, Account $account): Response
     {
-        // Ensure the account belongs to the budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('view', $account);
 
         $plaidTransactions = PlaidTransaction::where('account_id', $account->id)
@@ -56,11 +44,6 @@ class PlaidTransactionController extends Controller
      */
     public function getTransactions(Request $request, Budget $budget, Account $account): JsonResponse
     {
-        // Ensure the account belongs to the budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('view', $account);
 
         $validated = $request->validate([
@@ -110,11 +93,6 @@ class PlaidTransactionController extends Controller
      */
     public function show(Budget $budget, Account $account, string $plaidTransactionId): JsonResponse
     {
-        // Ensure the account belongs to the budget
-        if ($account->budget_id !== $budget->id) {
-            return response()->json(['error' => 'Account not found in this budget'], 404);
-        }
-
         $this->authorize('view', $account);
 
         $plaidTransaction = PlaidTransaction::where('account_id', $account->id)

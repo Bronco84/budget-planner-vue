@@ -29,15 +29,8 @@ class ProjectionsController extends Controller
     {
         $this->recurringTransactionService = $recurringTransactionService;
 
-        // Authorize budget ownership for every action that resolves a budget route parameter
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**
@@ -260,11 +253,6 @@ class ProjectionsController extends Controller
      */
     public function showBalanceProjection(Budget $budget, Account $account, Request $request)
     {
-        // Ensure account belongs to budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404, 'Account not found in this budget');
-        }
-
         $monthsAhead = intval($request->input('months', 12));
         $scenario = $request->input('scenario', 'default');
         $groupBy = $request->input('groupBy', 'day');

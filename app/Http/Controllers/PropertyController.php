@@ -54,7 +54,7 @@ class PropertyController extends Controller
      */
     public function store(Request $request, Budget $budget): RedirectResponse
     {
-        $this->authorize('view', $budget);
+        $this->authorize('update', $budget);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -99,10 +99,6 @@ class PropertyController extends Controller
     {
         $this->authorize('view', $budget);
 
-        if ($property->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $property->load('linkedAccounts');
 
         return Inertia::render('Properties/Show', [
@@ -117,10 +113,6 @@ class PropertyController extends Controller
     public function edit(Budget $budget, Property $property): Response
     {
         $this->authorize('view', $budget);
-
-        if ($property->budget_id !== $budget->id) {
-            abort(404);
-        }
 
         $property->load('linkedAccounts');
 
@@ -146,11 +138,7 @@ class PropertyController extends Controller
      */
     public function update(Request $request, Budget $budget, Property $property): RedirectResponse
     {
-        $this->authorize('view', $budget);
-
-        if ($property->budget_id !== $budget->id) {
-            abort(404);
-        }
+        $this->authorize('update', $budget);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -201,11 +189,7 @@ class PropertyController extends Controller
      */
     public function destroy(Budget $budget, Property $property): RedirectResponse
     {
-        $this->authorize('view', $budget);
-
-        if ($property->budget_id !== $budget->id) {
-            abort(404);
-        }
+        $this->authorize('update', $budget);
 
         // Unlink any accounts before deleting
         $budget->accounts()->where('property_id', $property->id)->update(['property_id' => null]);

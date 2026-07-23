@@ -46,11 +46,15 @@ Route::get('/csrf-token', function () {
 // These routes need to bypass Inertia middleware to return pure JSON
 // We use withoutMiddleware to exclude HandleInertiaRequests
 Route::withoutMiddleware([HandleInertiaRequests::class])->group(function () {
-    Route::post('webauthn/login/options', [WebAuthnLoginController::class, 'options'])
-        ->name('webauthn.login.options');
+    // Login challenge + assertion — guest-only and rate limited to blunt
+    // credential/enumeration spam.
+    Route::middleware(['guest', 'throttle:10,1'])->group(function () {
+        Route::post('webauthn/login/options', [WebAuthnLoginController::class, 'options'])
+            ->name('webauthn.login.options');
 
-    Route::middleware('guest')->post('webauthn/login', [WebAuthnLoginController::class, 'login'])
-        ->name('webauthn.login');
+        Route::post('webauthn/login', [WebAuthnLoginController::class, 'login'])
+            ->name('webauthn.login');
+    });
 
     Route::middleware('auth')->group(function () {
         Route::post('webauthn/register/options', [WebAuthnRegisterController::class, 'options'])
@@ -65,7 +69,12 @@ Route::get('/dashboard', function () {
     return redirect()->route('budgets.index');
 })->middleware(['auth'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
+// scopeBindings() makes nested route params (e.g. {account}, {transfer},
+// {recurring_transaction}, {rule}) resolve through their parent budget's
+// relationship, returning 404 automatically when a child does not belong to the
+// budget in the URL. This enforces ownership-chain integrity at the routing layer
+// so controllers no longer need manual `$child->budget_id !== $budget->id` checks.
+Route::middleware('auth')->scopeBindings()->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

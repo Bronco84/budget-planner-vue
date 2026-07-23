@@ -8,6 +8,7 @@ use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,15 +17,8 @@ class TransferController extends Controller
     public function __construct(
         protected TransferService $transferService
     ) {
-        // Authorize all actions through budget ownership
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**
@@ -60,8 +54,8 @@ class TransferController extends Controller
     public function store(Request $request, Budget $budget): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
-            'from_account_id' => 'required|exists:accounts,id|different:to_account_id',
-            'to_account_id' => 'required|exists:accounts,id',
+            'from_account_id' => ['required', 'different:to_account_id', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
+            'to_account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'amount' => 'required|numeric|min:0.01',
             'date' => 'required|date',
             'description' => 'nullable|string|max:255',
@@ -90,11 +84,6 @@ class TransferController extends Controller
      */
     public function show(Budget $budget, Transfer $transfer): Response
     {
-        // Verify transfer belongs to budget
-        if ($transfer->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $transfer->load(['fromAccount', 'toAccount', 'transactions']);
 
         return Inertia::render('Transfers/Show', [
@@ -108,11 +97,6 @@ class TransferController extends Controller
      */
     public function edit(Budget $budget, Transfer $transfer): Response
     {
-        // Verify transfer belongs to budget
-        if ($transfer->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $transfer->load(['fromAccount', 'toAccount']);
         $accounts = $budget->accounts()->get();
 
@@ -128,14 +112,9 @@ class TransferController extends Controller
      */
     public function update(Request $request, Budget $budget, Transfer $transfer): RedirectResponse|JsonResponse
     {
-        // Verify transfer belongs to budget
-        if ($transfer->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $validated = $request->validate([
-            'from_account_id' => 'required|exists:accounts,id|different:to_account_id',
-            'to_account_id' => 'required|exists:accounts,id',
+            'from_account_id' => ['required', 'different:to_account_id', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
+            'to_account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'amount' => 'required|numeric|min:0.01',
             'date' => 'required|date',
             'description' => 'nullable|string|max:255',
@@ -164,11 +143,6 @@ class TransferController extends Controller
     public function destroy(Request $request, Budget $budget, Transfer $transfer): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $budget);
-
-        // Verify transfer belongs to budget
-        if ($transfer->budget_id !== $budget->id) {
-            abort(404);
-        }
 
         $this->transferService->delete($transfer);
 

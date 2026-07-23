@@ -20,15 +20,8 @@ class AccountController extends Controller
      */
     public function __construct()
     {
-        // Authorize all resource actions for accounts
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**
@@ -99,11 +92,6 @@ class AccountController extends Controller
      */
     public function edit(Budget $budget, Account $account)
     {
-        // Verify account belongs to budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('update', $account);
 
         // Load the Plaid account and connection relationships
@@ -120,11 +108,6 @@ class AccountController extends Controller
      */
     public function update(Request $request, Budget $budget, Account $account): RedirectResponse
     {
-        // Verify account belongs to budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('update', $account);
 
         $validated = $request->validate([
@@ -151,11 +134,6 @@ class AccountController extends Controller
      */
     public function fetchLogo(Request $request, Budget $budget, Account $account): RedirectResponse
     {
-        // Verify account belongs to budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('update', $account);
 
         // Load the Plaid relationship if not already loaded
@@ -198,11 +176,6 @@ class AccountController extends Controller
      */
     public function clearLogo(Budget $budget, Account $account): RedirectResponse
     {
-        // Verify account belongs to budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('update', $account);
 
         $account->update([
@@ -243,11 +216,6 @@ class AccountController extends Controller
      */
     public function destroy(Budget $budget, Account $account): RedirectResponse
     {
-        // Verify account belongs to budget
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('delete', $account);
 
         // Don't allow deletion if there are transactions
@@ -267,11 +235,6 @@ class AccountController extends Controller
      */
     public function updateAutopay(Request $request, Budget $budget, Account $account): RedirectResponse
     {
-        // Validate the account belongs to this budget
-        if ($account->budget_id !== $budget->id) {
-            abort(403);
-        }
-
         // Validate account is a credit card
         if (! $account->isAutopayEligible()) {
             return redirect()->back()->with('error', 'Autopay is only available for credit card accounts with statement data.');

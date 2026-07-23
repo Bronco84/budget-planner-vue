@@ -110,11 +110,6 @@ class ScenarioController extends Controller
      */
     public function show(Budget $budget, Scenario $scenario)
     {
-        // Ensure scenario belongs to budget
-        if ($scenario->budget_id !== $budget->id) {
-            abort(404, 'Scenario not found in this budget');
-        }
-
         // Ensure user has access to this budget
         $this->authorize('view', $budget);
 
@@ -132,11 +127,6 @@ class ScenarioController extends Controller
      */
     public function update(Request $request, Budget $budget, Scenario $scenario)
     {
-        // Ensure scenario belongs to budget
-        if ($scenario->budget_id !== $budget->id) {
-            abort(404, 'Scenario not found in this budget');
-        }
-
         // Ensure user has access to this budget
         $this->authorize('update', $budget);
 
@@ -219,11 +209,6 @@ class ScenarioController extends Controller
      */
     public function destroy(Budget $budget, Scenario $scenario)
     {
-        // Ensure scenario belongs to budget
-        if ($scenario->budget_id !== $budget->id) {
-            abort(404, 'Scenario not found in this budget');
-        }
-
         // Ensure user has access to this budget
         $this->authorize('update', $budget);
 
@@ -248,11 +233,6 @@ class ScenarioController extends Controller
      */
     public function toggle(Budget $budget, Scenario $scenario)
     {
-        // Ensure scenario belongs to budget
-        if ($scenario->budget_id !== $budget->id) {
-            abort(404, 'Scenario not found in this budget');
-        }
-
         // Ensure user has access to this budget
         $this->authorize('update', $budget);
 

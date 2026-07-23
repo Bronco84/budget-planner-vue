@@ -114,6 +114,25 @@ class Budget extends Model
     }
 
     /**
+     * Alias of {@see recurringTransactionTemplates()} whose name matches the
+     * `{recurring_transaction}` route parameter, so scoped route bindings can
+     * resolve the child through the parent budget.
+     */
+    public function recurringTransactions(): HasMany
+    {
+        return $this->recurringTransactionTemplates();
+    }
+
+    /**
+     * Get the transfers for the budget. Enables scoped route binding for the
+     * `{transfer}` route parameter.
+     */
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(Transfer::class);
+    }
+
+    /**
      * Get the payoff plans for the budget.
      */
     public function payoffPlans(): HasMany

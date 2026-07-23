@@ -18,15 +18,8 @@ class RecurringTransactionAnalysisController extends Controller
     {
         $this->analysisService = $analysisService;
 
-        // Authorize budget ownership for every action that resolves a budget route parameter
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**

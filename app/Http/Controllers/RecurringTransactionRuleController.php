@@ -83,11 +83,6 @@ class RecurringTransactionRuleController extends Controller
     {
         $this->authorize('update', $budget);
 
-        // Ensure the rule belongs to the given template
-        if ($rule->recurring_transaction_template_id !== $recurring_transaction->id) {
-            abort(404);
-        }
-
         $validated = $request->validate([
             'field' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
             'operator' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
@@ -117,11 +112,6 @@ class RecurringTransactionRuleController extends Controller
     public function destroy(Budget $budget, RecurringTransactionTemplate $recurring_transaction, RecurringTransactionRule $rule): RedirectResponse
     {
         $this->authorize('update', $budget);
-
-        // Ensure the rule belongs to the given template
-        if ($rule->recurring_transaction_template_id !== $recurring_transaction->id) {
-            abort(404);
-        }
 
         $rule->delete();
 

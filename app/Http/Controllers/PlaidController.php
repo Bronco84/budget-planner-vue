@@ -25,15 +25,8 @@ class PlaidController extends Controller
     {
         $this->plaidService = $plaidService;
 
-        // Authorize budget ownership for every action that resolves a budget route parameter
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**
@@ -604,10 +597,6 @@ class PlaidController extends Controller
      */
     public function updateLiabilities(Budget $budget, Account $account): RedirectResponse
     {
-        if ($account->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (! $plaidAccount) {
@@ -904,6 +893,9 @@ class PlaidController extends Controller
 
     /**
      * Get the PlaidAccount for a given Account.
+     *
+     * Account ownership is enforced by scoped route bindings (the {account} param
+     * is resolved through the {budget}), so no manual budget check is needed here.
      */
     private function getPlaidAccountForAccount(Account $account): ?PlaidAccount
     {

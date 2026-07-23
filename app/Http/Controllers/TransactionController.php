@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Models\Transaction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,15 +18,8 @@ class TransactionController extends Controller
      */
     public function __construct()
     {
-        // Authorize all actions through budget ownership
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**
@@ -138,13 +132,13 @@ class TransactionController extends Controller
     public function store(Request $request, Budget $budget): RedirectResponse
     {
         $validated = $request->validate([
-            'account_id' => 'required|exists:accounts,id',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric',
             'date' => 'required|date',
             'category' => 'required|string|max:255',
             'notes' => 'nullable|string',
-            'recurring_transaction_template_id' => 'nullable|exists:recurring_transaction_templates,id',
+            'recurring_transaction_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);
 
         // Convert amount to cents and handle negative values for expenses
@@ -170,11 +164,6 @@ class TransactionController extends Controller
      */
     public function edit(Budget $budget, Transaction $transaction): Response
     {
-        // Verify transaction belongs to budget
-        if ($transaction->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('update', $transaction);
 
         $accounts = $budget->accounts()->get();
@@ -207,21 +196,16 @@ class TransactionController extends Controller
      */
     public function update(Request $request, Budget $budget, Transaction $transaction): RedirectResponse
     {
-        // Verify transaction belongs to budget
-        if ($transaction->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('update', $transaction);
 
         $validated = $request->validate([
-            'account_id' => 'required|exists:accounts,id',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric',
             'date' => 'required|date',
             'category' => 'required|string|max:255',
             'notes' => 'nullable|string',
-            'recurring_transaction_template_id' => 'nullable|exists:recurring_transaction_templates,id',
+            'recurring_transaction_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);
 
         // Update transaction
@@ -244,11 +228,6 @@ class TransactionController extends Controller
      */
     public function destroy(Budget $budget, Transaction $transaction): RedirectResponse
     {
-        // Verify transaction belongs to budget
-        if ($transaction->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('delete', $transaction);
 
         $transaction->delete();
@@ -262,11 +241,6 @@ class TransactionController extends Controller
      */
     public function getActivityLog(Budget $budget, Transaction $transaction)
     {
-        // Verify transaction belongs to budget
-        if ($transaction->budget_id !== $budget->id) {
-            abort(404);
-        }
-
         $this->authorize('view', $transaction);
 
         $activityLog = $transaction->getActivityLogFormatted();

@@ -89,7 +89,7 @@ class RecurringTransactionController extends Controller
      */
     public function store(Request $request, Budget $budget): RedirectResponse
     {
-        \Log::debug('RecurringTransaction store - request data:', $request->all());
+        \Log::debug('RecurringTransaction store', ['request_keys' => array_keys($request->all())]);
 
         try {
             $this->authorize('update', $budget);
@@ -266,10 +266,11 @@ class RecurringTransactionController extends Controller
     {
         $this->authorize('update', $budget);
 
-        // Log raw request data for debugging
-        Log::debug('Updating recurring transaction - raw request data:', [
-            'request_all' => $request->all(),
-            'rules_data' => $request->input('rules', []),
+        // Log request shape for debugging — keys only, not full payload values.
+        Log::debug('Updating recurring transaction', [
+            'template_id' => $recurring_transaction->id,
+            'request_keys' => array_keys($request->all()),
+            'rules_count' => count($request->input('rules', [])),
         ]);
 
         $validated = $request->validate([

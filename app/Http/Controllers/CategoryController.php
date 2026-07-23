@@ -11,15 +11,8 @@ class CategoryController extends Controller
 {
     public function __construct()
     {
-        // Authorize budget ownership for every action that resolves a budget route parameter
-        $this->middleware(function ($request, $next) {
-            $budget = $request->route('budget');
-            if ($budget) {
-                $this->authorize('view', $budget);
-            }
-
-            return $next($request);
-        });
+        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        $this->middleware('can:view,budget');
     }
 
     /**
@@ -99,11 +92,6 @@ class CategoryController extends Controller
      */
     public function update(Request $request, Budget $budget, Category $category)
     {
-        // Ensure the category belongs to the budget
-        if ($category->budget_id !== $budget->id) {
-            abort(403, 'Unauthorized action.');
-        }
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0',
@@ -121,11 +109,6 @@ class CategoryController extends Controller
      */
     public function destroy(Budget $budget, Category $category)
     {
-        // Ensure the category belongs to the budget
-        if ($category->budget_id !== $budget->id) {
-            abort(403, 'Unauthorized action.');
-        }
-
         // Check if category has transactions
         $transactionCount = $budget->transactions()
             ->where('category', $category->name)

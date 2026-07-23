@@ -46,11 +46,13 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
      *
      * @var list<string>
      */
+    // NOTE: `is_admin` is intentionally NOT fillable — it is a privilege flag and
+    // must only ever be set explicitly (seeder/console/Nova), never from request
+    // input, to avoid mass-assignment privilege escalation.
     protected $fillable = [
         'name',
         'email',
         'password',
-        'is_admin',
     ];
 
     /**

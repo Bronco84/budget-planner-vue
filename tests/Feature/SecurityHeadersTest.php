@@ -34,6 +34,25 @@ test('security headers are not added in local environment', function () {
     expect($response->headers->has('Strict-Transport-Security'))->toBeFalse();
 });
 
+test('core hardening headers are applied outside production', function () {
+    $middleware = new SecurityHeaders;
+    $request = Request::create('/test');
+
+    // Simulate a non-local, non-production env (e.g. staging).
+    app()->instance('env', 'staging');
+
+    $response = $middleware->handle($request, fn ($req) => response('test'));
+
+    expect($response->headers->has('X-Content-Type-Options'))->toBeTrue();
+    expect($response->headers->has('X-Frame-Options'))->toBeTrue();
+    expect($response->headers->has('Referrer-Policy'))->toBeTrue();
+    // CSP is shipped in report-only mode (not yet enforcing) outside local.
+    expect($response->headers->has('Content-Security-Policy-Report-Only'))->toBeTrue();
+    expect($response->headers->get('Content-Security-Policy-Report-Only'))->toContain('cdn.plaid.com');
+    // HSTS remains production-only.
+    expect($response->headers->has('Strict-Transport-Security'))->toBeFalse();
+});
+
 test('HSTS header includes subdomains and preload', function () {
     // Test the middleware logic directly
     $middleware = new SecurityHeaders;

@@ -75,7 +75,9 @@ class PlaidConnection extends Resource
 
             Text::make('Access Token', 'access_token')
                 ->onlyOnForms()
-                ->help('Encrypted Plaid access token'),
+                ->resolveUsing(fn () => null)
+                ->readonly()
+                ->help('Encrypted Plaid access token (value hidden for security)'),
 
             Select::make('Status')
                 ->options([

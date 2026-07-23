@@ -31,10 +31,20 @@ class PlaidConnection extends Model
     ];
 
     /**
+     * The attributes that should be hidden for serialization.
+     *
+     * Keeps the Plaid access token out of Inertia props / JSON responses.
+     */
+    protected $hidden = [
+        'access_token',
+    ];
+
+    /**
      * The attributes that should be cast.
      */
     protected $casts = [
         'last_sync_at' => 'datetime',
+        'access_token' => 'encrypted',
     ];
 
     const STATUS_ACTIVE = 'active';

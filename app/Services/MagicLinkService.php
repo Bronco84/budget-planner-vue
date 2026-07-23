@@ -30,11 +30,10 @@ class MagicLinkService
         // Generate the magic link URL
         $url = route('magic-link.authenticate', ['token' => $token, 'email' => $user->email]);
 
-        // Log magic link generation for debugging
+        // Log magic link generation for debugging.
+        // NOTE: never log $url or the raw token — it is a single-use login credential.
         \Log::info('Magic link generated', [
             'user_id' => $user->id,
-            'email' => $user->email,
-            'url' => $url,
             'expires_at' => $magicLinkToken->expires_at,
         ]);
 

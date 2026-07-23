@@ -461,17 +461,14 @@ class PlaidService
             $result = json_decode($response->getBody(), true);
             $accounts = $result['accounts'] ?? [];
 
-            // Log detailed account information for debugging
+            // Log non-sensitive metadata only — no account_id, mask, or balances.
             Log::info('Plaid accounts retrieved', [
                 'total_accounts' => count($accounts),
                 'accounts_summary' => array_map(function ($account) {
                     return [
-                        'account_id' => $account['account_id'],
                         'name' => $account['name'],
                         'type' => $account['type'],
                         'subtype' => $account['subtype'] ?? 'no_subtype',
-                        'mask' => $account['mask'] ?? 'no_mask',
-                        'balance' => $account['balances']['current'] ?? 'no_balance',
                     ];
                 }, $accounts),
             ]);
@@ -505,12 +502,13 @@ class PlaidService
 
             $result = json_decode($response->getBody(), true);
 
+            // Log counts only — never the raw payload (statement balances, APRs,
+            // due dates, account identifiers) which is sensitive financial data.
             Log::info('Plaid liabilities retrieved', [
                 'credit_cards' => count($result['liabilities']['credit'] ?? []),
                 'mortgages' => count($result['liabilities']['mortgage'] ?? []),
                 'student_loans' => count($result['liabilities']['student'] ?? []),
                 'other_liabilities' => count($result['liabilities']['other'] ?? []),
-                'raw_data' => $result,
             ]);
 
             return $result['liabilities'] ?? [];
@@ -1428,19 +1426,18 @@ class PlaidService
             }
         }
 
-        // Debug: Log raw card data received from Plaid
+        // Debug: log which liability fields Plaid provided — presence flags only,
+        // never the actual balances/APRs/due dates (sensitive financial data).
         Log::debug('Plaid credit card liability data received', [
             'plaid_account_id' => $plaidAccount->id,
-            'plaid_account_identifier' => $plaidAccount->plaid_account_id,
-            'account_name' => $plaidAccount->account_name,
             'raw_card_data_keys' => array_keys($cardData),
-            'last_statement_balance' => $cardData['last_statement_balance'] ?? 'NOT_PROVIDED',
-            'last_statement_issue_date' => $cardData['last_statement_issue_date'] ?? 'NOT_PROVIDED',
-            'credit_limit_from_account_data' => $creditLimit ?? 'NOT_PROVIDED',
-            'purchase_apr_extracted' => $purchaseApr ?? 'NOT_PROVIDED',
+            'has_last_statement_balance' => isset($cardData['last_statement_balance']),
+            'has_last_statement_issue_date' => isset($cardData['last_statement_issue_date']),
+            'has_credit_limit' => $creditLimit !== null,
+            'has_purchase_apr' => $purchaseApr !== null,
             'aprs_count' => isset($cardData['aprs']) ? count($cardData['aprs']) : 0,
-            'minimum_payment_amount' => $cardData['minimum_payment_amount'] ?? 'NOT_PROVIDED',
-            'next_payment_due_date' => $cardData['next_payment_due_date'] ?? 'NOT_PROVIDED',
+            'has_minimum_payment_amount' => isset($cardData['minimum_payment_amount']),
+            'has_next_payment_due_date' => isset($cardData['next_payment_due_date']),
         ]);
 
         // Extract liability data

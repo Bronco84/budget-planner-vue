@@ -19,16 +19,19 @@ Route::middleware('guest')->group(function () {
         ->name('magic-link.request');
 
     Route::post('magic-link', [MagicLinkController::class, 'store'])
+        ->middleware('throttle:6,1')
         ->name('magic-link.store');
 
     Route::get('magic-link/authenticate', [MagicLinkController::class, 'authenticate'])
+        ->middleware('throttle:10,1')
         ->name('magic-link.authenticate');
 
     // Registration
     Route::get('register', [PasskeyAuthController::class, 'showRegistrationForm'])
         ->name('register');
 
-    Route::post('register', [PasskeyAuthController::class, 'registerStore']);
+    Route::post('register', [PasskeyAuthController::class, 'registerStore'])
+        ->middleware('throttle:6,1');
 });
 
 Route::middleware('auth')->group(function () {

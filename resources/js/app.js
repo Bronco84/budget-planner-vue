@@ -1,12 +1,25 @@
 import '../css/app.css';
 import './bootstrap';
 
-import { createInertiaApp } from '@inertiajs/vue3';
+import { createInertiaApp, router } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+// Gracefully recover from expired CSRF/session (419) on Inertia navigations.
+// Inertia's router uses its own axios instance, so the window.axios CSRF-retry
+// interceptor in bootstrap.js does not cover these requests. A 419 returns a
+// non-Inertia page the router can't process, which otherwise leaves the user
+// stuck until they manually refresh (e.g. after trusted-device auto-login
+// regenerates the session under a stale page). Reloading pulls a fresh token.
+router.on('invalid', (event) => {
+    if (event.detail.response?.status === 419) {
+        event.preventDefault();
+        window.location.reload();
+    }
+});
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,

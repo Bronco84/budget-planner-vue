@@ -7,8 +7,7 @@ use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\FlaggedChatMessage;
 use App\Models\User;
-use App\Services\Chat\ContextNegotiatorService;
-use App\Services\Chat\SmartContextLoaderService;
+use App\Services\Chat\AssistantToolFactory;
 use Illuminate\Support\Facades\Log;
 use Prism\Prism\Facades\Prism;
 use Prism\Prism\ValueObjects\Messages\AssistantMessage;
@@ -17,10 +16,15 @@ use Prism\Prism\ValueObjects\Messages\UserMessage;
 
 class ChatService
 {
+    /**
+     * Maximum steps in the agentic tool loop. Must be >= 2 so the model gets a
+     * synthesis turn after its tool calls (at maxSteps=1 Prism returns empty text).
+     */
+    protected const MAX_AGENT_STEPS = 6;
+
     public function __construct(
         protected ContentModerationService $moderationService,
-        protected ContextNegotiatorService $contextNegotiator,
-        protected SmartContextLoaderService $contextLoader
+        protected AssistantToolFactory $toolFactory
     ) {}
 
     public function processMessageStream(
@@ -80,23 +84,15 @@ class ChatService
             // 7. Store user message
             $userMessage = $this->storeMessage($conversation, 'user', $message);
 
-            // 8. Phase 1: Context Negotiation - Ask AI what context it needs
-            $requestedContextTypes = $this->contextNegotiator->negotiate($message);
+            // 8. Build the on-demand data tools scoped to this user's budget
+            $budget = $this->resolveBudget($user, $budgetId);
+            $tools = $this->toolFactory->make($user, $budget);
 
-            Log::info('Context negotiation completed for streaming', [
-                'user_id' => $user->id,
-                'message_preview' => substr($message, 0, 50),
-                'requested_types' => $requestedContextTypes,
-            ]);
-
-            // 9. Phase 2: Load requested context with PII scrubbing
-            $context = $this->contextLoader->load($user, $budgetId, $requestedContextTypes);
-
-            // 10. Get conversation history
+            // 9. Get conversation history
             $conversationHistory = $this->getConversationHistory($conversation);
 
-            // 11. Build system prompt with context and safety guidelines
-            $baseSystemPrompt = $this->buildSmartSystemPrompt($context, $requestedContextTypes);
+            // 10. Build a lean system prompt; the model fetches data via tools
+            $baseSystemPrompt = $this->buildAgentSystemPrompt($budget);
             $systemPrompt = $this->moderationService->buildSafeSystemPrompt($baseSystemPrompt);
 
             // 12. Prepend system message to conversation history
@@ -105,7 +101,7 @@ class ChatService
                 $conversationHistory
             );
 
-            // 13. Use simulated streaming with Prism generate()
+            // 13. Use simulated streaming with the Prism tool-loop response
             Log::info('Starting simulated streaming response', [
                 'user_id' => $user->id,
                 'conversation_id' => $conversation->id,
@@ -115,7 +111,7 @@ class ChatService
             $conversationId = $conversation->id;
 
             // Create a simulated streaming response
-            return response()->stream(function () use ($messages, $conversationId) {
+            return response()->stream(function () use ($messages, $tools, $conversationId) {
                 // Send conversation_id event first
                 echo "event: conversation_id\n";
                 echo 'data: '.json_encode(['conversation_id' => $conversationId])."\n\n";
@@ -123,11 +119,13 @@ class ChatService
                 flush();
 
                 try {
-                    // Get the full response from Prism
+                    // Run the agentic tool loop; tools execute server-side during asText()
                     $response = Prism::text()
                         ->using('openai', 'gpt-4o-mini')
                         ->withMessages($messages)
-                        ->generate();
+                        ->withTools($tools)
+                        ->withMaxSteps(self::MAX_AGENT_STEPS)
+                        ->asText();
 
                     $fullText = $response->text;
 
@@ -233,36 +231,30 @@ class ChatService
             // 7. Store user message
             $userMessage = $this->storeMessage($conversation, 'user', $message);
 
-            // 8. Phase 1: Context Negotiation - Ask AI what context it needs
-            $requestedContextTypes = $this->contextNegotiator->negotiate($message);
+            // 8. Build the on-demand data tools scoped to this user's budget
+            $budget = $this->resolveBudget($user, $budgetId);
+            $tools = $this->toolFactory->make($user, $budget);
 
-            Log::info('Context negotiation completed', [
-                'user_id' => $user->id,
-                'message_preview' => substr($message, 0, 50),
-                'requested_types' => $requestedContextTypes,
-            ]);
-
-            // 9. Phase 2: Load requested context with PII scrubbing
-            $context = $this->contextLoader->load($user, $budgetId, $requestedContextTypes);
-
-            // 10. Get conversation history
+            // 9. Get conversation history
             $conversationHistory = $this->getConversationHistory($conversation);
 
-            // 11. Build system prompt with context and safety guidelines
-            $baseSystemPrompt = $this->buildSmartSystemPrompt($context, $requestedContextTypes);
+            // 10. Build a lean system prompt; the model fetches data via tools
+            $baseSystemPrompt = $this->buildAgentSystemPrompt($budget);
             $systemPrompt = $this->moderationService->buildSafeSystemPrompt($baseSystemPrompt);
 
-            // 12. Prepend system message to conversation history
+            // 11. Prepend system message to conversation history
             $messages = array_merge(
                 [new SystemMessage($systemPrompt)],
                 $conversationHistory
             );
 
-            // 13. Call LLM via Prism
+            // 12. Run the agentic tool loop via Prism
             $response = Prism::text()
                 ->using('openai', 'gpt-4o-mini')
                 ->withMessages($messages)
-                ->generate();
+                ->withTools($tools)
+                ->withMaxSteps(self::MAX_AGENT_STEPS)
+                ->asText();
 
             $assistantMessage = $response->text;
 
@@ -484,6 +476,52 @@ class ChatService
         $prompt .= "- Be encouraging and positive about their financial journey\n";
 
         return $prompt;
+    }
+
+    /**
+     * Resolve the budget for a chat request, enforcing ownership.
+     */
+    protected function resolveBudget(User $user, ?int $budgetId): ?Budget
+    {
+        if ($budgetId) {
+            return Budget::where('user_id', $user->id)->find($budgetId);
+        }
+
+        return $user->getActiveBudget();
+    }
+
+    /**
+     * Build the lean system prompt for the tool-calling assistant.
+     *
+     * The model is told it has tools to fetch the user's real financial data on
+     * demand, rather than having a fixed context stuffed into the prompt.
+     */
+    protected function buildAgentSystemPrompt(?Budget $budget): string
+    {
+        $prompt = 'You are a helpful financial assistant for a budget planning application. '.
+            "You help users understand their finances, answer questions about their budget, accounts, and transactions, and provide insights.\n\n";
+
+        if (! $budget) {
+            $prompt .= "The user hasn't set up a budget yet, so no financial data tools are available. ".
+                "Help them understand how to get started with the application.\n";
+
+            return $prompt.$this->getGuidelines();
+        }
+
+        $prompt .= "Current budget: {$budget->name}\n\n";
+
+        $prompt .= "=== USING YOUR TOOLS ===\n".
+            "You have tools that fetch this user's real financial data on demand. ".
+            'Call the relevant tool(s) to get accurate figures BEFORE answering any question about their finances. '.
+            'Never invent or estimate numbers — if a tool returns no data, tell the user plainly. '.
+            "You may call multiple tools and combine their results.\n\n".
+            "Data conventions:\n".
+            "- All tool results report money in dollars (already converted).\n".
+            "- Positive amounts are income; negative amounts are expenses.\n".
+            "- Liability account balances represent debt owed.\n".
+            "- Transaction queries are limited to the last 12 months.\n";
+
+        return $prompt.$this->getGuidelines();
     }
 
     /**

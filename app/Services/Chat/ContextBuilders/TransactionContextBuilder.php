@@ -24,7 +24,7 @@ class TransactionContextBuilder implements ContextBuilderInterface
         return match ($type) {
             'recent' => $this->buildRecentTransactions($budget),
             'month' => $this->buildMonthTransactions($budget),
-            'by_category' => $this->buildByCategory($budget),
+            'by_category' => $this->buildByCategory($budget, $options['month'] ?? null),
             default => $this->buildRecentTransactions($budget),
         };
     }
@@ -95,12 +95,14 @@ class TransactionContextBuilder implements ContextBuilderInterface
     /**
      * Build context for transactions grouped by category.
      */
-    protected function buildByCategory(Budget $budget): array
+    protected function buildByCategory(Budget $budget, ?string $month = null): array
     {
-        $startOfMonth = Carbon::now()->startOfMonth();
+        $anchor = $this->parseMonth($month);
+        $startOfMonth = $anchor->copy()->startOfMonth();
+        $endOfMonth = $anchor->copy()->endOfMonth();
 
         $transactions = $budget->transactions()
-            ->where('date', '>=', $startOfMonth)
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->get();
 
         $byCategory = $transactions
@@ -123,7 +125,7 @@ class TransactionContextBuilder implements ContextBuilderInterface
         $totalExpenses = abs(collect($byCategory)->where('is_expense', true)->sum('total'));
 
         return [
-            'period' => Carbon::now()->format('F Y'),
+            'period' => $anchor->format('F Y'),
             'by_category' => $byCategory,
             'summary' => [
                 'category_count' => count($byCategory),
@@ -132,6 +134,23 @@ class TransactionContextBuilder implements ContextBuilderInterface
                 'net' => $totalIncome - $totalExpenses,
             ],
         ];
+    }
+
+    /**
+     * Resolve a "YYYY-MM" (or any parseable) month string to a Carbon anchor,
+     * defaulting to the current month on empty or invalid input.
+     */
+    protected function parseMonth(?string $month): Carbon
+    {
+        if (empty($month)) {
+            return Carbon::now();
+        }
+
+        try {
+            return Carbon::parse($month);
+        } catch (\Exception $e) {
+            return Carbon::now();
+        }
     }
 
     /**

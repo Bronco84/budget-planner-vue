@@ -202,10 +202,14 @@ const loginWithPasskey = async () => {
     const options = optionsResponse.data;
     console.log('WebAuthn options received:', options);
 
-    // Check if we received HTML instead of JSON (indicates a server-side issue)
+    // An HTML body here means axios followed a redirect to a full page — which
+    // happens when the request is already authenticated (e.g. trusted-device
+    // auto-login). Treat it as "already signed in" and go to the dashboard
+    // rather than surfacing a confusing error.
     if (typeof options === 'string' && options.trim().startsWith('<!DOCTYPE')) {
-      console.error('Received HTML instead of JSON from server');
-      throw new Error('Server configuration error. Please contact support.');
+      console.info('Options endpoint returned HTML; session already authenticated. Redirecting.');
+      router.visit('/dashboard');
+      return;
     }
 
     // Validate response structure

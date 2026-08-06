@@ -46,9 +46,12 @@ Route::get('/csrf-token', function () {
 // These routes need to bypass Inertia middleware to return pure JSON
 // We use withoutMiddleware to exclude HandleInertiaRequests
 Route::withoutMiddleware([HandleInertiaRequests::class])->group(function () {
-    // Login challenge + assertion — guest-only and rate limited to blunt
-    // credential/enumeration spam.
-    Route::middleware(['guest', 'throttle:10,1'])->group(function () {
+    // Login challenge + assertion — rate limited to blunt credential/enumeration
+    // spam. These must NOT be guest-only: the trusted-device auto-login
+    // (RememberDevice) can mark the request authenticated, and a `guest` guard
+    // would then 302 it to the dashboard. axios follows that redirect to an HTML
+    // page, which PasskeyLogin.vue surfaces as "Server configuration error".
+    Route::middleware('throttle:10,1')->group(function () {
         Route::post('webauthn/login/options', [WebAuthnLoginController::class, 'options'])
             ->name('webauthn.login.options');
 

@@ -9,6 +9,9 @@ use App\Models\FlaggedChatMessage;
 use App\Models\User;
 use App\Services\Chat\AssistantToolFactory;
 use Illuminate\Support\Facades\Log;
+use Prism\Prism\Exceptions\PrismProviderOverloadedException;
+use Prism\Prism\Exceptions\PrismRateLimitedException;
+use Prism\Prism\Exceptions\PrismRequestTooLargeException;
 use Prism\Prism\Facades\Prism;
 use Prism\Prism\ValueObjects\Messages\AssistantMessage;
 use Prism\Prism\ValueObjects\Messages\SystemMessage;
@@ -109,9 +112,10 @@ class ChatService
             ]);
 
             $conversationId = $conversation->id;
+            $userId = $user->id;
 
             // Create a simulated streaming response
-            return response()->stream(function () use ($messages, $tools, $conversationId) {
+            return response()->stream(function () use ($messages, $tools, $conversationId, $userId) {
                 // Send conversation_id event first
                 echo "event: conversation_id\n";
                 echo 'data: '.json_encode(['conversation_id' => $conversationId])."\n\n";
@@ -149,9 +153,18 @@ class ChatService
                     ob_flush();
                     flush();
 
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
+                    // The stream has already sent a 200, so the failure can only be
+                    // reported in-band. Log the real cause; send the user a safe message.
+                    Log::error('Chat streaming provider error', [
+                        'user_id' => $userId,
+                        'conversation_id' => $conversationId,
+                        'exception' => $e::class,
+                        'error' => $e->getMessage(),
+                    ]);
+
                     echo "event: error\n";
-                    echo 'data: '.json_encode(['error' => $e->getMessage()])."\n\n";
+                    echo 'data: '.json_encode(['error' => $this->userFacingProviderError($e)])."\n\n";
                     ob_flush();
                     flush();
                 }
@@ -290,15 +303,31 @@ class ChatService
         } catch (\Exception $e) {
             Log::error('Chat service error', [
                 'user_id' => $user->id,
+                'exception' => $e::class,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return [
-                'error' => 'Failed to process message. Please try again.',
+                'error' => $this->userFacingProviderError($e),
                 'success' => false,
             ];
         }
+    }
+
+    /**
+     * Translate a provider/transport exception into a message that is safe and
+     * useful to show in the chat window. Prism's own messages embed provider
+     * internals (rate-limit payloads, model ids), so they are never surfaced.
+     */
+    protected function userFacingProviderError(\Throwable $e): string
+    {
+        return match (true) {
+            $e instanceof PrismRateLimitedException => 'The AI assistant is temporarily unavailable because the provider limit was reached. Please try again in a few minutes.',
+            $e instanceof PrismProviderOverloadedException => 'The AI provider is overloaded right now. Please try again in a moment.',
+            $e instanceof PrismRequestTooLargeException => 'That conversation is too long for the assistant to process. Start a new conversation and try again.',
+            default => 'Something went wrong generating a response. Please try again.',
+        };
     }
 
     protected function flagMessage(User $user, ChatConversation $conversation, string $content, array $contentCheck): void

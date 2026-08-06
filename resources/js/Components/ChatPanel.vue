@@ -7,7 +7,8 @@ import {
     PaperAirplaneIcon,
     PlusCircleIcon,
     TrashIcon,
-    ChatBubbleLeftIcon
+    ChatBubbleLeftIcon,
+    ArrowDownIcon
 } from '@heroicons/vue/24/outline';
 import axios from 'axios';
 
@@ -27,6 +28,15 @@ const error = ref(null);
 const currentConversationId = ref(null);
 const conversations = ref([]);
 const messagesContainerRef = ref(null);
+
+// Auto-follow: stick to the bottom while streaming, but release as soon as the user
+// scrolls away. Derived purely from measured scroll position, so our own programmatic
+// scrolls land at distance ~0 and simply re-affirm the pin — no suppression flag needed.
+const isPinnedToBottom = ref(true);
+
+// ~2.8 lines of text-sm/1.6 body copy. Large enough to absorb sub-pixel scroll rounding,
+// small enough that a single wheel notch (~100px) releases the pin.
+const STICK_TO_BOTTOM_THRESHOLD_PX = 64;
 
 // View management
 const currentView = ref('chat'); // 'chat' or 'history'
@@ -66,16 +76,67 @@ watch(() => props.isOpen, (newValue) => {
     }
 });
 
-// Auto-scroll to bottom when messages change
+// Auto-scroll to bottom when messages change — but only while the user is still parked
+// at the bottom. Scrolling up releases the pin so streamed tokens append out of view
+// instead of yanking the viewport back down.
 watch(messages, async () => {
+    if (!isPinnedToBottom.value) {
+        return;
+    }
     await nextTick();
     scrollToBottom();
 }, { deep: true });
 
+// The messages container lives inside a v-if/v-else-if/v-else chain, so it is destroyed
+// and recreated when messages.length crosses 0<->1 and when currentView toggles between
+// 'chat' and 'history'. A fresh node starts at scrollTop 0, and those remounts don't
+// always coincide with a `messages` mutation, so re-apply the pin when the element binds.
+// flush: 'post' is required — template refs are assigned in the post-render queue.
+watch(messagesContainerRef, (el) => {
+    if (el && isPinnedToBottom.value) {
+        el.scrollTop = el.scrollHeight;
+    }
+}, { flush: 'post' });
+
 const scrollToBottom = () => {
+    // Instant, never behavior:'smooth'. A smooth scroll fires a scroll event every frame
+    // with a large in-flight distance, which would unpin us mid-animation.
     if (messagesContainerRef.value) {
         messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight;
     }
+};
+
+const handleScroll = (event) => {
+    const el = event.target;
+    // Measured synchronously inside the event — do NOT defer this into rAF/throttle. A
+    // deferred read could land after new content arrived (scrollTop unchanged, distance
+    // grown) and spuriously release the pin. Appending content fires no scroll event, so
+    // this only ever runs on a real position change.
+    isPinnedToBottom.value =
+        el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_TO_BOTTOM_THRESHOLD_PX;
+};
+
+const isStreamActive = computed(() => {
+    const last = messages.value[messages.value.length - 1];
+    return Boolean(last && last.streaming);
+});
+
+const jumpToLatest = () => {
+    // Set the flag explicitly rather than relying on the resulting scroll event: a smooth
+    // scroll's target is computed at animation start, so tokens landing mid-flight would
+    // leave it short of the new bottom and it would never re-pin itself.
+    isPinnedToBottom.value = true;
+
+    if (isStreamActive.value || !messagesContainerRef.value) {
+        // Instant while streaming — a smooth animation would fight the per-token follow.
+        scrollToBottom();
+        return;
+    }
+
+    messagesContainerRef.value.scrollTo({
+        top: messagesContainerRef.value.scrollHeight,
+        behavior: 'smooth'
+    });
 };
 
 const loadConversations = async () => {
@@ -90,6 +151,7 @@ const loadConversations = async () => {
 const loadConversation = async (conversationId) => {
     try {
         isLoading.value = true;
+        isPinnedToBottom.value = true;
         const response = await axios.get(route('chat.conversations.show', conversationId));
         messages.value = response.data.conversation.messages;
         currentConversationId.value = conversationId;
@@ -106,6 +168,9 @@ const sendMessage = async () => {
     if (!currentMessage.value.trim()) {
         return;
     }
+
+    // Sending is explicit intent to see the reply.
+    isPinnedToBottom.value = true;
 
     const messageText = currentMessage.value;
     currentMessage.value = '';
@@ -238,6 +303,7 @@ const sendMessage = async () => {
 
 const startNewConversation = () => {
     messages.value = [];
+    isPinnedToBottom.value = true;
     currentConversationId.value = null;
     error.value = null;
     currentView.value = 'chat';
@@ -245,6 +311,9 @@ const startNewConversation = () => {
 
 const toggleHistoryView = () => {
     if (currentView.value === 'history') {
+        // Returning to chat remounts the scroller at scrollTop 0; land on the newest
+        // message rather than the top of the conversation.
+        isPinnedToBottom.value = true;
         currentView.value = 'chat';
     } else {
         currentView.value = 'history';
@@ -543,18 +612,40 @@ watch(isResizing, (newValue) => {
         </div>
 
         <!-- Messages -->
-        <div
-            v-else
-            ref="messagesContainerRef"
-            class="flex-1 overflow-y-auto p-4 space-y-2"
-        >
-            <ChatMessage
-                v-for="(message, index) in messages"
-                :key="index"
-                :message="message"
-            />
+        <!-- min-h-0 is required: this wrapper has visible overflow, so without it the
+             flex item grows to content height and pushes the input area off-screen. -->
+        <div v-else class="relative flex-1 min-h-0 flex flex-col">
+            <div
+                ref="messagesContainerRef"
+                class="flex-1 overflow-y-auto p-4 space-y-2"
+                @scroll="handleScroll"
+            >
+                <ChatMessage
+                    v-for="(message, index) in messages"
+                    :key="index"
+                    :message="message"
+                />
+            </div>
 
-            <!-- Loading Indicator -->
+            <!-- Jump to latest — only while the user has scrolled away from the bottom -->
+            <Transition
+                enter-active-class="transition ease-out duration-150"
+                enter-from-class="opacity-0 translate-y-1"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition ease-in duration-100"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 translate-y-1"
+            >
+                <button
+                    v-if="!isPinnedToBottom"
+                    @click="jumpToLatest"
+                    class="absolute bottom-4 right-4 z-10 flex items-center space-x-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
+                    title="Jump to latest"
+                >
+                    <ArrowDownIcon class="w-4 h-4" />
+                    <span>Latest</span>
+                </button>
+            </Transition>
         </div>
 
         <!-- Error Message -->

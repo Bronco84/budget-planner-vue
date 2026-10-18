@@ -1235,9 +1235,22 @@ class PlaidService
 
             foreach ($accounts as $account) {
                 if ($account['account_id'] === $plaidAccount->plaid_account_id) {
+                    $current = $account['balances']['current'] ?? null;
+                    $available = $account['balances']['available'] ?? null;
+
+                    // Some institutions (e.g. Regions checking) occasionally omit the
+                    // current balance. Fall back to available rather than writing 0;
+                    // if neither is present, keep the last known balance.
+                    $balance = $current ?? $available;
+                    $balanceCents = $balance !== null
+                        ? (int) round($balance * 100)
+                        : $plaidAccount->current_balance_cents;
+
                     $plaidAccount->update([
-                        'current_balance_cents' => $account['balances']['current'] * 100,
-                        'available_balance_cents' => ($account['balances']['available'] ?? $account['balances']['current']) * 100,
+                        'current_balance_cents' => $balanceCents,
+                        'available_balance_cents' => $available !== null
+                            ? (int) round($available * 100)
+                            : $balanceCents,
                         'balance_updated_at' => now(),
                     ]);
 
@@ -1245,7 +1258,9 @@ class PlaidService
                     $linkedAccount = $plaidAccount->account;
                     if ($linkedAccount) {
                         $linkedAccount->update([
-                            'current_balance_cents' => $account['balances']['current'] * 100,
+                            'current_balance_cents' => $balance !== null
+                                ? $balanceCents
+                                : $linkedAccount->current_balance_cents,
                             'balance_updated_at' => now(),
                         ]);
                     }

@@ -86,7 +86,7 @@ class RecurringTransactionService
      *
      * @return array<Carbon>
      */
-    protected function generateOccurrenceDates(RecurringTransactionTemplate $template, Carbon $startDate, Carbon $endDate): array
+    public function generateOccurrenceDates(RecurringTransactionTemplate $template, Carbon $startDate, Carbon $endDate): array
     {
         $occurrences = [];
         $effectiveStart = max($startDate, $template->start_date)->copy()->startOfDay();

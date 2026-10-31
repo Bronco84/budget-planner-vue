@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Budget;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
+use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -87,7 +88,8 @@ class CalendarController extends Controller
 
         // Get historical transactions for this month
         $historicalTransactions = Transaction::where('budget_id', $budget->id)
-            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->whereDate('date', '>=', $startOfMonth)
+            ->whereDate('date', '<=', $endOfMonth)
             ->with('account')
             ->get()
             ->groupBy(function ($transaction) {
@@ -197,100 +199,19 @@ class CalendarController extends Controller
         return $projected;
     }
 
+    /**
+     * Occurrences within the range, using the same schedule rules as the
+     * projections (e.g. bimonthly = twice a month on two days).
+     *
+     * @return array<Carbon>
+     */
     private function calculateOccurrences(RecurringTransactionTemplate $recurring, Carbon $startDate, Carbon $endDate)
     {
-        $occurrences = [];
-        $recurringStart = Carbon::parse($recurring->start_date);
-
-        // Don't project if start date is after the period we're looking at
-        if ($recurringStart->gt($endDate)) {
-            return $occurrences;
+        $templateEnd = $recurring->end_date ? min($endDate, Carbon::parse($recurring->end_date)) : $endDate;
+        if ($templateEnd->lt($startDate)) {
+            return [];
         }
 
-        // Calculate the first occurrence within our date range
-        $currentDate = $recurringStart->copy();
-
-        // If the recurring transaction started before our range,
-        // fast-forward to find the first occurrence in our range
-        if ($currentDate->lt($startDate)) {
-            // Calculate how many periods to skip
-            $daysDiff = (int) $currentDate->diffInDays($startDate);
-
-            switch ($recurring->frequency) {
-                case 'daily':
-                    $periodsToSkip = $daysDiff;
-                    $currentDate->addDays($periodsToSkip);
-                    break;
-                case 'weekly':
-                    $periodsToSkip = floor($daysDiff / 7);
-                    $currentDate->addWeeks($periodsToSkip);
-                    break;
-                case 'biweekly':
-                    $periodsToSkip = floor($daysDiff / 14);
-                    $currentDate->addWeeks($periodsToSkip * 2);
-                    break;
-                case 'monthly':
-                    $periodsToSkip = (int) $currentDate->diffInMonths($startDate);
-                    $currentDate->addMonths($periodsToSkip);
-                    break;
-                case 'bimonthly':
-                    $periodsToSkip = (int) floor($currentDate->diffInMonths($startDate) / 2);
-                    $currentDate->addMonths($periodsToSkip * 2);
-                    break;
-                case 'yearly':
-                    $periodsToSkip = (int) $currentDate->diffInYears($startDate);
-                    $currentDate->addYears($periodsToSkip);
-                    break;
-            }
-
-            // Make sure we're not before the range after fast-forwarding
-            while ($currentDate->lt($startDate)) {
-                $this->addPeriod($currentDate, $recurring->frequency);
-            }
-        }
-
-        // Now generate occurrences within the date range
-        while ($currentDate->lte($endDate)) {
-            // Check if we've passed the end date (if set)
-            if ($recurring->end_date && $currentDate->gt(Carbon::parse($recurring->end_date))) {
-                break;
-            }
-
-            // Add this occurrence
-            $occurrences[] = $currentDate->copy();
-
-            // Move to next occurrence
-            $this->addPeriod($currentDate, $recurring->frequency);
-        }
-
-        return $occurrences;
-    }
-
-    private function addPeriod(Carbon $date, string $frequency)
-    {
-        switch ($frequency) {
-            case 'daily':
-                $date->addDay();
-                break;
-            case 'weekly':
-                $date->addWeek();
-                break;
-            case 'biweekly':
-                $date->addWeeks(2);
-                break;
-            case 'monthly':
-                $date->addMonth();
-                break;
-            case 'bimonthly':
-                $date->addMonths(2);
-                break;
-            case 'yearly':
-                $date->addYear();
-                break;
-            default:
-                // Unknown frequency
-                $date->addCentury(); // Effectively stop the loop
-                break;
-        }
+        return app(RecurringTransactionService::class)->generateOccurrenceDates($recurring, $startDate, $templateEnd);
     }
 }

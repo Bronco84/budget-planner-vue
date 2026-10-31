@@ -55,10 +55,10 @@ scenarios:
   - id: update_scenario
     kind: alternate
     description: Updating name, description, colour and adjustments persists the new values.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/ScenarioTest.php::user can update a scenario
-    note: asserts the scenario fields only; replacement of adjustments is not asserted.
+      - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::updating a scenario with adjustments replaces the existing adjustments
   - id: delete_scenario
     kind: alternate
     description: Deleting removes the scenario and cascades to its adjustments.
@@ -88,7 +88,10 @@ scenarios:
   - id: invalid_color_or_type
     kind: validation
     description: A non-hex colour or unknown adjustment type fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::a scenario with a non hex colour or unknown adjustment type is rejected
+      - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::updating a scenario with invalid colour or type leaves it unchanged
   - id: clear_description
     kind: edge
     description: Sending a null or empty description on update clears it; omitting the key keeps the existing value.
@@ -99,10 +102,10 @@ scenarios:
   - id: cross_user_forbidden
     kind: authorization
     description: Another user's scenario in their own budget returns 403.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/ScenarioTest.php::user cannot access scenarios from another users budget
-    note: asserted for show only; store, update and destroy on a foreign budget are not tested.
+      - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::another user cannot create, update or delete scenarios on a budget they do not own
   - id: cross_budget_not_found
     kind: authorization
     description: A scenario from another budget addressed through the user's own budget returns 404.

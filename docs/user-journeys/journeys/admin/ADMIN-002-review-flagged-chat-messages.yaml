@@ -32,22 +32,27 @@ postconditions:
   - reviewed flags are distinguishable from unreviewed ones
 business_rules:
   - stored content is truncated to 1000 characters; metadata includes IP and user agent
+  - the Message relation is optional in Nova; ChatService::flagMessage() never sets message_id (blocked messages are not stored), so a required field would make every flag unsavable
 scenarios:
   - id: review_flag
     kind: happy_path
     description: An admin can list flagged messages and mark one reviewed.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaHttpAccessTest.php::an admin can list flagged chat messages and mark one reviewed
   - id: no_flags
     kind: empty_state
     description: With no flags the resource index is empty.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaHttpAccessTest.php::the flagged chat message index is empty when nothing is flagged
   - id: non_admin_denied
     kind: authorization
     description: Non-admins cannot reach the resource (viewNova gate).
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/SecurityNovaAccessTest.php::non-admin users cannot access nova
-    note: gate decision only; no HTTP test against the Nova resource.
+      - tests/Feature/Admin/NovaHttpAccessTest.php::a non-admin cannot list or update flagged chat messages over http
 known_issues:
   - no Nova action exists to ban/unban a user or act on a flag; bans are automatic and cache-only (ContentModerationService), so an admin cannot lift a mistaken 24-hour ban from Nova.
 confidence: medium

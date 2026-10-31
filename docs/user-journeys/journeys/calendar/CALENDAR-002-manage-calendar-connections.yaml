@@ -65,7 +65,9 @@ scenarios:
   - id: token_refresh_failure
     kind: recovery
     description: An expired token that cannot be refreshed (revoked access, no refresh token) redirects back with "Sync failed".
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarSyncTokenRefreshTest.php::syncing an expired connection whose refresh fails redirects back with a generic sync error
   - id: google_api_failure
     kind: integration
     description: A Google API error during events.list is reported as a generic "Sync failed" flash (no raw exception text) without 500, and the real cause is logged.

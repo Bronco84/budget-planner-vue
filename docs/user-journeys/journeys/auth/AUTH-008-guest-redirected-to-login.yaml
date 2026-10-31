@@ -38,18 +38,22 @@ scenarios:
   - id: protected_page_redirects_guest
     kind: authentication
     description: A guest requesting a budget page is redirected to login.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access budgets
-    note: asserted for budgets.show only; dashboard and profile.edit guest redirects are not tested.
+      - tests/Feature/Auth/GuestAccessTest.php::guests requesting the dashboard or profile are redirected to login
   - id: json_request_gets_401
     kind: edge
     description: A guest JSON request to an auth route (e.g. /api/preferences/active-budget) gets 401, not an HTML redirect.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/GuestAccessTest.php::a guest json request to an authenticated route gets 401 instead of a redirect
   - id: intended_url_restored_after_magic_link
     kind: alternate
     description: After a magic-link login the user is sent to the originally requested URL.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/GuestAccessTest.php::after a magic link sign in the user is sent to the originally requested url
 confidence: high
 evidence:
   - routes/web.php root, dashboard and profile routes

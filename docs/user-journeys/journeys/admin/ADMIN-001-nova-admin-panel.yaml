@@ -44,8 +44,9 @@ scenarios:
   - id: admin_loads_dashboard
     kind: happy_path
     description: An admin can load /nova over HTTP.
-    coverage: uncovered
-    note: tests check the gate only, not Nova HTTP responses.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaHttpAccessTest.php::an admin can load the nova dashboard over http
   - id: is_admin_must_be_true
     kind: edge
     description: Revoking is_admin removes access.
@@ -68,11 +69,15 @@ scenarios:
   - id: non_admin_http_denied
     kind: authorization
     description: A non-admin requesting /nova over HTTP receives 403.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaHttpAccessTest.php::a non-admin requesting nova over http receives 403
   - id: guest_redirected
     kind: authentication
     description: A guest requesting /nova is sent to a login page.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaHttpAccessTest.php::a guest requesting nova is redirected to the nova login page
 known_issues:
   - the viewNova gate hard-codes an allowlisted email address, granting access independent of is_admin; it should rely on is_admin alone.
   - Nova is registered withAuthenticationRoutes() and withPasswordResetRoutes() and the Nova User resource has a Password field, although the app removed password login in favour of passkeys; this keeps a password-based login surface at /nova.

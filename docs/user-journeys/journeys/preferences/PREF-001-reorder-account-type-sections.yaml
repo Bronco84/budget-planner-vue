@@ -50,7 +50,9 @@ scenarios:
   - id: saved_order_returned
     kind: happy_path
     description: GET account-type-order returns the saved order, or ACCOUNT_TYPES by default.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceScopingTest.php::the account type order defaults to the standard types and returns the saved order
   - id: unknown_type_rejected
     kind: validation
     description: An order containing a type outside the allowed types, or a non-array, is rejected with 422.
@@ -85,7 +87,10 @@ scenarios:
   - id: preferences_scoped_to_user
     kind: authorization
     description: Preferences are always read and written for the authenticated user; guests get 401/redirect.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceScopingTest.php::preferences are read and written only for the authenticated user
+      - tests/Feature/Preferences/PreferenceScopingTest.php::guests cannot read or write preferences
 known_issues:
   - GET /api/preferences/account-type-order and the generic show/update endpoints have no frontend caller.
 confidence: medium

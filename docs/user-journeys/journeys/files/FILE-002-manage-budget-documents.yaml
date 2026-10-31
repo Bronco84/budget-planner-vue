@@ -60,11 +60,9 @@ scenarios:
   - id: upload_valid_file
     kind: happy_path
     description: A PDF or image upload is accepted.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/SecurityFileValidationTest.php::file upload accepts PDF files
-      - tests/Feature/SecurityFileValidationTest.php::file upload accepts image files
-    note: tests only assert the status is not 400; neither checks 201 nor that an attachment exists.
+      - tests/Feature/Files/BudgetFileUploadAndAccessTest.php::uploading a valid pdf or image creates an attachment on the budget
   - id: download_and_delete
     kind: happy_path
     description: Download returns the file and delete removes it.
@@ -94,7 +92,9 @@ scenarios:
   - id: no_files_empty_state
     kind: empty_state
     description: A budget with no files shows an empty list.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/BudgetFileUploadAndAccessTest.php::a budget with no files renders an empty files list
   - id: attachment_from_other_budget_not_found
     kind: authorization
     description: Downloading or deleting an attachment of another budget under the user's own budget URL returns 404.
@@ -104,7 +104,9 @@ scenarios:
   - id: other_users_files_forbidden
     kind: authorization
     description: Index/download (view) and destroy (update) on another user's budget return 403; upload returns 403 JSON.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/BudgetFileUploadAndAccessTest.php::another users budget files cannot be listed, uploaded, downloaded or deleted
 known_issues: []
 confidence: high
 evidence:

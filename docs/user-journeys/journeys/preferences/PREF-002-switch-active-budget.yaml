@@ -54,11 +54,16 @@ scenarios:
   - id: no_budgets_empty_state
     kind: empty_state
     description: GET active-budget returns null when the user has no budgets.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceScopingTest.php::the active budget is null when the user has no budgets
   - id: stale_preference_falls_back
     kind: recovery
     description: If the stored budget was deleted or access was revoked, the preference is cleared and the first accessible budget is used.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceScopingTest.php::a deleted active budget is cleared and the first accessible budget is used
+      - tests/Feature/Preferences/PreferenceScopingTest.php::an active budget whose share was revoked is cleared and the first accessible budget is used
   - id: cannot_activate_foreign_budget
     kind: authorization
     description: Setting another user's unshared budget fails with "You do not have access to this budget."

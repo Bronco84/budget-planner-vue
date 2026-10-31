@@ -32,21 +32,21 @@
             "ineligible_account_rejected": "covered",
             "invalid_source_rejected": "covered",
             "source_from_other_budget_rejected": "covered",
-            "other_users_account_forbidden": "partial"
+            "other_users_account_forbidden": "covered"
         },
         "ADMIN-001": {
             "admin_gate_allows": "covered",
-            "admin_loads_dashboard": "uncovered",
+            "admin_loads_dashboard": "covered",
             "is_admin_must_be_true": "covered",
             "is_admin_not_mass_assignable": "covered",
             "non_admin_denied": "covered",
-            "non_admin_http_denied": "uncovered",
-            "guest_redirected": "uncovered"
+            "non_admin_http_denied": "covered",
+            "guest_redirected": "covered"
         },
         "ADMIN-002": {
-            "review_flag": "uncovered",
-            "no_flags": "uncovered",
-            "non_admin_denied": "partial"
+            "review_flag": "covered",
+            "no_flags": "covered",
+            "non_admin_denied": "covered"
         },
         "AUTH-001": {
             "login_page_renders": "covered",
@@ -123,9 +123,9 @@
         },
         "AUTH-008": {
             "root_redirects_to_login": "covered",
-            "protected_page_redirects_guest": "partial",
-            "json_request_gets_401": "uncovered",
-            "intended_url_restored_after_magic_link": "uncovered"
+            "protected_page_redirects_guest": "covered",
+            "json_request_gets_401": "covered",
+            "intended_url_restored_after_magic_link": "covered"
         },
         "AUTH-009": {
             "inertia_shares_live_token": "covered",
@@ -143,8 +143,8 @@
             "resend_notification": "covered",
             "email_change_sends_verification": "covered",
             "passkeyless_user_can_verify": "covered",
-            "already_verified_redirected": "uncovered",
-            "link_requires_auth_and_signature": "uncovered"
+            "already_verified_redirected": "covered",
+            "link_requires_auth_and_signature": "covered"
         },
         "AUTH-011": {
             "profile_lists_passkeys": "covered",
@@ -160,9 +160,9 @@
             "profile_lists_devices": "covered",
             "revoke_single_device": "covered",
             "revoke_all_other_devices": "covered",
-            "no_devices_empty_state": "uncovered",
+            "no_devices_empty_state": "covered",
             "cannot_revoke_other_users_device": "covered",
-            "revoked_device_stops_auto_login": "uncovered",
+            "revoked_device_stops_auto_login": "covered",
             "new_device_email_links_to_profile": "covered"
         },
         "BUDGET-001": {
@@ -196,9 +196,9 @@
             "cannot_activate_other_users_budget": "covered"
         },
         "BUDGET-004": {
-            "owner_updates_budget": "uncovered",
+            "owner_updates_budget": "covered",
             "invalid_update_rejected": "covered",
-            "other_users_budget_edit_forbidden": "uncovered"
+            "other_users_budget_edit_forbidden": "covered"
         },
         "BUDGET-005": {
             "owner_deletes_budget": "covered",
@@ -225,17 +225,19 @@
             "toggle_connection": "covered",
             "remove_connection": "covered",
             "unknown_connection": "covered",
-            "token_refresh_failure": "uncovered",
+            "token_refresh_failure": "covered",
             "google_api_failure": "covered",
             "cross_user_denied": "covered",
             "flash_message_shown": "covered"
         },
         "CALENDAR-003": {
-            "month_renders": "partial",
-            "no_budget_redirect": "uncovered",
+            "month_renders": "covered",
+            "no_budget_redirect": "covered",
             "invalid_month_params": "covered",
-            "inactive_connection_events_hidden": "uncovered",
-            "other_users_budget_denied": "covered"
+            "inactive_connection_events_hidden": "covered",
+            "other_users_budget_denied": "covered",
+            "recurring_schedule_matches_projections": "covered",
+            "first_of_month_included": "covered"
         },
         "CATEGORY-001": {
             "index_shows_spending": "covered",
@@ -246,14 +248,14 @@
             "other_users_categories_forbidden": "covered"
         },
         "CATEGORY-002": {
-            "delete_unused_category": "uncovered",
+            "delete_unused_category": "covered",
             "delete_blocked_when_in_use": "covered",
-            "other_users_category_forbidden": "uncovered"
+            "other_users_category_forbidden": "covered"
         },
         "CATEGORY-003": {
-            "reorder_own_categories": "uncovered",
+            "reorder_own_categories": "covered",
             "invalid_payload_rejected": "covered",
-            "foreign_category_ids_ignored": "uncovered",
+            "foreign_category_ids_ignored": "covered",
             "other_users_budget_forbidden": "covered"
         },
         "CHAT-001": {
@@ -309,14 +311,14 @@
         "FILE-002": {
             "files_page_renders": "covered",
             "index_json_for_dashboard": "covered",
-            "upload_valid_file": "partial",
+            "upload_valid_file": "covered",
             "download_and_delete": "covered",
             "oversized_file_rejected": "covered",
             "disallowed_type_rejected": "covered",
             "upload_rate_limited": "covered",
-            "no_files_empty_state": "uncovered",
+            "no_files_empty_state": "covered",
             "attachment_from_other_budget_not_found": "covered",
-            "other_users_files_forbidden": "uncovered"
+            "other_users_files_forbidden": "covered"
         },
         "PAYOFF-001": {
             "create_plan": "covered",
@@ -457,20 +459,20 @@
         },
         "PREF-001": {
             "save_order": "covered",
-            "saved_order_returned": "uncovered",
+            "saved_order_returned": "covered",
             "unknown_type_rejected": "covered",
             "custom_account_types_accepted": "covered",
             "generic_preference_round_trip": "covered",
             "generic_endpoint_whitelist": "covered",
             "failed_save_reverts_ui": "uncovered",
-            "preferences_scoped_to_user": "uncovered"
+            "preferences_scoped_to_user": "covered"
         },
         "PREF-002": {
             "switch_to_owned_budget": "covered",
             "switch_to_shared_budget": "uncovered",
             "invalid_budget_rejected": "covered",
-            "no_budgets_empty_state": "uncovered",
-            "stale_preference_falls_back": "uncovered",
+            "no_budgets_empty_state": "covered",
+            "stale_preference_falls_back": "covered",
             "cannot_activate_foreign_budget": "covered",
             "guest_rejected": "covered"
         },
@@ -480,7 +482,7 @@
             "unchanged_email_keeps_verification": "covered",
             "email_change_sends_verification": "covered",
             "invalid_or_taken_email_rejected": "covered",
-            "guest_cannot_view_or_update_profile": "uncovered"
+            "guest_cannot_view_or_update_profile": "covered"
         },
         "PROFILE-002": {
             "account_deleted": "covered",
@@ -510,12 +512,12 @@
             "cross_user_forbidden": "covered"
         },
         "PROPERTY-001": {
-            "index_lists_properties": "uncovered",
+            "index_lists_properties": "covered",
             "create_property": "covered",
-            "no_properties_empty_state": "uncovered",
+            "no_properties_empty_state": "covered",
             "invalid_property_rejected": "covered",
-            "link_account_from_other_budget_ignored": "uncovered",
-            "other_users_budget_forbidden": "uncovered"
+            "link_account_from_other_budget_ignored": "covered",
+            "other_users_budget_forbidden": "covered"
         },
         "PROPERTY-002": {
             "update_property": "covered",
@@ -523,7 +525,7 @@
             "delete_property_unlinks_accounts": "covered",
             "invalid_update_rejected": "covered",
             "show_redirects_to_edit": "covered",
-            "other_users_property_forbidden": "uncovered"
+            "other_users_property_forbidden": "covered"
         },
         "RECUR-001": {
             "create_fixed_template": "covered",
@@ -633,21 +635,21 @@
             "base_projection_reused_across_scenarios": "covered",
             "month_end_adjustment_day": "covered",
             "projection_page_does_not_log_autopay": "covered",
-            "no_scenarios": "uncovered",
-            "foreign_account_ids": "uncovered",
+            "no_scenarios": "covered",
+            "foreign_account_ids": "covered",
             "cross_user_forbidden": "covered",
-            "cross_user_scenario_toggle": "uncovered"
+            "cross_user_scenario_toggle": "covered"
         },
         "SCENARIO-002": {
             "create_with_adjustments": "covered",
-            "update_scenario": "partial",
+            "update_scenario": "covered",
             "delete_scenario": "covered",
             "foreign_account_rejected": "covered",
             "foreign_target_template_rejected": "covered",
             "server_error_is_generic": "covered",
-            "invalid_color_or_type": "uncovered",
+            "invalid_color_or_type": "covered",
             "clear_description": "covered",
-            "cross_user_forbidden": "partial",
+            "cross_user_forbidden": "covered",
             "cross_budget_not_found": "covered",
             "bimonthly_adjustment": "covered",
             "bimonthly_days_validation": "covered"

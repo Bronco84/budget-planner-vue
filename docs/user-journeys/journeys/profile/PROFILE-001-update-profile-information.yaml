@@ -62,7 +62,9 @@ scenarios:
   - id: guest_cannot_view_or_update_profile
     kind: authentication
     description: Guests are redirected to login for GET and PATCH /profile.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/GuestAccessTest.php::guests cannot view or update the profile
 known_issues: []
 confidence: high
 evidence:

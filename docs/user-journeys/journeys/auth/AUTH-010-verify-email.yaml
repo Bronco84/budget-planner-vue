@@ -76,11 +76,17 @@ scenarios:
   - id: already_verified_redirected
     kind: edge
     description: A verified user hitting the prompt or resend is redirected to the dashboard.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/EmailVerificationAccessTest.php::a verified user opening the prompt or requesting a link is redirected to the dashboard
   - id: link_requires_auth_and_signature
     kind: authentication
     description: Unsigned/expired links or guests cannot verify an address.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/EmailVerificationAccessTest.php::a guest cannot verify an address with a valid signed link
+      - tests/Feature/Auth/EmailVerificationAccessTest.php::an unsigned or expired verification link is rejected
+      - tests/Feature/Auth/EmailVerificationAccessTest.php::a signed link for another user does not verify either account
 known_issues: []
 confidence: high
 evidence:

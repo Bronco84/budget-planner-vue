@@ -40,7 +40,9 @@ scenarios:
   - id: index_lists_properties
     kind: happy_path
     description: Owner sees their budget's properties with linked accounts.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyListingAndAuthorizationTest.php::the properties page lists the budgets properties with their linked accounts
   - id: create_property
     kind: happy_path
     description: Valid submission stores the property and returns the user to the list.
@@ -50,7 +52,9 @@ scenarios:
   - id: no_properties_empty_state
     kind: empty_state
     description: A budget with no properties shows the empty state with a create link.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyListingAndAuthorizationTest.php::a budget without properties renders an empty properties list
   - id: invalid_property_rejected
     kind: validation
     description: Bad type, negative value or out-of-range years return validation errors.
@@ -60,11 +64,15 @@ scenarios:
   - id: link_account_from_other_budget_ignored
     kind: edge
     description: A linked_account_id that exists but belongs to another budget passes validation but is not linked.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyListingAndAuthorizationTest.php::linking an account from another budget when storing a property is ignored
   - id: other_users_budget_forbidden
     kind: authorization
     description: Index/create return 403 (view) and store returns 403 (update) for another user's budget.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyListingAndAuthorizationTest.php::another users budget properties cannot be listed, created or stored
 known_issues: []
 confidence: high
 evidence:

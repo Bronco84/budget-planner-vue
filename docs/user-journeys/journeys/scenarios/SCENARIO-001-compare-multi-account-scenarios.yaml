@@ -103,11 +103,15 @@ scenarios:
   - id: no_scenarios
     kind: empty_state
     description: A budget with no scenarios shows the empty scenario panel and only base projections.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::the multi account projection without scenarios shows only base projections
   - id: foreign_account_ids
     kind: validation
     description: account_ids including an account from another budget abort with 422.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::the multi account projection rejects an account from another budget with 422
   - id: cross_user_forbidden
     kind: authorization
     description: Another user cannot open the multi-account projection for a budget they do not own.
@@ -117,7 +121,9 @@ scenarios:
   - id: cross_user_scenario_toggle
     kind: authorization
     description: Another user cannot list or toggle scenarios on a budget they do not own.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::another user cannot list or toggle scenarios on a budget they do not own
 known_issues:
   - "modify_existing adjustments are accepted by validation and offered in ScenarioAdjustmentRow.vue, but generateProjectedTransactions returns nothing for them and no other code handles them, so they have no effect on the projection."
 confidence: high

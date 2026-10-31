@@ -28,7 +28,9 @@ scenarios:
   - id: reorder_own_categories
     kind: happy_path
     description: Posting new orders for the budget's categories persists them.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryDeleteAndReorderTest.php::reordering the budgets categories persists the new order
   - id: invalid_payload_rejected
     kind: validation
     description: Missing categories array or a negative order returns validation errors.
@@ -38,7 +40,9 @@ scenarios:
   - id: foreign_category_ids_ignored
     kind: edge
     description: A category id from another budget in the payload is left unchanged.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryDeleteAndReorderTest.php::reordering ignores category ids from another budget
   - id: other_users_budget_forbidden
     kind: authorization
     description: Reordering another user's categories returns 403.

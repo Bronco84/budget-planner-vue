@@ -31,8 +31,10 @@ business_rules:
 scenarios:
   - id: owner_updates_budget
     kind: happy_path
-    description: Valid update persists and redirects to the dashboard.
-    coverage: uncovered
+    description: The owner can open the edit page; a valid update persists and redirects to the budget dashboard (budgets.show) with a flash message.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetEditAuthorizationTest.php::the owner can open the edit page and update their budget
   - id: invalid_update_rejected
     kind: validation
     description: Empty name or bad colour returns validation errors.
@@ -42,7 +44,9 @@ scenarios:
   - id: other_users_budget_edit_forbidden
     kind: authorization
     description: Editing or updating another user's budget returns 403 (authorizeResource).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetEditAuthorizationTest.php::another user cannot edit or update a budget they do not own
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetController.php edit/update

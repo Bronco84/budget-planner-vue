@@ -29,7 +29,9 @@ scenarios:
   - id: delete_unused_category
     kind: happy_path
     description: A category with no transactions is deleted.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryDeleteAndReorderTest.php::deleting a category no transaction uses removes it with a success flash
   - id: delete_blocked_when_in_use
     kind: edge
     description: A category used by transactions is not deleted and an error flash is returned.
@@ -39,7 +41,9 @@ scenarios:
   - id: other_users_category_forbidden
     kind: authorization
     description: Deleting under another user's budget returns 403; a cross-budget category returns 404.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryDeleteAndReorderTest.php::another users category cannot be deleted and a cross budget category is not found
 confidence: high
 evidence:
   - app/Http/Controllers/CategoryController.php destroy

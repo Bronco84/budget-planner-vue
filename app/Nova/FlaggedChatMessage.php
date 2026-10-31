@@ -24,7 +24,7 @@ class FlaggedChatMessage extends Resource
             ID::make()->sortable(),
             BelongsTo::make('User')->sortable()->required(),
             BelongsTo::make('Conversation', 'conversation', ChatConversation::class)->sortable(),
-            BelongsTo::make('Message', 'message', ChatMessage::class)->sortable(),
+            BelongsTo::make('Message', 'message', ChatMessage::class)->sortable()->nullable(),
             Text::make('Flag Type', 'flag_type')->sortable()->required(),
             Textarea::make('Content')->hideFromIndex(),
             Code::make('Metadata')->json()->hideFromIndex(),

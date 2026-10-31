@@ -58,7 +58,9 @@ scenarios:
   - id: no_devices_empty_state
     kind: empty_state
     description: A user with no trusted devices sees an empty list.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceRevocationTest.php::a user with no trusted devices sees an empty device list
   - id: cannot_revoke_other_users_device
     kind: authorization
     description: Revoking another user's device returns 403 and leaves it intact.
@@ -68,7 +70,9 @@ scenarios:
   - id: revoked_device_stops_auto_login
     kind: integration
     description: After revocation the old device cookie no longer authenticates.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceRevocationTest.php::a revoked device cookie no longer signs the browser in
   - id: new_device_email_links_to_profile
     kind: integration
     description: The new-device login email's Manage Devices button links to the profile page (profile.edit), where devices are managed.

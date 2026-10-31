@@ -72,10 +72,10 @@ scenarios:
   - id: other_users_account_forbidden
     kind: authorization
     description: Posting autopay for another user's budget returns 403 (can:view,budget); cross-budget account returns 404.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Accounts/AutopayValidationTest.php::autopay cannot be configured on another users account
-    note: the 403 for another user's budget is covered; the cross-budget 404 is not asserted.
+      - tests/Feature/Accounts/AutopayCrossBudgetTest.php::autopay for a card from another budget under the users own budget url is not found
 known_issues: []
 confidence: medium
 evidence:

@@ -70,7 +70,9 @@ scenarios:
   - id: other_users_property_forbidden
     kind: authorization
     description: Edit/update/delete under another user's budget return 403; a property from another budget returns 404 via scopeBindings.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyListingAndAuthorizationTest.php::another users property cannot be edited, updated or deleted and a cross budget property is not found
 known_issues: []
 confidence: high
 evidence:

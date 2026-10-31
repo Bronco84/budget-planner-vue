@@ -33,14 +33,16 @@ scenarios:
   - id: month_renders
     kind: happy_path
     description: The current month renders transactions, projected recurring items and calendar events.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Calendar/CalendarMonthValidationTest.php::the calendar renders the requested month
-    note: asserts the page and currentMonth only; calendar day contents are not asserted.
+      - tests/Feature/Calendar/CalendarMonthContentsTest.php::the calendar month shows posted transactions, projected recurring items and active calendar events
   - id: no_budget_redirect
     kind: empty_state
     description: A user with no budgets is redirected to budget creation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarMonthContentsTest.php::a user without a budget is sent to budget creation from the calendar
   - id: invalid_month_params
     kind: validation
     description: Non-numeric or out-of-range year/month parameters are rejected by validation instead of rolling over or raising a 500.
@@ -50,13 +52,27 @@ scenarios:
   - id: inactive_connection_events_hidden
     kind: edge
     description: Events from a disabled connection are not shown.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarMonthContentsTest.php::events from a disabled calendar connection are not shown
   - id: other_users_budget_denied
     kind: authorization
     description: Passing another user's budget_id returns 403.
     coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users budget via calendar budget_id param
+  - id: recurring_schedule_matches_projections
+    kind: edge
+    description: Recurring items use the same schedule rules as projections (bimonthly means twice a month on two days).
+    coverage: covered
+    tests:
+      - 'tests/Feature/Calendar/CalendarRecurrenceTest.php::a bimonthly recurring item appears twice in the month on its two days'
+  - id: first_of_month_included
+    kind: edge
+    description: A transaction dated the 1st of the month appears on day one.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Calendar/CalendarRecurrenceTest.php::a transaction dated the first of the month is shown on day one'
 known_issues: []
 confidence: medium
 evidence:

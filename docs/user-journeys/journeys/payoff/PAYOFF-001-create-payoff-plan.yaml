@@ -39,7 +39,8 @@ postconditions:
 business_rules:
   - strategy is snowball, avalanche or custom; at least one debt is required
   - interest_rate 0-100; minimum_payment_cents and monthly_extra_payment_cents are non-negative integers
-  - each debt account must belong to the budget (findOrFail on budget accounts, 404 otherwise)
+  - each debt account must belong to the budget (scoped exists validation on store and preview)
+  - store runs in a DB transaction, so a failure keeps the existing active plan; preview's temporary rows are always rolled back
   - goal_type is savings, investment, purchase or other
   - index and preview need budget view; create and store need budget update
 scenarios:
@@ -84,11 +85,19 @@ scenarios:
     note: getDebtAccounts filters current_balance_cents > 0, so cards stored as negative balances (a convention BudgetServiceTest accepts) are hidden.
   - id: foreign_debt_account_rejected
     kind: authorization
-    description: A debt account from another budget is rejected on store (404) without side effects.
-    coverage: partial
+    description: A debt account from another budget is rejected on store and preview with a validation error, without side effects.
+    coverage: covered
     tests:
-      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::storing a plan with a debt account from another budget returns 404 and attaches no foreign debt
-    note: asserts the 404 and that no debt references the foreign account; "without side effects" is not asserted because the 404 happens after existing plans were already deactivated and the new plan row created (see known_issues).
+      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::storing a plan with a debt account from another budget is rejected and attaches no foreign debt
+      - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::storing a plan with a debt account from another budget is rejected and the active plan is untouched
+      - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::preview rejects a debt account from another budget
+  - id: failure_rolls_back
+    kind: recovery
+    description: A failure while storing a plan or computing a preview leaves the existing active plan intact and no temporary plan rows.
+    coverage: covered
+    tests:
+      - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::a failure while storing a plan rolls back and keeps the existing active plan
+      - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::preview leaves no temporary plans behind when the calculation fails
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot list, open the wizard for, store or preview plans in a budget they do not own (403).
@@ -99,8 +108,7 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot store a payoff plan in a budget they do not own
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot preview payoff strategies in a budget they do not own
 known_issues:
-  - store is not wrapped in a transaction; it deactivates existing plans and creates the plan before findOrFail on each debt account, so a foreign or invalid account leaves the budget with no active plan and a half-created plan.
-  - payoff-plans.preview persists temporary PayoffPlan/PayoffPlanDebt rows on a view-only endpoint and deletes them afterwards (no transaction; a failure leaves orphans), and its debts.*.account_id uses unscoped exists:accounts,id.
+  - payoff-plans.preview still writes temporary PayoffPlan/PayoffPlanDebt rows on a view-only endpoint (rolled back by the controller, but it needs a writable DB connection).
   - payoff-plans.preview is not called anywhere in resources/js; the wizard has no live strategy comparison.
   - starting_balance_cents is copied from the account's current balance at creation time and never refreshed.
 confidence: high

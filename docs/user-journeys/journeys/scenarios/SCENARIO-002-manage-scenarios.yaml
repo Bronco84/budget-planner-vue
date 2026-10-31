@@ -70,6 +70,20 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/ScenarioTest.php::scenario adjustments must have valid account from budget
+  - id: foreign_target_template_rejected
+    kind: authorization
+    description: An adjustment targeting a recurring template from another budget is rejected with 422 on store and update, with nothing persisted or replaced.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioCrossBudgetTest.php::creating a scenario targeting a recurring template from another budget is rejected and nothing is saved
+      - tests/Feature/ScenarioCrossBudgetTest.php::updating a scenario to target a recurring template from another budget is rejected and adjustments are unchanged
+  - id: server_error_is_generic
+    kind: recovery
+    description: A 500 from store/update/destroy/toggle returns a generic message without the exception text; the exception is logged.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioCrossBudgetTest.php::a scenario store failure returns a generic error without the exception text
+      - tests/Feature/ScenarioCrossBudgetTest.php::a scenario toggle failure returns a generic error without the exception text
   - id: invalid_color_or_type
     kind: validation
     description: A non-hex colour or unknown adjustment type fails validation.
@@ -93,10 +107,8 @@ scenarios:
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::scenario routes reject a cross-budget scenario with 404
 known_issues:
-  - adjustments.*.target_recurring_template_id is validated with an unscoped exists rule, so it can reference another budget's template (currently unused by projections).
   - Description cannot be cleared on update because null falls back to the existing value.
   - Scenario frequency options omit bimonthly, which recurring templates support.
-  - 500 responses include the raw exception message (error key) in JSON.
   - budgets.scenarios.show is not called by the frontend.
 confidence: high
 evidence:

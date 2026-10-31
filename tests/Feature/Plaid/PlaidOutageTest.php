@@ -104,7 +104,12 @@ test('a failed token exchange on import redirects back with an error and no conn
         ->from(route('plaid.discover', $this->budget))
         ->post(route('plaid.import', $this->budget), plaidOutageImportPayload())
         ->assertRedirect(route('plaid.discover', $this->budget))
-        ->assertSessionHas('error', fn (string $error) => str_starts_with($error, 'Failed to import accounts'));
+        ->assertSessionHas('error', match ($failure) {
+            'api_error' => 'Failed to import accounts. Please try again.',
+            'timeout' => "Couldn't reach the bank connection service, please try again.",
+        });
+
+    expect(session('error'))->not->toContain('expired')->not->toContain('cURL');
 
     expect($plaid->paths())->toBe(['/item/public_token/exchange'])
         ->and(PlaidConnection::count())->toBe(0)
@@ -128,7 +133,12 @@ test('a failed token exchange when linking one account redirects back with an er
             ],
         ])
         ->assertRedirect(route('plaid.link', [$this->budget, $account]))
-        ->assertSessionHas('error', fn (string $error) => str_starts_with($error, 'Failed to link account'));
+        ->assertSessionHas('error', match ($failure) {
+            'api_error' => 'Failed to link account. Please try again.',
+            'timeout' => "Couldn't reach the bank connection service, please try again.",
+        });
+
+    expect(session('error'))->not->toContain('expired')->not->toContain('cURL');
 
     expect($plaid->paths())->toBe(['/item/public_token/exchange'])
         ->and(PlaidConnection::count())->toBe(0)

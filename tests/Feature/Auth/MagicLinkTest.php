@@ -113,3 +113,27 @@ test('a magic link presented with a different email address is rejected', functi
 
     $this->assertGuest();
 });
+
+test('an unknown email gets the same response as a known one and no mail is sent', function () {
+    Mail::fake();
+    $user = User::factory()->create();
+
+    $known = $this->from(route('magic-link.request'))
+        ->post(route('magic-link.store'), ['email' => $user->email]);
+    $knownStatus = session('status');
+
+    $this->flushSession();
+
+    $unknown = $this->from(route('magic-link.request'))
+        ->post(route('magic-link.store'), ['email' => 'nobody-'.Str::random(8).'@example.com']);
+
+    $unknown->assertRedirect(route('magic-link.request'))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('status', $knownStatus);
+    expect($unknown->getStatusCode())->toBe($known->getStatusCode())
+        ->and($unknown->headers->get('Location'))->toBe($known->headers->get('Location'))
+        ->and(MagicLinkToken::count())->toBe(1);
+
+    Mail::assertSent(MagicLinkEmail::class, 1);
+    Mail::assertSent(MagicLinkEmail::class, fn ($mail) => $mail->hasTo($user->email));
+});

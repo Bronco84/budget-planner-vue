@@ -40,7 +40,9 @@ postconditions:
 business_rules:
   - analysis_period_months 3-24 (default 6), min_occurrences 2-10 (default 3), confidence_threshold 0-1 (default 0.6)
   - only unlinked transactions on the chosen account within the period are analysed
-  - the account must belong to the budget in the URL, otherwise JSON 403
+  - the account must belong to the budget in the URL (scoped exists validation, otherwise a validation error)
+  - pattern transactions linked on create-templates are limited to the budget's own transactions
+  - unexpected failures flash a generic "Analysis failed" / "Template creation failed" message; the exception is logged
   - every action is guarded by can:view,budget (including template creation)
 scenarios:
   - id: detects_monthly_pattern
@@ -91,17 +93,30 @@ scenarios:
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot analyze another users transactions
   - id: foreign_account_rejected
     kind: authorization
-    description: An account from another budget passed to analyze or create-templates on the user's own budget is rejected with 403.
-    coverage: uncovered
+    description: An account from another budget passed to analyze or create-templates on the user's own budget is rejected with a validation error and nothing is created.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::analyzing an account from another budget is rejected with a validation error
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::creating templates from analysis with an account from another budget is rejected and nothing is created
+  - id: foreign_pattern_transactions_not_linked
+    kind: authorization
+    description: Transaction ids from another budget inside selected_patterns are not linked to the new template; the budget's own ones are.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::creating templates from analysis does not link transactions from another budget
+  - id: failure_message_is_generic
+    kind: recovery
+    description: An exception during analysis or template creation flashes a generic error without the exception text.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::analysis failures show a generic message instead of the exception text
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::template creation failures show a generic message instead of the exception text
 known_issues:
   - prepareTemplateData (confirmation path) writes bimonthly_first_day/bimonthly_second_day, which are not fillable columns; first_day_of_month is silently dropped, so bimonthly templates fall back to day 1 in projections.
   - Confirmation-path templates store average_amount in dollars while min_amount/max_amount are stored in cents; the legacy path stores average in dollars and min/max from amount_stats, so units are inconsistent.
   - Templates created via the confirmation modal never link the transactions that formed the pattern (linkMatchingTransactionsToTemplate returns 0), so the same transactions remain unlinked and reappear in the next analysis.
-  - The legacy pattern path links transaction ids taken from the request payload (selected_patterns[].transactions[].id) with no budget filter, allowing foreign transactions to be linked.
   - selected_patterns items are not validated; failures become per-item errors stored in the template_creation_result session key, but the redirect always uses the success flash (with "Some templates could not be created" text), so partial failures are easy to miss.
   - Template creation is a write action guarded only by the budget view ability.
-  - The 403 for a foreign account is returned as JSON to an Inertia request, which renders as an error modal rather than a validation message.
-  - Exception messages are echoed to the user in the "Analysis failed:" / "Template creation failed:" flash.
 confidence: high
 evidence:
   - app/Http/Controllers/RecurringTransactionAnalysisController.php

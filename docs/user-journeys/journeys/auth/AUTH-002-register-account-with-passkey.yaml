@@ -79,6 +79,12 @@ scenarios:
     kind: edge
     description: A failed attestation returns an error response and no credential or trusted device is stored.
     coverage: uncovered
+  - id: registration_failure_message_is_generic
+    kind: recovery
+    description: An exception while saving the passkey returns JSON 500 "Failed to register passkey. Please try again."; the raw exception is only logged.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/PasskeyRegistrationErrorTest.php::a passkey registration failure returns a generic error without the raw exception
   - id: register_options_require_auth
     kind: authentication
     description: A guest calling webauthn/register/options or webauthn/register is rejected (401 JSON) rather than registering a passkey.
@@ -88,7 +94,6 @@ scenarios:
     description: An authenticated user visiting /register is redirected away by the guest middleware.
     coverage: uncovered
 known_issues:
-  - "WebAuthnRegisterController::register catches every exception and returns 500 with the raw exception message appended to 'Failed to register passkey' in the JSON body."
   - PasskeyRegister.vue does not render the flashed status ("Account created! Now register your passkey.") from registerStore.
   - Registration allowlist is a hardcoded email literal in the controller rather than configuration.
 confidence: high

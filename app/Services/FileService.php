@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\FileValidationException;
 use App\Models\Budget;
 use App\Models\File;
 use App\Models\FileAttachment;
@@ -27,8 +28,9 @@ class FileService
         // Generate hash of file content
         $hash = $this->generateFileHash($uploadedFile);
 
-        // Check if file already exists
-        $existingFile = File::where('hash', $hash)->first();
+        // Reuse this user's own record for identical content. Never another
+        // user's: the record carries their original filename.
+        $existingFile = File::where('hash', $hash)->where('uploaded_by', $userId)->first();
 
         if ($existingFile) {
             // File already exists, just create attachment
@@ -269,13 +271,13 @@ class FileService
     /**
      * Validate uploaded file.
      *
-     * @throws \Exception
+     * @throws FileValidationException
      */
     private function validateFile(UploadedFile $file): void
     {
         // Check file size (max 10MB)
         if ($file->getSize() > 10 * 1024 * 1024) {
-            throw new \Exception('File size exceeds 10MB limit');
+            throw new FileValidationException('File size exceeds 10MB limit');
         }
 
         // Check mime type (allow common document and image types)
@@ -296,7 +298,7 @@ class FileService
 
         $mimeType = $file->getMimeType();
         if (! in_array($mimeType, $allowedMimeTypes)) {
-            throw new \Exception('File type not allowed');
+            throw new FileValidationException('File type not allowed');
         }
 
         // Validate extension matches MIME type (additional security layer)
@@ -318,7 +320,7 @@ class FileService
 
         $allowedExtensions = $mimeToExtension[$mimeType] ?? [];
         if (! in_array($extension, $allowedExtensions)) {
-            throw new \Exception('File extension does not match file type. Expected: '.implode(', ', $allowedExtensions));
+            throw new FileValidationException('File extension does not match file type. Expected: '.implode(', ', $allowedExtensions));
         }
     }
 

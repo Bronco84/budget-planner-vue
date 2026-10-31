@@ -21,6 +21,8 @@ class ChatController extends Controller
             'budget_id' => 'nullable|integer|exists:budgets,id',
         ]);
 
+        $this->authorizeConversation($request, $validated['conversation_id'] ?? null);
+
         $response = $this->chatService->processMessage(
             user: $request->user(),
             message: $validated['message'],
@@ -43,6 +45,8 @@ class ChatController extends Controller
             'budget_id' => 'nullable|integer|exists:budgets,id',
         ]);
 
+        $this->authorizeConversation($request, $validated['conversation_id'] ?? null);
+
         return $this->chatService->processMessageStream(
             user: $request->user(),
             message: $validated['message'],
@@ -51,20 +55,24 @@ class ChatController extends Controller
         );
     }
 
+    /**
+     * Acknowledge the end of a stream. The assistant reply is persisted
+     * server-side while streaming, so any client-supplied text is ignored:
+     * accepting it would let a user forge assistant turns that are replayed
+     * to the model as conversation history.
+     */
     public function streamComplete(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'message' => 'required|string',
             'conversation_id' => 'required|integer|exists:chat_conversations,id',
         ]);
 
-        $result = $this->chatService->saveStreamedMessage(
-            user: $request->user(),
-            conversationId: $validated['conversation_id'],
-            message: $validated['message']
-        );
+        $this->authorizeConversation($request, $validated['conversation_id']);
 
-        return response()->json($result);
+        return response()->json([
+            'success' => true,
+            'conversation_id' => $validated['conversation_id'],
+        ]);
     }
 
     public function conversations(Request $request): JsonResponse
@@ -129,5 +137,15 @@ class ChatController extends Controller
             'message' => "Successfully deleted {$deletedCount} conversation(s)",
             'deleted_count' => $deletedCount,
         ]);
+    }
+
+    /**
+     * 404 when a supplied conversation id does not belong to the current user.
+     */
+    protected function authorizeConversation(Request $request, ?int $conversationId): void
+    {
+        if ($conversationId !== null) {
+            ChatConversation::where('user_id', $request->user()->id)->findOrFail($conversationId);
+        }
     }
 }

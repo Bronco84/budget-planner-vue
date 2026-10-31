@@ -31,21 +31,23 @@ class MagicLinkController extends Controller
     }
 
     /**
-     * Send a magic link to the user's email.
+     * Send a magic link to the user's email. The response is identical whether
+     * or not the address has an account, so the form cannot be used to
+     * enumerate registered emails.
      */
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
-            'email' => 'required|email|exists:users,email',
+        $validated = $request->validate([
+            'email' => 'required|email',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('email', $validated['email'])->first();
 
-        if ($user && $this->magicLinkService->sendMagicLink($user)) {
-            return back()->with('status', 'Magic link sent to your email!');
+        if ($user) {
+            $this->magicLinkService->sendMagicLink($user);
         }
 
-        return back()->withErrors(['email' => 'Failed to send magic link. Please try again.']);
+        return back()->with('status', 'If an account exists for that email, a sign-in link is on its way.');
     }
 
     /**

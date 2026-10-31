@@ -29,7 +29,7 @@ steps:
   - action: follow "Send me a magic link" from the login page (GET /magic-link)
     expected: Auth/MagicLinkRequest page rendered
   - action: submit email (POST /magic-link)
-    expected: 64-char token generated, sha256 hash stored with 15 min expiry, email sent, back with status "Magic link sent to your email!"
+    expected: 64-char token generated, sha256 hash stored with 15 min expiry, email sent, back with status "If an account exists for that email, a sign-in link is on its way."
   - action: open the link (GET /magic-link/authenticate?token=..&email=..)
     expected: token marked used, user logged in, session regenerated, auth_method=magic_link stored in session
   - action: post-login redirect
@@ -38,7 +38,7 @@ postconditions:
   - user is authenticated for the current session only
   - the magic link token has used_at set
 business_rules:
-  - email must exist in users (exists:users,email)
+  - email is validated for format only; the response is identical whether or not an account exists, and a link is only generated and mailed for an existing user
   - POST /magic-link throttled 6/min; GET /magic-link/authenticate throttled 10/min
   - expiry configurable via auth.magic_link_expiry_minutes (default 15)
   - magic-link sign-in does not create a TrustedDevice
@@ -68,8 +68,10 @@ scenarios:
       - 'tests/Feature/Auth/MagicLinkTest.php::a valid magic link signs in a user without a passkey and sends them to passkey registration'
   - id: unknown_email_rejected
     kind: validation
-    description: An email that does not belong to any user fails validation and no mail is sent.
-    coverage: uncovered
+    description: An email that does not belong to any user gets the same success response as a known one, but no token is stored and no mail is sent (no account enumeration).
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::an unknown email gets the same response as a known one and no mail is sent'
   - id: request_throttled
     kind: edge
     description: More than 6 link requests per minute are throttled.
@@ -87,8 +89,7 @@ scenarios:
     description: Magic link routes are guest-only; an authenticated user is redirected to the dashboard.
     coverage: uncovered
 known_issues:
-  - "exists:users,email on POST /magic-link reveals whether an account exists for an email (account enumeration)."
-  - MagicLinkController::store treats a mail transport exception as an uncaught 500 rather than the "Failed to send magic link" error branch (sendMagicLink returns a model, never false).
+  - a mail transport exception in MagicLinkController::store is an uncaught 500, and the mail is sent synchronously only for existing accounts, so errors and response timing can still hint whether an email is registered.
 confidence: high
 evidence:
   - routes/auth.php guest group

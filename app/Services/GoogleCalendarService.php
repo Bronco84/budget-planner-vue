@@ -26,11 +26,12 @@ class GoogleCalendarService
     }
 
     /**
-     * Get the authorization URL for Google OAuth.
+     * Get the authorization URL for Google OAuth. The state must be a random
+     * nonce the caller stores and verifies on the callback (OAuth CSRF).
      */
-    public function getAuthorizationUrl(User $user): string
+    public function getAuthorizationUrl(User $user, string $state): string
     {
-        $this->client->setState(json_encode(['user_id' => $user->id]));
+        $this->client->setState($state);
 
         return $this->client->createAuthUrl();
     }

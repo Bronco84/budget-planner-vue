@@ -72,9 +72,15 @@ scenarios:
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction template routes reject another users budget with 403
     note: only the edit (GET) route is asserted; update, duplicate and destroy are not tested for another user's budget.
+  - id: foreign_account_rejected
+    kind: authorization
+    description: Updating account_id / linked_credit_card_account_id to an account from another budget is rejected with a validation error and the template is unchanged.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::updating a template to reference accounts from another budget is rejected and the template is unchanged
 known_issues:
   - duplicate uses replicate() on the template only; matching rules are not copied, so the copy silently stops matching transactions that the original matched by rules.
-  - update has the same unscoped exists:accounts,id validation and float cents truncation as store (see RECUR-001).
+  - update has the same float cents truncation as store (see RECUR-001).
   - rules created through the update form get no priority value (store assigns index+1, update does not).
   - Delete relies on the transactions FK to unlink linked transactions; there is no confirmation of how many transactions lose their link.
 confidence: high

@@ -37,7 +37,10 @@ scenarios:
   - id: review_and_link
     kind: happy_path
     description: Owner reviews suggested matches and links a selection; flash reports the linked count.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::bulk linking links the selected transactions of the budget
+    note: asserts the link-transactions POST only; the find-matching review page is not tested.
   - id: no_templates_or_matches
     kind: empty_state
     description: A budget with no templates or no matching transactions shows the empty state.
@@ -56,11 +59,12 @@ scenarios:
     coverage: uncovered
   - id: foreign_ids_rejected
     kind: authorization
-    description: Template or transaction ids from another budget in the selections payload must be rejected.
-    coverage: uncovered
-    note: currently not enforced (see known_issues).
+    description: Template or transaction ids from another budget in the selections payload are rejected with a validation error and nothing is linked.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::bulk linking rejects transaction ids from another budget and links nothing
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::bulk linking rejects a template from another budget and links nothing
 known_issues:
-  - linkSelectedTransactions loads templates and transactions with find() and never checks they belong to the budget in the URL; validation is only exists:..., so an owner of any budget can link another user's unlinked transactions to their own template (IDOR that modifies foreign rows), and then read them via rules.linked.
   - Matching description fuzzy threshold (70% similar_text) runs every template against every unlinked transaction in PHP (O(templates x transactions)), which can be slow on large budgets.
 confidence: high
 evidence:

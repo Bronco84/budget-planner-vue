@@ -190,14 +190,14 @@ test('storing a plan rejects invalid wizard input without creating anything', fu
     'APR above 100' => [fn ($debt) => ['debts' => [array_merge($debt, ['interest_rate' => 100.5])]], 'debts.0.interest_rate'],
 ]);
 
-test('storing a plan with a debt account from another budget returns 404 and attaches no foreign debt', function () {
+test('storing a plan with a debt account from another budget is rejected and attaches no foreign debt', function () {
     $foreignCard = Account::factory()->creditCard()->create(['current_balance_cents' => 50000]);
 
     $this->actingAs($this->user)
         ->post(route('payoff-plans.store', $this->budget), lifecyclePlanPayload([
             'debts' => [['account_id' => $foreignCard->id, 'interest_rate' => 10, 'minimum_payment_cents' => 5000]],
         ]))
-        ->assertNotFound();
+        ->assertSessionHasErrors('debts.0.account_id');
 
     expect(PayoffPlanDebt::where('account_id', $foreignCard->id)->exists())->toBeFalse();
 });

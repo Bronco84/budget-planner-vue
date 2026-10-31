@@ -7,6 +7,8 @@ use App\Models\Scenario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class ScenarioController extends Controller
 {
@@ -55,7 +57,7 @@ class ScenarioController extends Controller
             'adjustments.*.day_of_week' => 'nullable|integer|min:0|max:6',
             'adjustments.*.day_of_month' => 'nullable|integer|min:1|max:31',
             'adjustments.*.description' => 'nullable|string',
-            'adjustments.*.target_recurring_template_id' => 'nullable|exists:recurring_transaction_templates,id',
+            'adjustments.*.target_recurring_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);
 
         // Validate that all accounts belong to this budget
@@ -96,9 +98,10 @@ class ScenarioController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
+            Log::error('Failed to create scenario', ['budget_id' => $budget->id, 'exception' => $e]);
+
             return response()->json([
                 'message' => 'Failed to create scenario.',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -146,7 +149,7 @@ class ScenarioController extends Controller
             'adjustments.*.day_of_week' => 'nullable|integer|min:0|max:6',
             'adjustments.*.day_of_month' => 'nullable|integer|min:1|max:31',
             'adjustments.*.description' => 'nullable|string',
-            'adjustments.*.target_recurring_template_id' => 'nullable|exists:recurring_transaction_templates,id',
+            'adjustments.*.target_recurring_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);
 
         // Validate that all accounts belong to this budget (if adjustments provided)
@@ -195,9 +198,10 @@ class ScenarioController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
+            Log::error('Failed to update scenario', ['budget_id' => $budget->id, 'exception' => $e]);
+
             return response()->json([
                 'message' => 'Failed to update scenario.',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -219,9 +223,10 @@ class ScenarioController extends Controller
                 'message' => 'Scenario deleted successfully.',
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to delete scenario', ['budget_id' => $budget->id, 'exception' => $e]);
+
             return response()->json([
                 'message' => 'Failed to delete scenario.',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -244,9 +249,10 @@ class ScenarioController extends Controller
                 'is_active' => $isActive,
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to toggle scenario', ['budget_id' => $budget->id, 'exception' => $e]);
+
             return response()->json([
                 'message' => 'Failed to toggle scenario.',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }

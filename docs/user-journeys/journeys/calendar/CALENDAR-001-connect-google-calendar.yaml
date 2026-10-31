@@ -28,15 +28,17 @@ steps:
   - action: open /calendar/connections
     expected: Calendar/Connections rendered with the user's connections and event counts
   - action: click Connect Google Calendar (GET /calendar/connect/google)
-    expected: 302 to Google with state containing the user id
+    expected: a random state nonce is stored in the session and the user is 302'd to Google with it as state
   - action: approve consent; Google calls /calendar/google/callback?code=...
-    expected: connection created/updated for calendar 'primary', events synced, redirect to connections index
+    expected: state checked against the session nonce (hash_equals, single use); connection created/updated for calendar 'primary', events synced, redirect to connections index with a 'message' flash
 postconditions:
   - an active CalendarConnection with access and refresh tokens exists for the user
   - CalendarEvents for the sync window are stored
 business_rules:
   - one connection per (user, calendar_id); reconnecting updates tokens in place
   - the callback is behind auth, so the user must still be logged in when Google redirects back
+  - the callback is rejected without a token exchange unless its state matches the nonce stored at connect; the nonce is cleared after any callback
+  - Google client errors are logged; the user only sees a generic failure message
 scenarios:
   - id: connections_page_renders
     kind: happy_path
@@ -45,12 +47,16 @@ scenarios:
   - id: redirect_to_google
     kind: happy_path
     description: Connect redirects away to Google's authorization URL.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::connecting stores a random oauth state in the session and sends it to google
   - id: callback_creates_connection
     kind: happy_path
     description: A successful callback stores the connection and performs the initial sync.
-    coverage: uncovered
-    note: requires faking the Google client; GoogleCalendarService constructs it internally.
+    coverage: partial
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback with a matching state stores the connection and flashes a visible message
+    note: GoogleCalendarService is mocked, so the token exchange, calendar lookup and initial sync themselves are not exercised.
   - id: reconnect_updates_existing
     kind: alternate
     description: Reconnecting the same calendar updates tokens on the existing connection instead of duplicating it.
@@ -67,17 +73,19 @@ scenarios:
       - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback without a code or error redirects to connections with an error
   - id: token_exchange_failure
     kind: integration
-    description: An invalid/expired code or Google API failure redirects to connections with "Failed to connect calendar".
-    coverage: uncovered
+    description: An invalid/expired code or Google API failure redirects to connections with a generic "Failed to connect calendar" error (no raw exception text) and logs the cause.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::a failed token exchange shows a generic error and logs the real cause
   - id: state_not_verified
     kind: authorization
-    description: The callback should bind the OAuth response to the user who started it (state check).
-    coverage: uncovered
-    note: state is set but never verified, see known_issues.
+    description: A callback whose state is missing or does not match the session nonce is rejected with an error flash and no token exchange.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback with a mismatched state is rejected without a token exchange
+      - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback without a stored or returned state is rejected without a token exchange
 known_issues:
-  - the OAuth state (json user_id) is never verified in the callback and is not a random nonce, so the flow is open to OAuth CSRF (an attacker's code could attach their calendar to the victim's account).
-  - the controller flashes under the 'success' key, which HandleInertiaRequests does not share, and Calendar/Connections.vue renders no flash at all, so success and error (including consent denial) are invisible to the user.
-  - error flashes include raw exception messages from the Google client.
+  - Calendar/Connections.vue renders no flash at all, so success and error messages (including consent denial) are still invisible to the user even though they are now flashed under shared keys (message/error).
 confidence: high
 evidence:
   - app/Http/Controllers/CalendarConnectionController.php index(), connect(), callback()

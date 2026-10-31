@@ -79,11 +79,17 @@ class File extends Model
 
     /**
      * Delete the file from S3 if no other attachments reference it.
+     *
+     * The S3 object is keyed by content hash and may be shared with another
+     * user's File record; in that case it is kept and true is returned so the
+     * caller can still remove this record.
      */
     public function deleteFromS3IfUnused(): bool
     {
         if ($this->attachments()->count() === 0) {
-            return Storage::disk('s3')->delete($this->hash);
+            $sharedWithAnotherRecord = static::where('hash', $this->hash)->whereKeyNot($this->getKey())->exists();
+
+            return $sharedWithAnotherRecord || Storage::disk('s3')->delete($this->hash);
         }
 
         return false;

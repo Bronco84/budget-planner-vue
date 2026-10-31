@@ -280,7 +280,9 @@ test('a failed public token exchange redirects back with an error and creates no
         ->from(route('plaid.discover', $this->budget))
         ->post(route('plaid.import', $this->budget), plaidImportPayload())
         ->assertRedirect(route('plaid.discover', $this->budget))
-        ->assertSessionHas('error', fn (string $error) => str_starts_with($error, 'Failed to import accounts'));
+        ->assertSessionHas('error', 'Failed to import accounts. Please try again.');
+
+    expect(session('error'))->not->toContain('provided public token is expired');
 
     expect($this->plaid->paths())->toBe(['/item/public_token/exchange'])
         ->and(PlaidConnection::count())->toBe(0)

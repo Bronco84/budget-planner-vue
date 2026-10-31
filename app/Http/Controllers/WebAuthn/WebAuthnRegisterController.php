@@ -4,6 +4,7 @@ namespace App\Http\Controllers\WebAuthn;
 
 use App\Services\DeviceTokenService;
 use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
@@ -39,7 +40,7 @@ class WebAuthnRegisterController
     /**
      * Registers a device for further WebAuthn authentication.
      */
-    public function register(AttestedRequest $request): Response
+    public function register(AttestedRequest $request): Response|JsonResponse
     {
         try {
             // Ensure user is authenticated
@@ -89,12 +90,11 @@ class WebAuthnRegisterController
         } catch (\Exception $e) {
             \Log::error('Passkey registration failed', [
                 'user_id' => Auth::id(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             return response()->json([
-                'message' => 'Failed to register passkey: '.$e->getMessage(),
+                'message' => 'Failed to register passkey. Please try again.',
             ], 500);
         }
     }

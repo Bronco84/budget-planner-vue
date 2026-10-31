@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\FileValidationException;
 use App\Models\Budget;
 use App\Models\FileAttachment;
 use App\Models\Transaction;
@@ -10,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class FileController extends Controller
@@ -54,8 +56,12 @@ class FileController extends Controller
                     'created_at' => $attachment->created_at,
                 ],
             ], 201);
-        } catch (\Exception $e) {
+        } catch (FileValidationException $e) {
             return response()->json(['error' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Log::error('File upload failed', ['user_id' => Auth::id(), 'exception' => $e]);
+
+            return response()->json(['error' => 'Failed to upload file. Please try again.'], 400);
         }
     }
 
@@ -97,8 +103,12 @@ class FileController extends Controller
                     'created_at' => $attachment->created_at,
                 ],
             ], 201);
-        } catch (\Exception $e) {
+        } catch (FileValidationException $e) {
             return response()->json(['error' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Log::error('File upload failed', ['user_id' => Auth::id(), 'exception' => $e]);
+
+            return response()->json(['error' => 'Failed to upload file. Please try again.'], 400);
         }
     }
 
@@ -236,7 +246,13 @@ class FileController extends Controller
 
             return response()->json(['message' => 'File attachment deleted successfully']);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            Log::error('File attachment delete failed', [
+                'user_id' => Auth::id(),
+                'attachment_id' => $attachment->id,
+                'exception' => $e,
+            ]);
+
+            return response()->json(['error' => 'Failed to delete file. Please try again.'], 500);
         }
     }
 

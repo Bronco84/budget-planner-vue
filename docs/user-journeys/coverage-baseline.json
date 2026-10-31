@@ -61,6 +61,7 @@
             "invalid_or_duplicate_email_rejected": "uncovered",
             "registration_throttled": "uncovered",
             "attestation_failure_surfaces_error": "uncovered",
+            "registration_failure_message_is_generic": "covered",
             "register_options_require_auth": "uncovered",
             "authenticated_user_redirected_from_register": "uncovered"
         },
@@ -69,7 +70,7 @@
             "link_emailed": "covered",
             "link_signs_in_user_with_passkey": "covered",
             "link_signs_in_user_without_passkey": "covered",
-            "unknown_email_rejected": "uncovered",
+            "unknown_email_rejected": "covered",
             "request_throttled": "uncovered",
             "no_trusted_device_created": "uncovered",
             "email_delivery": "uncovered",
@@ -83,7 +84,8 @@
             "email_mismatch_rejected": "covered"
         },
         "AUTH-005": {
-            "valid_cookie_auto_logs_in": "uncovered",
+            "valid_cookie_auto_logs_in": "covered",
+            "auto_login_regenerates_session": "covered",
             "auto_logged_in_user_skips_login_page": "uncovered",
             "expired_device_ignored": "uncovered",
             "fingerprint_mismatch_ignored": "uncovered",
@@ -189,13 +191,13 @@
         },
         "CALENDAR-001": {
             "connections_page_renders": "uncovered",
-            "redirect_to_google": "uncovered",
-            "callback_creates_connection": "uncovered",
+            "redirect_to_google": "covered",
+            "callback_creates_connection": "partial",
             "reconnect_updates_existing": "uncovered",
             "consent_denied": "uncovered",
             "callback_without_code": "covered",
-            "token_exchange_failure": "uncovered",
-            "state_not_verified": "uncovered"
+            "token_exchange_failure": "covered",
+            "state_not_verified": "covered"
         },
         "CALENDAR-002": {
             "sync_connection": "covered",
@@ -234,8 +236,10 @@
         },
         "CHAT-001": {
             "send_returns_reply": "covered",
-            "stream_returns_events": "uncovered",
-            "stream_complete_saves_reply": "uncovered",
+            "stream_returns_events": "partial",
+            "stream_complete_saves_reply": "covered",
+            "stream_complete_ignores_client_text": "covered",
+            "stream_reply_validated": "covered",
             "tools_built_for_budget": "covered",
             "no_budget_no_tools": "partial",
             "transaction_window_clamped": "covered",
@@ -243,7 +247,7 @@
             "message_validation": "uncovered",
             "provider_error_safe_message": "uncovered",
             "stream_error_ui_recovery": "uncovered",
-            "other_users_conversation": "uncovered",
+            "other_users_conversation": "covered",
             "other_users_budget_tools": "uncovered"
         },
         "CHAT-002": {
@@ -254,7 +258,8 @@
             "route_throttle": "uncovered",
             "auto_ban_after_offenses": "uncovered",
             "banned_user_refused": "uncovered",
-            "stream_refusal_visible": "uncovered"
+            "stream_refusal_visible": "uncovered",
+            "blocked_foreign_conversation": "covered"
         },
         "CHAT-003": {
             "list_conversations": "uncovered",
@@ -266,12 +271,14 @@
             "other_users_conversation_hidden": "uncovered"
         },
         "FILE-001": {
-            "upload_to_transaction": "uncovered",
-            "list_attachments": "uncovered",
-            "download_and_delete": "uncovered",
-            "duplicate_content_reused": "uncovered",
+            "upload_to_transaction": "covered",
+            "list_attachments": "covered",
+            "download_and_delete": "covered",
+            "duplicate_content_reused": "covered",
+            "cross_user_duplicate_content_isolated": "covered",
             "invalid_file_rejected": "partial",
-            "s3_failure_returns_error": "uncovered",
+            "s3_failure_returns_error": "covered",
+            "delete_failure_returns_generic_error": "covered",
             "other_users_transaction_files_forbidden": "uncovered"
         },
         "FILE-002": {
@@ -292,7 +299,8 @@
             "no_debt_accounts": "covered",
             "wizard_validation": "covered",
             "negative_liability_balance_excluded": "uncovered",
-            "foreign_debt_account_rejected": "partial",
+            "foreign_debt_account_rejected": "covered",
+            "failure_rolls_back": "covered",
             "cross_user_budget_forbidden": "covered"
         },
         "PAYOFF-002": {
@@ -323,6 +331,7 @@
             "institution_lookup_fallback": "partial",
             "link_token_unavailable": "partial",
             "import_failure_redirects_back": "partial",
+            "import_failure_message_is_user_safe": "covered",
             "cross_user_budget_denied": "covered"
         },
         "PLAID-002": {
@@ -334,7 +343,8 @@
             "store_validation": "uncovered",
             "account_missing_from_plaid_response": "uncovered",
             "link_form_cross_budget_account": "covered",
-            "store_cross_user_denied": "uncovered"
+            "store_cross_user_denied": "uncovered",
+            "link_failure_message_is_user_safe": "covered"
         },
         "PLAID-003": {
             "sync_imports_transactions": "covered",
@@ -365,8 +375,8 @@
             "upgrade_token_not_linked": "uncovered",
             "upgrade_token_missing_access_token": "uncovered",
             "update_connection_validation": "uncovered",
-            "upgrade_token_plaid_failure": "uncovered",
-            "exchange_failure_on_update": "uncovered",
+            "upgrade_token_plaid_failure": "partial",
+            "exchange_failure_on_update": "covered",
             "cross_user_denied": "covered",
             "cross_budget_account_not_found": "covered"
         },
@@ -406,6 +416,7 @@
             "unconfigured_plaid": "covered",
             "link_timeout": "partial",
             "exchange_failure_redirects": "covered",
+            "exchange_timeout_message": "covered",
             "sync_failure_reported": "uncovered",
             "authorization": "not_applicable"
         },
@@ -481,7 +492,7 @@
             "amount_required_unless_dynamic": "uncovered",
             "cents_conversion_precision": "uncovered",
             "cross_user_budget_forbidden": "uncovered",
-            "foreign_account_rejected": "uncovered"
+            "foreign_account_rejected": "covered"
         },
         "RECUR-002": {
             "edit_page_renders": "uncovered",
@@ -490,7 +501,8 @@
             "delete_template": "uncovered",
             "update_validation": "uncovered",
             "cross_budget_template_not_found": "covered",
-            "cross_user_budget_forbidden": "partial"
+            "cross_user_budget_forbidden": "partial",
+            "foreign_account_rejected": "covered"
         },
         "RECUR-003": {
             "add_rule_and_apply": "partial",
@@ -512,12 +524,12 @@
             "cross_user_budget_forbidden": "uncovered"
         },
         "RECUR-005": {
-            "review_and_link": "uncovered",
+            "review_and_link": "partial",
             "no_templates_or_matches": "uncovered",
             "already_linked_skipped": "uncovered",
             "selections_required": "uncovered",
             "cross_user_budget_forbidden": "uncovered",
-            "foreign_ids_rejected": "uncovered"
+            "foreign_ids_rejected": "covered"
         },
         "RECUR-006": {
             "detects_monthly_pattern": "covered",
@@ -529,7 +541,9 @@
             "bimonthly_confirmation": "uncovered",
             "refresh_fallback_redirects": "uncovered",
             "cross_user_budget_forbidden": "covered",
-            "foreign_account_rejected": "uncovered"
+            "foreign_account_rejected": "covered",
+            "foreign_pattern_transactions_not_linked": "covered",
+            "failure_message_is_generic": "covered"
         },
         "REPORT-001": {
             "dashboard_renders": "uncovered",
@@ -568,6 +582,8 @@
             "update_scenario": "partial",
             "delete_scenario": "covered",
             "foreign_account_rejected": "covered",
+            "foreign_target_template_rejected": "covered",
+            "server_error_is_generic": "covered",
             "invalid_color_or_type": "uncovered",
             "clear_description": "uncovered",
             "cross_user_forbidden": "partial",

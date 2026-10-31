@@ -39,6 +39,7 @@ postconditions:
   - TrustedDevice.last_used_at updated
 business_rules:
   - auto-login is skipped when already authenticated and on the logout route
+  - auto-login regenerates the session id (Laravel's SessionGuard::login)
   - expired devices (expires_at in the past) are ignored
   - the cookie is secure, httpOnly, SameSite=Lax, lifetime auth.device_remember_days (default 90)
   - "/dashboard is auth-only and simply redirects to budgets.index"
@@ -46,7 +47,17 @@ scenarios:
   - id: valid_cookie_auto_logs_in
     kind: happy_path
     description: A request carrying a valid device cookie with a matching fingerprint is authenticated as the device owner.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceAutoLoginTest.php::a trusted device auto login regenerates the session id
+  - id: auto_login_regenerates_session
+    kind: authentication
+    description: Auto-login issues a new session id (no session fixation); a guest request without a device cookie keeps its id.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceAutoLoginTest.php::a trusted device auto login regenerates the session id
+      - tests/Feature/Auth/TrustedDeviceAutoLoginTest.php::a guest request without a device cookie keeps its session id
+    note: regeneration comes from SessionGuard::login (used by loginUsingId), which calls session()->regenerate(true).
   - id: auto_logged_in_user_skips_login_page
     kind: happy_path
     description: An auto-logged-in visit to /login redirects through /dashboard to budgets.index.
@@ -76,7 +87,6 @@ scenarios:
 known_issues:
   - "Suspected: the fingerprint includes the request Accept header. Devices are created on webauthn/login (axios sends Accept: application/json) or webauthn/register (fetch, Accept: application/json), but full page loads send Accept: text/html,..., so the fingerprint never matches on a normal visit. Auto-login then only fires on JSON requests such as webauthn/login/options."
   - DeviceTokenService::verifyDeviceToken loads and decrypts every valid TrustedDevice for every user on each guest request with a cookie (O(n) scan, no indexed lookup).
-  - RememberDevice calls Auth::loginUsingId without regenerating the session ID.
 confidence: medium
 evidence:
   - bootstrap/app.php web middleware stack (RememberDevice before EnsureUserHasPasskey)

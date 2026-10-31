@@ -580,7 +580,9 @@ class RecurringTransactionAnalysisService
 
         $transactionIds = collect($patternData['transactions'])->pluck('id')->toArray();
 
+        // Ids come from the request payload, so only link this budget's transactions.
         return Transaction::whereIn('id', $transactionIds)
+            ->where('budget_id', $template->budget_id)
             ->update(['recurring_transaction_template_id' => $template->id]);
     }
 

@@ -86,11 +86,12 @@ scenarios:
     coverage: uncovered
   - id: foreign_account_rejected
     kind: authorization
-    description: account_id / linked_credit_card_account_id belonging to another budget must be rejected.
-    coverage: uncovered
-    note: currently not enforced; validation is only exists:accounts,id (see known_issues).
+    description: account_id / linked_credit_card_account_id belonging to another budget is rejected with a validation error and no template is saved.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::storing a template with an account from another budget is rejected and nothing is saved
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::storing a template with an autopay card from another budget is rejected and nothing is saved
 known_issues:
-  - store validates account_id and linked_credit_card_account_id with an unscoped exists:accounts,id rule, so a template can reference another user's account; RecurringTransactionService::projectTransactions selects templates by account_id only, so such a template would inject projected transactions into the other user's account projections.
   - getArr converts dollars with (int) ($amount * 100), which truncates floating-point error (e.g. 19.99 becomes 1998 cents, 0.29 becomes 28).
   - index logs the full first account record to the info log on every request (leftover debug logging).
 confidence: high

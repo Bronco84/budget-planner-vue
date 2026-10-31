@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -113,8 +114,8 @@ class RecurringTransactionController extends Controller
             'description' => 'required|string|max:255',
             'friendly_label' => 'nullable|string|max:255',
             'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
-            'account_id' => 'required|exists:accounts,id',
-            'linked_credit_card_account_id' => 'nullable|exists:accounts,id',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
+            'linked_credit_card_account_id' => ['nullable', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'category' => 'required|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'start_date' => 'required|date',
@@ -277,8 +278,8 @@ class RecurringTransactionController extends Controller
             'description' => 'required|string|max:255',
             'friendly_label' => 'nullable|string|max:255',
             'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
-            'account_id' => 'required|exists:accounts,id',
-            'linked_credit_card_account_id' => 'nullable|exists:accounts,id',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
+            'linked_credit_card_account_id' => ['nullable', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'category' => 'required|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'start_date' => 'required|date',
@@ -650,9 +651,9 @@ class RecurringTransactionController extends Controller
 
         $validated = $request->validate([
             'selections' => 'required|array',
-            'selections.*.template_id' => 'required|integer|exists:recurring_transaction_templates,id',
+            'selections.*.template_id' => ['required', 'integer', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
             'selections.*.transaction_ids' => 'required|array',
-            'selections.*.transaction_ids.*' => 'integer|exists:transactions,id',
+            'selections.*.transaction_ids.*' => ['integer', Rule::exists('transactions', 'id')->where('budget_id', $budget->id)],
         ]);
 
         $result = $this->recurringTransactionService->linkSelectedTransactions($validated['selections']);

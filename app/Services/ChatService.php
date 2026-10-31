@@ -115,7 +115,7 @@ class ChatService
             $userId = $user->id;
 
             // Create a simulated streaming response
-            return response()->stream(function () use ($messages, $tools, $conversationId, $userId) {
+            return response()->stream(function () use ($messages, $tools, $conversation, $conversationId, $userId, $message) {
                 // Send conversation_id event first
                 echo "event: conversation_id\n";
                 echo 'data: '.json_encode(['conversation_id' => $conversationId])."\n\n";
@@ -132,6 +132,30 @@ class ChatService
                         ->asText();
 
                     $fullText = $response->text;
+
+                    // Validate and persist the reply server-side before streaming it,
+                    // so the stored assistant turn is exactly what the model produced.
+                    $responseValidation = $this->moderationService->validateResponse($fullText);
+                    if (! $responseValidation['safe']) {
+                        Log::error('Streamed AI response failed validation', [
+                            'user_id' => $userId,
+                            'conversation_id' => $conversationId,
+                            'error' => $responseValidation['error'],
+                        ]);
+
+                        echo "event: error\n";
+                        echo 'data: '.json_encode(['error' => 'Unable to generate a safe response. Please try rephrasing your question.'])."\n\n";
+                        ob_flush();
+                        flush();
+
+                        return;
+                    }
+
+                    $this->storeMessage($conversation, 'assistant', $fullText);
+
+                    if ($conversation->messages()->count() <= 2 && ! $conversation->title) {
+                        $this->generateConversationTitle($conversation, $message);
+                    }
 
                     // Simulate streaming by sending chunks
                     $words = explode(' ', $fullText);
@@ -933,57 +957,5 @@ class ChatService
         return ChatConversation::where('user_id', $user->id)
             ->whereIn('id', $conversationIds)
             ->delete();
-    }
-
-    public function saveStreamedMessage(User $user, int $conversationId, string $message): array
-    {
-        try {
-            $conversation = ChatConversation::where('user_id', $user->id)
-                ->findOrFail($conversationId);
-
-            // Validate AI response
-            $responseValidation = $this->moderationService->validateResponse($message);
-            if (! $responseValidation['safe']) {
-                Log::error('Streamed AI response failed validation', [
-                    'user_id' => $user->id,
-                    'conversation_id' => $conversationId,
-                    'error' => $responseValidation['error'],
-                ]);
-
-                return [
-                    'success' => false,
-                    'error' => 'Response failed validation',
-                ];
-            }
-
-            // Store assistant response
-            $this->storeMessage($conversation, 'assistant', $message);
-
-            // Generate title for conversation if it's the first exchange
-            if ($conversation->messages()->count() <= 2 && ! $conversation->title) {
-                $this->generateConversationTitle($conversation, $conversation->messages()->where('role', 'user')->first()->content);
-            }
-
-            Log::info('Streamed response saved', [
-                'conversation_id' => $conversationId,
-                'response_length' => strlen($message),
-            ]);
-
-            return [
-                'success' => true,
-                'conversation_id' => $conversationId,
-            ];
-        } catch (\Exception $e) {
-            Log::error('Failed to save streamed message', [
-                'user_id' => $user->id,
-                'conversation_id' => $conversationId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'success' => false,
-                'error' => 'Failed to save message',
-            ];
-        }
     }
 }

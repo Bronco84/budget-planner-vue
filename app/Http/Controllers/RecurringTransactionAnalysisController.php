@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Services\RecurringTransactionAnalysisService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,7 +45,7 @@ class RecurringTransactionAnalysisController extends Controller
     public function analyze(Request $request, Budget $budget)
     {
         $validated = $request->validate([
-            'account_id' => 'required|exists:accounts,id',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'analysis_period_months' => 'integer|min:3|max:24',
             'min_occurrences' => 'integer|min:2|max:10',
             'confidence_threshold' => 'numeric|min:0|max:1',
@@ -88,13 +89,12 @@ class RecurringTransactionAnalysisController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Recurring transaction analysis failed', [
-                'error' => $e->getMessage(),
+                'exception' => $e,
                 'budget_id' => $budget->id,
                 'account_id' => $account->id,
-                'trace' => $e->getTraceAsString(),
             ]);
 
-            return redirect()->back()->with('error', 'Analysis failed: '.$e->getMessage());
+            return redirect()->back()->with('error', 'Analysis failed. Please try again.');
         }
     }
 
@@ -104,7 +104,7 @@ class RecurringTransactionAnalysisController extends Controller
     public function createTemplates(Request $request, Budget $budget)
     {
         $validated = $request->validate([
-            'account_id' => 'required|exists:accounts,id',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'selected_patterns' => 'required|array',
         ]);
 
@@ -142,12 +142,12 @@ class RecurringTransactionAnalysisController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Template creation failed', [
-                'error' => $e->getMessage(),
+                'exception' => $e,
                 'budget_id' => $budget->id,
                 'account_id' => $account->id,
             ]);
 
-            return redirect()->back()->with('error', 'Template creation failed: '.$e->getMessage());
+            return redirect()->back()->with('error', 'Template creation failed. Please try again.');
         }
     }
 }

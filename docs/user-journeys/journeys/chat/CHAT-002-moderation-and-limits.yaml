@@ -75,11 +75,16 @@ scenarios:
     description: When the stream endpoint returns a JSON 400/403/429 the user is told why.
     coverage: uncovered
     note: EventSource cannot read non-SSE error bodies; the panel shows a generic connection error.
+  - id: blocked_foreign_conversation
+    kind: authorization
+    description: A message aimed at another user's conversation_id returns 404 before moderation, so nothing is flagged against that conversation.
+    coverage: covered
+    tests:
+      - tests/Feature/ChatAssistantTest.php::a blocked message aimed at another users conversation returns 404 without flagging it
 known_issues:
   - trackConversationActivity records every message (not just new conversations) and logs 'rapid_conversation_creation' as an offense once more than 10 messages are sent in 10 minutes, so an ordinary user sending about 15 messages in 10 minutes is auto-banned from chat for 24 hours.
   - each rejected attempt after hitting the hourly limit is itself an offense, so a user who retries a few times past the limit escalates to a 24-hour ban.
   - the moderation rate counter re-puts the cache key with a fresh one-hour TTL on every message, so it is a rolling window that never resets while the user keeps chatting, and reset_in_seconds is always 3600.
-  - a blocked message with a foreign conversation_id hits findOrFail before blocking and returns a generic 500.
   - over-length detection (>5000 chars) is unreachable because validation caps messages at 2000.
 confidence: high
 evidence:

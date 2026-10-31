@@ -284,6 +284,13 @@ class PlaidService
             $result = json_decode($response->getBody(), true);
 
             return $result['access_token'] ?? null;
+        } catch (ConnectException $e) {
+            Log::error('Plaid token exchange could not connect', [
+                'error' => $e->getMessage(),
+                'host' => $this->baseUrl,
+                'environment' => $this->environment,
+            ]);
+            throw new \Exception($this->getConnectionErrorMessage($e), 0, $e);
         } catch (RequestException $e) {
             Log::error('Plaid token exchange failed', [
                 'error' => $e->getMessage(),

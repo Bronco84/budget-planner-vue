@@ -108,6 +108,14 @@ scenarios:
       - tests/Feature/Plaid/PlaidImportTest.php::a failed public token exchange redirects back with an error and creates nothing
       - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange on import redirects back with an error and no connection
     note: token exchange failure is covered; account fetch failure is not, because it currently reports success (see known_issues).
+  - id: import_failure_message_is_user_safe
+    kind: recovery
+    description: An import failure flashes "Failed to import accounts. Please try again." (or the could-not-reach message for a connect timeout); the raw Plaid/Guzzle text is only logged.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a Plaid error on import shows a generic message without the raw Plaid text
+      - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a connect timeout on token exchange shows a could not reach message without the cURL error
+      - tests/Feature/Plaid/PlaidImportTest.php::a failed public token exchange redirects back with an error and creates nothing
   - id: cross_user_budget_denied
     kind: authorization
     description: A user cannot open discovery or import into another user's budget (403 from can:view,budget).
@@ -118,7 +126,6 @@ known_issues:
   - 'import is not wrapped in a transaction (PlaidController.php:214-253): local Accounts are created before linkMultipleAccounts/syncTransactions, so a later failure leaves orphan unlinked accounts in the budget. Confirmed by a throwaway test (linkMultipleAccounts throwing left 2 Accounts, 0 PlaidAccounts); not committed.'
   - 'validation (PlaidController.php:181-188) only declares metadata.institution.name, so $validated drops metadata.institution.institution_id and metadata.item.id. As a result import always falls back to the institution name search (line 236) and every import gets a random plaid-item-<uniqid> item id (line 208-210), so re-importing the same Plaid item creates a second PlaidConnection instead of reusing it. Confirmed by a throwaway test sending institution_id ins_109508 and item.id: the connection stored institution_id null and plaid_item_id plaid-item-...; not committed.'
   - 'an account fetch failure during import is reported as success: PlaidService::getAccounts (PlaidService.php:477-484) returns [] on any RequestException, so import redirects to budgets.show with "Successfully imported 0 accounts from Plaid." and leaves an empty PlaidConnection. Confirmed by a throwaway test (/accounts/get returning ITEM_LOGIN_REQUIRED); not committed, so import_failure_redirects_back is only partial.'
-  - 'error flashes interpolate raw exception messages ("Failed to import accounts ..."), which can expose Plaid/Guzzle internals (e.g. cURL errors) to the user.'
   - budgets.setup.import (POST budgets/{budget}/setup/connect) is not used by the UI; Discover.vue always posts to plaid.import.
   - the post-import transaction sync swallows Plaid errors inside PlaidService::syncTransactions, so import reports success even when the initial sync failed (see PLAID-003).
 confidence: high

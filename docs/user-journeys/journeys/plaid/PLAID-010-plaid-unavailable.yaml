@@ -65,6 +65,13 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange on import redirects back with an error and no connection
       - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange when linking one account redirects back with an error and no connection
+  - id: exchange_timeout_message
+    kind: integration
+    description: A connect timeout/DNS failure during token exchange flashes "Couldn't reach the bank connection service, please try again." instead of the raw cURL error.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a connect timeout on token exchange shows a could not reach message without the cURL error
+      - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange on import redirects back with an error and no connection
   - id: sync_failure_reported
     kind: recovery
     description: A Plaid error during sync is surfaced to the user as a failure.
@@ -76,7 +83,6 @@ scenarios:
     coverage: not_applicable
     note: this journey is about external failure handling; authorization is covered by the owning journeys.
 known_issues:
-  - 'exchangePublicToken (PlaidService.php:287) only catches RequestException; a ConnectException (timeout/DNS) propagates and the controller flashes the raw cURL message to the user. Confirmed: with a faked connect timeout, import flashes "Failed to import accounts: cURL error 28: Connection timed out after 5001 milliseconds" (the redirect and no-connection behaviour is tested; the message text is deliberately not asserted).'
   - the Link/Discover/Setup pages give no visible explanation when linkToken is null; the connect button is simply disabled.
 confidence: medium
 evidence:

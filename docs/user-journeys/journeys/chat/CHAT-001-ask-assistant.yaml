@@ -9,10 +9,11 @@ summary: >
   opens an EventSource to GET /chat/stream; the server moderates and stores the user
   message, builds budget-scoped data tools (accounts, transactions, categories,
   projections, ...), runs a Prism tool loop (openai gpt-4o-mini) and streams the final
-  text word-by-word as SSE (conversation_id, text_delta, stream_end). On stream_end the
-  panel posts the full text to /chat/stream/complete, which validates and stores it as
-  the assistant message and titles new conversations. A non-streaming POST /chat/message
-  returns the reply as JSON.
+  text word-by-word as SSE (conversation_id, text_delta, stream_end). Before streaming,
+  the server validates the generated text and stores it as the assistant message
+  (titling new conversations). On stream_end the panel posts to /chat/stream/complete,
+  which only acknowledges (it ignores any client-supplied text). A non-streaming POST
+  /chat/message returns the reply as JSON.
 actors:
   - authenticated user
 preconditions:
@@ -23,7 +24,7 @@ routes:
   - chat.send
 depends_on:
   - path: app/Services/ChatService.php
-    reason: processMessageStream, processMessage, saveStreamedMessage, provider error translation
+    reason: processMessageStream (validates and persists the streamed reply), processMessage, provider error translation
   - path: app/Services/Chat/**
     reason: AssistantToolFactory and context builders that back the model's tools
   - path: app/Services/ContentModerationService.php
@@ -38,13 +39,15 @@ steps:
   - action: type a question in the chat panel
     expected: GET /chat/stream?message=...&conversation_id=... opens an SSE stream
   - action: receive events
-    expected: conversation_id event, then text_delta events, then stream_end
-  - action: panel posts the streamed text to /chat/stream/complete
-    expected: JSON {success true, conversation_id}; assistant message stored and conversation titled
+    expected: conversation_id event; the reply is validated and stored server-side (conversation titled), then text_delta events, then stream_end
+  - action: panel posts to /chat/stream/complete
+    expected: JSON {success true, conversation_id}; nothing is stored (posted message text is ignored)
 postconditions:
   - the conversation contains the user message and the assistant reply
 business_rules:
   - message is required, max 2000 chars; conversation_id and budget_id must exist
+  - a conversation_id that belongs to another user returns 404 on send, stream and stream/complete, before moderation or any write
+  - the assistant turn is always the server-generated text; a reply failing validateResponse is neither sent nor stored (in-band SSE error instead)
   - tools are scoped to the requested budget only if the user owns it, else to the user's active budget; with no budget no tools are offered
   - transaction queries are clamped to the last 12 months and the result count is capped
   - provider rate-limit/overload/too-large errors map to specific safe messages; anything else to a generic message; raw provider text is never returned
@@ -58,11 +61,28 @@ scenarios:
   - id: stream_returns_events
     kind: happy_path
     description: GET /chat/stream emits conversation_id, text_delta and stream_end events.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/ChatAssistantTest.php::the stream persists the assistant reply the server generated
+    note: asserts stream_end and the stored reply; the individual delta events are not asserted.
   - id: stream_complete_saves_reply
     kind: happy_path
-    description: Posting the streamed text stores the assistant message and titles a new conversation.
-    coverage: uncovered
+    description: The stream stores the server-generated reply as the assistant message and titles a new conversation.
+    coverage: covered
+    tests:
+      - tests/Feature/ChatAssistantTest.php::the stream persists the assistant reply the server generated
+  - id: stream_complete_ignores_client_text
+    kind: authorization
+    description: Posting text to /chat/stream/complete does not create an assistant message (no forged assistant turns).
+    coverage: covered
+    tests:
+      - tests/Feature/ChatAssistantTest.php::stream complete does not store client supplied assistant content
+  - id: stream_reply_validated
+    kind: validation
+    description: A generated reply that fails validateResponse is not streamed or stored; an SSE error event is sent instead.
+    coverage: covered
+    tests:
+      - tests/Feature/ChatAssistantTest.php::the stream does not persist or send a reply that fails response validation
   - id: tools_built_for_budget
     kind: alternate
     description: A budget-owning user gets the full tool set (13 tools including get_accounts, query_transactions).
@@ -103,22 +123,23 @@ scenarios:
     coverage: uncovered
   - id: other_users_conversation
     kind: authorization
-    description: Sending into another user's conversation_id is refused and does not append to it.
-    coverage: uncovered
+    description: Sending, streaming or completing into another user's conversation_id returns 404 and does not append to it.
+    coverage: covered
+    tests:
+      - tests/Feature/ChatAssistantTest.php::sending into another users conversation returns 404 and does not append to it
+      - tests/Feature/ChatAssistantTest.php::streaming into another users conversation returns 404 and does not append to it
+      - tests/Feature/ChatAssistantTest.php::stream complete for another users conversation returns 404
   - id: other_users_budget_tools
     kind: authorization
     description: Passing another user's budget_id does not expose that budget's data to the tools.
     coverage: uncovered
 known_issues:
-  - chat.stream.complete stores whatever text the client posts as the assistant message, so a user can forge assistant turns in their own history (which are replayed to the model as context); the server never retains the text it streamed.
-  - the stream path never runs validateResponse on the generated text before sending it; validation only happens on the client-supplied copy at stream/complete.
   - ChatPanel.vue's 'error' listener ignores event.data, so the safe provider message sent in-band is never shown; the user sees "Connection error. Check console for details."
   - the user message is persisted before the provider call, but on error the panel pops it from the UI, so reloaded history shows a user message with no reply.
-  - a foreign conversation_id passes the exists rule, then findOrFail throws inside the service try/catch, so the user gets a generic 500 ("Something went wrong...") instead of 404.
   - ChatPanel does not send budget_id, so tools always use the active budget; the question text travels in the GET query string (logged by web servers).
 confidence: high
 evidence:
   - app/Http/Controllers/ChatController.php
-  - app/Services/ChatService.php processMessageStream(), processMessage(), saveStreamedMessage(), resolveBudget(), userFacingProviderError()
+  - app/Services/ChatService.php processMessageStream(), processMessage(), resolveBudget(), userFacingProviderError()
   - resources/js/Components/ChatPanel.vue sendMessage()
 last_verified: null

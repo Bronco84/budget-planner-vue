@@ -60,12 +60,17 @@ scenarios:
     coverage: uncovered
   - id: upgrade_token_plaid_failure
     kind: integration
-    description: When Plaid refuses to create the update-mode token the endpoint returns JSON 500 and the UI toasts the error.
-    coverage: uncovered
+    description: When Plaid refuses to create the update-mode token the endpoint returns JSON 500 with a generic error (raw Plaid text only logged) and the UI toasts it.
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a Plaid error creating an update-mode link token returns a generic JSON error
+    note: the JSON 500 and its safe message are covered; the UI toast is frontend behaviour with no test.
   - id: exchange_failure_on_update
     kind: recovery
-    description: If the public token exchange fails the connection is left unchanged and the user is redirected back with an error.
-    coverage: uncovered
+    description: If the public token exchange fails the connection is left unchanged and the user is redirected back with a generic "Failed to re-authenticate. Please try again." error.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a Plaid error re-authenticating leaves the connection unchanged and shows a generic message
   - id: cross_user_denied
     kind: authorization
     description: Both endpoints return 403 for another user's budget/account.
@@ -81,7 +86,6 @@ scenarios:
 known_issues:
   - nothing in the app ever detects ITEM_LOGIN_REQUIRED or calls PlaidConnection::markAsError, so connections never enter the 'error' status and users are never prompted to re-authenticate; the button is always shown on linked accounts and re-auth is purely user-initiated.
   - Plaid documents that update mode does not require exchanging the public token; exchanging it and overwriting access_token should be verified against the Plaid sandbox.
-  - 'JSON 500 and error flashes include raw exception text ("Failed to create re-authentication link ...", "Failed to re-authenticate ...").'
 confidence: high
 evidence:
   - app/Http/Controllers/PlaidController.php upgradeLinkToken(), updateConnection()

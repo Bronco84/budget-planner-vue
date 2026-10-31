@@ -6,6 +6,8 @@ use App\Models\Budget;
 use App\Models\PayoffPlan;
 use App\Services\PayoffPlanService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -78,7 +80,7 @@ class PayoffPlanController extends Controller
             'monthly_extra_payment_cents' => 'required|integer|min:0',
             'start_date' => 'required|date',
             'debts' => 'required|array|min:1',
-            'debts.*.account_id' => 'required|exists:accounts,id',
+            'debts.*.account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'debts.*.interest_rate' => 'required|numeric|min:0|max:100',
             'debts.*.minimum_payment_cents' => 'required|integer|min:0',
             'debts.*.priority' => 'nullable|integer|min:0',
@@ -91,38 +93,43 @@ class PayoffPlanController extends Controller
             'goals.*.goal_type' => 'required|in:savings,investment,purchase,other',
         ]);
 
-        // Deactivate any existing active plans
-        $budget->payoffPlans()->where('is_active', true)->update(['is_active' => false]);
+        // All-or-nothing: a failure must not leave the budget without its active plan.
+        $plan = DB::transaction(function () use ($budget, $validated) {
+            // Deactivate any existing active plans
+            $budget->payoffPlans()->where('is_active', true)->update(['is_active' => false]);
 
-        // Create the plan
-        $plan = $budget->payoffPlans()->create([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'strategy' => $validated['strategy'],
-            'monthly_extra_payment_cents' => $validated['monthly_extra_payment_cents'],
-            'start_date' => $validated['start_date'],
-            'is_active' => true,
-        ]);
-
-        // Create debts
-        foreach ($validated['debts'] as $debtData) {
-            $account = $budget->accounts()->findOrFail($debtData['account_id']);
-
-            $plan->debts()->create([
-                'account_id' => $account->id,
-                'starting_balance_cents' => $account->current_balance_cents,
-                'interest_rate' => $debtData['interest_rate'],
-                'minimum_payment_cents' => $debtData['minimum_payment_cents'],
-                'priority' => $debtData['priority'] ?? 0,
+            // Create the plan
+            $plan = $budget->payoffPlans()->create([
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'strategy' => $validated['strategy'],
+                'monthly_extra_payment_cents' => $validated['monthly_extra_payment_cents'],
+                'start_date' => $validated['start_date'],
+                'is_active' => true,
             ]);
-        }
 
-        // Create goals if provided
-        if (! empty($validated['goals'])) {
-            foreach ($validated['goals'] as $goalData) {
-                $plan->goals()->create($goalData);
+            // Create debts
+            foreach ($validated['debts'] as $debtData) {
+                $account = $budget->accounts()->findOrFail($debtData['account_id']);
+
+                $plan->debts()->create([
+                    'account_id' => $account->id,
+                    'starting_balance_cents' => $account->current_balance_cents,
+                    'interest_rate' => $debtData['interest_rate'],
+                    'minimum_payment_cents' => $debtData['minimum_payment_cents'],
+                    'priority' => $debtData['priority'] ?? 0,
+                ]);
             }
-        }
+
+            // Create goals if provided
+            if (! empty($validated['goals'])) {
+                foreach ($validated['goals'] as $goalData) {
+                    $plan->goals()->create($goalData);
+                }
+            }
+
+            return $plan;
+        });
 
         return redirect()->route('payoff-plans.show', ['budget' => $budget, 'payoff_plan' => $plan])
             ->with('message', 'Payoff plan created successfully');
@@ -207,18 +214,25 @@ class PayoffPlanController extends Controller
 
         $validated = $request->validate([
             'debts' => 'required|array|min:1',
-            'debts.*.account_id' => 'required|exists:accounts,id',
+            'debts.*.account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'debts.*.balance' => 'required|integer|min:0',
             'debts.*.interest_rate' => 'required|numeric|min:0|max:100',
             'debts.*.minimum_payment' => 'required|integer|min:0',
             'monthly_extra_payment' => 'required|integer|min:0',
         ]);
 
-        $comparisons = $this->payoffPlanService->compareStrategies(
-            $budget,
-            $validated['debts'],
-            $validated['monthly_extra_payment']
-        );
+        // compareStrategies persists temporary plan rows; always roll them back,
+        // including when the calculation throws.
+        DB::beginTransaction();
+        try {
+            $comparisons = $this->payoffPlanService->compareStrategies(
+                $budget,
+                $validated['debts'],
+                $validated['monthly_extra_payment']
+            );
+        } finally {
+            DB::rollBack();
+        }
 
         return response()->json([
             'comparisons' => $comparisons,

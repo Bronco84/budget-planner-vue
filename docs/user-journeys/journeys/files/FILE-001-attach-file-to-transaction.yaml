@@ -8,8 +8,9 @@ summary: >
   On the transaction edit page (where a new manual transaction lands after
   creation) the owner uploads a file such as a receipt, sees the list of
   attachments, downloads one (streamed from S3) or deletes it. Files are
-  de-duplicated by SHA-256 hash; the stored object is removed from S3 only when the
-  last attachment referencing it is deleted.
+  de-duplicated by SHA-256 hash per uploader (each user gets their own File record;
+  the S3 object, keyed by hash, is shared); the stored object is removed from S3
+  only when no File record for that hash remains.
 actors:
   - budget owner
 preconditions:
@@ -43,23 +44,40 @@ business_rules:
   - max 10MB; allowed MIME types pdf, jpeg, png, gif, webp, txt, doc/docx, xls/xlsx, json, csv; extension must match MIME type
   - upload is throttled to 10 requests per minute
   - access allowed to the budget owner or a connected user
+  - de-duplication is scoped to the uploading user (files unique on hash + uploaded_by), so a user never sees another user's filename
+  - upload/delete failures return a generic error; only FileValidationException messages are shown to the user
 scenarios:
   - id: upload_to_transaction
     kind: happy_path
     description: A valid file uploads and is attached to the transaction.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::uploading content another user already uploaded creates a separate file record for the uploader
   - id: list_attachments
     kind: happy_path
     description: Attachment list returns the transaction's files.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::uploading content another user already uploaded creates a separate file record for the uploader
   - id: download_and_delete
     kind: happy_path
     description: Download streams the file; delete removes the attachment.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::deleting one users copy keeps the stored object another user still uses
   - id: duplicate_content_reused
     kind: alternate
-    description: Uploading identical content reuses the existing File record.
-    coverage: uncovered
+    description: The same user uploading identical content reuses their existing File record.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::the same user uploading identical content reuses their existing file record
+  - id: cross_user_duplicate_content_isolated
+    kind: edge
+    description: Content another user already uploaded gets a separate File record carrying the uploader's own filename; deleting one user's copy keeps the shared S3 object until the last record goes.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::uploading content another user already uploaded creates a separate file record for the uploader
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::deleting one users copy keeps the stored object another user still uses
   - id: invalid_file_rejected
     kind: validation
     description: Oversized, disallowed-type or extension-mismatched files are rejected.
@@ -67,18 +85,25 @@ scenarios:
     tests:
       - tests/Feature/SecurityFileValidationTest.php::file upload rejects disallowed file types
       - tests/Feature/SecurityFileValidationTest.php::file extension must match mime type
-    note: tests exercise the shared FileService validation through budgets.files.upload, not the transaction upload route.
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::a disallowed file type on a transaction upload still explains why it was rejected
+    note: the transaction upload route is tested for disallowed type only; oversized and extension-mismatch cases are exercised through budgets.files.upload.
   - id: s3_failure_returns_error
     kind: recovery
-    description: An S3 failure returns 400 JSON with the error and creates no records.
-    coverage: uncovered
+    description: An S3 failure returns 400 JSON with a generic error (raw exception only logged) and creates no records.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::an S3 failure on upload returns a generic error and creates no records
+  - id: delete_failure_returns_generic_error
+    kind: recovery
+    description: A failure while deleting an attachment returns 500 JSON with a generic error, never the raw exception.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::a failure deleting an attachment returns a generic error
   - id: other_users_transaction_files_forbidden
     kind: authorization
     description: Upload, list, download and delete on another user's transaction or attachment return 403.
     coverage: uncovered
 known_issues:
-  - "De-duplication is global across users: uploading content that another user already uploaded attaches their File record, so the attachment shows the other user's original filename."
-  - "Exception messages from FileService are returned verbatim in 400/500 JSON responses."
   - "Access check allows connected users, while TransactionPolicy and BudgetPolicy are owner-only; file routes are not nested under {budget} so scopeBindings does not apply."
 confidence: high
 evidence:

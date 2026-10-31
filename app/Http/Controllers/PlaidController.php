@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
 use App\Services\PlaidService;
+use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -263,10 +264,11 @@ class PlaidController extends Controller
         } catch (\Exception $e) {
             Log::error('Plaid import failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'budget_id' => $budget->id,
+                'exception' => $e,
             ]);
 
-            return redirect()->back()->with('error', 'Failed to import accounts: '.$e->getMessage());
+            return redirect()->back()->with('error', $this->userSafeError($e, 'Failed to import accounts. Please try again.'));
         }
     }
 
@@ -388,10 +390,11 @@ class PlaidController extends Controller
         } catch (\Exception $e) {
             Log::error('Plaid linking failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'account_id' => $account->id,
+                'exception' => $e,
             ]);
 
-            return redirect()->back()->with('error', 'Failed to link account: '.$e->getMessage());
+            return redirect()->back()->with('error', $this->userSafeError($e, 'Failed to link account. Please try again.'));
         }
     }
 
@@ -533,9 +536,10 @@ class PlaidController extends Controller
             Log::error('Account re-linking failed', [
                 'error' => $e->getMessage(),
                 'account_id' => $account->id,
+                'exception' => $e,
             ]);
 
-            return redirect()->back()->with('error', 'Failed to re-link account: '.$e->getMessage());
+            return redirect()->back()->with('error', $this->userSafeError($e, 'Failed to re-link account. Please try again.'));
         }
     }
 
@@ -701,9 +705,10 @@ class PlaidController extends Controller
                 'error' => $e->getMessage(),
                 'account_id' => $account->id,
                 'plaid_account_id' => $plaidAccount->id,
+                'exception' => $e,
             ]);
 
-            return response()->json(['error' => 'Failed to create re-authentication link: '.$e->getMessage()], 500);
+            return response()->json(['error' => $this->userSafeError($e, 'Failed to create re-authentication link. Please try again.')], 500);
         }
     }
 
@@ -749,9 +754,10 @@ class PlaidController extends Controller
             Log::error('Re-authentication failed', [
                 'error' => $e->getMessage(),
                 'account_id' => $account->id,
+                'exception' => $e,
             ]);
 
-            return redirect()->back()->with('error', 'Failed to re-authenticate: '.$e->getMessage());
+            return redirect()->back()->with('error', $this->userSafeError($e, 'Failed to re-authenticate. Please try again.'));
         }
     }
 
@@ -902,6 +908,21 @@ class PlaidController extends Controller
         return PlaidAccount::where('account_id', $account->id)
             ->with('plaidConnection')
             ->first();
+    }
+
+    /**
+     * Message safe to show the user for a failed Plaid operation. The raw
+     * exception is logged by the caller and never shown.
+     */
+    private function userSafeError(\Throwable $e, string $fallback): string
+    {
+        for ($cause = $e; $cause; $cause = $cause->getPrevious()) {
+            if ($cause instanceof ConnectException) {
+                return "Couldn't reach the bank connection service, please try again.";
+            }
+        }
+
+        return $fallback;
     }
 
     /**

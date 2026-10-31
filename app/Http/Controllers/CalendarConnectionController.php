@@ -6,11 +6,18 @@ use App\Models\CalendarConnection;
 use App\Services\GoogleCalendarService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class CalendarConnectionController extends Controller
 {
+    /**
+     * Session key holding the OAuth state nonce for the in-flight Google consent.
+     */
+    protected const OAUTH_STATE_KEY = 'calendar_oauth_state';
+
     public function __construct(
         protected GoogleCalendarService $googleCalendarService
     ) {}
@@ -43,9 +50,12 @@ class CalendarConnectionController extends Controller
     /**
      * Redirect to Google OAuth.
      */
-    public function connect(): RedirectResponse
+    public function connect(Request $request): RedirectResponse
     {
-        $authUrl = $this->googleCalendarService->getAuthorizationUrl(auth()->user());
+        $state = Str::random(40);
+        $request->session()->put(self::OAUTH_STATE_KEY, $state);
+
+        $authUrl = $this->googleCalendarService->getAuthorizationUrl(auth()->user(), $state);
 
         return redirect()->away($authUrl);
     }
@@ -55,9 +65,19 @@ class CalendarConnectionController extends Controller
      */
     public function callback(Request $request): RedirectResponse
     {
+        // Single use: the nonce is cleared whatever the outcome.
+        $expectedState = $request->session()->pull(self::OAUTH_STATE_KEY);
+
         if ($request->has('error')) {
             return redirect()->route('calendar.connections.index')
                 ->with('error', 'Calendar connection was cancelled or failed.');
+        }
+
+        $state = $request->query('state');
+
+        if (! is_string($expectedState) || ! is_string($state) || ! hash_equals($expectedState, $state)) {
+            return redirect()->route('calendar.connections.index')
+                ->with('error', 'Calendar connection failed: the request could not be verified. Please try again.');
         }
 
         $code = $request->query('code');
@@ -74,10 +94,16 @@ class CalendarConnectionController extends Controller
             );
 
             return redirect()->route('calendar.connections.index')
-                ->with('success', "Successfully connected to {$connection->calendar_name}!");
+                ->with('message', "Successfully connected to {$connection->calendar_name}!");
         } catch (\Exception $e) {
+            Log::error('Google Calendar OAuth callback failed', [
+                'user_id' => auth()->id(),
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+
             return redirect()->route('calendar.connections.index')
-                ->with('error', 'Failed to connect calendar: '.$e->getMessage());
+                ->with('error', 'Failed to connect calendar. Please try again.');
         }
     }
 
@@ -92,10 +118,16 @@ class CalendarConnectionController extends Controller
             $count = $this->googleCalendarService->syncEvents($calendarConnection);
 
             return redirect()->back()
-                ->with('success', "Synced {$count} events from {$calendarConnection->calendar_name}");
+                ->with('message', "Synced {$count} events from {$calendarConnection->calendar_name}");
         } catch (\Exception $e) {
+            Log::error('Google Calendar sync failed', [
+                'calendar_connection_id' => $calendarConnection->id,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+
             return redirect()->back()
-                ->with('error', 'Sync failed: '.$e->getMessage());
+                ->with('error', 'Sync failed. Please try again.');
         }
     }
 
@@ -111,7 +143,7 @@ class CalendarConnectionController extends Controller
         $status = $calendarConnection->is_active ? 'enabled' : 'disabled';
 
         return redirect()->back()
-            ->with('success', "Calendar connection {$status}");
+            ->with('message', "Calendar connection {$status}");
     }
 
     /**
@@ -124,6 +156,6 @@ class CalendarConnectionController extends Controller
         $calendarConnection->delete();
 
         return redirect()->back()
-            ->with('success', 'Calendar connection removed');
+            ->with('message', 'Calendar connection removed');
     }
 }

@@ -5,6 +5,7 @@ use App\Models\MagicLinkToken;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia;
 
 function issueMagicLink(User $user, array $overrides = []): string
 {
@@ -136,4 +137,16 @@ test('an unknown email gets the same response as a known one and no mail is sent
 
     Mail::assertSent(MagicLinkEmail::class, 1);
     Mail::assertSent(MagicLinkEmail::class, fn ($mail) => $mail->hasTo($user->email));
+});
+
+test('the login page receives the invalid magic link error so it can be shown', function () {
+    $user = User::factory()->create();
+
+    $this->followingRedirects()
+        ->get(route('magic-link.authenticate', ['token' => 'not-a-real-token', 'email' => $user->email]))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Auth/PasskeyLogin')
+            ->where('errors.magic_link', 'Invalid or expired magic link.'));
+
+    $this->assertGuest();
 });

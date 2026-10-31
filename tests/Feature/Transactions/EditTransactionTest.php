@@ -163,3 +163,24 @@ test('user cannot read the activity log of another users transaction', function 
         ->getJson(route('budget.transaction.activity-log', [$otherBudget, $otherTransaction]))
         ->assertForbidden();
 });
+
+test('updating a transaction converts dollars to the exact cent amount', function (float $amount, int $expectedCents) {
+    // Capture the raw value sent to the database (the integer column would mask float error).
+    Transaction::saving(function (Transaction $transaction) {
+        test()->rawCents = $transaction->getAttributes()['amount_in_cents'];
+    });
+
+    $this->actingAs($this->user)
+        ->patch(
+            route('budget.transaction.update', [$this->budget, $this->transaction]),
+            validTransactionUpdate(['amount' => $amount]),
+        )
+        ->assertSessionHasNoErrors();
+
+    expect($this->rawCents)->toBe($expectedCents)
+        ->and($this->transaction->fresh()->amount_in_cents)->toBe($expectedCents);
+})->with([
+    '0.29' => [0.29, 29],
+    '19.99' => [19.99, 1999],
+    '-19.99' => [-19.99, -1999],
+]);

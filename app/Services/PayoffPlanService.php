@@ -78,11 +78,17 @@ class PayoffPlanService
                 'priority' => $debt->priority,
                 'total_paid' => 0,
                 'total_interest_paid' => 0,
+                'paid_off_month' => $debt->starting_balance_cents > 0 ? null : 0,
+                'never_paid_off' => false,
             ];
         })->toArray();
 
         // Sort debts based on strategy
         $debtData = $this->sortDebtsByStrategy($debtData, $strategy);
+
+        // Total paid toward debt each month stays constant, so minimums freed
+        // by paid-off debts roll over to the remaining ones.
+        $monthlyPaymentBudget = $monthlyExtraPayment + array_sum(array_column($debtData, 'minimum_payment'));
 
         // Calculate month-by-month projections
         $timeline = [];
@@ -112,28 +118,41 @@ class PayoffPlanService
             }
             unset($debt);
 
-            // Pay minimum payments on all debts
+            // Snowball/avalanche: the monthly budget is every debt's minimum plus
+            // the extra payment. Minimums are paid on all open debts first; the
+            // remainder (extra + minimums freed by paid-off debts + anything a
+            // debt didn't need this month) goes to open debts in priority order.
+            $remaining = $monthlyPaymentBudget;
+
             foreach ($debtData as &$debt) {
                 if ($debt['balance'] > 0) {
-                    $payment = min($debt['minimum_payment'], $debt['balance']);
+                    $payment = min($debt['minimum_payment'], $debt['balance'], $remaining);
                     $debt['balance'] -= $payment;
                     $debt['total_paid'] += $payment;
+                    $remaining -= $payment;
                     $monthData['total_payment'] += $payment;
                 }
             }
             unset($debt);
 
-            // Apply extra payment to focused debt
-            $remainingExtra = $monthlyExtraPayment;
             foreach ($debtData as &$debt) {
-                if ($debt['balance'] > 0 && $remainingExtra > 0) {
-                    $extraPayment = min($remainingExtra, $debt['balance']);
+                if ($remaining <= 0) {
+                    break;
+                }
+                if ($debt['balance'] > 0) {
+                    $extraPayment = min($remaining, $debt['balance']);
                     $debt['balance'] -= $extraPayment;
                     $debt['total_paid'] += $extraPayment;
-                    $remainingExtra -= $extraPayment;
+                    $remaining -= $extraPayment;
                     $monthData['extra_payment_used'] += $extraPayment;
                     $monthData['total_payment'] += $extraPayment;
-                    break; // Focus on one debt at a time (snowball/avalanche)
+                }
+            }
+            unset($debt);
+
+            foreach ($debtData as &$debt) {
+                if ($debt['balance'] <= 0 && $debt['paid_off_month'] === null) {
+                    $debt['paid_off_month'] = $month;
                 }
             }
             unset($debt);
@@ -154,10 +173,19 @@ class PayoffPlanService
             $currentDate->addMonth();
         }
 
+        // Payments that can't outpace interest stop at the month cap with
+        // balances still owed; report that explicitly instead of a far-future date.
+        foreach ($debtData as &$debt) {
+            $debt['never_paid_off'] = $debt['balance'] > 0;
+        }
+        unset($debt);
+        $neverPaidOff = count(array_filter($debtData, fn ($d) => $d['never_paid_off'])) > 0;
+
         return [
             'timeline' => $timeline,
             'total_months' => $month,
-            'payoff_date' => $currentDate->format('Y-m-d'),
+            'never_paid_off' => $neverPaidOff,
+            'payoff_date' => $neverPaidOff ? null : $currentDate->format('Y-m-d'),
             'total_interest_paid' => array_sum(array_column($debtData, 'total_interest_paid')),
             'final_debt_data' => $debtData,
         ];
@@ -228,6 +256,7 @@ class PayoffPlanService
                 'strategy' => $strategy,
                 'total_months' => $projection['total_months'],
                 'payoff_date' => $projection['payoff_date'],
+                'never_paid_off' => $projection['never_paid_off'],
                 'total_interest_paid' => $projection['total_interest_paid'],
             ];
 

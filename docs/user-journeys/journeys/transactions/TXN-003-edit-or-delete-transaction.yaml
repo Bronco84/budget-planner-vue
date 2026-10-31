@@ -58,6 +58,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Transactions/EditTransactionTest.php::activity log returns the transaction history as json
+  - id: update_cents_conversion_precision
+    kind: edge
+    description: Updating with decimal amounts such as 0.29 and 19.99 stores the exact cent value.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::updating a transaction converts dollars to the exact cent amount
   - id: invalid_update_rejected
     kind: validation
     description: Invalid fields or a foreign account id return validation errors.

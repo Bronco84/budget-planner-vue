@@ -9,23 +9,23 @@ import { useForm } from '@inertiajs/vue3';
 import { nextTick, ref } from 'vue';
 
 const confirmingUserDeletion = ref(false);
-const passwordInput = ref(null);
+const emailInput = ref(null);
 
 const form = useForm({
-    password: '',
+    email: '',
 });
 
 const confirmUserDeletion = () => {
     confirmingUserDeletion.value = true;
 
-    nextTick(() => passwordInput.value.focus());
+    nextTick(() => emailInput.value.focus());
 };
 
 const deleteUser = () => {
     form.delete(route('profile.destroy'), {
         preserveScroll: true,
         onSuccess: () => closeModal(),
-        onError: () => passwordInput.value.focus(),
+        onError: () => emailInput.value.focus(),
         onFinish: () => form.reset(),
     });
 };
@@ -64,28 +64,29 @@ const closeModal = () => {
 
                 <p class="mt-1 text-sm text-gray-600">
                     Once your account is deleted, all of its resources and data
-                    will be permanently deleted. Please enter your password to
-                    confirm you would like to permanently delete your account.
+                    will be permanently deleted. Please type your account email
+                    to confirm you would like to permanently delete your account.
                 </p>
 
                 <div class="mt-6">
                     <InputLabel
-                        for="password"
-                        value="Password"
+                        for="delete_account_email"
+                        value="Type your email to confirm"
                         class="sr-only"
                     />
 
                     <TextInput
-                        id="password"
-                        ref="passwordInput"
-                        v-model="form.password"
-                        type="password"
+                        id="delete_account_email"
+                        ref="emailInput"
+                        v-model="form.email"
+                        type="email"
+                        autocomplete="off"
                         class="mt-1 block w-3/4"
-                        placeholder="Password"
+                        placeholder="Type your email to confirm"
                         @keyup.enter="deleteUser"
                     />
 
-                    <InputError :message="form.errors.password" class="mt-2" />
+                    <InputError :message="form.errors.email" class="mt-2" />
                 </div>
 
                 <div class="mt-6 flex justify-end">

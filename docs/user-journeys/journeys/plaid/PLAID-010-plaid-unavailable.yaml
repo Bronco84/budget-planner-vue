@@ -31,7 +31,7 @@ steps:
   - action: submit import/store while token exchange fails
     expected: redirect back with "Failed to import accounts" / "Failed to link account" error flash
   - action: sync while Plaid errors
-    expected: user is told the sync failed (not currently the case, see known_issues)
+    expected: redirect back with a user-safe error flash (could-not-reach message for timeouts)
 postconditions:
   - no partial PlaidConnection is created when exchange fails
 business_rules:
@@ -74,9 +74,10 @@ scenarios:
       - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange on import redirects back with an error and no connection
   - id: sync_failure_reported
     kind: recovery
-    description: A Plaid error during sync is surfaced to the user as a failure.
-    coverage: uncovered
-    note: confirmed broken, errors are swallowed and reported as a "Synced 0 ..." success (see PLAID-003 known_issues); no test committed.
+    description: A Plaid error or connect timeout during sync is surfaced to the user as a failure.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncTest.php::a Plaid error or timeout during sync shows a failure instead of a zero count success
   - id: authorization
     kind: authorization
     description: Ownership enforcement for these routes is catalogued in PLAID-001/002/003.

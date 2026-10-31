@@ -84,8 +84,7 @@ scenarios:
     tests:
       - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback with a mismatched state is rejected without a token exchange
       - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback without a stored or returned state is rejected without a token exchange
-known_issues:
-  - Calendar/Connections.vue renders no flash at all, so success and error messages (including consent denial) are still invisible to the user even though they are now flashed under shared keys (message/error).
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/CalendarConnectionController.php index(), connect(), callback()

@@ -36,19 +36,40 @@
 
     <div class="py-12">
       <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <!-- Never paid off warning -->
+        <div
+          v-if="debtProjection.never_paid_off"
+          class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          role="alert"
+        >
+          <p class="font-semibold">This plan never pays off all of its debt.</p>
+          <p class="mt-1">
+            The monthly payments don't cover the interest on at least one debt, so its balance keeps growing.
+            Increase the minimum or extra payment to reach a payoff date.
+          </p>
+        </div>
+
         <!-- Key Metrics -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
             <div class="text-sm text-gray-500">Payoff Time</div>
-            <div class="mt-2 text-2xl font-bold text-gray-900">
-              {{ Math.ceil(debtProjection.total_months / 12) }} years
+            <div v-if="debtProjection.never_paid_off" class="mt-2 text-2xl font-bold text-red-600">
+              Never
             </div>
-            <div class="text-xs text-gray-500">{{ debtProjection.total_months }} months</div>
+            <template v-else>
+              <div class="mt-2 text-2xl font-bold text-gray-900">
+                {{ Math.ceil(debtProjection.total_months / 12) }} years
+              </div>
+              <div class="text-xs text-gray-500">{{ debtProjection.total_months }} months</div>
+            </template>
           </div>
 
           <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
             <div class="text-sm text-gray-500">Payoff Date</div>
-            <div class="mt-2 text-2xl font-bold text-gray-900">
+            <div v-if="debtProjection.never_paid_off" class="mt-2 text-2xl font-bold text-red-600">
+              Not reached
+            </div>
+            <div v-else class="mt-2 text-2xl font-bold text-gray-900">
               {{ formatPayoffDate(debtProjection.payoff_date) }}
             </div>
           </div>
@@ -351,6 +372,9 @@ const getDebtProgress = (debtId) => {
 };
 
 const getDebtPayoffMonth = (debtId) => {
+  const finalDebt = props.debtProjection.final_debt_data.find(d => d.id === debtId);
+  if (finalDebt?.never_paid_off) return 'Never (payments don\'t cover interest)';
+
   // Find when this debt reaches 0
   const timeline = props.debtProjection.timeline;
   for (let i = 0; i < timeline.length; i++) {

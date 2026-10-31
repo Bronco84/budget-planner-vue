@@ -77,9 +77,10 @@ scenarios:
     coverage: uncovered
   - id: bimonthly_confirmation
     kind: edge
-    description: A bimonthly pattern confirmed in the modal keeps both days of the month.
-    coverage: uncovered
-    note: currently broken; the modal's bimonthly_first_day/second_day keys are not template columns (see known_issues).
+    description: A bimonthly pattern confirmed in the modal keeps both days of the month (bimonthly_first_day -> first_day_of_month, bimonthly_second_day -> day_of_month).
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::a bimonthly pattern confirmed in the modal keeps both days of the month
   - id: refresh_fallback_redirects
     kind: recovery
     description: GET on the analyze/create-templates URLs redirects to the analysis page.
@@ -112,7 +113,6 @@ scenarios:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::analysis failures show a generic message instead of the exception text
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::template creation failures show a generic message instead of the exception text
 known_issues:
-  - prepareTemplateData (confirmation path) writes bimonthly_first_day/bimonthly_second_day, which are not fillable columns; first_day_of_month is silently dropped, so bimonthly templates fall back to day 1 in projections.
   - Confirmation-path templates store average_amount in dollars while min_amount/max_amount are stored in cents; the legacy path stores average in dollars and min/max from amount_stats, so units are inconsistent.
   - Templates created via the confirmation modal never link the transactions that formed the pattern (linkMatchingTransactionsToTemplate returns 0), so the same transactions remain unlinked and reappear in the next analysis.
   - selected_patterns items are not validated; failures become per-item errors stored in the template_creation_result session key, but the redirect always uses the success flash (with "Some templates could not be created" text), so partial failures are easy to miss.

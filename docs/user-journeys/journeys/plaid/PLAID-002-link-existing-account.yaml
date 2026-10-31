@@ -37,6 +37,8 @@ postconditions:
 business_rules:
   - an existing active connection is matched by plaid_item_id first, then institution_id (when not null), scoped to the budget
   - an account that already has a PlaidAccount is re-linked in place instead of duplicated
+  - metadata.institution.institution_id and metadata.item.id (or metadata.item_id) are optional, validated and used for connection matching and creation; a missing item id gets a generated plaid-item-<uniqid>
+  - a failed post-link transaction sync keeps the link and adds a user-safe error flash
   - the selected metadata.account.id must exist in Plaid's /accounts/get response or linking fails
 scenarios:
   - id: link_page_renders
@@ -50,11 +52,16 @@ scenarios:
   - id: store_reuses_existing_connection
     kind: alternate
     description: Linking an account from an item/institution already connected in the budget attaches it to the existing connection.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkTest.php::linking an account reuses the active connection for the same Plaid item
   - id: relink_orphaned_account
     kind: alternate
-    description: An account with a stale PlaidAccount is updated to point at the active or newly created connection.
-    coverage: uncovered
+    description: An account with a stale PlaidAccount is updated to point at the active or newly created connection (created from the Link metadata's item and institution ids).
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidLinkTest.php::re-linking an account with a stale Plaid link creates a connection from the Link metadata
+    note: the new-connection branch is covered; re-linking onto an existing active connection is not asserted.
   - id: linked_page_shows_metadata
     kind: alternate
     description: For an already linked account the page shows status, institution, last sync and any error_message.

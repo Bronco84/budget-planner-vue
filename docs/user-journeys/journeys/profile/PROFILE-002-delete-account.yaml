@@ -6,8 +6,11 @@ status: implemented
 priority: medium
 summary: >
   From the profile page the user confirms account deletion in a modal by
-  entering their password. On success they are logged out, the user row is
-  deleted, the session invalidated and they are redirected to /.
+  typing their account email. Deletion is only allowed when the session
+  authenticated (passkey, magic link or trusted device) within
+  auth.delete_account_reauth_minutes (default 15). On success they are logged
+  out, their passkeys and the user row are deleted (owned data cascades), the
+  session invalidated and they are redirected to /.
 actors:
   - authenticated user
 preconditions:
@@ -17,49 +20,77 @@ routes:
   - profile.destroy
 depends_on:
   - path: resources/js/Pages/Profile/Partials/DeleteUserForm.vue
-    reason: confirmation modal with password field
+    reason: confirmation modal with the type-your-email field
+  - path: app/Listeners/RecordAuthenticationTime.php
+    reason: Login event listener that stamps auth.authenticated_at in the session, checked by destroy()
+  - path: app/Providers/EventServiceProvider.php
+    reason: registers RecordAuthenticationTime for Illuminate\Auth\Events\Login
 steps:
-  - action: click Delete Account and enter password
-    expected: modal submits DELETE /profile
-  - action: server validates current_password
-    expected: user logged out and deleted, session invalidated, redirect to /
+  - action: click Delete Account and type the account email
+    expected: modal submits DELETE /profile with email
+  - action: server checks the email (case-insensitive) and that the session authenticated recently
+    expected: user logged out, passkeys and user deleted in a transaction, session invalidated, redirect to /
 postconditions:
-  - the user record no longer exists
+  - the user record, its WebAuthn credentials, trusted devices and magic-link tokens no longer exist
 business_rules:
-  - password is required and must match (current_password rule)
+  - email is required and must equal the account email, ignoring case
+  - "session auth.authenticated_at must be within auth.delete_account_reauth_minutes; otherwise the email error is \"For your security, sign in again before deleting your account.\""
+  - WebAuthn credentials are deleted explicitly (polymorphic, no FK); trusted devices, magic-link tokens, budgets and preferences cascade via FKs
 scenarios:
   - id: account_deleted
     kind: happy_path
-    description: A user with a password who supplies it is logged out and deleted.
-    coverage: partial
-    tests:
-      - tests/Feature/ProfileTest.php::test_user_can_delete_their_account
-    note: the factory user has a password; real accounts are passwordless (passkey-only), for whom this flow cannot succeed.
-  - id: wrong_password_rejected
-    kind: validation
-    description: An incorrect password returns an error and keeps the account.
+    description: A user in a freshly authenticated session who types their email is logged out and deleted.
     coverage: covered
     tests:
-      - tests/Feature/ProfileTest.php::test_correct_password_must_be_provided_to_delete_account
+      - tests/Feature/ProfileTest.php::test_user_can_delete_their_account
+      - tests/Feature/DeleteAccountTest.php::signing in with a magic link records the authentication time used by account deletion
+  - id: wrong_password_rejected
+    kind: validation
+    description: A typed email that does not match the account returns an email error and keeps the account.
+    coverage: covered
+    tests:
+      - tests/Feature/ProfileTest.php::test_correct_email_must_be_provided_to_delete_account
+      - tests/Feature/DeleteAccountTest.php::account deletion is rejected when the typed email does not match
+    note: id kept for coverage-baseline continuity; confirmation is now the typed email, not a password.
   - id: passkey_only_user_can_delete
     kind: edge
     description: A user created via passkey registration (null password) can delete their account.
-    coverage: uncovered
-    note: currently impossible - current_password always fails for a null password (suspected bug).
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::a passkey only user can delete their account by typing their email in a fresh session
+  - id: stale_session_rejected
+    kind: authentication
+    description: A session that authenticated more than the re-auth window ago (or never recorded a sign-in time) cannot delete the account.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::account deletion is rejected when the session authenticated more than the reauth window ago
+      - tests/Feature/DeleteAccountTest.php::account deletion is rejected when the session has no recorded sign in time
+  - id: login_paths_record_authentication_time
+    kind: integration
+    description: Every login path stamps auth.authenticated_at in the session.
+    coverage: partial
+    tests:
+      - tests/Feature/DeleteAccountTest.php::signing in with a magic link records the authentication time used by account deletion
+      - tests/Feature/DeleteAccountTest.php::a trusted device auto login records the authentication time
+    note: the passkey assertion path (Laragear AssertedRequest::login -> SessionGuard::attempt) fires the same Login event but has no fixture to exercise it.
   - id: related_data_cleanup
     kind: integration
-    description: Deleting the user removes or detaches owned budgets, passkeys, trusted devices and preferences.
-    coverage: uncovered
+    description: Deleting the user removes their passkeys, trusted devices and magic-link tokens.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::a passkey only user can delete their account by typing their email in a fresh session
   - id: guest_cannot_delete
     kind: authentication
     description: A guest DELETE /profile is redirected to login.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::a guest cannot delete an account
 known_issues:
-  - Account deletion requires current_password but registerStore creates users without a password, so passkey-only users can never delete their account. Deletion should re-verify with a passkey instead.
-  - WebAuthn credentials are a polymorphic relation with no foreign key, so they are orphaned when the user is deleted (budgets, preferences, trusted devices and magic-link tokens cascade). The device_token cookie is also not cleared.
+  - The device_token cookie is not cleared on deletion (it is inert because the trusted device rows are deleted).
 confidence: medium
 evidence:
   - app/Http/Controllers/ProfileController.php destroy()
   - database/migrations/2026_01_05_210006_make_password_nullable_in_users_table.php
   - app/Http/Controllers/PasskeyAuthController.php registerStore() creates users without a password
+  - app/Listeners/RecordAuthenticationTime.php
 last_verified: null

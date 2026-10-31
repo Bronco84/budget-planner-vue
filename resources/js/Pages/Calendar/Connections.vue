@@ -27,6 +27,14 @@
               </Link>
             </div>
 
+            <div v-if="flashMessage" class="mb-6 rounded-md bg-green-50 dark:bg-green-900/30 p-4 border border-green-200 dark:border-green-800/50">
+              <p class="text-sm font-medium text-green-800 dark:text-green-300">{{ flashMessage }}</p>
+            </div>
+
+            <div v-if="flashError" class="mb-6 rounded-md bg-red-50 dark:bg-red-900/30 p-4 border border-red-200 dark:border-red-800/50">
+              <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ flashError }}</p>
+            </div>
+
             <!-- Connections List -->
             <div v-if="connections.length > 0" class="space-y-4">
               <div
@@ -114,11 +122,15 @@
 </template>
 
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { useToast } from '@/composables/useToast';
 
 const toast = useToast();
+const page = usePage();
+const flashMessage = computed(() => page.props.flash?.message);
+const flashError = computed(() => page.props.flash?.error);
 
 defineProps({
   connections: {

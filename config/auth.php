@@ -44,6 +44,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Account Deletion Re-authentication Window
+    |--------------------------------------------------------------------------
+    |
+    | Accounts are passwordless, so deleting one requires the session to have
+    | signed in (passkey, magic link or trusted device) within this many minutes.
+    |
+    */
+
+    'delete_account_reauth_minutes' => env('DELETE_ACCOUNT_REAUTH_MINUTES', 15),
+
+    /*
+    |--------------------------------------------------------------------------
     | Authentication Guards
     |--------------------------------------------------------------------------
     |

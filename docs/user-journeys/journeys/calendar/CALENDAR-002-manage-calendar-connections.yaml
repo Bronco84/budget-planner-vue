@@ -75,8 +75,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Calendar/CalendarConnectionTest.php::another user cannot sync toggle or remove a calendar connection
+  - id: flash_message_shown
+    kind: happy_path
+    description: After an action, the connections page receives flash.message (and flash.error on failure) and Connections.vue shows it in a banner.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::the connections page receives the flashed message so it can be shown
+    note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
 known_issues:
-  - "success messages are flashed under 'success', which is not shared with Inertia, and Connections.vue renders no flash, so the user gets no feedback."
   - sync error flashes include raw exception messages.
 confidence: medium
 evidence:

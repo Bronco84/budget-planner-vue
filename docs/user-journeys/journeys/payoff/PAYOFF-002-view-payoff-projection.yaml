@@ -21,14 +21,14 @@ depends_on:
 integrations: []
 steps:
   - action: open budget/{budget}/payoff-plans/{payoff_plan}
-    expected: PayoffPlans/Show with plan, debtProjection (timeline, total_months, payoff_date, total_interest_paid, final_debt_data) and goalProjections
+    expected: PayoffPlans/Show with plan, debtProjection (timeline, total_months, never_paid_off, payoff_date, total_interest_paid, final_debt_data with per-debt paid_off_month/never_paid_off) and goalProjections
 postconditions:
   - nothing is persisted
 business_rules:
   - interest per month = round(balance x APR / 100 / 12), applied before payments
   - minimum payments are capped at the remaining balance
-  - extra payment goes to the first debt with a balance after sorting (snowball = smallest balance, avalanche = highest APR, custom = priority)
-  - simulation stops when all balances are zero or after 600 months
+  - the monthly payment budget is the sum of every debt's minimum plus the extra payment; minimums are paid on all open debts, then the remainder (extra + minimums freed by paid-off debts + anything a debt didn't need) goes to open debts in order after sorting (snowball = smallest balance, avalanche = highest APR, custom = priority)
+  - simulation stops when all balances are zero or after 600 months; if any balance remains, never_paid_off is true, payoff_date is null and the page shows a "never pays off" warning
   - goal months_to_complete = ceil(target / monthly_contribution); null when contribution is 0
   - payoff_plan is scoped to the budget; needs budget view
 scenarios:
@@ -58,9 +58,12 @@ scenarios:
       - tests/Feature/Services/PayoffPlanServiceTest.php::accrues interest month over month
   - id: payoff_never_reached
     kind: edge
-    description: When minimum plus extra payments do not exceed monthly interest, the plan should report that payoff is never reached.
-    coverage: uncovered
-    note: currently the loop silently stops at 600 months and returns a payoff_date 50 years out with balances still positive.
+    description: When minimum plus extra payments do not exceed monthly interest, the plan reports never_paid_off (plan and per debt) with a null payoff_date.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/PayoffPlanServiceTest.php::flags a plan whose payments never cover the interest
+      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::a plan whose payments never cover the interest is flagged as never paid off
+    note: the Show.vue warning banner rendering itself is not browser-tested.
   - id: zero_balance_debt
     kind: edge
     description: A plan whose debts all start at zero balance returns an empty timeline and total_months 0.
@@ -70,8 +73,10 @@ scenarios:
   - id: multi_debt_rollover
     kind: edge
     description: With several debts, leftover extra payment and freed minimums from a paid-off debt roll into the next debt.
-    coverage: uncovered
-    note: not implemented; the extra loop breaks after the first debt and freed minimums are dropped (see known_issues).
+    coverage: covered
+    tests:
+      - tests/Feature/Services/PayoffPlanServiceTest.php::rolls freed minimums from a paid-off debt into the next debt
+      - tests/Feature/Services/PayoffPlanServiceTest.php::rolls the extra payment remainder into the next debt in the same month
   - id: goal_with_zero_contribution
     kind: edge
     description: A goal with 0 monthly contribution has null months_to_complete.
@@ -87,8 +92,6 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject a plan addressed through another budget with 404
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject the owners plan addressed through the owners other budget with 404
 known_issues:
-  - The extra payment is applied only to the first unpaid debt with `break`; any remainder after that debt reaches zero is discarded and minimum payments of paid-off debts are not rolled over, so snowball/avalanche timelines are longer than the strategies promise.
-  - No "never paid off" signal; negative-amortisation plans report total_months 600 and a far-future payoff_date with positive final balances.
   - Interest accrues before payments every month including month 1, so a plan starting on the statement date charges a full month of interest immediately.
   - Goal projections ignore the debt timeline (contributions start at plan start rather than after debts are paid).
 confidence: high

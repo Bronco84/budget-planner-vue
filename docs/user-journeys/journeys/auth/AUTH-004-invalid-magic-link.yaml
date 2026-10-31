@@ -59,8 +59,14 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/MagicLinkTest.php::a magic link presented with a different email address is rejected'
+  - id: error_reaches_login_page
+    kind: recovery
+    description: The login page receives errors.magic_link ("Invalid or expired magic link.") and PasskeyLogin.vue shows it in its error banner.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/MagicLinkTest.php::the login page receives the invalid magic link error so it can be shown
+    note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
 known_issues:
-  - PasskeyLogin.vue only renders the status prop, so the errors.magic_link message is never shown; the guest silently lands on the login page.
   - verifyToken marks the token used before the controller checks the email, so a mismatched-email request burns a still-valid link.
 confidence: high
 evidence:

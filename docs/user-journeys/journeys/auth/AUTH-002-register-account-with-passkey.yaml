@@ -93,8 +93,14 @@ scenarios:
     kind: authorization
     description: An authenticated user visiting /register is redirected away by the guest middleware.
     coverage: uncovered
+  - id: account_created_status_shown
+    kind: happy_path
+    description: After account creation, PasskeyRegister receives flash.status "Account created! Now register your passkey." and shows it in its success banner.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/PasskeyEnforcementTest.php::the passkey registration page receives the account created status so it can be shown
+    note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
 known_issues:
-  - PasskeyRegister.vue does not render the flashed status ("Account created! Now register your passkey.") from registerStore.
   - Registration allowlist is a hardcoded email literal in the controller rather than configuration.
 confidence: high
 evidence:

@@ -35,7 +35,7 @@
           </div>
 
           <!-- Error Message -->
-          <div v-if="error" class="rounded-xl bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/30 dark:to-pink-900/30 p-4 border border-red-200 dark:border-red-800/50">
+          <div v-if="error || errors.magic_link" class="rounded-xl bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/30 dark:to-pink-900/30 p-4 border border-red-200 dark:border-red-800/50">
             <div class="flex">
               <div class="flex-shrink-0">
                 <svg class="h-5 w-5 text-red-500 dark:text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -43,7 +43,7 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ error }}</p>
+                <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ error || errors.magic_link }}</p>
               </div>
             </div>
           </div>
@@ -164,6 +164,10 @@ import TextInput from '@/Components/TextInput.vue';
 
 const props = defineProps({
   status: String,
+  errors: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const loading = ref(false);

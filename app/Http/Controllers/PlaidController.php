@@ -11,6 +11,7 @@ use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -184,6 +185,10 @@ class PlaidController extends Controller
             'metadata' => 'required|array',
             'metadata.institution' => 'required|array',
             'metadata.institution.name' => 'required|string',
+            'metadata.institution.institution_id' => 'nullable|string',
+            'metadata.item' => 'nullable|array',
+            'metadata.item.id' => 'nullable|string',
+            'metadata.item_id' => 'nullable|string',
             'selected_accounts' => 'required|array',
             'selected_accounts.*' => 'required|string',
         ]);
@@ -196,7 +201,7 @@ class PlaidController extends Controller
                 return redirect()->back()->with('error', 'Failed to connect to Plaid.');
             }
 
-            // Get all accounts from Plaid
+            // Get all accounts from Plaid (throws when Plaid fails)
             $plaidAccounts = $this->plaidService->getAccounts($accessToken);
             $selectedPlaidAccounts = array_filter($plaidAccounts, function ($account) use ($validated) {
                 // Use 'id' field for Plaid metadata accounts, 'account_id' for API accounts
@@ -205,35 +210,12 @@ class PlaidController extends Controller
                 return in_array($accountId, $validated['selected_accounts']);
             });
 
-            $importedCount = 0;
+            // A missing item id gets a generated one in createOrFindConnection.
             $itemId = $validated['metadata']['item']['id'] ??
                      $validated['metadata']['item_id'] ??
-                     'plaid-item-'.uniqid();
+                     null;
 
-            // Prepare account data for batch linking
-            $accountData = [];
-            foreach ($selectedPlaidAccounts as $plaidAccount) {
-                // Create local account
-                $accountType = $this->plaidService->mapPlaidAccountType($plaidAccount);
-                $localAccount = $budget->accounts()->create([
-                    'name' => $plaidAccount['name'],
-                    'type' => $accountType,
-                    'current_balance_cents' => isset($plaidAccount['balances']['current'])
-                        ? (int) round($plaidAccount['balances']['current'] * 100)
-                        : 0,
-                    'balance_updated_at' => now(),
-                    'include_in_budget' => true,
-                ]);
-
-                $accountData[] = [
-                    'local_account' => $localAccount,
-                    'plaid_account_data' => $plaidAccount,
-                ];
-
-                $importedCount++;
-            }
-
-            // Fetch institution logo and URL
+            // Fetch institution logo and URL (remote calls, kept outside the transaction)
             $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
             $institutionName = $validated['metadata']['institution']['name'];
             $institutionDetails = $this->fetchInstitutionDetails($institutionId, $institutionName);
@@ -241,25 +223,50 @@ class PlaidController extends Controller
             $institutionLogo = $institutionDetails['logo'] ?? null;
             $institutionUrl = $institutionDetails['url'] ?? null;
 
-            // Link all accounts to Plaid under single connection
-            $plaidAccounts = $this->plaidService->linkMultipleAccounts(
-                $budget,
-                $accountData,
-                $accessToken,
-                $itemId,
-                $institutionId,
-                $validated['metadata']['institution']['name'],
-                $institutionLogo,
-                $institutionUrl
-            );
+            // Create the local accounts and link them under one connection atomically,
+            // so a failure part-way leaves no orphan accounts or empty connection.
+            $linkedAccounts = DB::transaction(function () use (
+                $budget, $selectedPlaidAccounts, $accessToken, $itemId,
+                $institutionId, $institutionName, $institutionLogo, $institutionUrl
+            ) {
+                $accountData = [];
+                foreach ($selectedPlaidAccounts as $plaidAccount) {
+                    $localAccount = $budget->accounts()->create([
+                        'name' => $plaidAccount['name'],
+                        'type' => $this->plaidService->mapPlaidAccountType($plaidAccount),
+                        'current_balance_cents' => isset($plaidAccount['balances']['current'])
+                            ? (int) round($plaidAccount['balances']['current'] * 100)
+                            : 0,
+                        'balance_updated_at' => now(),
+                        'include_in_budget' => true,
+                    ]);
 
-            // Sync transactions for all linked accounts
-            foreach ($plaidAccounts as $plaidAccount) {
-                $this->plaidService->syncTransactions($plaidAccount);
-            }
+                    $accountData[] = [
+                        'local_account' => $localAccount,
+                        'plaid_account_data' => $plaidAccount,
+                    ];
+                }
+
+                return $this->plaidService->linkMultipleAccounts(
+                    $budget,
+                    $accountData,
+                    $accessToken,
+                    $itemId,
+                    $institutionId,
+                    $institutionName,
+                    $institutionLogo,
+                    $institutionUrl
+                );
+            });
+
+            $importedCount = count($linkedAccounts);
+
+            // Initial sync; a failure here keeps the import but is reported.
+            $syncError = $this->syncAfterLinking($linkedAccounts);
 
             return redirect()->route('budgets.show', $budget)
-                ->with('message', "Successfully imported {$importedCount} accounts from Plaid.");
+                ->with('message', "Successfully imported {$importedCount} accounts from Plaid.")
+                ->with('error', $syncError);
 
         } catch (\Exception $e) {
             Log::error('Plaid import failed', [
@@ -282,6 +289,10 @@ class PlaidController extends Controller
             'metadata' => 'required|array',
             'metadata.institution' => 'required|array',
             'metadata.institution.name' => 'required|string',
+            'metadata.institution.institution_id' => 'nullable|string',
+            'metadata.item' => 'nullable|array',
+            'metadata.item.id' => 'nullable|string',
+            'metadata.item_id' => 'nullable|string',
             'metadata.account' => 'required|array',
             'metadata.account.id' => 'required|string',
         ]);
@@ -355,11 +366,11 @@ class PlaidController extends Controller
                     $plaidAccountData
                 );
 
-                // Sync transactions
-                $this->plaidService->syncTransactions($plaidAccount);
+                $syncError = $this->syncAfterLinking([$plaidAccount]);
 
                 return redirect()->route('budgets.show', $budget)
-                    ->with('message', "Account linked successfully to existing {$institutionName} connection.");
+                    ->with('message', "Account linked successfully to existing {$institutionName} connection.")
+                    ->with('error', $syncError);
             }
 
             // No existing connection - create new one (original logic)
@@ -382,11 +393,11 @@ class PlaidController extends Controller
                 $institutionUrl
             );
 
-            // Sync transactions
-            $this->plaidService->syncTransactions($plaidAccount);
+            $syncError = $this->syncAfterLinking([$plaidAccount]);
 
             return redirect()->route('budgets.show', $budget)
-                ->with('message', 'Account linked to Plaid successfully.');
+                ->with('message', 'Account linked to Plaid successfully.')
+                ->with('error', $syncError);
         } catch (\Exception $e) {
             Log::error('Plaid linking failed', [
                 'error' => $e->getMessage(),
@@ -466,18 +477,14 @@ class PlaidController extends Controller
                     'connection_id' => $existingConnection->id,
                 ]);
 
-                // Sync transactions
-                $this->plaidService->syncTransactions($existingPlaidAccount);
+                $syncError = $this->syncAfterLinking([$existingPlaidAccount->fresh()]);
 
                 return redirect()->route('budgets.show', $budget)
-                    ->with('message', "Account re-linked successfully to existing {$institutionName} connection.");
+                    ->with('message', "Account re-linked successfully to existing {$institutionName} connection.")
+                    ->with('error', $syncError);
             }
 
             // No existing connection - create new one and update PlaidAccount
-            $itemId = $validated['metadata']['item']['id'] ??
-                    $validated['metadata']['item_id'] ??
-                    null;
-
             // Fetch institution logo and URL
             $institutionDetails = $this->fetchInstitutionDetails($institutionId, $institutionName);
             $institutionId = $institutionDetails['institution_id'] ?? $institutionId;
@@ -526,11 +533,11 @@ class PlaidController extends Controller
                 'connection_id' => $plaidConnection->id,
             ]);
 
-            // Sync transactions
-            $this->plaidService->syncTransactions($existingPlaidAccount);
+            $syncError = $this->syncAfterLinking([$existingPlaidAccount->fresh()]);
 
             return redirect()->route('budgets.show', $budget)
-                ->with('message', 'Account re-linked to Plaid successfully.');
+                ->with('message', 'Account re-linked to Plaid successfully.')
+                ->with('error', $syncError);
 
         } catch (\Exception $e) {
             Log::error('Account re-linking failed', [
@@ -656,19 +663,55 @@ class PlaidController extends Controller
      */
     private function handleSyncException(\Exception $e, Account $account, PlaidAccount $plaidAccount): RedirectResponse
     {
-        // Handle PRODUCT_NOT_READY error specifically
-        if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY')) {
-            return redirect()->back()->with('error',
-                'Transaction data for this account is still being processed by Plaid. This can take 1-3 days for credit cards after initial connection. Please try again later.');
-        }
-
         Log::error('Account sync error', [
             'account_id' => $account->id,
             'plaid_account_id' => $plaidAccount->id,
             'error' => $e->getMessage(),
         ]);
 
-        return redirect()->back()->with('error', 'Failed to sync transactions: '.$e->getMessage());
+        return redirect()->back()->with('error', $this->syncFailureMessage($e));
+    }
+
+    /**
+     * User-safe message for a failed sync, keyed off the Plaid error code that
+     * PlaidService prefixes onto the exception message.
+     */
+    private function syncFailureMessage(\Throwable $e): string
+    {
+        $message = $e->getMessage();
+
+        return $this->userSafeError($e, match (true) {
+            str_contains($message, 'PRODUCT_NOT_READY') => 'Transaction data for this account is still being processed by Plaid. This can take 1-3 days for credit cards after initial connection. Please try again later.',
+            str_contains($message, 'ITEM_LOGIN_REQUIRED') => 'Your bank needs you to sign in again. Use Re-authenticate to reconnect this account.',
+            default => 'Failed to sync transactions. Please try again.',
+        });
+    }
+
+    /**
+     * Run the initial sync for freshly linked accounts. Linking has already
+     * succeeded, so a sync failure is reported rather than undoing the link.
+     *
+     * @param  iterable<PlaidAccount>  $plaidAccounts
+     * @return string|null a user-safe message for the first failure, or null
+     */
+    private function syncAfterLinking(iterable $plaidAccounts): ?string
+    {
+        $error = null;
+
+        foreach ($plaidAccounts as $plaidAccount) {
+            try {
+                $this->plaidService->syncTransactions($plaidAccount);
+            } catch (\Exception $e) {
+                Log::warning('Initial sync after linking failed', [
+                    'plaid_account_id' => $plaidAccount->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $error ??= $this->syncFailureMessage($e);
+            }
+        }
+
+        return $error;
     }
 
     /**
@@ -832,48 +875,36 @@ class PlaidController extends Controller
 
         $totalImported = 0;
         $totalUpdated = 0;
-        $errors = [];
+        $succeeded = 0;
+        $failedAccounts = [];
+        $lastError = null;
 
         foreach ($plaidAccounts as $plaidAccount) {
-            try {
-                Log::info('Starting sync for account', [
-                    'plaid_account_id' => $plaidAccount->id,
-                    'account_id' => $plaidAccount->account_id,
-                    'institution' => $plaidAccount->institution_name,
-                ]);
+            $accountName = $plaidAccount->account ? $plaidAccount->account->name : 'Unknown';
 
+            try {
                 $result = $this->plaidService->syncTransactions($plaidAccount);
                 $totalImported += $result['imported'];
                 $totalUpdated += $result['updated'];
-
-                Log::info('Sync successful', [
-                    'plaid_account_id' => $plaidAccount->id,
-                    'imported' => $result['imported'],
-                    'updated' => $result['updated'],
-                ]);
+                $succeeded++;
             } catch (\Exception $e) {
-                $accountName = $plaidAccount->account ? $plaidAccount->account->name : 'Unknown';
-
-                // Handle PRODUCT_NOT_READY error specifically
+                // Transaction data not ready yet (new credit cards): skip silently.
                 if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY')) {
                     Log::info('Account transaction data not ready yet', [
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $accountName,
-                        'institution' => $plaidAccount->institution_name,
                     ]);
 
-                    // Don't add to errors array for this specific case
                     continue;
                 }
 
-                $errorMessage = "Error syncing account {$accountName}: {$e->getMessage()}";
-                $errors[] = $errorMessage;
+                $failedAccounts[] = $accountName;
+                $lastError = $e;
 
                 Log::error('Sync error', [
                     'plaid_account_id' => $plaidAccount->id,
                     'account_id' => $plaidAccount->account_id,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
                 ]);
             }
         }
@@ -881,20 +912,22 @@ class PlaidController extends Controller
         Log::info('Sync complete', [
             'total_imported' => $totalImported,
             'total_updated' => $totalUpdated,
-            'error_count' => count($errors),
+            'error_count' => count($failedAccounts),
         ]);
 
-        if (! empty($errors)) {
-            // Log errors but don't show them to the user unless there were no successful syncs
-            Log::error('Plaid sync errors', $errors);
-
-            if ($totalImported === 0 && $totalUpdated === 0) {
-                return redirect()->back()->with('error', 'Failed to sync transactions. Please try again.');
-            }
+        // Every account that was attempted failed.
+        if ($lastError && $succeeded === 0) {
+            return redirect()->back()->with('error', $this->userSafeError($lastError, 'Failed to sync transactions. Please try again.'));
         }
 
-        return redirect()->back()->with('message',
-            "Synced {$totalImported} new and updated {$totalUpdated} transactions.");
+        $message = "Synced {$totalImported} new and updated {$totalUpdated} transactions.";
+
+        if ($failedAccounts) {
+            $count = count($failedAccounts);
+            $message .= ' '.$count.' '.($count === 1 ? 'account' : 'accounts').' could not be synced: '.implode(', ', $failedAccounts).'.';
+        }
+
+        return redirect()->back()->with('message', $message);
     }
 
     /**

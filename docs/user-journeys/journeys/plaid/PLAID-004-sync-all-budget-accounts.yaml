@@ -30,17 +30,21 @@ postconditions:
 business_rules:
   - limited to 3 requests per minute
   - PRODUCT_NOT_READY accounts are skipped silently
-  - errors are only shown when every account failed and nothing was imported or updated
+  - when every attempted account failed, the user gets a user-safe error flash ("Failed to sync transactions. Please try again." or the could-not-reach message)
+  - 'when some accounts failed, the success message lists them ("N account(s) could not be synced: <names>."); raw Plaid text is only logged'
 scenarios:
   - id: sync_all_happy
     kind: happy_path
     description: All linked accounts are synced and the combined counts are flashed.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::syncing all accounts reports the combined counts
   - id: no_linked_accounts
     kind: empty_state
     description: A budget with no Plaid accounts redirects back with "No Plaid-connected accounts found."
-    coverage: uncovered
-    note: SecurityRateLimitingTest exercises this path but asserts only that it is not 429.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::a budget with no linked accounts reports that nothing is connected
   - id: sync_all_rate_limited
     kind: edge
     description: The fourth sync-all within a minute returns 429.
@@ -49,9 +53,18 @@ scenarios:
       - tests/Feature/SecurityRateLimitingTest.php::plaid sync-all endpoint has stricter rate limiting
   - id: partial_failure_reported
     kind: integration
-    description: When some accounts fail, the successful totals are flashed; when all fail the user gets "Failed to sync transactions."
-    coverage: uncovered
-    note: unreachable today because per-account errors are swallowed in PlaidService (see known_issues).
+    description: When some accounts fail, the successful totals are flashed with the failed account names; when all fail the user gets "Failed to sync transactions. Please try again."
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::sync all reports accounts that failed alongside the successful totals
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::sync all reports a failure even when a successful account had nothing new
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::sync all shows an error when every account failed
+  - id: product_not_ready_skipped
+    kind: edge
+    description: Accounts whose Plaid data is not ready yet (PRODUCT_NOT_READY) are skipped without being reported as failures.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::sync all skips accounts whose Plaid data is not ready yet
   - id: cross_user_denied
     kind: authorization
     description: Syncing another user's budget returns 403.
@@ -59,7 +72,6 @@ scenarios:
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot sync all transactions on another users budget
 known_issues:
-  - per-account exceptions never reach the controller because PlaidService::syncTransactions swallows them, so the error aggregation and the all-failed error flash never trigger; failures read as "Synced 0 ...".
   - Budgets/Show.vue only toasts flash.message on success; an error flash (e.g. "No Plaid-connected accounts found.") is not displayed by that handler.
 confidence: high
 evidence:

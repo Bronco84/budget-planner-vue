@@ -263,7 +263,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 
@@ -272,9 +272,12 @@ const props = defineProps({
   isNewUser: Boolean,
 });
 
+const page = usePage();
+
 const loading = ref(false);
-const error = ref('');
-const success = ref('');
+// Seed from the flash so redirects here (e.g. passkey enforcement, account creation) explain why.
+const error = ref(page.props.flash?.error || '');
+const success = ref(page.props.flash?.status || '');
 const passkeyName = ref('');
 
 // Use computed to determine which layout to use

@@ -76,7 +76,7 @@ class AccountController extends Controller
         $account = $budget->accounts()->create([
             'name' => $validated['name'],
             'type' => $validated['type'],
-            'current_balance_cents' => $validated['current_balance'] * 100,
+            'current_balance_cents' => (int) round($validated['current_balance'] * 100),
             'balance_updated_at' => now(),
             'include_in_budget' => $includeInBudget,
             // Auto-sync: excluded accounts are also excluded from total balance

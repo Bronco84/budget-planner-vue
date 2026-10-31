@@ -65,8 +65,14 @@ scenarios:
     kind: authentication
     description: Guests pass through the middleware untouched and are handled by auth/guest guards instead.
     coverage: uncovered
+  - id: enforcement_error_shown
+    kind: recovery
+    description: After the redirect, PasskeyRegister receives flash.error "You must register a passkey to continue." and shows it in its error banner.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/PasskeyEnforcementTest.php::the passkey registration page receives the enforcement error so it can be shown
+    note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
 known_issues:
-  - PasskeyRegister.vue does not display the flashed error, so the user is redirected without being told why.
   - The middleware returns an HTML redirect for JSON/XHR requests instead of a 403/409 JSON response.
 confidence: high
 evidence:

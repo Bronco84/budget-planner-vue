@@ -142,7 +142,7 @@ class TransactionController extends Controller
         ]);
 
         // Convert amount to cents and handle negative values for expenses
-        $amountInCents = $validated['amount'] * 100;
+        $amountInCents = (int) round($validated['amount'] * 100);
 
         /** @var Transaction $transaction */
         $transaction = $budget->transactions()->create([
@@ -212,7 +212,7 @@ class TransactionController extends Controller
         $transaction->update([
             'account_id' => $validated['account_id'],
             'description' => $validated['description'],
-            'amount_in_cents' => $validated['amount'] * 100,
+            'amount_in_cents' => (int) round($validated['amount'] * 100),
             'date' => $validated['date'],
             'category' => $validated['category'],
             'notes' => $validated['notes'] ?? null,

@@ -446,7 +446,7 @@ class RecurringTransactionController extends Controller
 
         // Handle amount conversion - set to 0 for dynamic amount transactions
         if (isset($validated['amount']) && $validated['amount'] !== null) {
-            $validated['amount_in_cents'] = (int) ($validated['amount'] * 100);
+            $validated['amount_in_cents'] = (int) round($validated['amount'] * 100);
             Log::debug('getArr - Converted amount:', [
                 'original' => $validated['amount'],
                 'converted' => $validated['amount_in_cents'],
@@ -464,12 +464,12 @@ class RecurringTransactionController extends Controller
         // Convert dynamic amount values to cents if provided
         // Ensure min/max have the same sign as the main amount
         if (isset($validated['min_amount']) && $validated['min_amount'] !== null) {
-            $minCents = (int) (abs($validated['min_amount']) * 100);
+            $minCents = (int) round(abs($validated['min_amount']) * 100);
             $validated['min_amount'] = $isExpense ? -$minCents : $minCents;
         }
 
         if (isset($validated['max_amount']) && $validated['max_amount'] !== null) {
-            $maxCents = (int) (abs($validated['max_amount']) * 100);
+            $maxCents = (int) round(abs($validated['max_amount']) * 100);
             $validated['max_amount'] = $isExpense ? -$maxCents : $maxCents;
         }
 

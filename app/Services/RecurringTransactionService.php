@@ -505,10 +505,7 @@ class RecurringTransactionService
                 if ($rules->isNotEmpty()) {
                     $filteredMatches = $entityMatches->filter(function (Transaction $transaction) use ($rules) {
                         foreach ($rules as $rule) {
-                            $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
-                            $ruleValue = $rule->value;
-                            $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue);
-                            if (! $matches) {
+                            if (! $rule->matchesTransaction($transaction)) {
                                 return false;
                             }
                         }
@@ -543,11 +540,7 @@ class RecurringTransactionService
         $matchingTransactions = $transactions->filter(function (Transaction $transaction) use ($rules) {
             // Transaction must match ALL rules (AND logic)
             foreach ($rules as $rule) {
-                $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
-                $ruleValue = $rule->value;
-                $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue);
-
-                if (! $matches) {
+                if (! $rule->matchesTransaction($transaction)) {
                     return false;
                 }
             }
@@ -789,12 +782,12 @@ class RecurringTransactionService
     {
         $rules = $template->rules()->where('is_active', true)->get();
 
-        // If no rules, unlink all transactions
+        // With no rules left there is nothing to re-evaluate against. Links are
+        // not tagged with how they were made (Plaid entity, description, manual
+        // or rule), so leave every existing link in place rather than wiping
+        // links that never came from rules.
         if ($rules->isEmpty()) {
-            $unlinkedCount = Transaction::where('recurring_transaction_template_id', $template->id)
-                ->update(['recurring_transaction_template_id' => null]);
-
-            return ['unlinked' => $unlinkedCount, 'linked' => 0];
+            return ['unlinked' => 0, 'linked' => 0];
         }
 
         // Find all transactions that currently match the rules
@@ -902,9 +895,7 @@ class RecurringTransactionService
                 if ($rules->isNotEmpty()) {
                     $matchesAllRules = true;
                     foreach ($rules as $rule) {
-                        $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
-                        $ruleValue = $rule->value;
-                        if (! $this->evaluateRuleCondition($fieldValue, $rule->operator, $ruleValue)) {
+                        if (! $rule->matchesTransaction($transaction)) {
                             $matchesAllRules = false;
                             break;
                         }
@@ -962,84 +953,6 @@ class RecurringTransactionService
             'by_rules' => $linkedByRules,
             'by_description' => $linkedByDescription,
         ];
-    }
-
-    /**
-     * Get the value of a transaction field for comparison with a rule
-     *
-     * @return mixed
-     */
-    protected function getTransactionFieldValue(Transaction $transaction, string $field)
-    {
-        switch ($field) {
-            case 'description':
-                return $transaction->description;
-            case 'amount':
-                return $transaction->amount_in_cents;
-            case 'category':
-                return $transaction->category;
-            case 'date':
-                return $transaction->date ? $transaction->date->format('Y-m-d') : null;
-            case 'account_id':
-                return $transaction->account_id;
-            default:
-                return null;
-        }
-    }
-
-    /**
-     * Evaluate if a transaction field value matches a rule condition
-     *
-     * @param  mixed  $fieldValue
-     * @param  mixed  $ruleValue
-     */
-    protected function evaluateRuleCondition($fieldValue, string $operator, $ruleValue): bool
-    {
-        switch ($operator) {
-            case '=':
-            case 'equals':
-                return $fieldValue == $ruleValue;
-            case '!=':
-                return $fieldValue != $ruleValue;
-            case '>':
-            case 'greater_than':
-                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue > $ruleValue;
-            case '<':
-            case 'less_than':
-                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue < $ruleValue;
-            case '>=':
-                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue >= $ruleValue;
-            case '<=':
-                return is_numeric($fieldValue) && is_numeric($ruleValue) && $fieldValue <= $ruleValue;
-            case 'contains':
-                return is_string($fieldValue) && is_string($ruleValue) &&
-                    stripos($fieldValue, $ruleValue) !== false;
-            case 'not_contains':
-                return is_string($fieldValue) && is_string($ruleValue) &&
-                    stripos($fieldValue, $ruleValue) === false;
-            case 'starts_with':
-                return is_string($fieldValue) && is_string($ruleValue) &&
-                    stripos($fieldValue, $ruleValue) === 0;
-            case 'ends_with':
-                return is_string($fieldValue) && is_string($ruleValue) &&
-                    stripos($fieldValue, $ruleValue, max(0, strlen($fieldValue) - strlen($ruleValue))) !== false;
-            case 'regex':
-                if (! is_string($fieldValue) || ! is_string($ruleValue)) {
-                    return false;
-                }
-                try {
-                    return preg_match('/'.$ruleValue.'/i', $fieldValue) === 1;
-                } catch (\Exception $e) {
-                    Log::warning('Invalid regex pattern in rule evaluation', [
-                        'pattern' => $ruleValue,
-                        'error' => $e->getMessage(),
-                    ]);
-
-                    return false;
-                }
-            default:
-                return false;
-        }
     }
 
     /**
@@ -1270,10 +1183,7 @@ class RecurringTransactionService
         $matchCount = 0;
 
         foreach ($transactions as $transaction) {
-            $fieldValue = $this->getTransactionFieldValue($transaction, $rule->field);
-            $matches = $this->evaluateRuleCondition($fieldValue, $rule->operator, $rule->value);
-
-            if ($matches) {
+            if ($rule->matchesTransaction($transaction)) {
                 $matchingTransactions->push($transaction);
                 $matchCount++;
             }

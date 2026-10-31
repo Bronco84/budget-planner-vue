@@ -1574,9 +1574,12 @@ const importFromBank = async () => {
       onSuccess: (page) => {
         syncingTransactions.value = false;
 
-        // Show success message to user
-        if (page.props.flash && page.props.flash.message) {
+        // Show the outcome; a sync where every account failed flashes only an error
+        if (page.props.flash?.message) {
           toast.success(page.props.flash.message);
+        }
+        if (page.props.flash?.error) {
+          toast.error(page.props.flash.error);
         }
 
         // Reload only the necessary components

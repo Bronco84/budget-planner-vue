@@ -181,3 +181,37 @@ test('user cannot store a transaction on another users budget', function () {
 
     expect(Transaction::count())->toBe(0);
 });
+
+test('storing a transaction converts dollars to the exact cent amount', function (float $amount, int $expectedCents) {
+    // Capture the raw value sent to the database: the integer column (and SQLite's
+    // 15-digit REAL formatting) would otherwise mask a float like 28.999999999999996.
+    Transaction::saving(function (Transaction $transaction) {
+        test()->rawCents = $transaction->getAttributes()['amount_in_cents'];
+    });
+
+    $this->actingAs($this->user)
+        ->post(route('budget.transaction.store', $this->budget), [
+            'account_id' => $this->account->id,
+            'description' => 'Coffee',
+            'amount' => $amount,
+            'date' => '2026-06-14',
+            'category' => 'Dining',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($this->rawCents)->toBe($expectedCents)
+        ->and($this->budget->transactions()->sole()->amount_in_cents)->toBe($expectedCents);
+})->with([
+    '0.29' => [0.29, 29],
+    '19.99' => [19.99, 1999],
+    '-19.99' => [-19.99, -1999],
+]);
+
+test('create transaction page has a breadcrumb trail', function () {
+    $this->actingAs($this->user)
+        ->get(route('budget.transaction.create', $this->budget))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('breadcrumbs')
+            ->where('breadcrumbs', fn ($crumbs) => collect($crumbs)->last()['title'] === 'Create Transaction'));
+});

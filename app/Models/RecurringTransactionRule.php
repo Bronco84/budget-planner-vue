@@ -137,7 +137,9 @@ class RecurringTransactionRule extends Model
                     substr($fieldValue, -strlen($ruleValue)) === $ruleValue;
 
             case self::OPERATOR_REGEX:
-                return is_string($fieldValue) && preg_match($ruleValue, $fieldValue);
+                // The value is a full pattern with delimiters; one that doesn't
+                // compile (validated on input, but may predate validation) matches nothing.
+                return is_string($fieldValue) && @preg_match($ruleValue, $fieldValue) === 1;
 
             case self::OPERATOR_GREATER_THAN:
                 return is_numeric($fieldValue) && $fieldValue > (float) $ruleValue;

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureUserHasPasskey;
 use App\Models\User;
+use Inertia\Testing\AssertableInertia;
 
 // TestCase disables passkey enforcement globally; these tests opt back in.
 beforeEach(function () {
@@ -51,4 +52,23 @@ test('a user with a passkey is not redirected', function () {
     $response = $this->actingAs($user)->get(route('budgets.index'));
 
     expect($response->headers->get('Location'))->not->toBe(route('passkey.register'));
+});
+
+test('the passkey registration page receives the enforcement error so it can be shown', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->followingRedirects()
+        ->get(route('budgets.index'))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Auth/PasskeyRegister')
+            ->where('flash.error', 'You must register a passkey to continue.'));
+});
+
+test('the passkey registration page receives the account created status so it can be shown', function () {
+    $this->followingRedirects()
+        ->post(route('register'), ['name' => 'Owner', 'email' => 'bamccoley@gmail.com'])
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Auth/PasskeyRegister')
+            ->where('flash.status', 'Account created! Now register your passkey.'));
 });

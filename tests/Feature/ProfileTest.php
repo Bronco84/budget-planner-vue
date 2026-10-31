@@ -67,8 +67,9 @@ class ProfileTest extends TestCase
 
         $response = $this
             ->actingAs($user)
+            ->withSession(['auth' => ['authenticated_at' => now()->getTimestamp()]])
             ->delete('/profile', [
-                'password' => 'password',
+                'email' => $user->email,
             ]);
 
         $response
@@ -79,19 +80,20 @@ class ProfileTest extends TestCase
         $this->assertNull($user->fresh());
     }
 
-    public function test_correct_password_must_be_provided_to_delete_account(): void
+    public function test_correct_email_must_be_provided_to_delete_account(): void
     {
         $user = User::factory()->create();
 
         $response = $this
             ->actingAs($user)
+            ->withSession(['auth' => ['authenticated_at' => now()->getTimestamp()]])
             ->from('/profile')
             ->delete('/profile', [
-                'password' => 'wrong-password',
+                'email' => 'wrong@example.com',
             ]);
 
         $response
-            ->assertSessionHasErrors('password')
+            ->assertSessionHasErrors('email')
             ->assertRedirect('/profile');
 
         $this->assertNotNull($user->fresh());

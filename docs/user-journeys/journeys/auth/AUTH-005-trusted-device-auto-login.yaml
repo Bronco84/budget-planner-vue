@@ -69,7 +69,21 @@ scenarios:
   - id: fingerprint_mismatch_ignored
     kind: edge
     description: A valid token presented with different browser headers is not accepted.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::a device token presented from a different browser does not auto log in
+  - id: json_login_device_matches_page_loads
+    kind: integration
+    description: A device trusted during the JSON passkey-login request auto-logs in on a later HTML page load from the same browser (the fingerprint ignores the Accept header).
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::a device trusted during a json passkey login auto logs in on a later html page load
+  - id: auto_login_records_authentication_time
+    kind: integration
+    description: Auto-login stamps auth.authenticated_at in the session (used by account deletion, PROFILE-002).
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::a trusted device auto login records the authentication time
   - id: unknown_or_tampered_cookie_ignored
     kind: authentication
     description: A device_token value that matches no stored device does not authenticate anyone.
@@ -85,7 +99,6 @@ scenarios:
     tests:
       - tests/Feature/WebAuthnLoginOptionsTest.php::an authenticated request to login options returns json, not an html redirect
 known_issues:
-  - "Suspected: the fingerprint includes the request Accept header. Devices are created on webauthn/login (axios sends Accept: application/json) or webauthn/register (fetch, Accept: application/json), but full page loads send Accept: text/html,..., so the fingerprint never matches on a normal visit. Auto-login then only fires on JSON requests such as webauthn/login/options."
   - DeviceTokenService::verifyDeviceToken loads and decrypts every valid TrustedDevice for every user on each guest request with a cookie (O(n) scan, no indexed lookup).
 confidence: medium
 evidence:

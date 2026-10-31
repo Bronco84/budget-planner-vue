@@ -153,3 +153,25 @@ test('user cannot add an account to another users budget', function () {
 
     expect($this->otherBudget->accounts()->count())->toBe(0);
 });
+
+test('storing a manual account converts the balance to the exact cent amount', function (float $balance, int $expectedCents) {
+    // Capture the raw value sent to the database (the integer column would mask float error).
+    Account::saving(function (Account $account) {
+        test()->rawCents = $account->getAttributes()['current_balance_cents'];
+    });
+
+    $this->actingAs($this->user)
+        ->post(route('budgets.accounts.store', $this->budget), [
+            'name' => 'Wallet',
+            'type' => 'checking',
+            'current_balance' => $balance,
+            'include_in_budget' => true,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($this->rawCents)->toBe($expectedCents)
+        ->and($this->budget->accounts()->sole()->current_balance_cents)->toBe($expectedCents);
+})->with([
+    '0.29' => [0.29, 29],
+    '19.99' => [19.99, 1999],
+]);

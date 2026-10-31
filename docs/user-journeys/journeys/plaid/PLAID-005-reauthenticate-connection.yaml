@@ -84,11 +84,11 @@ scenarios:
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::plaid POST route rejects a cross-budget account with 404
 known_issues:
-  - nothing in the app ever detects ITEM_LOGIN_REQUIRED or calls PlaidConnection::markAsError, so connections never enter the 'error' status and users are never prompted to re-authenticate; the button is always shown on linked accounts and re-auth is purely user-initiated.
+  - only a transaction sync (plaid.sync, plaid.sync-all, post-link sync) detects ITEM_LOGIN_REQUIRED and calls PlaidConnection::markAsError (covered in PLAID-003 plaid_error_surfaced_on_sync and PLAID-004 partial_failure_reported); balance/liabilities/investments refreshes do not. The UI does not yet key a re-auth prompt off the 'error' status; the button is always shown on linked accounts.
   - Plaid documents that update mode does not require exchanging the public token; exchanging it and overwriting access_token should be verified against the Plaid sandbox.
 confidence: high
 evidence:
   - app/Http/Controllers/PlaidController.php upgradeLinkToken(), updateConnection()
   - resources/js/Pages/Plaid/Link.vue updateConnection()
-  - app/Models/PlaidConnection.php markAsError() has no callers
+  - app/Services/PlaidService.php syncTransactions() calls PlaidConnection::markAsError on ITEM_LOGIN_REQUIRED
 last_verified: null

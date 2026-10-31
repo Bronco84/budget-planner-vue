@@ -55,6 +55,12 @@ scenarios:
     kind: alternate
     description: Delete removes the template and returns to the index.
     coverage: uncovered
+  - id: update_cents_conversion_precision
+    kind: edge
+    description: Updating with decimal amounts such as 19.99 stores the exact cent value.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateAmountTest.php::updating a recurring template converts amounts to the exact cent value
   - id: update_validation
     kind: validation
     description: Invalid frequency/day combinations or end_date before start_date are rejected on update.
@@ -80,7 +86,6 @@ scenarios:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::updating a template to reference accounts from another budget is rejected and the template is unchanged
 known_issues:
   - duplicate uses replicate() on the template only; matching rules are not copied, so the copy silently stops matching transactions that the original matched by rules.
-  - update has the same float cents truncation as store (see RECUR-001).
   - rules created through the update form get no priority value (store assigns index+1, update does not).
   - Delete relies on the transactions FK to unlink linked transactions; there is no confirmation of how many transactions lose their link.
 confidence: high

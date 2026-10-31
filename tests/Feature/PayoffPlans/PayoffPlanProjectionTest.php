@@ -116,3 +116,17 @@ test('a goal with no monthly contribution has no completion estimate', function 
             ->where('goalProjections.0.months_to_complete', null)
             ->where('goalProjections.0.completion_date', null));
 });
+
+test('a plan whose payments never cover the interest is flagged as never paid off', function () {
+    // 24% APR on $1,200 = $24/month interest against a $10 minimum.
+    projectionAddDebt($this->plan, $this->card, 120000, 24, 1000);
+
+    $this->actingAs($this->user)
+        ->get(route('payoff-plans.show', [$this->budget, $this->plan]))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('PayoffPlans/Show')
+            ->where('debtProjection.never_paid_off', true)
+            ->where('debtProjection.payoff_date', null)
+            ->where('debtProjection.final_debt_data.0.never_paid_off', true));
+});

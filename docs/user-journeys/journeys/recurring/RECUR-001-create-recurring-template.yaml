@@ -77,9 +77,10 @@ scenarios:
     coverage: uncovered
   - id: cents_conversion_precision
     kind: edge
-    description: Decimal amounts such as 19.99 are converted to the exact cent value.
-    coverage: uncovered
-    note: getArr uses (int) ($amount * 100), which truncates float error (see known_issues).
+    description: Decimal amounts such as 19.99 (and min/max amounts) are converted to the exact cent value.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateAmountTest.php::storing a recurring template converts amounts to the exact cent value
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot list, open the create form for, or store a template in a budget they do not own (403).
@@ -92,7 +93,6 @@ scenarios:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::storing a template with an account from another budget is rejected and nothing is saved
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::storing a template with an autopay card from another budget is rejected and nothing is saved
 known_issues:
-  - getArr converts dollars with (int) ($amount * 100), which truncates floating-point error (e.g. 19.99 becomes 1998 cents, 0.29 becomes 28).
   - index logs the full first account record to the info log on every request (leftover debug logging).
 confidence: high
 evidence:

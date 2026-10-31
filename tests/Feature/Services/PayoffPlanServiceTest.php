@@ -104,3 +104,58 @@ test('avalanche pays no more interest than snowball', function () {
     expect($comparison['avalanche']['total_interest_paid'])
         ->toBeLessThanOrEqual($comparison['snowball']['total_interest_paid']);
 });
+
+test('rolls freed minimums from a paid-off debt into the next debt', function () {
+    $budget = Budget::factory()->create();
+    // Snowball, 0% APR: A $250 (min $50), B $1,000 (min $100), extra $50 => $200/month total.
+    // M1 A150 B900, M2 A50 B800, M3 A0 + $50 leftover to B => B650,
+    // then B gets the full $200: M4 450, M5 250, M6 50, M7 0.
+    $plan = makePlan($budget, 'snowball', 5000, [
+        ['balance' => 25000, 'interest_rate' => 0, 'minimum_payment' => 5000],
+        ['balance' => 100000, 'interest_rate' => 0, 'minimum_payment' => 10000],
+    ]);
+
+    $result = app(PayoffPlanService::class)->calculatePayoffProjection($plan);
+
+    expect($result['total_months'])->toBe(7)
+        ->and($result['never_paid_off'])->toBeFalse()
+        ->and($result['final_debt_data'][0]['paid_off_month'])->toBe(3)
+        ->and($result['final_debt_data'][1]['paid_off_month'])->toBe(7)
+        ->and($result['timeline'][3]['debts'][1]['balance'])->toBe(45000);
+});
+
+test('rolls the extra payment remainder into the next debt in the same month', function () {
+    $budget = Budget::factory()->create();
+    // Snowball, 0% APR: A $100 (min $10), B $1,000 (min $100), extra $200 => $310/month.
+    // M1: minimums leave A90 B900; the $200 pays A's $90 and the $110 remainder goes to B => B790.
+    // M2 480, M3 170, M4 0.
+    $plan = makePlan($budget, 'snowball', 20000, [
+        ['balance' => 10000, 'interest_rate' => 0, 'minimum_payment' => 1000],
+        ['balance' => 100000, 'interest_rate' => 0, 'minimum_payment' => 10000],
+    ]);
+
+    $result = app(PayoffPlanService::class)->calculatePayoffProjection($plan);
+
+    expect($result['timeline'][0]['debts'][0]['balance'])->toBe(0)
+        ->and($result['timeline'][0]['debts'][1]['balance'])->toBe(79000)
+        ->and($result['timeline'][0]['total_payment'])->toBe(31000)
+        ->and($result['final_debt_data'][0]['paid_off_month'])->toBe(1)
+        ->and($result['final_debt_data'][1]['paid_off_month'])->toBe(4)
+        ->and($result['total_months'])->toBe(4);
+});
+
+test('flags a plan whose payments never cover the interest', function () {
+    $budget = Budget::factory()->create();
+    // 24% APR on $1,000 = $20/month interest against a $10 minimum: balance only grows.
+    $plan = makePlan($budget, 'avalanche', 0, [
+        ['balance' => 100000, 'interest_rate' => 24, 'minimum_payment' => 1000],
+    ]);
+
+    $result = app(PayoffPlanService::class)->calculatePayoffProjection($plan);
+
+    expect($result['never_paid_off'])->toBeTrue()
+        ->and($result['payoff_date'])->toBeNull()
+        ->and($result['final_debt_data'][0]['never_paid_off'])->toBeTrue()
+        ->and($result['final_debt_data'][0]['paid_off_month'])->toBeNull()
+        ->and($result['final_debt_data'][0]['balance'])->toBeGreaterThan(100000);
+});

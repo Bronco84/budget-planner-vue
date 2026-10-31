@@ -8,6 +8,10 @@ class DeviceFingerprintService
 {
     /**
      * Generate a device fingerprint from request data.
+     *
+     * Only headers a browser sends identically on every request are used. The
+     * Accept header is deliberately excluded: the device is trusted during a
+     * JSON passkey-login request, but later page loads send an HTML Accept.
      */
     public function generate(Request $request): string
     {
@@ -15,7 +19,6 @@ class DeviceFingerprintService
             $request->userAgent() ?? '',
             $request->header('Accept-Language') ?? '',
             $request->header('Accept-Encoding') ?? '',
-            $request->header('Accept') ?? '',
         ];
 
         $fingerprint = implode('|', $components);

@@ -55,6 +55,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Accounts/ManualAccountTest.php::an inactive manual account is also excluded from the total balance
+  - id: balance_cents_conversion_precision
+    kind: edge
+    description: A decimal balance such as 19.99 is stored as the exact cent value (1999).
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::storing a manual account converts the balance to the exact cent amount
   - id: missing_fields_rejected
     kind: validation
     description: Missing name/type/balance or non-numeric balance returns validation errors.
@@ -76,7 +82,6 @@ scenarios:
       - tests/Feature/Accounts/ManualAccountTest.php::user cannot add an account to another users budget
 known_issues:
   - "AccountController@create calls PlaidService::createLinkToken($budget) with the Budget model where a user id is expected; (string)$budget serialises the whole budget JSON into Plaid's client_user_id. BudgetController@setup passes Auth::id() correctly."
-  - "current_balance is multiplied by 100 without rounding before storage in an integer column (float precision, e.g. 19.99*100)."
   - "resources/js/Pages/Accounts/Create.vue also posts to budgets.accounts.store but is never rendered by any controller (orphan page)."
 confidence: high
 evidence:

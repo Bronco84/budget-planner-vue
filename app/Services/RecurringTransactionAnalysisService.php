@@ -493,7 +493,8 @@ class RecurringTransactionAnalysisService
         if ($isConfirmationData) {
             // Handle user-edited confirmation data
             // Always store the amount - for dynamic amounts, this is the estimated/average amount
-            $amountInCents = intval(($patternData['amount'] ?? 0) * 100);
+            $amountInCents = (int) round(($patternData['amount'] ?? 0) * 100);
+            $isBimonthly = $patternData['frequency'] === 'bimonthly';
 
             // Determine if this is an expense (negative) based on the main amount
             $isExpense = $amountInCents < 0;
@@ -502,13 +503,13 @@ class RecurringTransactionAnalysisService
             // Frontend sends positive values, we apply the sign here
             $minAmount = null;
             if ($patternData['amount_type'] === 'dynamic' && $patternData['min_amount'] !== null) {
-                $minCents = intval(abs($patternData['min_amount']) * 100);
+                $minCents = (int) round(abs($patternData['min_amount']) * 100);
                 $minAmount = $isExpense ? -$minCents : $minCents;
             }
 
             $maxAmount = null;
             if ($patternData['amount_type'] === 'dynamic' && $patternData['max_amount'] !== null) {
-                $maxCents = intval(abs($patternData['max_amount']) * 100);
+                $maxCents = (int) round(abs($patternData['max_amount']) * 100);
                 $maxAmount = $isExpense ? -$maxCents : $maxCents;
             }
 
@@ -521,10 +522,13 @@ class RecurringTransactionAnalysisService
                 'frequency' => $patternData['frequency'],
                 'start_date' => $patternData['start_date'],
                 'end_date' => ! empty($patternData['end_date']) ? $patternData['end_date'] : null,
-                'day_of_month' => $patternData['day_of_month'] ?? null,
+                // Bimonthly templates store the first day in first_day_of_month and
+                // the second day in day_of_month (same convention as the form and analysis).
+                'day_of_month' => $isBimonthly
+                    ? ($patternData['bimonthly_second_day'] ?? $patternData['day_of_month'] ?? null)
+                    : ($patternData['day_of_month'] ?? null),
+                'first_day_of_month' => $isBimonthly ? ($patternData['bimonthly_first_day'] ?? null) : null,
                 'day_of_week' => $patternData['day_of_week'] ?? null,
-                'bimonthly_first_day' => $patternData['bimonthly_first_day'] ?? null,
-                'bimonthly_second_day' => $patternData['bimonthly_second_day'] ?? null,
                 'is_dynamic_amount' => $patternData['amount_type'] === 'dynamic',
                 'average_amount' => $patternData['amount'] ?? null,
                 'min_amount' => $minAmount,

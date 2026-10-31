@@ -440,12 +440,10 @@ class PlaidService
                 'end_date' => $endDate,
             ]);
 
-            // If it's a PRODUCT_NOT_READY error, throw a specific exception
-            if ($errorDetails && isset($errorDetails['error_code']) && $errorDetails['error_code'] === 'PRODUCT_NOT_READY') {
-                throw new \Exception('PRODUCT_NOT_READY: '.($errorDetails['error_message'] ?? 'Transaction data is not yet ready'));
-            }
-
-            return [];
+            // Surface every Plaid error to the caller, prefixed with its Plaid error
+            // code (e.g. PRODUCT_NOT_READY, ITEM_LOGIN_REQUIRED) so callers can react.
+            $errorCode = $errorDetails['error_code'] ?? 'PLAID_ERROR';
+            throw new \Exception($errorCode.': '.($errorDetails['error_message'] ?? 'Transaction fetch failed'), 0, $e);
         }
     }
 
@@ -482,12 +480,15 @@ class PlaidService
 
             return $accounts;
         } catch (RequestException $e) {
+            $errorDetails = $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null;
+
             Log::error('Plaid accounts fetch failed', [
                 'error' => $e->getMessage(),
-                'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null,
+                'response' => $errorDetails,
             ]);
 
-            return [];
+            $errorCode = $errorDetails['error_code'] ?? 'PLAID_ERROR';
+            throw new \Exception($errorCode.': '.($errorDetails['error_message'] ?? 'Account fetch failed'), 0, $e);
         }
     }
 
@@ -658,12 +659,16 @@ class PlaidService
     public function createOrFindConnection(
         Budget $budget,
         string $accessToken,
-        string $itemId,
+        ?string $itemId,
         ?string $institutionId = null,
         ?string $institutionName = null,
         ?string $institutionLogo = null,
         ?string $institutionUrl = null
     ): PlaidConnection {
+        if ($itemId === null || $itemId === '') {
+            $itemId = 'plaid-item-'.uniqid();
+        }
+
         $data = [
             'institution_id' => $institutionId,
             'institution_name' => $institutionName ?? 'Unknown Institution',
@@ -712,7 +717,7 @@ class PlaidService
         Budget $budget,
         array $accountData,
         string $accessToken,
-        string $itemId,
+        ?string $itemId,
         ?string $institutionId = null,
         ?string $institutionName = null,
         ?string $institutionLogo = null,
@@ -876,6 +881,9 @@ class PlaidService
      * Sync transactions from Plaid to the application.
      *
      * @param  int  $days  Number of days in the past to sync
+     * @return array{imported: int, updated: int}
+     *
+     * @throws \Exception when Plaid fails; ITEM_LOGIN_REQUIRED also marks the connection as errored
      */
     public function syncTransactions(PlaidAccount $plaidAccount, int $days = 180): array
     {
@@ -908,7 +916,8 @@ class PlaidService
             } catch (\Exception $txError) {
                 // For investment accounts, transaction fetch failures are expected
                 // (e.g., PRODUCT_NOT_READY). Log but continue to balance/investment updates.
-                if ($plaidAccount->isInvestmentAccount()) {
+                // A login-required item is broken for every product, so it still fails.
+                if ($plaidAccount->isInvestmentAccount() && ! str_contains($txError->getMessage(), 'ITEM_LOGIN_REQUIRED')) {
                     Log::info('Transaction fetch failed for investment account (expected, continuing to balance update)', [
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $plaidAccount->account_name,
@@ -1209,11 +1218,13 @@ class PlaidService
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return [
-                'imported' => 0,
-                'updated' => 0,
-                'error' => $e->getMessage(),
-            ];
+            // The bank needs the user to log in again: flag the connection so the
+            // re-authenticate prompt can be shown.
+            if (str_contains($e->getMessage(), 'ITEM_LOGIN_REQUIRED')) {
+                $plaidAccount->plaidConnection->markAsError('ITEM_LOGIN_REQUIRED: the bank requires the user to log in again.');
+            }
+
+            throw $e;
         }
     }
 

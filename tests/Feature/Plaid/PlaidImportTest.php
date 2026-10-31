@@ -301,3 +301,80 @@ test('another users budget cannot be discovered, set up or imported into', funct
     expect($this->plaid->requests)->toBe([])
         ->and(PlaidConnection::count())->toBe(0);
 });
+
+test('import uses the institution id and Plaid item id from Link metadata', function () {
+    stubSuccessfulPlaidImport($this->plaid);
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.import', $this->budget), plaidImportPayload())
+        ->assertRedirect(route('budgets.show', $this->budget));
+
+    $connection = PlaidConnection::where('budget_id', $this->budget->id)->sole();
+    expect($connection->plaid_item_id)->toBe('item-platypus-1')
+        ->and($connection->institution_id)->toBe('ins_109508')
+        ->and($this->plaid->bodyFor('/institutions/get_by_id')['institution_id'])->toBe('ins_109508')
+        ->and($this->plaid->paths())->not->toContain('/institutions/search');
+});
+
+test('re-importing the same Plaid item reuses its connection', function () {
+    stubSuccessfulPlaidImport($this->plaid);
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.import', $this->budget), plaidImportPayload(['selected_accounts' => ['acc-checking']]));
+    $this->actingAs($this->user)
+        ->post(route('plaid.import', $this->budget), plaidImportPayload(['selected_accounts' => ['acc-card']]))
+        ->assertSessionHas('message', 'Successfully imported 1 accounts from Plaid.');
+
+    $connection = PlaidConnection::where('budget_id', $this->budget->id)->sole();
+    expect($connection->plaid_item_id)->toBe('item-platypus-1')
+        ->and($connection->plaidAccounts()->pluck('plaid_account_id')->sort()->values()->all())->toBe(['acc-card', 'acc-checking']);
+});
+
+test('an account fetch failure on import shows an error and creates nothing', function () {
+    stubSuccessfulPlaidImport($this->plaid);
+    $this->plaid->on('/accounts/get', FakePlaidApi::error('ITEM_LOGIN_REQUIRED', 'the login details of this item have changed'));
+
+    $this->actingAs($this->user)
+        ->from(route('plaid.discover', $this->budget))
+        ->post(route('plaid.import', $this->budget), plaidImportPayload())
+        ->assertRedirect(route('plaid.discover', $this->budget))
+        ->assertSessionMissing('message')
+        ->assertSessionHas('error', 'Failed to import accounts. Please try again.');
+
+    expect(PlaidConnection::count())->toBe(0)
+        ->and($this->budget->accounts()->count())->toBe(0);
+});
+
+test('a failure while linking imported accounts rolls back every local write', function () {
+    stubSuccessfulPlaidImport($this->plaid);
+    PlaidAccount::creating(function (PlaidAccount $plaidAccount) {
+        if ($plaidAccount->plaid_account_id === 'acc-savings') {
+            throw new RuntimeException('simulated database failure');
+        }
+    });
+
+    $this->actingAs($this->user)
+        ->from(route('plaid.discover', $this->budget))
+        ->post(route('plaid.import', $this->budget), plaidImportPayload())
+        ->assertRedirect(route('plaid.discover', $this->budget))
+        ->assertSessionHas('error', 'Failed to import accounts. Please try again.');
+
+    expect(session('error'))->not->toContain('simulated')
+        ->and($this->budget->accounts()->count())->toBe(0)
+        ->and(PlaidAccount::count())->toBe(0)
+        ->and(PlaidConnection::count())->toBe(0);
+});
+
+test('import keeps the accounts but reports when the initial transaction sync fails', function () {
+    stubSuccessfulPlaidImport($this->plaid);
+    $this->plaid->on('/transactions/get', FakePlaidApi::error('INTERNAL_SERVER_ERROR', 'secret internal plaid detail', 500));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.import', $this->budget), plaidImportPayload())
+        ->assertRedirect(route('budgets.show', $this->budget))
+        ->assertSessionHas('message', 'Successfully imported 2 accounts from Plaid.')
+        ->assertSessionHas('error', 'Failed to sync transactions. Please try again.');
+
+    expect($this->budget->accounts()->count())->toBe(2)
+        ->and(PlaidConnection::where('budget_id', $this->budget->id)->sole()->plaidAccounts()->count())->toBe(2);
+});

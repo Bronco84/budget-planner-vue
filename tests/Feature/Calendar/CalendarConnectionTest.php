@@ -4,6 +4,7 @@ use App\Models\CalendarConnection;
 use App\Models\User;
 use App\Services\GoogleCalendarService;
 use Illuminate\Support\Facades\Log;
+use Inertia\Testing\AssertableInertia;
 
 /*
  * CALENDAR-001 / CALENDAR-002. GoogleCalendarService is always mocked so no test
@@ -151,4 +152,14 @@ test('a failed token exchange shows a generic error and logs the real cause', fu
         ->assertSessionHas('error', fn ($error) => ! str_contains($error, 'internal google detail'));
 
     Log::shouldHaveReceived('error')->once();
+});
+
+test('the connections page receives the flashed message so it can be shown', function () {
+    $this->actingAs($this->user)
+        ->from(route('calendar.connections.index'))
+        ->followingRedirects()
+        ->post(route('calendar.connections.toggle', $this->connection))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Calendar/Connections')
+            ->where('flash.message', 'Calendar connection disabled'));
 });

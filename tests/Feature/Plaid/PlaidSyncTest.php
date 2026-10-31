@@ -273,3 +273,50 @@ test('liabilities refresh endpoint updates statement data and reports when none 
     $this->actingAs($this->user)->post($route)
         ->assertSessionHas('error', 'Failed to update statement data. This feature may not be available for all credit card providers.');
 });
+
+test('a login required error during sync shows a re-authenticate error and marks the connection as errored', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+    $this->plaid->on('/transactions/get', FakePlaidApi::error('ITEM_LOGIN_REQUIRED', 'the login details of this item have changed'));
+
+    $this->actingAs($this->user)
+        ->from(route('plaid.link', [$this->budget, $account]))
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertRedirect(route('plaid.link', [$this->budget, $account]))
+        ->assertSessionMissing('message')
+        ->assertSessionHas('error', 'Your bank needs you to sign in again. Use Re-authenticate to reconnect this account.');
+
+    expect(session('error'))->not->toContain('login details')
+        ->and($plaidAccount->plaidConnection->fresh())
+        ->status->toBe(PlaidConnection::STATUS_ERROR)
+        ->error_message->not->toBeNull();
+});
+
+test('a Plaid error or timeout during sync shows a failure instead of a zero count success', function (mixed $response, string $expected) {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+    $this->plaid->on('/transactions/get', $response);
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionMissing('message')
+        ->assertSessionHas('error', $expected);
+
+    expect(session('error'))->not->toContain('internal plaid detail')
+        ->and(session('error'))->not->toContain('cURL')
+        ->and($plaidAccount->plaidConnection->fresh()->status)->toBe(PlaidConnection::STATUS_ACTIVE);
+})->with([
+    'api error' => [fn () => FakePlaidApi::error('INTERNAL_SERVER_ERROR', 'secret internal plaid detail', 500), 'Failed to sync transactions. Please try again.'],
+    'connect timeout' => [FakePlaidApi::TIMEOUT, "Couldn't reach the bank connection service, please try again."],
+]);
+
+test('PRODUCT_NOT_READY during sync shows the still being processed message', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'credit', 'credit card', 'credit card');
+    $account = $plaidAccount->account;
+    $this->plaid->on('/transactions/get', FakePlaidApi::error('PRODUCT_NOT_READY', 'the requested product is not yet ready'));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionMissing('message')
+        ->assertSessionHas('error', 'Transaction data for this account is still being processed by Plaid. This can take 1-3 days for credit cards after initial connection. Please try again later.');
+});

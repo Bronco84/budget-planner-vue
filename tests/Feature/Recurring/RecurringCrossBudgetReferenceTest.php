@@ -221,3 +221,34 @@ test('template creation failures show a generic message instead of the exception
         ])
         ->assertSessionHas('error', 'Template creation failed. Please try again.');
 });
+
+test('a bimonthly pattern confirmed in the modal keeps both days of the month', function () {
+    // Shape sent by RecurringTransactionConfirmationModal (form fields, no confidence_score).
+    $this->actingAs($this->user)
+        ->post(route('recurring-transactions.analysis.create-templates', $this->budget), [
+            'account_id' => $this->account->id,
+            'selected_patterns' => [[
+                'description' => 'Paycheck',
+                'category' => 'Income',
+                'amount_type' => 'static',
+                'amount' => 1500.29,
+                'min_amount' => null,
+                'max_amount' => null,
+                'frequency' => 'bimonthly',
+                'day_of_week' => null,
+                'day_of_month' => null,
+                'bimonthly_first_day' => 1,
+                'bimonthly_second_day' => 15,
+                'start_date' => '2026-01-01',
+                'end_date' => null,
+            ]],
+        ])
+        ->assertRedirect(route('recurring-transactions.index', $this->budget->id));
+
+    $template = RecurringTransactionTemplate::where('budget_id', $this->budget->id)->sole();
+
+    expect($template->frequency)->toBe('bimonthly')
+        ->and($template->first_day_of_month)->toBe(1)
+        ->and($template->day_of_month)->toBe(15)
+        ->and($template->amount_in_cents)->toBe(150029);
+});

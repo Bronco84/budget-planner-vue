@@ -42,7 +42,7 @@ steps:
   - action: apply rules (POST .../rules/apply)
     expected: matching unlinked transactions linked; flash "Successfully linked N transactions..." or "No matching transactions found."
   - action: edit or delete a rule (PATCH/DELETE .../rules/{rule})
-    expected: links re-evaluated; redirect to the template detail page with linked/unlinked counts
+    expected: links re-evaluated with RecurringTransactionRule::matchesTransaction; redirect to the template detail page with linked/unlinked counts. Deleting the last rule leaves existing links untouched
 postconditions:
   - rule set and transaction links reflect the user's changes
 business_rules:
@@ -67,7 +67,18 @@ scenarios:
   - id: update_rule_reevaluates_links
     kind: alternate
     description: Editing a rule unlinks transactions that no longer match and links newly matching ones.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::updating a rule to a delimited regex links matching transactions
+    note: linking newly matching transactions is asserted; unlinking no-longer-matching ones is not.
+  - id: reevaluation_uses_rule_matching
+    kind: edge
+    description: Re-evaluation matches exactly like test/preview/apply (delimited regex, absolute dollar amounts, case sensitivity); a stored regex that doesn't compile matches nothing instead of erroring.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::updating a rule to a delimited regex links matching transactions
+      - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::re-evaluation matches amount rules the same way the rule preview does
+      - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::a stored regex rule that does not compile matches nothing instead of erroring
   - id: preview_without_active_rules
     kind: empty_state
     description: Preview with no active rules renders hasActiveRules false; apply redirects with "No active rules to apply".
@@ -84,11 +95,13 @@ scenarios:
       - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::storing a regex rule with a malformed pattern is rejected
       - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::updating a rule to a malformed regex pattern is rejected
       - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::testing a draft rule with a malformed regex pattern is rejected
-  - id: delete_last_rule_unlinks_everything
+  - id: delete_last_rule_keeps_links
     kind: edge
-    description: Deleting the only active rule triggers reevaluateTransactionLinks with no rules.
-    coverage: uncovered
-    note: current behaviour unlinks every transaction of the template, including entity- or manually-linked ones (see known_issues).
+    description: Deleting the only active rule leaves the template's existing links (entity, description, manual or rule) in place.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::deleting the last rule keeps transactions linked by other means
+    note: link source is not recorded on transactions, so rule-made links also stay linked after the last rule is deleted.
   - id: cross_budget_template_not_found
     kind: authorization
     description: Rules routes for a template that belongs to another budget return 404.
@@ -97,8 +110,7 @@ scenarios:
       - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction routes reject a cross-budget template with 404
     note: only rules.index is asserted; store/update/destroy/test/preview/apply and cross-user 403 are untested.
 known_issues:
-  - "Two regex conventions coexist: RecurringTransactionRule::matchesTransaction (test/preview/apply) passes the value to preg_match as a full pattern with delimiters, while RecurringTransactionService::evaluateRuleCondition (reevaluateTransactionLinks after update/destroy) wraps it as '/'.value.'/i' and swallows compile errors. A value valid for one is usually invalid for the other, so reevaluation silently treats delimited regex rules as non-matching."
-  - reevaluateTransactionLinks unlinks ALL linked transactions when the template has no active rules left, so deleting the last rule wipes links created by Plaid entity matching, description matching or manual linking.
+  - Transactions don't record how they were linked (entity, description, manual, rule). While rules remain, reevaluateTransactionLinks still unlinks any linked transaction that fails the rules, including entity-, description- or manually-linked ones; with no rules left it unlinks nothing.
   - update and destroy redirect to recurring-transactions.edit while store and apply redirect to rules.index, so the Rules page and detail tab land on different pages after similar actions.
   - test and preview dereference $recurring_transaction->account without a null check; a template whose account was deleted errors.
 confidence: high

@@ -85,9 +85,19 @@ scenarios:
     tests:
       - tests/Feature/Transactions/ManualTransactionTest.php::user cannot open the create transaction form for another users budget
       - tests/Feature/Transactions/ManualTransactionTest.php::user cannot store a transaction on another users budget
-known_issues:
-  - "amount*100 is stored without rounding (float to integer cents; e.g. 0.29*100 = 28.999...). TransferController rounds; TransactionController does not."
-  - "Breadcrumb is defined as 'budgets.transactions.create' in routes/breadcrumbs.php while the route is 'budget.transaction.create', so the create page gets no breadcrumb."
+  - id: cents_conversion_precision
+    kind: edge
+    description: Decimal amounts such as 0.29 and 19.99 are stored as the exact cent value (29, 1999).
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::storing a transaction converts dollars to the exact cent amount
+  - id: create_page_breadcrumb
+    kind: happy_path
+    description: The create page receives a breadcrumb trail ending in "Create Transaction".
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::create transaction page has a breadcrumb trail
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/TransactionController.php create/store

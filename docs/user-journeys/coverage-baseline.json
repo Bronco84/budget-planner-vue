@@ -143,8 +143,8 @@
             "inertia_shares_live_token": "covered",
             "shared_token_follows_rotation": "covered",
             "refresh_endpoint_returns_token": "covered",
-            "axios_419_retry": "uncovered",
-            "inertia_419_reload": "uncovered",
+            "axios_419_retry": "covered",
+            "inertia_419_reload": "covered",
             "stale_token_rejected": "covered",
             "token_endpoint_public": "not_applicable"
         },
@@ -162,7 +162,7 @@
             "profile_lists_passkeys": "covered",
             "add_additional_passkey": "covered",
             "duplicate_credential_rejected": "covered",
-            "add_passkey_returns_to_profile": "partial",
+            "add_passkey_returns_to_profile": "covered",
             "rename_passkey": "covered",
             "delete_passkey": "covered",
             "rename_requires_name": "covered",
@@ -299,7 +299,7 @@
             "message_validation": "covered",
             "provider_error_safe_message": "covered",
             "failed_turn_not_persisted": "covered",
-            "stream_error_ui_recovery": "uncovered",
+            "stream_error_ui_recovery": "covered",
             "other_users_conversation": "covered",
             "other_users_budget_tools": "covered"
         },
@@ -315,7 +315,7 @@
             "stream_start_refusals": "covered",
             "flagged_allowed_stream": "covered",
             "banned_user_refused": "covered",
-            "stream_refusal_visible": "uncovered",
+            "stream_refusal_visible": "covered",
             "blocked_foreign_conversation": "covered"
         },
         "CHAT-003": {
@@ -337,7 +337,8 @@
             "s3_failure_returns_error": "covered",
             "delete_failure_returns_generic_error": "covered",
             "other_users_transaction_files_forbidden": "covered",
-            "shared_budget_roles": "covered"
+            "shared_budget_roles": "covered",
+            "viewer_reads_receipts": "covered"
         },
         "FILE-002": {
             "files_page_renders": "covered",
@@ -510,7 +511,7 @@
             "custom_account_types_accepted": "covered",
             "generic_preference_round_trip": "covered",
             "generic_endpoint_whitelist": "covered",
-            "failed_save_reverts_ui": "uncovered",
+            "failed_save_reverts_ui": "covered",
             "preferences_scoped_to_user": "covered"
         },
         "PREF-002": {
@@ -578,7 +579,7 @@
             "create_with_inline_rules_links_transactions": "covered",
             "make_recurring_from_transaction": "covered",
             "redirect_without_active_budget": "covered",
-            "empty_list": "partial",
+            "empty_list": "covered",
             "schedule_validation": "covered",
             "amount_required_unless_dynamic": "covered",
             "cents_conversion_precision": "covered",
@@ -722,7 +723,7 @@
             "invalid_invite_input_rejected": "covered",
             "invites_rate_limited": "covered",
             "mail_failure_reported": "covered",
-            "invitation_ui_end_to_end": "uncovered"
+            "invitation_ui_end_to_end": "covered"
         },
         "SHARE-002": {
             "members_listed_with_roles": "covered",
@@ -736,7 +737,7 @@
             "role_reflected_in_ui_props": "covered",
             "legacy_admin_is_owner": "covered",
             "stranger_cannot_view_sharing": "covered",
-            "sharing_ui_end_to_end": "uncovered"
+            "sharing_ui_end_to_end": "covered"
         },
         "SHARE-003": {
             "member_leaves": "covered",
@@ -784,7 +785,7 @@
         "TXN-002": {
             "create_form_renders": "covered",
             "store_transaction": "covered",
-            "quick_add_modal": "partial",
+            "quick_add_modal": "covered",
             "prefill_from_query": "covered",
             "missing_fields_rejected": "covered",
             "foreign_account_rejected": "covered",

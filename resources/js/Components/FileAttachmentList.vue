@@ -66,8 +66,9 @@
                         Download
                     </button>
 
-                    <!-- Delete Button -->
+                    <!-- Delete Button (hidden in read-only mode, e.g. for budget viewers) -->
                     <button
+                        v-if="!readonly"
                         type="button"
                         @click="confirmDelete(attachment)"
                         class="inline-flex items-center px-3 py-1.5 border border-red-300 shadow-sm text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
@@ -146,6 +147,10 @@ const props = defineProps({
     attachments: {
         type: Array,
         required: true
+    },
+    readonly: {
+        type: Boolean,
+        default: false
     }
 })
 

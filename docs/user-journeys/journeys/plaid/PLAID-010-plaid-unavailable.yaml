@@ -57,7 +57,7 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidOutageTest.php::a connect timeout while creating a link token is logged with a friendly message
       - tests/Feature/Plaid/PlaidOutageTest.php::Plaid requests are bounded by connect and request timeouts
-    note: server side covered (friendly log message, linkToken null, 5s/30s client timeouts); the disabled connect button is frontend behaviour with no test.
+    note: 'server side covered (friendly log message, linkToken null, 5s/30s client timeouts); the disabled connect button is frontend behaviour. Not browser tested: every page that shows it (budget setup, account create, Plaid discover/link) creates a Plaid Link token while rendering, and the local environment points at a real Plaid environment, so the E2E specs block those pages (tests/playwright/support/plaid.js) rather than call Plaid.'
   - id: exchange_failure_redirects
     kind: recovery
     description: A failed /item/public_token/exchange on import or store redirects back with an error flash and no connection.

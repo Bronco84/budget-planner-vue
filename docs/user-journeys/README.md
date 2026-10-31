@@ -208,6 +208,47 @@ Switches: `git commit --no-verify` (or `JOURNEYS_SKIP=1`) bypasses a hook;
 `JOURNEYS_E2E=1` makes pre-push run the affected Playwright specs (they need the
 local Herd site).
 
+## E2E
+
+`tests/playwright/` holds browser specs for behaviour feature tests can't see
+(rendered states, client-side recovery, WebAuthn ceremonies). They run against
+the local Herd site and its database, with the system Google Chrome
+(`channel: 'chrome'`, so no `npx playwright install`). They are local only and
+not run in CI.
+
+```bash
+PLAYWRIGHT_EMAIL=you@example.com npx playwright test          # everything
+npx playwright test tests/playwright/sharing.spec.js            # one spec
+```
+
+`PLAYWRIGHT_EMAIL` is only needed by `smoke.spec.js` (read-only pages of an
+existing account). The other specs create their own data. Helpers live in
+`tests/playwright/support/`:
+`fixtures.js` (the `throwawayUser` fixture), `auth.js` (login-link sign-in,
+virtual WebAuthn authenticator), `budget.js`, `errors.js` (console-error
+collector), `plaid.js` and `mail.js`.
+
+Data safety rules for specs:
+
+- Never touch an existing account's budgets, accounts or transactions. Create
+  throwaway users (`e2e-<label>-<random>@example.test`, signed in through the
+  local login-link endpoint, passkey enrolled with Chrome's virtual
+  authenticator) and throwaway budgets (`E2E <random>`) through the UI.
+- Clean up through the UI: the `throwawayUser` fixture deletes registered
+  budgets and then the account (type-email confirmation, within 15 minutes
+  of sign-in) when the test ends, pass or fail.
+- Never call real third parties. Chat specs use a moderation refusal or answer
+  the stream requests in the browser. `plaid.js` blocks every page that
+  creates a Plaid Link token and the dashboard's automatic sync (which runs
+  when an account's last sync is over 12 hours old), stops budget creation
+  from landing on setup, and specs assert it blocked nothing. Every spec,
+  including the smoke spec, installs it. Mail goes to Herd's local mail
+  server, which `mail.js` reads.
+- Each spec asserts no console or page errors. Errors a test provokes on
+  purpose are allowed explicitly with `errors.allow(pattern)`.
+
+Cite a spec in a scenario as `tests/playwright/<file>.spec.js::<exact test title>`.
+
 ## CI
 
 The `journeys` job in `.github/workflows/ci.yml`:

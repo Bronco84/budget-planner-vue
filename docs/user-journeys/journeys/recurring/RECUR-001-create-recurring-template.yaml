@@ -79,10 +79,10 @@ scenarios:
   - id: empty_list
     kind: empty_state
     description: A budget with no templates shows the "No recurring transactions have been set up yet" message.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateCreateTest.php::a budget with no templates renders an empty recurring list
-    note: the empty recurringTransactions prop is asserted; the "No recurring transactions" message is rendered by Index.vue with no browser test.
+      - 'tests/playwright/budget-basics.spec.js::a budget without recurring templates shows the empty recurring list'
   - id: schedule_validation
     kind: validation
     description: Missing day_of_week/day_of_month for the chosen frequency, or a bimonthly pair with identical days, is rejected.

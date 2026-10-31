@@ -143,9 +143,12 @@ scenarios:
   - id: invitation_ui_end_to_end
     kind: happy_path
     description: Sharing page and invitation landing page render and drive the flow in a browser.
-    coverage: uncovered
-    note: no Playwright spec yet; feature tests assert the Inertia props.
+    coverage: covered
+    tests:
+      - 'tests/playwright/sharing.spec.js::owner invites a viewer who accepts, is promoted to editor, adds a transaction and is removed'
+    note: Local-only E2E (throwaway owner and invitee); the invitation link is read from the email in Herd's local mail store. Covers the existing-user path; registering through the link is feature-tested only.
 known_issues:
+  - "Sharing.vue renders no flash messages, so the owner gets no \"Invitation sent\" confirmation (only the pending list updates) and the mail_failure_reported error flash is never shown; the dashboard doesn't show the invitee's \"You joined ...\" flash either."
   - "Invitation emails are sent synchronously; a slow mail transport delays the owner's request."
 confidence: high
 evidence:

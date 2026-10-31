@@ -81,8 +81,10 @@ scenarios:
   - id: failed_save_reverts_ui
     kind: recovery
     description: When the save fails the dragged sections snap back to the previous order.
-    coverage: uncovered
-    note: client-side behaviour; needs a browser test.
+    coverage: covered
+    tests:
+      - 'tests/playwright/budget-basics.spec.js::a failed account type order save snaps the dragged sections back'
+    note: Local-only E2E; a successful drag is saved and survives a reload, then a save answered with 500 in the browser snaps the sections back.
   - id: preferences_scoped_to_user
     kind: authorization
     description: Preferences are always read and written for the authenticated user; guests get 401/redirect.

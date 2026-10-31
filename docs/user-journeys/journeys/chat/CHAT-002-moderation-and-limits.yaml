@@ -116,8 +116,10 @@ scenarios:
   - id: stream_refusal_visible
     kind: recovery
     description: When starting a stream returns a JSON 400/403/429 the user is told why.
-    coverage: uncovered
-    note: the refusal is now returned as JSON by POST /chat/stream (asserted in ChatStreamStartTest) and ChatPanel shows its error text; the panel display itself needs a browser test.
+    coverage: covered
+    tests:
+      - 'tests/playwright/chat.spec.js::a moderation refusal is shown in the chat panel and the message is restored for editing'
+    note: Local-only E2E with a real prompt-injection refusal (blocked by ContentModerationService before any provider call); 403/429 share the same display path.
   - id: blocked_foreign_conversation
     kind: authorization
     description: A message aimed at another user's conversation_id returns 404 before moderation, so nothing is flagged against that conversation.

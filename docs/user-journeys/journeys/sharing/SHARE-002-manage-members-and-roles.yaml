@@ -131,8 +131,10 @@ scenarios:
   - id: sharing_ui_end_to_end
     kind: happy_path
     description: The Sharing page and read-only dashboard render correctly for each role in a browser.
-    coverage: uncovered
-    note: no Playwright spec yet; feature tests assert the Inertia props that drive the UI.
+    coverage: covered
+    tests:
+      - 'tests/playwright/sharing.spec.js::owner invites a viewer who accepts, is promoted to editor, adds a transaction and is removed'
+    note: Local-only E2E. Viewer sees no Edit Budget, account Edit or Add property controls and no invite form; after the owner promotes them to editor they get the edit controls and quick-add a transaction; after removal the budget returns 403 and their active budget falls back.
 known_issues:
   - "Some edit-form pages stay viewable by viewers (account create, property create/edit, transfer edit, transaction create); saving from them is still rejected (403). The dashboard hides the links."
   - "Transaction detail (and its attachments) is only reachable through the edit page, which requires the editor role, so viewers cannot open a transaction's receipts from the UI."

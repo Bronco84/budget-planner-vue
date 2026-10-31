@@ -6,46 +6,16 @@
 //   PLAYWRIGHT_EMAIL=you@example.com npx playwright test tests/playwright/smoke.spec.js
 //
 // Note: laravel-login-link creates the user if the email does not exist, so use
-// an account that already has a budget.
+// an account that already has a budget. Plaid requests (the dashboard's automatic
+// sync) are blocked in the browser; see support/plaid.js.
 import { test, expect } from '@playwright/test';
+import { login } from './support/auth.js';
+import { trackErrors } from './support/errors.js';
+import { guardPlaid } from './support/plaid.js';
 
 const EMAIL = process.env.PLAYWRIGHT_EMAIL;
 
 test.skip(!EMAIL, 'Set PLAYWRIGHT_EMAIL to the email of an existing local account to run the smoke suite.');
-
-/**
- * Whether a console error is a failed load of a third-party resource, e.g. a
- * bank's favicon from gstatic returning 404. Those depend on external services
- * and the account's institutions, not on this app.
- */
-function isThirdPartyResourceFailure(msg, appOrigin) {
-    const { url } = msg.location();
-    return msg.text().startsWith('Failed to load resource') && !!url && new URL(url).origin !== appOrigin;
-}
-
-/** Collect console errors and uncaught page errors for the lifetime of the page. */
-function trackErrors(page, appOrigin) {
-    const errors = [];
-    page.on('console', (msg) => {
-        if (msg.type() === 'error' && !isThirdPartyResourceFailure(msg, appOrigin)) {
-            const { url } = msg.location();
-            errors.push(`console: ${msg.text()}${url ? ` (${url})` : ''}`);
-        }
-    });
-    page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`));
-    return errors;
-}
-
-async function login(page) {
-    await page.goto('/login');
-    const token = await page.locator('meta[name="csrf-token"]').getAttribute('content');
-    expect(token, 'CSRF token meta tag present on /login').toBeTruthy();
-
-    const response = await page.request.post('/laravel-login-link-login', {
-        form: { _token: token, email: EMAIL },
-    });
-    expect(response.ok(), `login link POST returned ${response.status()}`).toBeTruthy();
-}
 
 /** Extract the initial Inertia page object from a full HTML response. */
 async function inertiaPage(response) {
@@ -89,9 +59,12 @@ async function openDashboard(page, errors) {
 test.describe('authenticated smoke', () => {
     let errors;
 
-    test.beforeEach(async ({ page, baseURL }) => {
+    test.beforeEach(async ({ page, context, baseURL }) => {
         errors = trackErrors(page, new URL(baseURL).origin);
-        await login(page);
+        // The dashboard syncs Plaid on load when the last sync is over 12 hours old;
+        // block that (and any Link-token page) so the smoke run never calls Plaid.
+        await guardPlaid(context, baseURL);
+        await login(page, EMAIL);
     });
 
     test('budgets index redirects to the active budget dashboard', async ({ page }) => {

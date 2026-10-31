@@ -31,6 +31,8 @@ business_rules:
   - search matches description or notes (LIKE)
   - timeframe is one of this_month, last_month, last_3_months, this_year; unknown values are ignored
   - 20 per page ordered by date desc
+  - each row carries file_attachments_count; rows with attachments show a paperclip that opens a read-only receipts modal (see FILE-001 viewer_reads_receipts)
+  - the per-row Edit link is shown only to members who can edit (budgetAccess.can.edit); viewers do not see it
 scenarios:
   - id: list_loads
     kind: happy_path

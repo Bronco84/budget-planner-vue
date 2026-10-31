@@ -28,8 +28,11 @@ class TransactionController extends Controller
      */
     public function index(Request $request, Budget $budget): Response
     {
+        // file_attachments_count lets the list show a receipts indicator
+        // without loading the attachments themselves.
         $query = $budget->transactions()
-            ->with(['account', 'recurringTemplate']);
+            ->with(['account', 'recurringTemplate'])
+            ->withCount('fileAttachments');
 
         // Apply search filter
         if ($request->filled('search')) {

@@ -26,7 +26,13 @@ depends_on:
   - path: resources/js/Components/FileUpload.vue
     reason: upload widget
   - path: resources/js/Components/FileAttachmentList.vue
-    reason: list with download and delete actions
+    reason: list with download and delete actions (delete hidden when readonly)
+  - path: resources/js/Components/TransactionAttachmentsModal.vue
+    reason: read-only receipts modal opened from the transactions list
+  - path: resources/js/Pages/Transactions/Index.vue
+    reason: paperclip attachment-count indicator that opens the read-only modal
+  - path: app/Http/Controllers/TransactionController.php
+    reason: index adds file_attachments_count with withCount
 integrations:
   - AWS S3 (file storage)
 steps:
@@ -34,6 +40,8 @@ steps:
     expected: 201 JSON with the attachment; activity logged on the transaction
   - action: page loads attachments (GET /transactions/{transaction}/files)
     expected: JSON {attachments}
+  - action: on the transactions list, click the paperclip on a transaction with attachments
+    expected: read-only modal lists the attachments (GET /transactions/{transaction}/files) with download buttons and no delete; available to viewers
   - action: download (GET /files/{attachment}/download)
     expected: file streamed with original filename and no-cache headers; download logged
   - action: delete (DELETE /files/{attachment})
@@ -113,12 +121,20 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Sharing/BudgetRoleMatrixTest.php::each budget route enforces its role requirement
+  - id: viewer_reads_receipts
+    kind: authorization
+    description: On the transactions list a paperclip with the attachment count (file_attachments_count via withCount) appears on transactions that have attachments; clicking it opens a read-only modal (name, size, uploader, date, download) that any member, including a viewer, can use. A viewer can list and download but gets 403 uploading or deleting; a non-member gets 403 listing or downloading.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/ViewerTransactionReceiptsTest.php::the transactions list gives each transaction its attachment count
+      - tests/Feature/Files/ViewerTransactionReceiptsTest.php::a viewer can list and download a transactions receipts
+      - tests/Feature/Files/ViewerTransactionReceiptsTest.php::a viewer cannot upload or delete receipts
+      - tests/Feature/Files/ViewerTransactionReceiptsTest.php::a non-member cannot list or download a transactions receipts
 known_issues:
-  - 'Viewers can list and download transaction attachments through the API, but the UI only shows them on the transaction edit page, which needs edit access; viewers have no screen that shows a transaction''s receipts.'
   - "File routes are not nested under {budget}, so scopeBindings and AuthorizeBudgetAccess do not apply; FileController checks the transaction's budget role itself."
-  - "Viewers can reach attachments only through the transaction edit page, which requires the editor role."
 confidence: high
 evidence:
   - app/Http/Controllers/FileController.php uploadToTransaction/getTransactionAttachments/download/delete
   - resources/js/Pages/Transactions/Edit.vue
+  - resources/js/Pages/Transactions/Index.vue paperclip + TransactionAttachmentsModal.vue
 last_verified: null

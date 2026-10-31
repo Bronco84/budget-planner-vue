@@ -55,7 +55,7 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidReauthPromptTest.php::the bank connection page flags a connection in the error state as needing re-authentication
       - tests/Feature/Plaid/PlaidReauthPromptTest.php::the bank connection page does not flag an active connection as needing re-authentication
-    note: the page prop is asserted; the rendered warning is frontend behaviour with no browser test.
+    note: 'the page prop is asserted; the rendered warning is frontend behaviour. Not browser tested: the warning is on the Plaid link page, which creates a Plaid Link token while rendering and needs an existing connection, so the local-only E2E specs (which never call Plaid and create data only through the UI) cannot reach it.'
   - id: upgrade_token_issued
     kind: happy_path
     description: A linked account receives an update-mode link token and the institution name as JSON.

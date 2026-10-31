@@ -24,3 +24,7 @@ yarn-error.log
 /.zed
 .DS_Store
 /.playwright-mcp
+
+# Playwright output
+/test-results/
+/playwright-report/

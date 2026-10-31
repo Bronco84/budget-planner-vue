@@ -66,11 +66,13 @@ scenarios:
   - id: add_passkey_returns_to_profile
     kind: alternate
     description: Registration started from the profile (return=profile) sends the user back to the profile; first-passkey enrolment and unknown return values go to /budgets.
-    coverage: partial
+    coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyEnforcementTest.php::adding a passkey from the profile returns to the profile afterwards'
       - 'tests/Feature/Auth/PasskeyEnforcementTest.php::first passkey enrolment and unknown return values go to the budgets page afterwards'
-    note: asserts the redirectTo prop; the client-side redirect after the ceremony is not browser tested.
+      - 'tests/playwright/passkeys.spec.js::a passkey added from the profile returns to the profile'
+      - 'tests/playwright/passkeys.spec.js::a new account must enrol a passkey and then continues to its budgets'
+    note: The browser specs run real ceremonies against Chrome's virtual WebAuthn authenticator (local-only E2E).
   - id: rename_passkey
     kind: happy_path
     description: Renaming updates the alias and flashes a status.
@@ -102,7 +104,8 @@ scenarios:
     tests:
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot rename another users passkey'
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot delete another users passkey'
-known_issues: []
+known_issues:
+  - "The optional \"Passkey Name\" typed on the registration page is sent to the options endpoint but never saved; WebAuthnCredentialObserver names every new passkey from the device (e.g. \"Computer - macOS - Chrome\"). Renaming afterwards works."
 confidence: high
 evidence:
   - routes/auth.php auth group

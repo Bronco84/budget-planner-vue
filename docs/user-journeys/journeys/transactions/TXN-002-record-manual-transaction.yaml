@@ -52,12 +52,13 @@ scenarios:
   - id: quick_add_modal
     kind: alternate
     description: QuickAddTransactionModal posts to the active budget's store endpoint.
-    coverage: partial
+    coverage: covered
     tests:
       - 'tests/Feature/Transactions/QuickAddCategoriesTest.php::the active budget shared prop lists its categories for the quick-add picker'
       - 'tests/Feature/Transactions/QuickAddCategoriesTest.php::a quick-add transaction with a picked category is stored linked to it'
       - tests/Feature/Transactions/ManualTransactionTest.php::quick add payload without notes or template stores the transaction
-    note: 'server side only: asserts the modal''s field set is accepted by the store endpoint; the modal posting to the active budget is not exercised (needs a browser test).'
+      - 'tests/playwright/budget-basics.spec.js::quick add stores a transaction with a picked category in the active budget'
+    note: The browser spec (local-only E2E) creates a category, quick-adds from the sidebar with it picked, lands on the edit page with it selected and sees it on the dashboard.
   - id: prefill_from_query
     kind: alternate
     description: Query parameters populate prefillData.
@@ -122,7 +123,6 @@ scenarios:
     tests:
       - tests/Feature/Categories/CategoryLinkingTest.php::a category name from quick add is linked to the matching budget category
 known_issues:
-  - "QuickAddTransactionModal still takes a free-text category (the shared activeBudget prop has no categories); it is linked by name when it matches, otherwise stored unlinked."
 
 confidence: high
 evidence:

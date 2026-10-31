@@ -45,6 +45,7 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a signed-in user without a passkey is redirected to passkey registration'
+      - 'tests/playwright/passkeys.spec.js::a new account must enrol a passkey and then continues to its budgets'
     note: tests/TestCase.php disables EnsureUserHasPasskey by default, so no existing test exercises it.
   - id: registration_routes_allowed
     kind: edge

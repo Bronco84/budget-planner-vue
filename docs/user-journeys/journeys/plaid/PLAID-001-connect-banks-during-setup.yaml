@@ -103,7 +103,7 @@ scenarios:
     coverage: partial
     tests:
       - tests/Feature/Plaid/PlaidOutageTest.php::connect pages render without a link token when Plaid returns an error
-    note: server side (linkToken null, 200) is covered; the disabled connect button is frontend behaviour with no test.
+    note: 'server side (linkToken null, 200) is covered; the disabled connect button is frontend behaviour. Not browser tested: every page that shows it (budget setup, account create, Plaid discover/link) creates a Plaid Link token while rendering, and the local environment points at a real Plaid environment, so the E2E specs block those pages (tests/playwright/support/plaid.js) rather than call Plaid.'
   - id: import_failure_redirects_back
     kind: recovery
     description: Token exchange or account fetch failure redirects back with an error flash and no connection is created.

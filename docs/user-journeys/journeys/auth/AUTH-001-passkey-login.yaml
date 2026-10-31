@@ -62,6 +62,7 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a valid passkey assertion signs the user in and issues a trusted device cookie'
+      - 'tests/playwright/passkeys.spec.js::a user signs out and signs back in with their passkey'
   - id: invalid_assertion_rejected
     kind: validation
     description: An invalid or unknown assertion returns 422 and no session is created.

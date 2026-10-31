@@ -64,13 +64,19 @@ scenarios:
   - id: axios_419_retry
     kind: recovery
     description: A 419 axios response triggers one /csrf-token fetch shared by concurrent requests and a single replay.
-    coverage: uncovered
-    note: client-side behaviour (axios interceptor, and apiFetch for fetch() writes); no JS unit tests exist and Playwright specs are stale.
+    coverage: covered
+    tests:
+      - 'tests/playwright/csrf.spec.js::a fetch write with a rotated CSRF token is replayed once with a fresh token'
+      - 'tests/playwright/csrf.spec.js::concurrent axios writes that hit a 419 share one token refresh and each replay once'
+      - 'tests/playwright/csrf.spec.js::an Inertia form submitted with a rotated CSRF token still succeeds'
+    note: Local-only E2E with a real stale token (the session is signed out and back in behind the open page). Inertia shares the axios instance, so its writes are retried by the same interceptor.
   - id: inertia_419_reload
     kind: recovery
     description: An Inertia visit that returns 419 reloads the page instead of leaving the user stuck.
-    coverage: uncovered
-    note: client-side behaviour; needs a browser test.
+    coverage: covered
+    tests:
+      - 'tests/playwright/csrf.spec.js::an Inertia visit answered with 419 reloads the page instead of leaving it stuck'
+    note: Local-only E2E; the visit's 419 is answered in the browser, since a real stale token is retried by the axios interceptor before Inertia sees it.
   - id: stale_token_rejected
     kind: validation
     description: A POST with a stale CSRF token is rejected with 419.
@@ -83,7 +89,8 @@ scenarios:
     description: The token endpoint is intentionally public; it only reveals the caller's own session token.
     coverage: not_applicable
     note: no resource ownership; same-origin policy prevents other sites reading the response.
-known_issues: []
+known_issues:
+  - "A partial reload (router.reload({ only })) doesn't return the shared csrf_token prop, but Inertia keeps the merged stale value and the router 'success' handler re-applies it, overwriting a token just refreshed by the 419 retry. E.g. after reordering account types (PREF-001) every later write 419s once and is retried."
 confidence: medium
 evidence:
   - routes/web.php /csrf-token closure

@@ -181,8 +181,11 @@ scenarios:
   - id: stream_error_ui_recovery
     kind: recovery
     description: On a stream error the panel shows the server's safe message (or a generic connection error), removes the pending messages and restores the input text.
-    coverage: uncovered
-    note: client-side behaviour (ChatPanel.vue); needs a browser test.
+    coverage: covered
+    tests:
+      - 'tests/playwright/chat.spec.js::a stream error event shows the server message, drops the pending turn and restores the input'
+      - 'tests/playwright/chat.spec.js::a dropped stream connection shows a generic connection error and restores the input'
+    note: Local-only E2E; the stream start and the SSE stream are answered in the browser (in-band error event, and a 503), so no provider is called. The server's safe error events are feature-tested.
   - id: other_users_conversation
     kind: authorization
     description: Sending, streaming or completing into another user's conversation_id returns 404 and does not append to it.

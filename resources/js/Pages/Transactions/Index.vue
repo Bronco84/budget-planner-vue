@@ -101,7 +101,24 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                       <div class="flex items-start justify-between">
                         <div class="flex-1">
-                          <div class="text-sm font-medium text-gray-900">{{ transaction.description }}</div>
+                          <div class="flex items-center gap-2">
+                            <div class="text-sm font-medium text-gray-900">{{ transaction.description }}</div>
+                            <!-- Receipts indicator: opens a read-only list any member can see -->
+                            <button
+                              v-if="transaction.file_attachments_count > 0"
+                              type="button"
+                              class="inline-flex items-center gap-0.5 rounded px-1 text-xs text-gray-500 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              :title="`View ${transaction.file_attachments_count} attachment${transaction.file_attachments_count === 1 ? '' : 's'}`"
+                              :aria-label="`View ${transaction.file_attachments_count} attachment${transaction.file_attachments_count === 1 ? '' : 's'}`"
+                              data-testid="transaction-attachments-button"
+                              @click="openAttachments(transaction)"
+                            >
+                              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                              {{ transaction.file_attachments_count }}
+                            </button>
+                          </div>
                           <div v-if="transaction.notes" class="text-xs text-gray-500 mt-1 max-w-xs truncate">
                             {{ transaction.notes }}
                           </div>
@@ -140,6 +157,7 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <Link
+                        v-if="canEdit"
                         :href="route('budget.transaction.edit', [budget.id, transaction.id])"
                         class="text-indigo-600 hover:text-indigo-900"
                       >
@@ -244,13 +262,21 @@
         </div>
       </div>
     </div>
+
+    <TransactionAttachmentsModal
+      :show="attachmentsTransaction !== null"
+      :transaction="attachmentsTransaction"
+      @close="attachmentsTransaction = null"
+    />
   </AuthenticatedLayout>
 </template>
 
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
-import { reactive, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import TransactionAttachmentsModal from '@/Components/TransactionAttachmentsModal.vue';
+import { useBudgetAccess } from '@/composables/useBudgetAccess.js';
 import { formatCurrency } from '@/utils/format.js';
 
 // Define props
@@ -261,6 +287,16 @@ const props = defineProps({
   categories: Array,
   filters: Object
 });
+
+// Viewers see receipts read-only and get no Edit link (the edit page needs edit access)
+const { canEdit } = useBudgetAccess();
+
+// Transaction whose attachments are shown in the read-only modal
+const attachmentsTransaction = ref(null);
+
+function openAttachments(transaction) {
+  attachmentsTransaction.value = transaction;
+}
 
 // Form state for filters
 const form = reactive({

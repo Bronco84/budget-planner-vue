@@ -37,6 +37,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Auth/AuthenticationTest.php::test_users_can_logout
+      - 'tests/playwright/passkeys.spec.js::a user signs out and signs back in with their passkey'
   - id: logout_rotates_csrf_token
     kind: edge
     description: The session CSRF token changes on logout and the next Inertia page shares the new token.

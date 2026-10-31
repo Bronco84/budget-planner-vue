@@ -102,16 +102,18 @@ class TransactionContextBuilder implements ContextBuilderInterface
         $endOfMonth = $anchor->copy()->endOfMonth();
 
         $transactions = $budget->transactions()
+            ->with('budgetCategory')
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->get();
 
+        // Group by the linked category's name, falling back to the legacy string.
         $byCategory = $transactions
-            ->groupBy('category')
-            ->map(function ($categoryTransactions, $category) {
+            ->groupBy('category_name')
+            ->map(function ($categoryTransactions) {
                 $total = $categoryTransactions->sum('amount_in_cents') / 100;
 
                 return [
-                    'category' => $category ?: 'Uncategorized',
+                    'category' => $categoryTransactions->first()->category_name ?: 'Uncategorized',
                     'total' => $total,
                     'transaction_count' => $categoryTransactions->count(),
                     'is_expense' => $total < 0,

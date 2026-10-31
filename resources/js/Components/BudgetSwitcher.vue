@@ -35,6 +35,8 @@ const getInitials = (name) => {
     return (words[0][0] + words[1][0]).toUpperCase();
 };
 
+const roleLabel = (role) => (role ? role.charAt(0).toUpperCase() + role.slice(1) : '');
+
 // Get budget color (use stored color or fallback to default)
 const getBudgetColor = (budget) => {
     return budget?.color || '#6366f1'; // Default to indigo if no color set
@@ -163,7 +165,9 @@ onUnmounted(() => {
                     {{ getInitials(activeBudget.name) }}
                 </div>
                 <div v-if="!isCollapsed || isMobileOpen" class="min-w-0 flex-1">
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Active Budget</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                        Active Budget<span v-if="activeBudget.role && activeBudget.role !== 'owner'"> · {{ roleLabel(activeBudget.role) }}</span>
+                    </div>
                     <div class="font-semibold truncate">{{ activeBudget.name }}</div>
                 </div>
             </div>
@@ -222,7 +226,16 @@ onUnmounted(() => {
                     </div>
                     
                     <div class="min-w-0 flex-1">
-                        <div class="font-medium truncate">{{ budget.name }}</div>
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="font-medium truncate">{{ budget.name }}</span>
+                            <span
+                                v-if="budget.shared && budget.role"
+                                class="flex-shrink-0 rounded-full bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300"
+                                :title="`Shared with you as ${roleLabel(budget.role).toLowerCase()}`"
+                            >
+                                {{ roleLabel(budget.role) }}
+                            </span>
+                        </div>
                         <div 
                             v-if="budget.description" 
                             class="text-xs text-gray-500 dark:text-gray-400 truncate"

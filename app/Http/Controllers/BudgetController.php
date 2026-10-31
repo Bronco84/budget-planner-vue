@@ -25,10 +25,30 @@ class BudgetController extends Controller
     }
 
     /**
+     * Budget name/settings are owner-only, so edit/update map to the
+     * `updateSettings` ability rather than `update` (which editors hold for
+     * budget data).
+     *
+     * @return array<string, string>
+     */
+    protected function resourceAbilityMap()
+    {
+        return array_merge(parent::resourceAbilityMap(), [
+            'edit' => 'updateSettings',
+            'update' => 'updateSettings',
+        ]);
+    }
+
+    /**
      * Display a listing of the resource.
      */
-    public function index(): Response|RedirectResponse
+    public function index(Request $request): Response|RedirectResponse
     {
+        // A guest who opened an invitation link and then signed in is sent back to it.
+        if ($pendingInvitation = $request->session()->pull(BudgetInvitationController::PENDING_SESSION_KEY)) {
+            return redirect()->to($pendingInvitation);
+        }
+
         $user = Auth::user();
         $activeBudget = $user->getActiveBudget();
 
@@ -87,7 +107,8 @@ class BudgetController extends Controller
      */
     public function setup(Budget $budget): Response|RedirectResponse
     {
-        $this->authorize('view', $budget);
+        // Adding the first accounts is a write; connecting a bank is owner-only.
+        $this->authorize('update', $budget);
 
         // If budget already has accounts, redirect to budget show
         if ($budget->accounts()->exists()) {
@@ -95,9 +116,12 @@ class BudgetController extends Controller
                 ->with('message', 'Budget already has accounts configured.');
         }
 
+        $linkToken = null;
         try {
-            $plaidService = app(PlaidService::class);
-            $linkToken = $plaidService->createLinkToken(Auth::id());
+            if (Auth::user()->can('manageConnections', $budget)) {
+                $plaidService = app(PlaidService::class);
+                $linkToken = $plaidService->createLinkToken(Auth::id());
+            }
         } catch (\Exception $e) {
             $linkToken = null;
             \Log::warning('Failed to create Plaid link token for setup', [

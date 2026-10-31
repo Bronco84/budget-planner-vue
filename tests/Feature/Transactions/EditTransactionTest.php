@@ -105,7 +105,8 @@ test('updating a transaction rejects invalid input and leaves it unchanged', fun
     'missing description' => [['description' => ''], 'description'],
     'non numeric amount' => [['amount' => 'abc'], 'amount'],
     'invalid date' => [['date' => '2026-13-45'], 'date'],
-    'missing category' => [['category' => ''], 'category'],
+    'unknown category id' => [['category_id' => 999999], 'category_id'],
+    'category too long' => [['category' => str_repeat('x', 256)], 'category'],
     'missing account' => [['account_id' => ''], 'account_id'],
 ]);
 

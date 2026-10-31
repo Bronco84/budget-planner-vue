@@ -350,7 +350,7 @@ class ReportsController extends Controller
         $monthsInRange = $this->monthsInRange($startDate, $endDate);
 
         foreach ($categories as $category) {
-            $categoryTransactions = $transactions->where('category', $category->name);
+            $categoryTransactions = $transactions->filter(fn ($transaction) => $transaction->isInCategory($category));
             $spent = abs($categoryTransactions->where('amount_in_cents', '<', 0)->sum('amount_in_cents'));
             // Category amounts are monthly dollars; prorate them over the selected range.
             $allocated = (int) round($category->amount * 100 * $monthsInRange);
@@ -410,7 +410,7 @@ class ReportsController extends Controller
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'))
             ->where('amount_in_cents', '<', 0)
-            ->with('plaidTransaction');
+            ->with(['plaidTransaction', 'budgetCategory']);
 
         // Filter by account if selected
         if ($selectedAccount) {
@@ -420,9 +420,9 @@ class ReportsController extends Controller
         $transactions = $transactionsQuery->get();
 
         // Group by category
-        $byCategory = $transactions->groupBy('category')->map(function ($categoryTransactions, $category) {
+        $byCategory = $transactions->groupBy('category_name')->map(function ($categoryTransactions) {
             return [
-                'category' => $category ?: 'Uncategorized',
+                'category' => $categoryTransactions->first()->category_name ?: 'Uncategorized',
                 'total' => abs($categoryTransactions->sum('amount_in_cents')),
                 'count' => $categoryTransactions->count(),
                 'average' => abs($categoryTransactions->avg('amount_in_cents')),

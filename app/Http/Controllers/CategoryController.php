@@ -32,7 +32,7 @@ class CategoryController extends Controller
 
         // Calculate spent for each category based on transactions
         $categoriesWithSpent = $categories->map(function ($category) use ($transactions) {
-            $spent = $transactions->where('category', $category->name)
+            $spent = $transactions->filter(fn ($transaction) => $transaction->isInCategory($category))
                 ->sum(function ($transaction) {
                     return abs($transaction->amount_in_cents);
                 });
@@ -109,9 +109,9 @@ class CategoryController extends Controller
      */
     public function destroy(Budget $budget, Category $category)
     {
-        // Check if category has transactions
+        // Check if category has transactions (linked by id, or legacy rows by name)
         $transactionCount = $budget->transactions()
-            ->where('category', $category->name)
+            ->inCategory($category)
             ->count();
 
         if ($transactionCount > 0) {
@@ -122,28 +122,5 @@ class CategoryController extends Controller
         $category->delete();
 
         return redirect()->back()->with('message', 'Category deleted successfully.');
-    }
-
-    /**
-     * Reorder categories.
-     */
-    public function reorder(Request $request, Budget $budget)
-    {
-        $validated = $request->validate([
-            'categories' => 'required|array',
-            'categories.*.id' => 'required|exists:categories,id',
-            'categories.*.order' => 'required|integer|min:0',
-        ]);
-
-        foreach ($validated['categories'] as $categoryData) {
-            $category = Category::find($categoryData['id']);
-
-            // Ensure category belongs to this budget
-            if ($category && $category->budget_id === $budget->id) {
-                $category->update(['order' => $categoryData['order']]);
-            }
-        }
-
-        return redirect()->back()->with('message', 'Category order updated successfully.');
     }
 }

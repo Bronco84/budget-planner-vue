@@ -61,9 +61,8 @@ test('a linked account receives an update mode link token and the institution na
         ->toHaveKey('update');
 });
 
-test('posting the update mode public token replaces the access token and reactivates the connection', function () {
+test('completing update mode keeps the existing access token, reactivates the connection and never exchanges the public token', function () {
     $connection = plaidReauthLinkedAccount($this->account, $this->budget);
-    $this->plaid->on('/item/public_token/exchange', ['access_token' => 'access-sandbox-renewed', 'item_id' => 'item-reauth']);
 
     $this->actingAs($this->user)
         ->from(route('plaid.link', [$this->budget, $this->account]))
@@ -77,9 +76,11 @@ test('posting the update mode public token replaces the access token and reactiv
 
     expect(PlaidConnection::count())->toBe(1)
         ->and($connection->fresh())
-        ->access_token->toBe('access-sandbox-renewed')
+        ->access_token->toBe('access-sandbox-old')
         ->status->toBe(PlaidConnection::STATUS_ACTIVE)
-        ->error_message->toBeNull();
+        ->error_message->toBeNull()
+        ->and($this->plaid->paths())->not->toContain('/item/public_token/exchange')
+        ->and($this->plaid->requests)->toBe([]);
 });
 
 test('requesting an upgrade token for an unlinked account returns a JSON 404', function () {

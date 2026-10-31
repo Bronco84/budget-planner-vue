@@ -20,7 +20,7 @@ depends_on:
     reason: projectTransactions per account
 integrations: []
 steps:
-  - action: open budget/{budget}/projections?months=N
+  - action: click "Projections" in the sidebar (or open budget/{budget}/projections?months=N)
     expected: Budgets/Projections rendered by ProjectionsController::showBudgetProjections with projections {starting_balance, monthly_totals, transactions} and params {months, start_date}
   - action: change the months filter on the page
     expected: page reloads via router.get with the new months value
@@ -59,8 +59,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Projections/BudgetProjectionTest.php::another user cannot view projections for a budget they do not own
-known_issues:
-  - No page outside Budgets/Projections.vue links to budget.projections, so the feature is effectively unreachable.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/ProjectionsController.php showBudgetProjections

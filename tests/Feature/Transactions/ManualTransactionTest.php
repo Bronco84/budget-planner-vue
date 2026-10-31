@@ -139,7 +139,8 @@ test('storing a transaction rejects invalid input and creates nothing', function
     'non numeric amount' => [['amount' => 'ten'], 'amount'],
     'missing date' => [['date' => ''], 'date'],
     'invalid date' => [['date' => 'not-a-date'], 'date'],
-    'missing category' => [['category' => ''], 'category'],
+    'unknown category id' => [['category_id' => 999999], 'category_id'],
+    'category too long' => [['category' => str_repeat('x', 256)], 'category'],
 ]);
 
 test('storing a transaction rejects another budgets recurring template', function () {

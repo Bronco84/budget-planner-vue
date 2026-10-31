@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Budget;
 use App\Models\ChatConversation;
 use App\Services\ChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class ChatController extends Controller
 {
@@ -51,7 +54,19 @@ class ChatController extends Controller
         };
     }
 
-    public function stream(Request $request)
+    /**
+     * Pending streams live this long between POST /chat/stream and the
+     * EventSource GET that consumes them.
+     */
+    protected const PENDING_STREAM_TTL_SECONDS = 120;
+
+    /**
+     * Start a streamed reply. The question travels in the POST body (not a
+     * URL that servers log); moderation runs here so refusals are readable
+     * JSON. The moderated turn is parked under a random, single-use id bound
+     * to this user, which the EventSource then opens.
+     */
+    public function startStream(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'message' => 'required|string|max:2000',
@@ -61,12 +76,60 @@ class ChatController extends Controller
 
         $this->authorizeConversation($request, $validated['conversation_id'] ?? null);
 
-        return $this->chatService->processMessageStream(
+        $budgetId = $validated['budget_id'] ?? null;
+        if ($budgetId !== null) {
+            abort_unless($request->user()->can('view', Budget::findOrFail($budgetId)), 403);
+        }
+
+        $prepared = $this->chatService->prepareStream(
             user: $request->user(),
             message: $validated['message'],
             conversationId: $validated['conversation_id'] ?? null,
-            budgetId: $validated['budget_id'] ?? null
         );
+
+        if ($prepared instanceof JsonResponse) {
+            return $prepared;
+        }
+
+        $streamId = Str::random(40);
+
+        Cache::put($this->pendingStreamKey($request, $streamId), [
+            'message' => $prepared['message'],
+            'conversation_id' => $prepared['conversation_id'],
+            'budget_id' => $budgetId,
+        ], now()->addSeconds(self::PENDING_STREAM_TTL_SECONDS));
+
+        return response()->json(['stream_id' => $streamId]);
+    }
+
+    /**
+     * Stream the reply for a pending stream started by this user. Unknown,
+     * expired, reused or other users' ids return 404.
+     */
+    public function stream(Request $request, string $streamId)
+    {
+        $key = $this->pendingStreamKey($request, $streamId);
+        $pending = Cache::get($key);
+
+        // Cache::add is atomic, so two requests racing on one id cannot both stream.
+        if (! is_array($pending)
+            || ! Cache::add("{$key}:claimed", true, self::PENDING_STREAM_TTL_SECONDS)) {
+            abort(404);
+        }
+
+        Cache::forget($key);
+
+        return $this->chatService->streamReply(
+            user: $request->user(),
+            message: $pending['message'],
+            conversationId: $pending['conversation_id'],
+            budgetId: $pending['budget_id']
+        );
+    }
+
+    protected function pendingStreamKey(Request $request, string $streamId): string
+    {
+        return "chat_pending_stream:{$request->user()->id}:{$streamId}";
     }
 
     /**

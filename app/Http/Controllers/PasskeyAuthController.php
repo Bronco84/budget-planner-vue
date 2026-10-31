@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BudgetInvitation;
 use App\Models\User;
+use App\Services\BudgetSharingService;
 use App\Services\DeviceTokenService;
 use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,9 +37,32 @@ class PasskeyAuthController extends Controller
     /**
      * Display the initial registration form (for new users to enter name/email).
      */
-    public function showRegistrationForm(): Response
+    public function showRegistrationForm(Request $request): Response
     {
-        return Inertia::render('Auth/Register');
+        $invitation = null;
+        $invitationError = null;
+
+        if ($request->filled('invitation')) {
+            $pending = BudgetInvitation::findPendingByToken((string) $request->query('invitation'));
+
+            if ($pending) {
+                $pending->load(['budget', 'inviter']);
+                $invitation = [
+                    'token' => (string) $request->query('invitation'),
+                    'email' => $pending->email,
+                    'role' => $pending->role->value,
+                    'budget_name' => $pending->budget->name,
+                    'invited_by' => $pending->inviter?->name,
+                ];
+            } else {
+                $invitationError = 'This invitation link is invalid, expired or has already been used.';
+            }
+        }
+
+        return Inertia::render('Auth/Register', [
+            'invitation' => $invitation,
+            'invitationError' => $invitationError,
+        ]);
     }
 
     /**
@@ -68,25 +94,56 @@ class PasskeyAuthController extends Controller
 
     /**
      * Handle an incoming registration request (create new user).
+     *
+     * Open registration is closed: an account can be created only with a valid,
+     * unexpired, unused budget invitation for the same email (the new user then
+     * joins that budget with the invited role), or for an email in
+     * config('auth.registration_allowlist').
      */
-    public function registerStore(Request $request): RedirectResponse
+    public function registerStore(Request $request, BudgetSharingService $sharing): RedirectResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:'.User::class,
+            'invitation' => 'nullable|string|max:255',
         ]);
 
-        // Restrict registration to specific email only
-        if ($request->email !== 'bamccoley@gmail.com') {
+        $invitation = null;
+
+        if ($request->filled('invitation')) {
+            $invitation = BudgetInvitation::findPendingByToken($request->input('invitation'));
+
+            if (! $invitation) {
+                return back()->withErrors([
+                    'email' => 'This invitation link is invalid, expired or has already been used.',
+                ])->withInput();
+            }
+
+            if (! $invitation->matchesEmail($request->email)) {
+                return back()->withErrors([
+                    'email' => 'Use the email address the invitation was sent to.',
+                ])->withInput();
+            }
+        } elseif (! in_array(strtolower(trim($request->email)), config('auth.registration_allowlist', []), true)) {
             return back()->withErrors([
                 'email' => 'Registration is currently restricted. Please contact the administrator.',
             ])->withInput();
         }
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-        ]);
+        $user = DB::transaction(function () use ($request, $invitation, $sharing) {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+            ]);
+
+            if ($invitation) {
+                // The invitation link was delivered to this address, which proves ownership.
+                $user->forceFill(['email_verified_at' => now()])->save();
+                $sharing->accept($invitation, $user);
+            }
+
+            return $user;
+        });
 
         Auth::login($user);
 

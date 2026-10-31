@@ -55,6 +55,11 @@ Breadcrumbs::for('budgets.edit', function (BreadcrumbTrail $trail, Budget $budge
     $trail->push('Edit Budget', route('budgets.edit', $budget));
 });
 
+Breadcrumbs::for('budgets.sharing.index', function (BreadcrumbTrail $trail, Budget $budget) {
+    $trail->parent('budgets.show', $budget);
+    $trail->push('Sharing', route('budgets.sharing.index', $budget));
+});
+
 Breadcrumbs::for('budgets.setup', function (BreadcrumbTrail $trail, Budget $budget) {
     $trail->parent('budgets.show', $budget);
     $trail->push('Setup', route('budgets.setup', $budget));

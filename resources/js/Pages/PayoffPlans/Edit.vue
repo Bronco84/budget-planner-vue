@@ -91,6 +91,127 @@
             </div>
 
             <div>
+              <h3 class="text-sm font-medium text-gray-700 mb-3">Debts</h3>
+              <div class="space-y-3">
+                <div
+                  v-for="(debt, index) in form.debts"
+                  :key="debt.id"
+                  class="border rounded-lg p-4"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="font-medium text-gray-900">{{ debt.name }}</span>
+                    <span class="text-xs text-gray-500">Current balance {{ formatCurrency(debt.current_balance_cents) }}</span>
+                  </div>
+                  <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label :for="`debt-apr-${debt.id}`" class="block text-xs font-medium text-gray-600">APR (%)</label>
+                      <input
+                        :id="`debt-apr-${debt.id}`"
+                        v-model.number="debt.interest_rate"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        required
+                      />
+                      <p v-if="form.errors[`debts.${index}.interest_rate`]" class="mt-1 text-sm text-red-600">
+                        {{ form.errors[`debts.${index}.interest_rate`] }}
+                      </p>
+                    </div>
+                    <div>
+                      <label :for="`debt-min-${debt.id}`" class="block text-xs font-medium text-gray-600">Minimum payment ($/month)</label>
+                      <input
+                        :id="`debt-min-${debt.id}`"
+                        v-model.number="debt.minimum_payment_dollars"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        required
+                      />
+                      <p v-if="form.errors[`debts.${index}.minimum_payment_cents`]" class="mt-1 text-sm text-red-600">
+                        {{ form.errors[`debts.${index}.minimum_payment_cents`] }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="form.goals.length > 0">
+              <h3 class="text-sm font-medium text-gray-700">Goals</h3>
+              <p class="mt-1 mb-3 text-xs text-gray-500">
+                Goals are funded after every debt is paid off, lowest priority number first.
+              </p>
+              <div class="space-y-3">
+                <div
+                  v-for="(goal, index) in form.goals"
+                  :key="goal.id"
+                  class="border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4"
+                >
+                  <div class="sm:col-span-2">
+                    <label :for="`goal-name-${goal.id}`" class="block text-xs font-medium text-gray-600">Name</label>
+                    <input
+                      :id="`goal-name-${goal.id}`"
+                      v-model="goal.name"
+                      type="text"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      required
+                    />
+                    <p v-if="form.errors[`goals.${index}.name`]" class="mt-1 text-sm text-red-600">
+                      {{ form.errors[`goals.${index}.name`] }}
+                    </p>
+                  </div>
+                  <div>
+                    <label :for="`goal-target-${goal.id}`" class="block text-xs font-medium text-gray-600">Target ($)</label>
+                    <input
+                      :id="`goal-target-${goal.id}`"
+                      v-model.number="goal.target_dollars"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      required
+                    />
+                    <p v-if="form.errors[`goals.${index}.target_amount_cents`]" class="mt-1 text-sm text-red-600">
+                      {{ form.errors[`goals.${index}.target_amount_cents`] }}
+                    </p>
+                  </div>
+                  <div>
+                    <label :for="`goal-contribution-${goal.id}`" class="block text-xs font-medium text-gray-600">Monthly contribution ($)</label>
+                    <input
+                      :id="`goal-contribution-${goal.id}`"
+                      v-model.number="goal.contribution_dollars"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      required
+                    />
+                    <p v-if="form.errors[`goals.${index}.monthly_contribution_cents`]" class="mt-1 text-sm text-red-600">
+                      {{ form.errors[`goals.${index}.monthly_contribution_cents`] }}
+                    </p>
+                  </div>
+                  <div>
+                    <label :for="`goal-priority-${goal.id}`" class="block text-xs font-medium text-gray-600">Priority</label>
+                    <input
+                      :id="`goal-priority-${goal.id}`"
+                      v-model.number="goal.priority"
+                      type="number"
+                      step="1"
+                      min="0"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                    <p v-if="form.errors[`goals.${index}.priority`]" class="mt-1 text-sm text-red-600">
+                      {{ form.errors[`goals.${index}.priority`] }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
               <label class="flex items-center">
                 <input
                   type="checkbox"
@@ -139,6 +260,7 @@ import { ref, watch } from 'vue';
 import { useForm, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { useToast } from '@/composables/useToast';
+import { formatCurrency } from '@/utils/format.js';
 
 const toast = useToast();
 
@@ -153,7 +275,23 @@ const form = useForm({
   strategy: props.plan.strategy,
   monthly_extra_payment_cents: props.plan.monthly_extra_payment_cents,
   is_active: props.plan.is_active,
+  debts: (props.plan.debts || []).map(debt => ({
+    id: debt.id,
+    name: debt.account?.name,
+    current_balance_cents: debt.current_balance_cents,
+    interest_rate: Number(debt.interest_rate),
+    minimum_payment_dollars: debt.minimum_payment_cents / 100,
+  })),
+  goals: (props.plan.goals || []).map(goal => ({
+    id: goal.id,
+    name: goal.name,
+    target_dollars: goal.target_amount_cents / 100,
+    contribution_dollars: goal.monthly_contribution_cents / 100,
+    priority: goal.priority ?? 0,
+  })),
 });
+
+const toCents = (dollars) => Math.round((dollars || 0) * 100);
 
 const extraPaymentDollars = ref(props.plan.monthly_extra_payment_cents / 100);
 
@@ -162,7 +300,23 @@ watch(extraPaymentDollars, (value) => {
 });
 
 const submit = () => {
-  form.patch(route('payoff-plans.update', [props.budget.id, props.plan.id]));
+  form
+    .transform((data) => ({
+      ...data,
+      debts: data.debts.map(debt => ({
+        id: debt.id,
+        interest_rate: debt.interest_rate,
+        minimum_payment_cents: toCents(debt.minimum_payment_dollars),
+      })),
+      goals: data.goals.map(goal => ({
+        id: goal.id,
+        name: goal.name,
+        target_amount_cents: toCents(goal.target_dollars),
+        monthly_contribution_cents: toCents(goal.contribution_dollars),
+        priority: goal.priority === '' ? null : goal.priority,
+      })),
+    }))
+    .patch(route('payoff-plans.update', [props.budget.id, props.plan.id]));
 };
 
 const confirmDelete = async () => {

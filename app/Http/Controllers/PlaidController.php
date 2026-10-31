@@ -27,7 +27,8 @@ class PlaidController extends Controller
     {
         $this->plaidService = $plaidService;
 
-        // Authorize budget ownership (BudgetPolicy view ability) for every action.
+        // Budget membership for every action; each action then authorizes
+        // manageConnections (owner) or sync (editor) — see BudgetPolicy.
         $this->middleware('can:view,budget');
     }
 
@@ -86,6 +87,9 @@ class PlaidController extends Controller
      */
     public function showLinkForm(Budget $budget, Account $account): Response
     {
+        // Bank connections are managed by budget owners only.
+        $this->authorize('manageConnections', $budget);
+
         // Check if the account is already linked to Plaid and load the connection relationship
         $plaidAccount = PlaidAccount::with('plaidConnection')
             ->where('account_id', $account->id)
@@ -143,6 +147,9 @@ class PlaidController extends Controller
      */
     public function discover(Budget $budget): Response
     {
+        // Bank connections are managed by budget owners only.
+        $this->authorize('manageConnections', $budget);
+
         // Get existing connections for this budget to show user what they already have
         $existingConnections = PlaidConnection::where('budget_id', $budget->id)
             ->where('status', PlaidConnection::STATUS_ACTIVE)
@@ -182,6 +189,9 @@ class PlaidController extends Controller
      */
     public function import(Request $request, Budget $budget): RedirectResponse
     {
+        // Bank connections are managed by budget owners only.
+        $this->authorize('manageConnections', $budget);
+
         $validated = $request->validate([
             'public_token' => 'required|string',
             'metadata' => 'required|array',
@@ -295,6 +305,9 @@ class PlaidController extends Controller
      */
     public function store(Request $request, Budget $budget, Account $account): RedirectResponse
     {
+        // Bank connections are managed by budget owners only.
+        $this->authorize('manageConnections', $budget);
+
         $validated = $request->validate([
             'public_token' => 'required|string',
             'metadata' => 'required|array',
@@ -572,6 +585,9 @@ class PlaidController extends Controller
      */
     public function syncTransactions(Budget $budget, Account $account): RedirectResponse
     {
+        // Editors and owners may refresh data from existing connections.
+        $this->authorize('sync', $budget);
+
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (! $plaidAccount) {
@@ -586,87 +602,6 @@ class PlaidController extends Controller
         } catch (\Exception $e) {
             return $this->handleSyncException($e, $account, $plaidAccount);
         }
-    }
-
-    /**
-     * Update the account balance from Plaid.
-     *
-     * Note: This is also done automatically by syncTransactions().
-     * Use this endpoint for a quick balance-only refresh.
-     */
-    public function updateBalance(Budget $budget, Account $account): RedirectResponse
-    {
-        $plaidAccount = $this->getPlaidAccountForAccount($account);
-
-        if (! $plaidAccount) {
-            return $this->notLinkedToPlaidResponse();
-        }
-
-        $updated = $this->plaidService->updateAccountBalance($plaidAccount);
-
-        if ($updated) {
-            return redirect()->back()->with('message', 'Account balance updated successfully.');
-        }
-
-        return redirect()->back()->with('error', 'Failed to update account balance.');
-    }
-
-    /**
-     * Update liability data (statement balance, payment info) for a credit card account.
-     *
-     * Note: This is also done automatically by syncTransactions() for credit cards.
-     * Use this endpoint for a quick liability-only refresh.
-     */
-    public function updateLiabilities(Budget $budget, Account $account): RedirectResponse
-    {
-        $plaidAccount = $this->getPlaidAccountForAccount($account);
-
-        if (! $plaidAccount) {
-            return $this->notLinkedToPlaidResponse();
-        }
-
-        // Verify this is a credit card account
-        if (! $plaidAccount->isCreditCard()) {
-            return redirect()->back()->with('error', 'Liability data is only available for credit card accounts.');
-        }
-
-        $updated = $this->plaidService->updateLiabilityData($plaidAccount);
-
-        if ($updated) {
-            return redirect()->back()->with('message', 'Statement balance and payment information updated successfully.');
-        }
-
-        return redirect()->back()->with('error', 'Failed to update statement data. This feature may not be available for all credit card providers.');
-    }
-
-    /**
-     * Update investment data (holdings, securities) for an investment account.
-     *
-     * Note: This is also done automatically by syncTransactions() for investment accounts.
-     * Use this endpoint for a quick investment-only refresh.
-     */
-    public function updateInvestments(Budget $budget, Account $account): RedirectResponse
-    {
-        $plaidAccount = $this->getPlaidAccountForAccount($account);
-
-        if (! $plaidAccount) {
-            return $this->notLinkedToPlaidResponse();
-        }
-
-        // Verify this is an investment account
-        if (! $plaidAccount->isInvestmentAccount()) {
-            return redirect()->back()->with('error', 'Investment data is only available for investment accounts.');
-        }
-
-        $updated = $this->plaidService->updateInvestmentData($plaidAccount);
-
-        if ($updated) {
-            $holdingsCount = $plaidAccount->holdings()->count();
-
-            return redirect()->back()->with('message', "Investment holdings updated successfully. {$holdingsCount} positions synced.");
-        }
-
-        return redirect()->back()->with('error', 'Failed to update investment data. This feature may not be available for all institutions.');
     }
 
     /**
@@ -731,6 +666,9 @@ class PlaidController extends Controller
      */
     public function upgradeLinkToken(Budget $budget, Account $account)
     {
+        // Bank connections are managed by budget owners only.
+        $this->authorize('manageConnections', $budget);
+
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (! $plaidAccount) {
@@ -767,11 +705,17 @@ class PlaidController extends Controller
     }
 
     /**
-     * Update an existing Plaid connection with a new access token from re-authentication.
+     * Mark an existing Plaid connection healthy after the user completed Link
+     * update mode (re-authentication). The access token is kept as is.
      */
     public function updateConnection(Request $request, Budget $budget, Account $account): RedirectResponse
     {
-        $validated = $request->validate([
+        // Bank connections are managed by budget owners only.
+        $this->authorize('manageConnections', $budget);
+
+        // Link's onSuccess still reports a public token in update mode; it is
+        // required as proof the flow completed but deliberately not exchanged.
+        $request->validate([
             'public_token' => 'required|string',
             'metadata' => 'required|array',
         ]);
@@ -783,16 +727,10 @@ class PlaidController extends Controller
         }
 
         try {
-            // Exchange public token for new access token
-            $newAccessToken = $this->plaidService->exchangePublicToken($validated['public_token']);
-
-            if (! $newAccessToken) {
-                return redirect()->back()->with('error', 'Failed to update connection.');
-            }
-
-            // Update the EXISTING connection with new access token
+            // Update mode repairs the Item's login in place: the existing access
+            // token stays valid, so there is no public token to exchange (Plaid
+            // docs, "Updating Items via Link"). Just mark the connection healthy.
             $plaidAccount->plaidConnection->update([
-                'access_token' => $newAccessToken,
                 'status' => PlaidConnection::STATUS_ACTIVE,
                 'error_message' => null,
             ]);
@@ -820,6 +758,9 @@ class PlaidController extends Controller
      */
     public function destroy(Budget $budget, Account $account): RedirectResponse
     {
+        // Bank connections are managed by budget owners only.
+        $this->authorize('manageConnections', $budget);
+
         $plaidAccount = $this->getPlaidAccountForAccount($account);
 
         if (! $plaidAccount) {
@@ -857,6 +798,9 @@ class PlaidController extends Controller
      */
     public function syncAllTransactions(Budget $budget): RedirectResponse
     {
+        // Editors and owners may refresh data from existing connections.
+        $this->authorize('sync', $budget);
+
         // Log that the method has been called
         Log::info('syncAllTransactions method called', [
             'budget_id' => $budget->id,

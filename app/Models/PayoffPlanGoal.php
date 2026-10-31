@@ -15,12 +15,14 @@ class PayoffPlanGoal extends Model
         'monthly_contribution_cents',
         'target_date',
         'goal_type',
+        'priority',
     ];
 
     protected $casts = [
         'target_amount_cents' => 'integer',
         'monthly_contribution_cents' => 'integer',
         'target_date' => 'date',
+        'priority' => 'integer',
     ];
 
     /**

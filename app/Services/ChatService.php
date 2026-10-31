@@ -8,6 +8,7 @@ use App\Models\ChatMessage;
 use App\Models\FlaggedChatMessage;
 use App\Models\User;
 use App\Services\Chat\AssistantToolFactory;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Prism\Prism\Exceptions\PrismProviderOverloadedException;
 use Prism\Prism\Exceptions\PrismRateLimitedException;
@@ -30,12 +31,17 @@ class ChatService
         protected AssistantToolFactory $toolFactory
     ) {}
 
-    public function processMessageStream(
-        User $user,
-        string $message,
-        ?int $conversationId = null,
-        ?int $budgetId = null
-    ) {
+    /**
+     * First half of a streamed chat turn (POST /chat/stream): run moderation
+     * before anything is streamed, so refusals come back as JSON the panel can
+     * read. Returns a refusal response, or the sanitized message and the
+     * conversation id to stream into (a conversation may be created here when a
+     * flagged-but-allowed message has to be recorded against it).
+     *
+     * @return JsonResponse|array{message: string, conversation_id: int|null}
+     */
+    public function prepareStream(User $user, string $message, ?int $conversationId = null): JsonResponse|array
+    {
         try {
             // 1. Check if user is banned
             if ($this->moderationService->isUserBanned($user)) {
@@ -76,10 +82,44 @@ class ChatService
                         'blocked' => true,
                     ], 400);
                 }
+
+                // A conversation created while flagging is new activity too.
+                if ($conversation->wasRecentlyCreated) {
+                    $this->moderationService->trackConversationActivity($user, $conversation->id);
+                }
+
+                $conversationId = $conversation->id;
             }
 
-            // 5. Get or create conversation (reusing one created while flagging)
-            $conversation ??= $this->getOrCreateConversation($user, $conversationId);
+            return ['message' => $message, 'conversation_id' => $conversationId];
+        } catch (\Exception $e) {
+            Log::error('Chat service streaming error', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to process message. Please try again.',
+                'success' => false,
+            ], 500);
+        }
+    }
+
+    /**
+     * Second half of a streamed chat turn (GET /chat/stream/{streamId}): store
+     * the already-moderated user message, run the tool loop and stream the
+     * reply as server-sent events.
+     */
+    public function streamReply(
+        User $user,
+        string $message,
+        ?int $conversationId = null,
+        ?int $budgetId = null
+    ) {
+        try {
+            // 5. Get or create conversation (prepareStream may have created it while flagging)
+            $conversation = $this->getOrCreateConversation($user, $conversationId);
 
             // 6. Track new conversations for rapid-creation abuse
             if ($conversation->wasRecentlyCreated) {
@@ -443,9 +483,7 @@ class ChatService
 
     public function buildContext(User $user, ?int $budgetId = null): array
     {
-        $activeBudget = $budgetId
-            ? Budget::where('user_id', $user->id)->find($budgetId)
-            : $user->getActiveBudget();
+        $activeBudget = $this->resolveBudget($user, $budgetId);
 
         if (! $activeBudget) {
             return [
@@ -568,7 +606,9 @@ class ChatService
     protected function resolveBudget(User $user, ?int $budgetId): ?Budget
     {
         if ($budgetId) {
-            return Budget::where('user_id', $user->id)->find($budgetId);
+            $budget = Budget::find($budgetId);
+
+            return $budget && $user->can('view', $budget) ? $budget : null;
         }
 
         return $user->getActiveBudget();

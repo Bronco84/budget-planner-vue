@@ -71,15 +71,15 @@
 
                   <!-- Category -->
                   <div>
-                    <InputLabel for="category" value="Category" />
-                    <TextInput
-                      id="category"
-                      type="text"
+                    <InputLabel for="category_id" value="Category" />
+                    <CategorySelect
+                      id="category_id"
                       class="mt-1 block w-full"
-                      v-model="form.category"
-                      required
+                      :categories="categories"
+                      v-model:category-id="form.category_id"
+                      v-model:category="form.category"
                     />
-                    <InputError class="mt-2" :message="form.errors.category" />
+                    <InputError class="mt-2" :message="form.errors.category_id || form.errors.category" />
                   </div>
 
                   <!-- Amount -->
@@ -190,6 +190,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import TextArea from '@/Components/TextArea.vue';
 import SelectInput from '@/Components/SelectInput.vue';
+import CategorySelect from '@/Components/CategorySelect.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { formatCurrency } from '@/utils/format.js';
@@ -197,6 +198,10 @@ import { formatCurrency } from '@/utils/format.js';
 const props = defineProps({
   budget: Object,
   accounts: Array,
+  categories: {
+    type: Array,
+    default: () => [],
+  },
   recurringTemplates: Array,
   prefillData: {
     type: Object,
@@ -212,6 +217,7 @@ const form = useForm({
   amount: props.prefillData.amount || '',
   account_id: props.prefillData.account_id || '',
   category: props.prefillData.category || '',
+  category_id: props.prefillData.category_id || null,
   date: props.prefillData.date || today,
   notes: '',
   recurring_transaction_template_id: props.prefillData.recurring_transaction_template_id || '',

@@ -5,12 +5,11 @@ use App\Models\Budget;
 use App\Models\PayoffPlan;
 use App\Models\PayoffPlanDebt;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 
 /*
  * HTTP-level coverage for PAYOFF-001 (create) and PAYOFF-003 (edit/delete):
- * index, wizard, store, preview, edit, update and destroy as the budget owner.
+ * index, wizard, store, edit, update and destroy as the budget owner.
  */
 
 beforeEach(function () {
@@ -96,7 +95,7 @@ test('index shows an empty list when the budget has no plans', function () {
 
 // --- PAYOFF-001: wizard ---
 
-test('create wizard offers only liability accounts with a positive balance', function () {
+test('create wizard offers only liability accounts that carry a balance', function () {
     Account::factory()->checking()->create(['budget_id' => $this->budget->id, 'current_balance_cents' => 900000]);
     Account::factory()->creditCard()->create(['budget_id' => $this->budget->id, 'current_balance_cents' => 0]);
 
@@ -110,6 +109,30 @@ test('create wizard offers only liability accounts with a positive balance', fun
             ->has('debtAccounts', 1)
             ->where('debtAccounts.0.id', $this->card->id)
             ->where('debtAccounts.0.current_balance_cents', 250000));
+});
+
+test('create wizard offers a liability stored with a negative balance as a positive debt', function () {
+    $this->card->delete();
+    $negativeCard = Account::factory()->creditCard()->create([
+        'budget_id' => $this->budget->id,
+        'current_balance_cents' => -45000,
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('payoff-plans.create', $this->budget))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('debtAccounts', 1)
+            ->where('debtAccounts.0.id', $negativeCard->id)
+            ->where('debtAccounts.0.current_balance_cents', 45000));
+
+    $this->actingAs($this->user)
+        ->post(route('payoff-plans.store', $this->budget), lifecyclePlanPayload([
+            'debts' => [['account_id' => $negativeCard->id, 'interest_rate' => 0, 'minimum_payment_cents' => 5000]],
+        ]))
+        ->assertSessionHasNoErrors();
+
+    expect(PayoffPlanDebt::where('account_id', $negativeCard->id)->sole()->starting_balance_cents)->toBe(45000);
 });
 
 test('create wizard has no debt accounts when the budget has no liabilities', function () {
@@ -142,6 +165,7 @@ test('storing a plan persists debts and goals, makes it the only active plan and
                 'target_amount_cents' => 100000,
                 'monthly_contribution_cents' => 25000,
                 'goal_type' => 'savings',
+                'priority' => 1,
             ]],
         ]));
 
@@ -167,7 +191,8 @@ test('storing a plan persists debts and goals, makes it the only active plan and
     $goal = $plan->goals()->sole();
     expect($goal->name)->toBe('Emergency fund')
         ->and($goal->target_amount_cents)->toBe(100000)
-        ->and($goal->monthly_contribution_cents)->toBe(25000);
+        ->and($goal->monthly_contribution_cents)->toBe(25000)
+        ->and($goal->priority)->toBe(1);
 });
 
 test('storing a plan rejects invalid wizard input without creating anything', function (Closure $overrides, string $errorKey) {
@@ -203,56 +228,6 @@ test('storing a plan with a debt account from another budget is rejected and att
     expect(PayoffPlanDebt::where('account_id', $foreignCard->id)->exists())->toBeFalse();
 });
 
-// --- PAYOFF-001: preview ---
-
-test('preview compares snowball and avalanche and leaves no temporary plans behind', function () {
-    $smallCheap = Account::factory()->creditCard()->create(['budget_id' => $this->budget->id, 'current_balance_cents' => 50000]);
-
-    $response = $this->actingAs($this->user)
-        ->postJson(route('payoff-plans.preview', $this->budget), [
-            'monthly_extra_payment' => 20000,
-            'debts' => [
-                ['account_id' => $smallCheap->id, 'balance' => 50000, 'interest_rate' => 5, 'minimum_payment' => 2500],
-                ['account_id' => $this->card->id, 'balance' => 250000, 'interest_rate' => 24, 'minimum_payment' => 7500],
-            ],
-        ])
-        ->assertOk()
-        ->assertJsonStructure(['comparisons' => [
-            'snowball' => ['strategy', 'total_months', 'payoff_date', 'total_interest_paid'],
-            'avalanche' => ['strategy', 'total_months', 'payoff_date', 'total_interest_paid'],
-        ]]);
-
-    $comparisons = $response->json('comparisons');
-    expect($comparisons['avalanche']['total_interest_paid'])->toBeLessThanOrEqual($comparisons['snowball']['total_interest_paid'])
-        ->and($comparisons['snowball']['total_months'])->toBeGreaterThan(0)
-        ->and(PayoffPlan::count())->toBe(0)
-        ->and(PayoffPlanDebt::count())->toBe(0);
-});
-
-test('preview computes the comparison in memory without writing any plan rows', function () {
-    $writes = [];
-    DB::listen(function ($query) use (&$writes) {
-        if (preg_match('/^\s*(insert|update|delete)\b.*payoff_plan/i', $query->sql)) {
-            $writes[] = $query->sql;
-        }
-    });
-
-    $response = $this->actingAs($this->user)
-        ->postJson(route('payoff-plans.preview', $this->budget), [
-            'monthly_extra_payment' => 10000,
-            'debts' => [
-                ['account_id' => $this->card->id, 'balance' => 120000, 'interest_rate' => 12, 'minimum_payment' => 10000],
-            ],
-        ])
-        ->assertOk();
-
-    // 1,200.00 at 12% APR paid 200.00/month clears in 7 months either way.
-    expect($response->json('comparisons.snowball.total_months'))->toBe(7)
-        ->and($response->json('comparisons.avalanche.total_months'))->toBe(7)
-        ->and($response->json('comparisons.snowball.never_paid_off'))->toBeFalse()
-        ->and($writes)->toBe([]);
-});
-
 // --- PAYOFF-003: edit / update / destroy ---
 
 test('edit page renders the plan with its debts and goals', function () {
@@ -271,10 +246,10 @@ test('edit page renders the plan with its debts and goals', function () {
 test('updating a plan persists the changes and the show page reflects the recalculated projection', function () {
     $plan = lifecycleCreatePlan($this->budget, $this->card, ['monthly_extra_payment_cents' => 0]);
 
-    // $1,200 at 0% with a $100 minimum: 12 months before the update.
+    // The card now owes $2,500 at 0% with a $100 minimum: 25 months before the update.
     $this->actingAs($this->user)
         ->get(route('payoff-plans.show', [$this->budget, $plan]))
-        ->assertInertia(fn (AssertableInertia $page) => $page->where('debtProjection.total_months', 12));
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('debtProjection.total_months', 25));
 
     $this->actingAs($this->user)
         ->patch(route('payoff-plans.update', [$this->budget, $plan]), [
@@ -293,13 +268,86 @@ test('updating a plan persists the changes and the show page reflects the recalc
         ->and($plan->monthly_extra_payment_cents)->toBe(10000)
         ->and($plan->is_active)->toBeFalse();
 
-    // $100 minimum + $100 extra against $1,200 = 6 months.
+    // $100 minimum + $100 extra against $2,500 = 13 months.
     $this->actingAs($this->user)
         ->get(route('payoff-plans.show', [$this->budget, $plan]))
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->where('plan.strategy', 'custom')
-            ->where('debtProjection.total_months', 6));
+            ->where('debtProjection.total_months', 13));
 });
+
+test('updating a plan edits its debts APR and minimum payment and its goals', function () {
+    $plan = lifecycleCreatePlan($this->budget, $this->card);
+    $debt = $plan->debts()->sole();
+    $goal = $plan->goals()->create([
+        'name' => 'Vacation',
+        'target_amount_cents' => 100000,
+        'monthly_contribution_cents' => 10000,
+        'goal_type' => 'savings',
+        'priority' => 1,
+    ]);
+
+    $this->actingAs($this->user)
+        ->patch(route('payoff-plans.update', [$this->budget, $plan]), [
+            'name' => 'Existing plan',
+            'strategy' => 'snowball',
+            'monthly_extra_payment_cents' => 0,
+            'debts' => [['id' => $debt->id, 'interest_rate' => 7.5, 'minimum_payment_cents' => 25000]],
+            'goals' => [[
+                'id' => $goal->id,
+                'name' => 'Emergency fund',
+                'target_amount_cents' => 300000,
+                'monthly_contribution_cents' => 20000,
+                'priority' => 3,
+            ]],
+        ])
+        ->assertRedirect(route('payoff-plans.show', [$this->budget, $plan]))
+        ->assertSessionHasNoErrors();
+
+    $debt->refresh();
+    $goal->refresh();
+    expect((float) $debt->interest_rate)->toBe(7.5)
+        ->and($debt->minimum_payment_cents)->toBe(25000)
+        ->and($debt->starting_balance_cents)->toBe(120000)
+        ->and($goal->name)->toBe('Emergency fund')
+        ->and($goal->target_amount_cents)->toBe(300000)
+        ->and($goal->monthly_contribution_cents)->toBe(20000)
+        ->and($goal->priority)->toBe(3);
+});
+
+test('updating debts and goals rejects invalid values and records from another plan', function (Closure $payload, string $errorKey) {
+    $plan = lifecycleCreatePlan($this->budget, $this->card);
+    $debt = $plan->debts()->sole();
+    $goal = $plan->goals()->create([
+        'name' => 'Vacation',
+        'target_amount_cents' => 100000,
+        'monthly_contribution_cents' => 10000,
+        'goal_type' => 'savings',
+    ]);
+    $otherPlan = lifecycleCreatePlan($this->budget, $this->card, ['is_active' => false]);
+    $context = ['debt' => $debt, 'goal' => $goal, 'otherDebt' => $otherPlan->debts()->sole()];
+
+    $this->actingAs($this->user)
+        ->from(route('payoff-plans.edit', [$this->budget, $plan]))
+        ->patch(route('payoff-plans.update', [$this->budget, $plan]), array_merge([
+            'name' => 'Existing plan',
+            'strategy' => 'snowball',
+            'monthly_extra_payment_cents' => 0,
+        ], $payload($context)))
+        ->assertRedirect(route('payoff-plans.edit', [$this->budget, $plan]))
+        ->assertSessionHasErrors($errorKey);
+
+    expect((float) $debt->fresh()->interest_rate)->toBe(0.0)
+        ->and($debt->fresh()->minimum_payment_cents)->toBe(10000)
+        ->and($context['otherDebt']->fresh()->minimum_payment_cents)->toBe(10000)
+        ->and($goal->fresh()->name)->toBe('Vacation');
+})->with([
+    'APR above 100' => [fn ($c) => ['debts' => [['id' => $c['debt']->id, 'interest_rate' => 120, 'minimum_payment_cents' => 5000]]], 'debts.0.interest_rate'],
+    'negative minimum payment' => [fn ($c) => ['debts' => [['id' => $c['debt']->id, 'interest_rate' => 5, 'minimum_payment_cents' => -1]]], 'debts.0.minimum_payment_cents'],
+    'debt from another plan' => [fn ($c) => ['debts' => [['id' => $c['otherDebt']->id, 'interest_rate' => 5, 'minimum_payment_cents' => 5000]]], 'debts.0.id'],
+    'goal without a name' => [fn ($c) => ['goals' => [['id' => $c['goal']->id, 'name' => '', 'target_amount_cents' => 1000, 'monthly_contribution_cents' => 0]]], 'goals.0.name'],
+    'negative goal target' => [fn ($c) => ['goals' => [['id' => $c['goal']->id, 'name' => 'X', 'target_amount_cents' => -5, 'monthly_contribution_cents' => 0]]], 'goals.0.target_amount_cents'],
+]);
 
 test('updating a plan rejects invalid input and leaves the plan unchanged', function (array $overrides, string $errorKey) {
     $plan = lifecycleCreatePlan($this->budget, $this->card, ['name' => 'Original', 'monthly_extra_payment_cents' => 0]);

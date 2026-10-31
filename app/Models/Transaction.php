@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsCategoryAssignment;
 use App\Services\BudgetService;
 use App\Services\RecurringTransactionService;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,7 +15,22 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Transaction extends Model
 {
-    use HasFactory, LogsActivity;
+    use HasFactory, LogsActivity, SyncsCategoryAssignment;
+
+    /**
+     * How a transaction was linked to its recurring template (link_source).
+     * Null means unknown (links made before the column existed) and, like
+     * every source except 'rule', is never removed by rule re-evaluation.
+     */
+    const LINK_SOURCE_MANUAL = 'manual';
+
+    const LINK_SOURCE_RULE = 'rule';
+
+    const LINK_SOURCE_ENTITY = 'entity';
+
+    const LINK_SOURCE_DESCRIPTION = 'description';
+
+    const LINK_SOURCE_ANALYSIS = 'analysis';
 
     /**
      * Boot the model.
@@ -22,6 +38,17 @@ class Transaction extends Model
     protected static function boot()
     {
         parent::boot();
+
+        // An unlinked transaction has no link source.
+        static::saving(function (Transaction $transaction) {
+            $attributes = $transaction->getAttributes();
+
+            if (array_key_exists('recurring_transaction_template_id', $attributes)
+                && $attributes['recurring_transaction_template_id'] === null
+                && ($attributes['link_source'] ?? null) !== null) {
+                $transaction->link_source = null;
+            }
+        });
 
         // Clear projection caches when transactions are created/updated/deleted
         static::created(function (Transaction $transaction) {
@@ -68,12 +95,14 @@ class Transaction extends Model
         'account_id',
         'description',
         'category',
+        'category_id',
         'amount_in_cents',
         'date',
         'plaid_transaction_id',
         'is_plaid_imported',
         'is_reconciled',
         'recurring_transaction_template_id',
+        'link_source',
         'transfer_id',
         'bank_feed_transaction_id',
         'import_source',
@@ -93,11 +122,75 @@ class Transaction extends Model
     ];
 
     /**
+     * Link this transaction to a recurring template, recording how, and save.
+     */
+    public function linkToRecurringTemplate(int $templateId, string $source): bool
+    {
+        $this->recurring_transaction_template_id = $templateId;
+        $this->link_source = $source;
+
+        return $this->save();
+    }
+
+    /**
      * Get the budget that owns the transaction.
      */
     public function budget(): BelongsTo
     {
         return $this->belongsTo(Budget::class);
+    }
+
+    /**
+     * Get the budget category the transaction is assigned to.
+     *
+     * Named budgetCategory because the legacy `category` column (kept in sync
+     * with the category's name) would shadow a relation called `category`.
+     */
+    public function budgetCategory(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'category_id');
+    }
+
+    /**
+     * The category name to display/group by: the linked category's name, or the
+     * legacy free-text category for rows that never matched a category. Grouping
+     * by it merges linked rows (even with a stale copied name) with unlinked
+     * legacy rows that carry the same category name.
+     */
+    public function getCategoryNameAttribute(): ?string
+    {
+        if ($this->category_id && $this->budgetCategory) {
+            return $this->budgetCategory->name;
+        }
+
+        return $this->category;
+    }
+
+    /**
+     * Scope to transactions assigned to the given category: linked by id, or
+     * unlinked legacy rows whose category string equals the category's name.
+     */
+    public function scopeInCategory(Builder $query, Category $category): Builder
+    {
+        return $query->where(function (Builder $q) use ($category) {
+            $q->where('category_id', $category->id)
+                ->orWhere(function (Builder $legacy) use ($category) {
+                    $legacy->whereNull('category_id')->where('category', $category->name);
+                });
+        });
+    }
+
+    /**
+     * Whether this transaction belongs to the given category (in-memory
+     * counterpart of scopeInCategory).
+     */
+    public function isInCategory(Category $category): bool
+    {
+        if ($this->category_id) {
+            return (int) $this->category_id === (int) $category->id;
+        }
+
+        return $this->category === $category->name;
     }
 
     /**

@@ -87,17 +87,6 @@ test('another user cannot store a payoff plan in a budget they do not own', func
     payoffAuthzAssertPlanUntouched($this->plan);
 });
 
-test('another user cannot preview payoff strategies in a budget they do not own', function () {
-    $this->actingAs($this->intruder)
-        ->postJson(route('payoff-plans.preview', $this->budget), [
-            'monthly_extra_payment' => 0,
-            'debts' => [['account_id' => $this->card->id, 'balance' => 1000, 'interest_rate' => 0, 'minimum_payment' => 100]],
-        ])
-        ->assertForbidden();
-
-    expect(PayoffPlan::count())->toBe(1);
-});
-
 // --- Plan-level routes (PAYOFF-002/003): foreign budget is 403 ---
 
 test('another user cannot view a payoff plan in a budget they do not own', function () {

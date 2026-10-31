@@ -17,6 +17,21 @@
           <p class="text-center text-sm text-gray-600 dark:text-gray-400 mb-8">
             Start your journey with secure, passwordless authentication
           </p>
+
+          <div
+            v-if="invitation"
+            class="mb-6 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800/50 p-4 text-sm text-indigo-800 dark:text-indigo-200"
+          >
+            <span v-if="invitation.invited_by" class="font-medium">{{ invitation.invited_by }}</span><span v-else>Someone</span>
+            invited you to <span class="font-medium">{{ invitation.budget_name }}</span> as {{ invitation.role === 'viewer' ? 'a' : 'an' }}
+            <span class="font-medium">{{ invitation.role }}</span>. Create your account to join.
+          </div>
+          <div
+            v-else-if="invitationError"
+            class="mb-6 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800/50 p-4 text-sm text-red-700 dark:text-red-300"
+          >
+            {{ invitationError }}
+          </div>
         </div>
 
         <form @submit.prevent="submit" class="space-y-6">
@@ -44,6 +59,7 @@
               type="email"
               v-model="form.email"
               required
+              :readonly="Boolean(invitation)"
               autocomplete="username"
               class="mt-1 block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
               placeholder="your@email.com"
@@ -118,9 +134,17 @@ import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 
+const props = defineProps({
+    invitation: { type: Object, default: null },
+    invitationError: { type: String, default: null },
+});
+
+// Registration is invitation-only (plus a configured allowlist); an invited
+// email is fixed to the address the invitation was sent to.
 const form = useForm({
     name: '',
-    email: '',
+    email: props.invitation?.email ?? '',
+    invitation: props.invitation?.token ?? null,
 });
 
 const submit = () => {

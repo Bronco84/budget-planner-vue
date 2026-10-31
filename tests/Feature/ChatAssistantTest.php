@@ -60,7 +60,7 @@ test('streaming into another users conversation returns 404 and does not append 
     $victim = chatConversationFor(User::factory()->create());
 
     $this->actingAs(User::factory()->create())
-        ->get(route('chat.stream', ['message' => 'Hi there', 'conversation_id' => $victim->id]))
+        ->postJson(route('chat.stream.start'), ['message' => 'Hi there', 'conversation_id' => $victim->id])
         ->assertNotFound();
 
     expect($victim->messages()->count())->toBe(1);
@@ -83,8 +83,7 @@ test('the stream persists the assistant reply the server generated', function ()
     Prism::fake([TextResponseFake::make()->withText('You spent $200 on groceries.')]);
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)
-        ->get(route('chat.stream', ['message' => 'How much on groceries?']));
+    $response = streamChat($this->actingAs($user), ['message' => 'How much on groceries?']);
 
     $response->assertOk();
     $body = $response->streamedContent();
@@ -100,8 +99,7 @@ test('the stream does not persist or send a reply that fails response validation
     Prism::fake([TextResponseFake::make()->withText('Your password is hunter2.')]);
     $user = User::factory()->create();
 
-    $body = $this->actingAs($user)
-        ->get(route('chat.stream', ['message' => 'Hello']))
+    $body = streamChat($this->actingAs($user), ['message' => 'Hello'])
         ->streamedContent();
 
     expect($body)->toContain('event: error')
@@ -180,8 +178,7 @@ test('a provider failure while streaming sends the safe message in-band and leav
     $user = User::factory()->create();
     $conversation = chatConversationFor($user);
 
-    $body = $this->actingAs($user)
-        ->get(route('chat.stream', ['message' => 'Follow-up question', 'conversation_id' => $conversation->id]))
+    $body = streamChat($this->actingAs($user), ['message' => 'Follow-up question', 'conversation_id' => $conversation->id])
         ->assertOk()
         ->streamedContent();
 
@@ -194,8 +191,7 @@ test('a provider failure while streaming a new conversation leaves no empty conv
     fakePrismProviderFailure(PrismRateLimitedException::make());
     $user = User::factory()->create();
 
-    $this->actingAs($user)
-        ->get(route('chat.stream', ['message' => 'First question']))
+    streamChat($this->actingAs($user), ['message' => 'First question'])
         ->assertOk()
         ->streamedContent();
 

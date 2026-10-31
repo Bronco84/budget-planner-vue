@@ -8,7 +8,7 @@ summary: >
   The owner opens the create-transaction form (optionally pre-filled from query
   parameters, e.g. from a recurring projection) or the QuickAddTransactionModal,
   chooses an account in the budget, enters description, signed amount, date,
-  category and notes, optionally links a recurring template, and is redirected to
+  picks a category from the budget's categories (or Uncategorized), enters notes, optionally links a recurring template, and is redirected to
   the transaction's edit page to attach files.
 actors:
   - budget owner
@@ -26,14 +26,16 @@ depends_on:
 integrations: []
 steps:
   - action: visit /budget/{budget}/transactions/create (optionally with description/account_id/category/date/amount/recurring_transaction_template_id query)
-    expected: Transactions/Create rendered with accounts, recurring templates and prefillData
+    expected: Transactions/Create rendered with accounts, the budget's categories, recurring templates and prefillData (a category name in the query is mapped to prefillData.category_id)
   - action: submit (POST /budget/{budget}/transactions)
     expected: transaction stored with amount_in_cents = amount*100; redirect to budget.transaction.edit with a prompt to add attachments
 postconditions:
   - Transaction exists in the budget and an activity-log entry is recorded by model events
 business_rules:
   - account_id must exist in this budget; recurring_transaction_template_id, if given, must belong to this budget
-  - description and category required (max 255); amount numeric (negative = expense); date required
+  - description required (max 255); amount numeric (negative = expense); date required
+  - category_id optional (null = Uncategorized) and must belong to this budget; the chosen category's name is copied to the legacy `category` column
+  - without category_id, a category string (QuickAddTransactionModal still sends free text) is linked to the budget category with the same trimmed, case-insensitive name, otherwise stored unlinked
 scenarios:
   - id: create_form_renders
     kind: happy_path
@@ -52,6 +54,8 @@ scenarios:
     description: QuickAddTransactionModal posts to the active budget's store endpoint.
     coverage: partial
     tests:
+      - 'tests/Feature/Transactions/QuickAddCategoriesTest.php::the active budget shared prop lists its categories for the quick-add picker'
+      - 'tests/Feature/Transactions/QuickAddCategoriesTest.php::a quick-add transaction with a picked category is stored linked to it'
       - tests/Feature/Transactions/ManualTransactionTest.php::quick add payload without notes or template stores the transaction
     note: 'server side only: asserts the modal''s field set is accepted by the store endpoint; the modal posting to the active budget is not exercised (needs a browser test).'
   - id: prefill_from_query
@@ -62,7 +66,7 @@ scenarios:
       - tests/Feature/Transactions/ManualTransactionTest.php::create transaction form is prefilled from query parameters
   - id: missing_fields_rejected
     kind: validation
-    description: Missing description/amount/date/category returns validation errors.
+    description: Missing description/amount/date returns validation errors.
     coverage: covered
     tests:
       - tests/Feature/Transactions/ManualTransactionTest.php::storing a transaction rejects invalid input and creates nothing
@@ -97,7 +101,29 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Transactions/ManualTransactionTest.php::create transaction page has a breadcrumb trail
-known_issues: []
+  - id: store_with_category_id
+    kind: happy_path
+    description: Storing with a category_id links the transaction and copies the category name; omitting it stores an uncategorized transaction.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryLinkingTest.php::storing a transaction with a category id links it and copies the category name
+      - tests/Feature/Categories/CategoryLinkingTest.php::storing a transaction without a category leaves it uncategorized
+      - tests/Feature/Categories/CategoryLinkingTest.php::the transaction forms offer the budgets categories
+  - id: foreign_category_rejected
+    kind: authorization
+    description: A category_id from another budget fails validation and nothing is stored.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryLinkingTest.php::storing a transaction rejects a category from another budget
+  - id: category_name_linked
+    kind: alternate
+    description: A free-text category (quick add) matching a budget category by trimmed, case-insensitive name is linked to it.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryLinkingTest.php::a category name from quick add is linked to the matching budget category
+known_issues:
+  - "QuickAddTransactionModal still takes a free-text category (the shared activeBudget prop has no categories); it is linked by name when it matches, otherwise stored unlinked."
+
 confidence: high
 evidence:
   - app/Http/Controllers/TransactionController.php create/store

@@ -30,6 +30,7 @@ steps:
 postconditions:
   - the budget and its cascaded children no longer exist
 business_rules:
+  - "deleting is owner-only (BudgetPolicy::delete), including owner members; editors and viewers get 403"
   - deletion is a hard delete (no SoftDeletes on Budget)
   - FileAttachment rows on the budget and its transactions are deleted; each file is removed (row and S3 object) only when nothing else uses it (File::deleteFromS3IfUnused)
   - each of the budget's PlaidConnections has its item removed at Plaid (/item/remove) after the local delete; a Plaid failure is logged and never blocks the delete
@@ -77,6 +78,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetDestroyFlowTest.php::deleting another users budget is forbidden and the budget remains
+  - id: shared_budget_delete_owner_only
+    kind: authorization
+    description: Editors and viewers of a shared budget get 403 when deleting it.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetRoleMatrixTest.php::each budget route enforces its role requirement
 known_issues: []
 confidence: medium
 evidence:

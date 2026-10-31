@@ -44,6 +44,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Registration Allowlist
+    |--------------------------------------------------------------------------
+    |
+    | Open registration is closed. An account can be created only through a
+    | valid budget invitation link, or for an email listed here
+    | (comma-separated REGISTRATION_ALLOWLIST, compared case-insensitively).
+    |
+    */
+
+    'registration_allowlist' => array_values(array_filter(array_map(
+        fn (string $email) => strtolower(trim($email)),
+        explode(',', (string) env('REGISTRATION_ALLOWLIST', 'bamccoley@gmail.com'))
+    ))),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue Magic Link Emails
+    |--------------------------------------------------------------------------
+    |
+    | When true, magic link emails are queued so the response time does not
+    | reveal whether an account exists. Magic links are the fallback sign-in,
+    | so only enable this once a queue worker is running; otherwise links
+    | are never delivered.
+    |
+    */
+
+    'magic_link_queue' => (bool) env('MAGIC_LINK_QUEUE', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Account Deletion Re-authentication Window
     |--------------------------------------------------------------------------
     |

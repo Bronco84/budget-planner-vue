@@ -113,6 +113,7 @@
                 :budget="budget"
                 :recurring-transaction="recurringTransaction"
                 :accounts="accounts"
+                :categories="categories"
                 :linked-transactions="linkedTransactions"
                 :rules="rules"
                 :eligible-credit-cards="eligibleCreditCards"
@@ -344,6 +345,10 @@ const props = defineProps({
   budget: Object,
   recurringTransaction: Object,
   accounts: Array,
+  categories: {
+    type: Array,
+    default: () => [],
+  },
   rules: Array,
   linkedTransactions: Array,
   fieldOptions: Object,

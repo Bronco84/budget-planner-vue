@@ -5,8 +5,8 @@ use App\Models\Category;
 use App\Models\User;
 
 /*
- * CATEGORY-002 / CATEGORY-003: deleting an unused category, reordering the
- * budget's own categories, and the cross-user / cross-budget guards.
+ * CATEGORY-002: deleting an unused category and the cross-user /
+ * cross-budget guards. (The CATEGORY-003 reorder endpoint was removed.)
  */
 
 beforeEach(function () {
@@ -52,45 +52,4 @@ test('another users category cannot be deleted and a cross budget category is no
         ->assertNotFound();
 
     expect(Category::find($foreign->id))->not->toBeNull();
-});
-
-test('reordering the budgets categories persists the new order', function () {
-    $first = categoryFor($this->budget, 'First', 0);
-    $second = categoryFor($this->budget, 'Second', 1);
-    $third = categoryFor($this->budget, 'Third', 2);
-
-    $this->actingAs($this->user)
-        ->from(route('budgets.categories.index', $this->budget))
-        ->post(route('budgets.categories.reorder', $this->budget), [
-            'categories' => [
-                ['id' => $first->id, 'order' => 2],
-                ['id' => $second->id, 'order' => 0],
-                ['id' => $third->id, 'order' => 1],
-            ],
-        ])
-        ->assertRedirect(route('budgets.categories.index', $this->budget))
-        ->assertSessionHas('message');
-
-    expect($first->fresh()->order)->toBe(2)
-        ->and($second->fresh()->order)->toBe(0)
-        ->and($third->fresh()->order)->toBe(1)
-        ->and($this->budget->categories()->pluck('name')->all())->toBe(['Second', 'Third', 'First']);
-});
-
-test('reordering ignores category ids from another budget', function () {
-    $mine = categoryFor($this->budget, 'Mine', 0);
-    $foreign = categoryFor(Budget::factory()->create(), 'Foreign', 5);
-
-    $this->actingAs($this->user)
-        ->post(route('budgets.categories.reorder', $this->budget), [
-            'categories' => [
-                ['id' => $mine->id, 'order' => 3],
-                ['id' => $foreign->id, 'order' => 0],
-            ],
-        ])
-        ->assertRedirect()
-        ->assertSessionHasNoErrors();
-
-    expect($mine->fresh()->order)->toBe(3)
-        ->and($foreign->fresh()->order)->toBe(5);
 });

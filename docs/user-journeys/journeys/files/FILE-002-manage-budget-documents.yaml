@@ -39,6 +39,7 @@ steps:
 postconditions:
   - budget attachments reflect the change
 business_rules:
+  - "any member may list and download budget documents; uploading and deleting needs the editor role"
   - same file rules as FILE-001 (10MB, MIME allow-list, extension must match)
   - upload throttled to 10 per minute
   - download/destroy 404 when the attachment does not belong to this budget
@@ -107,6 +108,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Files/BudgetFileUploadAndAccessTest.php::another users budget files cannot be listed, uploaded, downloaded or deleted
+  - id: shared_budget_roles
+    kind: authorization
+    description: On a shared budget viewers can list and download documents but get 403 uploading or deleting; editors can upload and delete.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetRoleMatrixTest.php::each budget route enforces its role requirement
 known_issues: []
 confidence: high
 evidence:

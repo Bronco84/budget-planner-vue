@@ -16,5 +16,5 @@ test('guests are not redirected to passkey registration by the enforcement middl
     $this->get(route('register'))->assertOk();
 
     $this->get(route('budgets.index'))->assertRedirect(route('login'));
-    $this->getJson('/api/preferences/theme')->assertUnauthorized();
+    $this->getJson('/api/preferences/active-budget')->assertUnauthorized();
 });

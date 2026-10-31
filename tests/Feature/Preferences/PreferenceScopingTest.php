@@ -5,19 +5,20 @@ use App\Models\User;
 use App\Models\UserPreference;
 
 /*
- * PREF-001: the saved account type order is read back (or the defaults), and
+ * PREF-001: the saved account type order reaches the dashboard (or the defaults), and
  * preferences are always scoped to the authenticated user.
  * PREF-002: the active budget is null without budgets and falls back when the
  * stored budget is gone or no longer accessible.
  */
 
-test('the account type order defaults to the standard types and returns the saved order', function () {
+test('the account type order defaults to the standard types and the dashboard receives the saved order', function () {
     $user = User::factory()->create();
+    $budget = Budget::factory()->create(['user_id' => $user->id]);
 
     $this->actingAs($user)
-        ->getJson(route('preferences.account-type-order.get'))
+        ->get(route('budgets.show', $budget))
         ->assertOk()
-        ->assertExactJson(['order' => User::ACCOUNT_TYPES]);
+        ->assertInertia(fn ($page) => $page->where('userAccountTypeOrder', User::ACCOUNT_TYPES));
 
     $order = array_reverse(User::ACCOUNT_TYPES);
 
@@ -26,9 +27,9 @@ test('the account type order defaults to the standard types and returns the save
         ->assertOk();
 
     $this->actingAs($user)
-        ->getJson(route('preferences.account-type-order.get'))
+        ->get(route('budgets.show', $budget))
         ->assertOk()
-        ->assertExactJson(['order' => $order]);
+        ->assertInertia(fn ($page) => $page->where('userAccountTypeOrder', $order));
 });
 
 test('preferences are read and written only for the authenticated user', function () {
@@ -41,13 +42,7 @@ test('preferences are read and written only for the authenticated user', functio
         ->assertOk();
 
     // Bob never sees Alice's order, and his own write leaves hers untouched.
-    $this->actingAs($bob)
-        ->getJson(route('preferences.account-type-order.get'))
-        ->assertExactJson(['order' => User::ACCOUNT_TYPES]);
-
-    $this->actingAs($bob)
-        ->getJson(route('preferences.show', 'account_type_order'))
-        ->assertJsonPath('value', null);
+    expect($bob->fresh()->getAccountTypeOrder())->toBe(User::ACCOUNT_TYPES);
 
     $bobOrder = User::ACCOUNT_TYPES;
     [$bobOrder[0], $bobOrder[1]] = [$bobOrder[1], $bobOrder[0]];
@@ -61,10 +56,8 @@ test('preferences are read and written only for the authenticated user', functio
 });
 
 test('guests cannot read or write preferences', function () {
-    $this->getJson(route('preferences.account-type-order.get'))->assertUnauthorized();
     $this->postJson(route('preferences.account-type-order.update'), ['order' => User::ACCOUNT_TYPES])
         ->assertUnauthorized();
-    $this->getJson(route('preferences.show', 'account_type_order'))->assertUnauthorized();
     $this->postJson(route('preferences.update', 'account_type_order'), ['value' => User::ACCOUNT_TYPES])
         ->assertUnauthorized();
 

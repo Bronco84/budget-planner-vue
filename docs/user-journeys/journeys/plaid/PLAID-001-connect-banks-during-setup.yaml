@@ -19,7 +19,6 @@ preconditions:
 routes:
   - budgets.setup
   - budgets.setup.connect
-  - budgets.setup.import
   - plaid.discover
   - plaid.import
 depends_on:
@@ -43,6 +42,7 @@ postconditions:
   - one Account and one PlaidAccount per selected Plaid account
   - a single active PlaidConnection holding the access token and institution metadata
 business_rules:
+  - "connecting banks (budgets.setup.connect, plaid.discover, plaid.import) is owner-only (BudgetPolicy::manageConnections); budgets.setup needs the editor role and only owners get a Plaid link token"
   - only accounts whose Plaid id is in selected_accounts are imported
   - initial balance is Plaid current balance in cents, or 0 when missing
   - institution details are looked up by metadata.institution.institution_id, falling back to a name search; missing details are tolerated
@@ -77,7 +77,6 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidImportTest.php::importing creates local accounts for only the selected Plaid accounts under one connection
-      - tests/Feature/Plaid/PlaidImportTest.php::the setup import route imports accounts the same way
   - id: import_validation
     kind: validation
     description: Missing public_token, metadata.institution.name or selected_accounts fails validation.
@@ -152,8 +151,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidImportTest.php::another users budget cannot be discovered, set up or imported into
-known_issues:
-  - budgets.setup.import (POST budgets/{budget}/setup/connect) is not used by the UI; Discover.vue always posts to plaid.import.
+  - id: shared_budget_non_owner_denied
+    kind: authorization
+    description: Editors and viewers of a shared budget get 403 on discover and import, and nothing reaches Plaid.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::editors and viewers cannot connect, re-authenticate or unlink bank connections
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetController.php setup()

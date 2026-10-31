@@ -12,8 +12,10 @@ summary: >
   (persisted as a per-budget preference) and page size.
 actors:
   - budget owner
+  - budget editor
+  - budget viewer
 preconditions:
-  - user is authenticated and owns the budget
+  - user is authenticated and a member (owner, editor or viewer) of the budget
 routes:
   - budgets.show
 depends_on:
@@ -30,6 +32,7 @@ steps:
 postconditions:
   - preference budget_{id}_projection_months updated when a new value is requested
 business_rules:
+  - "any member can view the dashboard; budgetAccess (role, can.edit/manage/manage_connections) hides edit, sync, add, connect and settings controls from viewers, and owner controls from editors (server policies still enforce)"
   - per_page is clamped to 10..200 (default 100)
   - default date range is 90 days; default projection horizon is the saved preference or 1 month
   - accounts excluded from total balance are ignored by the total; liabilities are subtracted
@@ -93,9 +96,15 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access budgets
+  - id: shared_member_views_dashboard
+    kind: alternate
+    description: A viewer of a shared budget opens the dashboard (200) with budgetAccess marking it read-only; an editor gets edit but not owner controls.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::shared budgets appear in the switcher with the member role and become the active budget
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::editors see edit controls but not owner controls
 known_issues:
   - "BudgetService::getAccountTransactions only returns past-dated rows that have a plaid_transaction_id (Plaid is treated as source of truth), so manual transactions dated today or earlier never appear in the dashboard ledger, even for manual-only accounts. Ledger tests therefore use future-dated manual transactions."
-  - "Shared budgets: User::hasBudget/accessibleBudgets include connected_users, but BudgetPolicy::view is owner-only, so a connected user who selects a shared budget gets 403 here."
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetController.php show

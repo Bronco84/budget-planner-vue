@@ -344,9 +344,7 @@ class RecurringTransactionService
             ]);
 
             if ($template->average_amount !== null) {
-                $calculatedAmount = (int) ($template->average_amount * 100);
-
-                return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
+                return $this->applyLinkedCreditCardBalance($template, (int) $template->average_amount);
             }
 
             return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
@@ -384,9 +382,7 @@ class RecurringTransactionService
             ]);
 
             if ($template->average_amount !== null) {
-                $calculatedAmount = (int) ($template->average_amount * 100);
-
-                return $this->applyLinkedCreditCardBalance($template, $calculatedAmount);
+                return $this->applyLinkedCreditCardBalance($template, (int) $template->average_amount);
             }
 
             return $this->applyLinkedCreditCardBalance($template, $template->amount_in_cents);
@@ -595,6 +591,7 @@ class RecurringTransactionService
             ->with('plaidTransaction');
 
         // Priority 1: Match by Plaid entity_id if available
+        $linkSource = $template->plaid_entity_id ? Transaction::LINK_SOURCE_ENTITY : Transaction::LINK_SOURCE_DESCRIPTION;
         if ($template->plaid_entity_id) {
             Log::debug('RecurringTransactionService: Using Plaid entity matching', [
                 'template_id' => $template->id,
@@ -637,8 +634,7 @@ class RecurringTransactionService
         $linkedCount = 0;
         foreach ($matchingTransactions as $transaction) {
             if ($transaction->recurring_transaction_template_id === null) {
-                $transaction->recurring_transaction_template_id = $template->id;
-                $transaction->save();
+                $transaction->linkToRecurringTemplate($template->id, $linkSource);
                 $linkedCount++;
             }
         }
@@ -779,8 +775,7 @@ class RecurringTransactionService
         // Link the matching transactions to this template
         $linkedCount = 0;
         foreach ($unlinkedTransactions as $transaction) {
-            $transaction->recurring_transaction_template_id = $template->id;
-            $transaction->save();
+            $transaction->linkToRecurringTemplate($template->id, Transaction::LINK_SOURCE_RULE);
             $linkedCount++;
         }
 
@@ -795,10 +790,8 @@ class RecurringTransactionService
     {
         $rules = $template->rules()->where('is_active', true)->get();
 
-        // With no rules left there is nothing to re-evaluate against. Links are
-        // not tagged with how they were made (Plaid entity, description, manual
-        // or rule), so leave every existing link in place rather than wiping
-        // links that never came from rules.
+        // With no rules left there is nothing to re-evaluate against, so leave
+        // every existing link in place.
         if ($rules->isEmpty()) {
             return ['unlinked' => 0, 'linked' => 0];
         }
@@ -807,14 +800,18 @@ class RecurringTransactionService
         $matchingTransactions = $this->findTransactionsMatchingAllRules($template, $rules);
         $matchingIds = $matchingTransactions->pluck('id')->toArray();
 
-        // Get currently linked transactions
-        $currentlyLinked = Transaction::where('recurring_transaction_template_id', $template->id)->get();
+        // Only links the rules made are re-evaluated; manual, Plaid entity,
+        // description, analysis and unknown (null) links are never removed.
+        $ruleLinked = Transaction::where('recurring_transaction_template_id', $template->id)
+            ->where('link_source', Transaction::LINK_SOURCE_RULE)
+            ->get();
 
-        // Unlink transactions that no longer match
+        // Unlink rule links that no longer match
         $unlinkedCount = 0;
-        foreach ($currentlyLinked as $transaction) {
+        foreach ($ruleLinked as $transaction) {
             if (! in_array($transaction->id, $matchingIds)) {
                 $transaction->recurring_transaction_template_id = null;
+                $transaction->link_source = null;
                 $transaction->save();
                 $unlinkedCount++;
             }
@@ -825,8 +822,7 @@ class RecurringTransactionService
         foreach ($matchingTransactions as $transaction) {
             // Only link if not already linked to any template
             if ($transaction->recurring_transaction_template_id === null) {
-                $transaction->recurring_transaction_template_id = $template->id;
-                $transaction->save();
+                $transaction->linkToRecurringTemplate($template->id, Transaction::LINK_SOURCE_RULE);
                 $linkedCount++;
             }
         }
@@ -895,7 +891,11 @@ class RecurringTransactionService
             foreach ($templates as $template) {
                 // Strategy 1: Match by Plaid entity_id
                 if ($template->plaid_entity_id && $transaction->plaidTransaction) {
+                    // counterparties is cast to an array; tolerate a raw JSON string too.
                     $counterparties = $transaction->plaidTransaction->counterparties ?? '';
+                    if (is_array($counterparties)) {
+                        $counterparties = json_encode($counterparties);
+                    }
                     if (is_string($counterparties) && str_contains($counterparties, $template->plaid_entity_id)) {
                         $matchedTemplate = $template;
                         $matchMethod = 'entity';
@@ -931,8 +931,11 @@ class RecurringTransactionService
 
             // Link the transaction if a match was found
             if ($matchedTemplate) {
-                $transaction->recurring_transaction_template_id = $matchedTemplate->id;
-                $transaction->save();
+                $transaction->linkToRecurringTemplate($matchedTemplate->id, match ($matchMethod) {
+                    'entity' => Transaction::LINK_SOURCE_ENTITY,
+                    'rules' => Transaction::LINK_SOURCE_RULE,
+                    default => Transaction::LINK_SOURCE_DESCRIPTION,
+                });
                 $linkedCount++;
 
                 switch ($matchMethod) {
@@ -1114,9 +1117,9 @@ class RecurringTransactionService
                 }
 
                 // Only link if not already linked
+                // The user picked these suggestions, so the link is manual.
                 if ($transaction->recurring_transaction_template_id === null) {
-                    $transaction->recurring_transaction_template_id = $templateId;
-                    $transaction->save();
+                    $transaction->linkToRecurringTemplate((int) $templateId, Transaction::LINK_SOURCE_MANUAL);
                     $linkedCount++;
                 }
             }
@@ -1560,7 +1563,7 @@ class RecurringTransactionService
                 : ['No matching transactions found'];
 
             return [
-                'amount' => $template->average_amount ? (int) ($template->average_amount * 100) : $template->amount_in_cents,
+                'amount' => $template->average_amount ? (int) $template->average_amount : $template->amount_in_cents,
                 'method' => 'fallback',
                 'confidence' => ['score' => 0, 'level' => 'low', 'factors' => $factors],
             ];
@@ -1584,7 +1587,7 @@ class RecurringTransactionService
 
         if ($filteredTransactions->isEmpty()) {
             return [
-                'amount' => $template->average_amount ? (int) ($template->average_amount * 100) : $template->amount_in_cents,
+                'amount' => $template->average_amount ? (int) $template->average_amount : $template->amount_in_cents,
                 'method' => 'fallback',
                 'confidence' => ['score' => 0, 'level' => 'low', 'factors' => ['All transactions filtered out by constraints']],
             ];

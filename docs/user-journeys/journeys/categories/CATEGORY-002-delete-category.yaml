@@ -6,8 +6,8 @@ status: implemented
 priority: medium
 summary: >
   From the categories page the owner confirms deletion of a category. The delete
-  is refused with an error flash when any of the budget's transactions use the
-  category's name.
+  is refused with an error flash when any of the budget's transactions are linked
+  to the category (by category_id, or unlinked legacy rows carrying its name).
 actors:
   - budget owner
 preconditions:
@@ -22,9 +22,10 @@ steps:
   - action: confirm delete (DELETE /budgets/{budget}/categories/{category})
     expected: category removed and back with success flash, or back with an error naming the transaction count
 postconditions:
-  - category deleted only when no transaction references its name
+  - category deleted only when no transaction references it
 business_rules:
-  - categories in use by transactions (matched by name) cannot be deleted
+  - categories in use by transactions (linked by category_id, or unlinked legacy rows matching the name) cannot be deleted
+  - recurring templates linked to a deleted category have category_id nulled by the foreign key (their name string is kept)
 scenarios:
   - id: delete_unused_category
     kind: happy_path
@@ -38,6 +39,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Categories/CategoryValidationTest.php::deleting a category that transactions use is blocked with an error flash
+  - id: delete_blocked_by_id
+    kind: edge
+    description: A transaction linked by category_id blocks the delete even when its copied category name differs.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryLinkingTest.php::deleting a category is blocked by transactions linked by id even when their name differs
   - id: other_users_category_forbidden
     kind: authorization
     description: Deleting under another user's budget returns 403; a cross-budget category returns 404.

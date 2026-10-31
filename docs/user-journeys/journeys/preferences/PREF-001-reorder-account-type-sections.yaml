@@ -9,16 +9,15 @@ summary: >
   credit card...) into a new order. The page posts the full order to the
   preferences API, which stores it in user_preferences.other_preferences; the
   page then partially reloads userAccountTypeOrder. The saved order is used by
-  BudgetController for section ordering and default account selection. A generic
-  key/value preference endpoint can also read and write arbitrary keys.
+  BudgetController for section ordering and default account selection and is
+  read back through the budget page's userAccountTypeOrder prop. A generic
+  key/value preference endpoint can also write whitelisted keys.
 actors:
   - authenticated user
 preconditions:
   - user has a budget with accounts of more than one type
 routes:
-  - preferences.account-type-order.get
   - preferences.account-type-order.update
-  - preferences.show
   - preferences.update
 depends_on:
   - path: resources/js/Pages/Budgets/Show.vue
@@ -49,10 +48,10 @@ scenarios:
       - tests/Feature/Preferences/PreferenceValidationTest.php::saving an account type order accepts custom types used in the users budgets
   - id: saved_order_returned
     kind: happy_path
-    description: GET account-type-order returns the saved order, or ACCOUNT_TYPES by default.
+    description: The budget page's userAccountTypeOrder prop carries the saved order, or ACCOUNT_TYPES by default.
     coverage: covered
     tests:
-      - tests/Feature/Preferences/PreferenceScopingTest.php::the account type order defaults to the standard types and returns the saved order
+      - tests/Feature/Preferences/PreferenceScopingTest.php::the account type order defaults to the standard types and the dashboard receives the saved order
   - id: unknown_type_rejected
     kind: validation
     description: An order containing a type outside the allowed types, or a non-array, is rejected with 422.
@@ -68,10 +67,10 @@ scenarios:
       - tests/Feature/Preferences/PreferenceValidationTest.php::saving an account type order rejects custom types that only exist in another users budget
   - id: generic_preference_round_trip
     kind: alternate
-    description: Writing a value via POST /api/preferences/{key} is returned by GET /api/preferences/{key}.
+    description: Writing a whitelisted value via POST /api/preferences/{key} stores it for the user and echoes it back.
     coverage: covered
     tests:
-      - tests/Feature/Preferences/PreferenceValidationTest.php::a whitelisted preference written via the generic endpoint is returned by it
+      - tests/Feature/Preferences/PreferenceValidationTest.php::a whitelisted preference written via the generic endpoint is stored for the user
   - id: generic_endpoint_whitelist
     kind: validation
     description: The generic endpoint rejects keys outside the whitelist (e.g. active_budget_id, budget_*_projection_months) and invalid values for whitelisted keys with 422, storing nothing.
@@ -92,7 +91,7 @@ scenarios:
       - tests/Feature/Preferences/PreferenceScopingTest.php::preferences are read and written only for the authenticated user
       - tests/Feature/Preferences/PreferenceScopingTest.php::guests cannot read or write preferences
 known_issues:
-  - GET /api/preferences/account-type-order and the generic show/update endpoints have no frontend caller.
+  - The generic POST /api/preferences/{key} endpoint has no frontend caller (it only accepts whitelisted keys). The unused GET endpoints were removed.
 confidence: medium
 evidence:
   - routes/web.php preferences routes inside the auth group

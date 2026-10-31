@@ -6,6 +6,10 @@ use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
+/**
+ * Delegates to the parent budget's sharing role: members can view, editors
+ * and owners can change. See BudgetPolicy.
+ */
 class TransactionPolicy
 {
     use HandlesAuthorization;
@@ -23,7 +27,7 @@ class TransactionPolicy
      */
     public function view(User $user, Transaction $transaction): bool
     {
-        return $user->id === $transaction->budget->user_id;
+        return $user->canViewBudget($transaction->budget);
     }
 
     /**
@@ -39,7 +43,7 @@ class TransactionPolicy
      */
     public function update(User $user, Transaction $transaction): bool
     {
-        return $user->id === $transaction->budget->user_id;
+        return $user->canEditBudget($transaction->budget);
     }
 
     /**
@@ -47,7 +51,7 @@ class TransactionPolicy
      */
     public function delete(User $user, Transaction $transaction): bool
     {
-        return $user->id === $transaction->budget->user_id;
+        return $user->canEditBudget($transaction->budget);
     }
 
     /**
@@ -55,7 +59,7 @@ class TransactionPolicy
      */
     public function restore(User $user, Transaction $transaction): bool
     {
-        return $user->id === $transaction->budget->user_id;
+        return $user->canEditBudget($transaction->budget);
     }
 
     /**
@@ -63,6 +67,6 @@ class TransactionPolicy
      */
     public function forceDelete(User $user, Transaction $transaction): bool
     {
-        return $user->id === $transaction->budget->user_id;
+        return $user->canEditBudget($transaction->budget);
     }
 }

@@ -1,0 +1,155 @@
+schema: 1
+id: SHARE-001
+name: Owner invites someone to a budget and they join
+domain: sharing
+status: implemented
+priority: critical
+summary: >
+  A budget owner invites an email address as a viewer, editor or owner from the
+  Sharing page. The invitee is emailed a single-use link that expires after 7
+  days. An existing user opens it, signs in with the invited email and accepts;
+  an unknown email registers through the link (the only way past closed
+  registration besides the configured allowlist) and joins with the invited role.
+  Owners see pending invitations and can revoke them.
+actors:
+  - budget owner
+  - invited existing user
+  - invited guest
+preconditions:
+  - inviter is an owner (primary or owner member) of the budget
+routes:
+  - budgets.invitations.store
+  - budgets.invitations.destroy
+  - invitations.show
+  - invitations.accept
+  - register
+  - POST /register
+depends_on:
+  - path: app/Services/BudgetSharingService.php
+    reason: invite (replace pending, mail), atomic single-use accept, role upgrade-only on accept
+  - path: app/Models/BudgetInvitation.php
+    reason: token generation and SHA-256 hashing, pending scope, email matching
+  - path: app/Mail/BudgetInvitationMail.php
+    reason: invitation email with the accept link (plaintext token only lives here)
+  - path: resources/views/emails/budget-invitation.blade.php
+    reason: invitation email body (sign in vs create account copy)
+  - path: resources/js/Pages/Invitations/Show.vue
+    reason: invitation landing page (ready / wrong account / sign in / register / invalid)
+  - path: resources/js/Pages/Budgets/Sharing.vue
+    reason: invite form and pending invitation list
+  - path: app/Http/Controllers/BudgetController.php
+    reason: budgets.index returns a guest who opened an invitation and then signed in to it
+integrations:
+  - Mail (BudgetInvitationMail, sent synchronously)
+steps:
+  - action: owner submits email + role on the Sharing page (POST budgets/{budget}/invitations)
+    expected: invitation stored with a hashed token and 7-day expiry; email sent; flash "Invitation sent to <email>."
+  - action: invitee opens the emailed link (GET invitations/{token})
+    expected: Invitations/Show with status ready (signed in, same email), wrong_account, sign_in (existing account) or register (unknown email)
+  - action: signed-in invitee accepts (POST invitations/{token}/accept)
+    expected: joins the budget with the invited role, it becomes their active budget, redirect to budgets.show
+  - action: unknown invitee follows "Create account" (GET /register?invitation=token) and submits
+    expected: account created with the invited email verified, joined to the budget, sent to passkey registration
+postconditions:
+  - budget_user row with the invited access_level; invitation accepted_at set
+business_rules:
+  - only owners may invite or revoke (BudgetPolicy::manageMembers); editors and viewers get 403
+  - invitations expire after 7 days and are single use (accept claims the row atomically)
+  - only the SHA-256 hash of the token is stored; the plaintext token exists only in the emailed link
+  - the accepting account's email must match the invited email (case-insensitive)
+  - re-inviting an email replaces its pending invitation (new token, role and expiry)
+  - inviting an existing member (including the primary owner) is rejected
+  - accepting never downgrades an existing stronger role
+  - POST invitations is throttled to 10/min (budgets.invitations.store), accept to 10/min, the landing page to 30/min
+  - a mail failure keeps the invitation and flashes an error
+scenarios:
+  - id: existing_user_invited_and_accepts
+    kind: happy_path
+    description: Owner invites an existing user, who is emailed a link, opens it signed in and accepts with the invited role.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an owner invites an existing user who is emailed a link and accepts while signed in
+  - id: unknown_email_registers_via_invitation
+    kind: happy_path
+    description: An invited unknown email registers through the invitation link and joins with the invited role.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/InvitationRegistrationTest.php::an invited unknown email registers through the invitation and joins the budget with the invited role
+  - id: email_copy_matches_account_state
+    kind: alternate
+    description: The email tells an existing user to sign in and an unknown email to create an account.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::the invitation email tells an existing user to sign in and an unknown email to create an account
+  - id: guest_returned_to_invitation_after_sign_in
+    kind: alternate
+    description: A guest opening the link is offered sign in or registration, and budgets.index returns them to the invitation after signing in.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::a guest opening an invitation is asked to sign in or register and returned to it after signing in
+  - id: reinvite_replaces_pending
+    kind: alternate
+    description: Re-inviting an email replaces the pending invitation and invalidates the old token.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::re-inviting the same email replaces the pending invitation
+  - id: owner_revokes_invitation
+    kind: alternate
+    description: Owner sees pending invitations on the Sharing page (without token hashes) and revokes one.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an owner sees and revokes pending invitations
+  - id: wrong_email_cannot_accept
+    kind: authorization
+    description: Accepting while signed in as a different email is rejected and nothing changes.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::accepting while signed in as a different email is rejected
+      - tests/Feature/Auth/InvitationRegistrationTest.php::registering with an invitation for a different email is rejected
+  - id: non_owner_cannot_invite
+    kind: authorization
+    description: Editors and viewers cannot invite or revoke, and see no pending invitations.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::editors and viewers cannot invite or revoke invitations
+  - id: expired_used_tampered_rejected
+    kind: edge
+    description: Expired, already-used and tampered tokens are rejected on the landing page, on accept and at registration.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::expired, used and tampered invitation tokens are rejected
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an invitation can only be accepted once
+      - tests/Feature/Auth/InvitationRegistrationTest.php::expired, used and tampered invitation tokens cannot be used to register
+      - tests/Feature/Auth/InvitationRegistrationTest.php::an invitation token registers only one account
+  - id: invalid_invite_input_rejected
+    kind: validation
+    description: Invalid email or role, or an email that already belongs to a member, is rejected without sending mail.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::invitations require a valid email and role
+      - tests/Feature/Sharing/BudgetInvitationTest.php::inviting someone who is already a member is rejected and no email is sent
+  - id: invites_rate_limited
+    kind: edge
+    description: More than 10 invitations a minute are throttled (429).
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::sending invitations is rate limited
+  - id: mail_failure_reported
+    kind: recovery
+    description: A mail transport failure keeps the invitation and flashes a generic error.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::a failed invitation email is reported without losing the invitation
+  - id: invitation_ui_end_to_end
+    kind: happy_path
+    description: Sharing page and invitation landing page render and drive the flow in a browser.
+    coverage: uncovered
+    note: no Playwright spec yet; feature tests assert the Inertia props.
+known_issues:
+  - "Invitation emails are sent synchronously; a slow mail transport delays the owner's request."
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetInvitationController.php
+  - app/Http/Controllers/PasskeyAuthController.php registerStore/showRegistrationForm
+  - app/Services/BudgetSharingService.php
+last_verified: null

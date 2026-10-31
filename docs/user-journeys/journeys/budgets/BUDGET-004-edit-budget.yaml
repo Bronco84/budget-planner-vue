@@ -27,6 +27,7 @@ steps:
 postconditions:
   - budget attributes updated
 business_rules:
+  - "budget name/description/colour are owner-only (BudgetPolicy::updateSettings, mapped for edit/update in BudgetController::resourceAbilityMap); editors and viewers get 403"
   - same validation as create (name required, max 255; colour #RRGGBB)
 scenarios:
   - id: owner_updates_budget
@@ -47,6 +48,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetEditAuthorizationTest.php::another user cannot edit or update a budget they do not own
+  - id: shared_budget_settings_owner_only
+    kind: authorization
+    description: Editors and viewers of a shared budget get 403 on the edit page and update; owner members may edit.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetRoleMatrixTest.php::each budget route enforces its role requirement
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetController.php edit/update

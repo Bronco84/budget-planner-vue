@@ -8,9 +8,10 @@ summary: >
   When a bank requires the user to log in again (Plaid ITEM_LOGIN_REQUIRED), the user
   clicks "Re-authenticate" on the Bank Connection page. The browser requests an
   update-mode link token, opens Plaid Link in update mode, and on success posts the
-  resulting public token. The server exchanges it and writes the new access token onto
-  the existing connection, marking it active and clearing its error message, which
-  repairs every account under that connection.
+  resulting public token. Update mode repairs the Item's login in place, so the server
+  does not exchange the token: it keeps the existing access token and marks the
+  connection active, clearing its error message, which repairs every account under
+  that connection. Only budget owners can re-authenticate.
 actors:
   - budget owner
 preconditions:
@@ -21,10 +22,12 @@ routes:
   - plaid.update-connection
 depends_on:
   - path: app/Services/PlaidService.php
-    reason: createLinkToken in update mode (existing access token), exchangePublicToken
+    reason: createLinkToken in update mode (existing access token)
+  - path: app/Policies/BudgetPolicy.php
+    reason: manageConnections (owner only)
 integrations:
   - Plaid Link update mode
-  - Plaid API (/link/token/create with access_token, /item/public_token/exchange)
+  - Plaid API (/link/token/create with access_token)
 steps:
   - action: open the Bank Connection page for an account whose connection status is 'error'
     expected: an amber warning "Your bank needs you to sign in again" with a "Sign in again" button is shown above the actions
@@ -33,10 +36,12 @@ steps:
   - action: complete Plaid Link in update mode
     expected: client posts public_token and metadata to plaid/update-connection
   - action: server updates the connection
-    expected: connection access_token replaced, status active, error_message null; redirect back with success flash and the page reloads
+    expected: access_token kept, status active, error_message null; no Plaid call; redirect back with success flash and the page reloads
 postconditions:
   - the existing PlaidConnection (not a new one) holds a working access token
 business_rules:
+  - both endpoints (and the link page) are owner-only (BudgetPolicy::manageConnections); editors and viewers get 403
+  - update mode does not exchange the public token (Plaid "Updating Items via Link"); the existing access token stays
   - both endpoints are limited to 10 requests per minute
   - upgrade-link-token returns JSON 404 when the account is not linked and 400 when the connection has no access token
   - update-connection requires public_token and metadata
@@ -59,10 +64,10 @@ scenarios:
       - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::a linked account receives an update mode link token and the institution name
   - id: connection_updated
     kind: happy_path
-    description: Posting the update-mode public token replaces the access token on the existing connection and marks it active.
+    description: Completing update mode keeps the existing access token, marks the connection active and never calls /item/public_token/exchange.
     coverage: covered
     tests:
-      - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::posting the update mode public token replaces the access token and reactivates the connection
+      - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::completing update mode keeps the existing access token, reactivates the connection and never exchanges the public token
   - id: upgrade_token_not_linked
     kind: edge
     description: Requesting an upgrade token for an unlinked account returns JSON 404 "Account is not linked to Plaid."
@@ -90,10 +95,16 @@ scenarios:
     note: the JSON 500 and its safe message are covered; the UI toast is frontend behaviour with no test.
   - id: exchange_failure_on_update
     kind: recovery
-    description: If the public token exchange fails the connection is left unchanged and the user is redirected back with a generic "Failed to re-authenticate. Please try again." error.
+    description: No token exchange happens on update, so a Plaid token error cannot surface or replace the access token.
     coverage: covered
     tests:
-      - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a Plaid error re-authenticating leaves the connection unchanged and shows a generic message
+      - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::re-authenticating does not call Plaid, so a Plaid token error cannot surface or replace the access token
+  - id: non_owner_cannot_reauthenticate
+    kind: authorization
+    description: Editors and viewers of a shared budget get 403 on the link page, upgrade-link-token and update-connection; nothing reaches Plaid.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::editors and viewers cannot connect, re-authenticate or unlink bank connections
   - id: cross_user_denied
     kind: authorization
     description: Both endpoints return 403 for another user's budget/account.
@@ -106,8 +117,6 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::plaid POST route rejects a cross-budget account with 404
-known_issues:
-  - Plaid documents that update mode does not require exchanging the public token; exchanging it and overwriting access_token should be verified against the Plaid sandbox.
 confidence: high
 evidence:
   - app/Http/Controllers/PlaidController.php upgradeLinkToken(), updateConnection()

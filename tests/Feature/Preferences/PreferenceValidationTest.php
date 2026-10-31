@@ -109,15 +109,13 @@ test('the generic preference endpoint validates whitelisted values', function ()
     expect($user->fresh()->getAccountTypeOrder())->toBe(['savings', 'checking']);
 });
 
-test('a whitelisted preference written via the generic endpoint is returned by it', function () {
+test('a whitelisted preference written via the generic endpoint is stored for the user', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->postJson(route('preferences.update', 'account_type_order'), ['value' => ['checking', 'savings']])
-        ->assertOk();
-
-    $this->actingAs($user)
-        ->getJson(route('preferences.show', 'account_type_order'))
         ->assertOk()
         ->assertJson(['key' => 'account_type_order', 'value' => ['checking', 'savings']]);
+
+    expect($user->fresh()->getAccountTypeOrder())->toBe(['checking', 'savings']);
 });

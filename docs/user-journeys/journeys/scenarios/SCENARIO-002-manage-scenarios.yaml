@@ -7,7 +7,8 @@ priority: high
 summary: >
   From the scenario panel on the multi-account projection page the user creates a named,
   coloured scenario with one or more adjustments (one-time expense, recurring expense,
-  debt paydown, savings contribution, modify existing) tied to budget accounts, edits it
+  debt paydown, savings contribution, or modifying one of the budget's recurring
+  transactions by a new amount or a percentage) tied to budget accounts, edits it
   later (adjustments are replaced wholesale) or deletes it. All endpoints are JSON and
   called via axios.
 actors:
@@ -16,7 +17,6 @@ preconditions:
   - user owns a budget with at least one account
 routes:
   - budgets.scenarios.store
-  - budgets.scenarios.show
   - budgets.scenarios.update
   - budgets.scenarios.destroy
 depends_on:
@@ -30,8 +30,6 @@ integrations: []
 steps:
   - action: create a scenario (POST budgets/{budget}/scenarios)
     expected: 201 JSON with the scenario and its adjustments
-  - action: fetch one scenario (GET budgets/{budget}/scenarios/{scenario})
-    expected: JSON scenario with adjustments (not currently called by the UI)
   - action: edit the scenario (PATCH)
     expected: 200 JSON; when adjustments are sent, existing adjustments are deleted and recreated
   - action: delete the scenario (DELETE)
@@ -43,8 +41,9 @@ business_rules:
   - adjustment_type in one_time_expense, recurring_expense, debt_paydown, savings_contribution, modify_existing
   - frequency in daily, weekly, biweekly, monthly, bimonthly, quarterly, yearly; bimonthly (twice a month) needs two different days, first_day_of_month and day_of_month (same convention as recurring templates); first_day_of_month is dropped for other frequencies
   - every adjustment account must belong to the budget, else 422 with "One or more accounts do not belong to this budget."
+  - modify_existing requires target_recurring_template_id (a template of this budget); its account_id is taken from the target template; percent_change is optional numeric -100..1000 (percentage mode), otherwise amount_in_cents is the new amount; other types store no percent_change
   - create and update run in a DB transaction; scenario is scoped to the budget
-  - store/update/destroy need budget update; show needs budget view
+  - store/update/destroy need budget update
 scenarios:
   - id: create_with_adjustments
     kind: happy_path
@@ -78,6 +77,19 @@ scenarios:
     tests:
       - tests/Feature/ScenarioCrossBudgetTest.php::creating a scenario targeting a recurring template from another budget is rejected and nothing is saved
       - tests/Feature/ScenarioCrossBudgetTest.php::updating a scenario to target a recurring template from another budget is rejected and adjustments are unchanged
+  - id: modify_existing_adjustment_saved
+    kind: alternate
+    description: A modify-existing adjustment is saved with its target template, percentage and window, on the target template's account.
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioModifyExistingTest.php::a modify existing adjustment is saved with its template and percentage
+      - tests/Feature/Scenarios/ScenarioModifyExistingTest.php::a modify existing adjustment takes its account from the target template
+  - id: modify_existing_validation
+    kind: validation
+    description: A modify-existing adjustment without a target template, or with a percentage below -100 or non-numeric, is rejected with 422.
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioModifyExistingTest.php::a modify existing adjustment needs a target template and a sane percentage
   - id: server_error_is_generic
     kind: recovery
     description: A 500 from store/update/destroy/toggle returns a generic message without the exception text; the exception is logged.
@@ -126,8 +138,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/ScenarioAdjustmentScheduleTest.php::a bimonthly adjustment needs two different days of the month
-known_issues:
-  - budgets.scenarios.show is not called by the frontend.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/ScenarioController.php

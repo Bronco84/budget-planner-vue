@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Models\File;
 use App\Models\FileAttachment;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -297,24 +298,34 @@ class FileService
     }
 
     /**
-     * Check if user can access file attachment.
+     * Check if user can access a file attachment through its budget's sharing
+     * role: any member may read (list/download); editors and owners may write
+     * (delete). See BudgetPolicy.
      */
-    public function canUserAccessAttachment(FileAttachment $attachment, int $userId): bool
+    public function canUserAccessAttachment(FileAttachment $attachment, int $userId, bool $write = false): bool
+    {
+        $budget = $this->attachmentBudget($attachment);
+        $user = User::find($userId);
+
+        if (! $budget || ! $user) {
+            return false;
+        }
+
+        return $write ? $user->canEditBudget($budget) : $user->canViewBudget($budget);
+    }
+
+    /**
+     * The budget an attachment belongs to (directly, or through its transaction).
+     */
+    public function attachmentBudget(FileAttachment $attachment): ?Budget
     {
         $attachable = $attachment->attachable;
 
-        // Check access based on attachable type
-        if ($attachable instanceof Transaction) {
-            return $attachable->budget->user_id === $userId ||
-                   $attachable->budget->connected_users()->where('user_id', $userId)->exists();
-        }
-
-        if ($attachable instanceof Budget) {
-            return $attachable->user_id === $userId ||
-                   $attachable->connected_users()->where('user_id', $userId)->exists();
-        }
-
-        return false;
+        return match (true) {
+            $attachable instanceof Transaction => $attachable->budget,
+            $attachable instanceof Budget => $attachable,
+            default => null,
+        };
     }
 
     /**

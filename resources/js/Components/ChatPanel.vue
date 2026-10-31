@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import ChatMessage from './ChatMessage.vue';
 import {
     XMarkIcon,
@@ -21,6 +21,12 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
+
+const page = usePage();
+
+// The budget the user is looking at: the page's own budget on budget-scoped
+// pages, otherwise the active budget. The server checks the user may view it.
+const currentBudgetId = computed(() => page.props.budget?.id ?? page.props.activeBudget?.id ?? null);
 
 const messages = ref([]);
 const currentMessage = ref('');
@@ -199,17 +205,39 @@ const sendMessage = async () => {
     const previousConversationId = currentConversationId.value;
 
     try {
-        // Build URL with query params for GET request (EventSource requirement)
-        const url = new URL(route('chat.stream'), window.location.origin);
-        url.searchParams.append('message', messageText);
-        if (currentConversationId.value) {
-            url.searchParams.append('conversation_id', currentConversationId.value);
+        // POST the question (kept out of URLs and server logs); moderation runs
+        // here, so refusals come back as readable JSON. The reply is then
+        // streamed from the single-use stream id it returns.
+        const startResponse = await apiFetch(route('chat.stream.start'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: messageText,
+                conversation_id: currentConversationId.value,
+                budget_id: currentBudgetId.value,
+            }),
+        });
+
+        let startData = null;
+        try {
+            startData = await startResponse.json();
+        } catch {
+            startData = null;
         }
 
-        console.log('📡 Connecting to:', url.toString());
+        if (!startResponse.ok || !startData?.stream_id) {
+            const validationMessage = startData?.errors
+                ? Object.values(startData.errors).flat()[0]
+                : null;
+            throw new Error(startData?.error || validationMessage || 'Failed to send message. Please try again.');
+        }
+
+        const url = route('chat.stream', startData.stream_id);
 
         // Create EventSource
-        const eventSource = new EventSource(url.toString());
+        const eventSource = new EventSource(url);
 
         // Handle connection opened
         eventSource.addEventListener('open', (event) => {

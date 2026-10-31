@@ -92,7 +92,10 @@
         <!-- Debts Overview -->
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Debts in This Plan</h3>
+            <h3 class="text-lg font-medium text-gray-900">Debts in This Plan</h3>
+            <p class="mt-1 mb-4 text-sm text-gray-500">
+              Projected from today's account balances, starting {{ formatDate(debtProjection.projection_start_date) }}.
+            </p>
             <div class="space-y-4">
               <div
                 v-for="debt in plan.debts"
@@ -101,29 +104,37 @@
               >
                 <div class="flex items-center justify-between">
                   <div class="flex-1">
-                    <h4 class="font-medium text-gray-900">{{ debt.account.name }}</h4>
+                    <h4 class="font-medium text-gray-900">{{ debt.account?.name }}</h4>
                     <div class="mt-1 text-sm text-gray-500">
                       {{ debt.interest_rate }}% APR • Min payment: {{ formatCurrency(debt.minimum_payment_cents) }}/month
                     </div>
                   </div>
                   <div class="text-right">
                     <div class="text-lg font-bold text-red-600">
-                      {{ formatCurrency(debt.starting_balance_cents) }}
+                      {{ formatCurrency(debt.current_balance_cents) }}
                     </div>
-                    <div class="text-xs text-gray-500">Starting balance</div>
+                    <div class="text-xs text-gray-500">Current balance</div>
+                    <div class="mt-1 text-xs text-gray-500">
+                      Started at {{ formatCurrency(debt.starting_balance_cents) }}
+                    </div>
                   </div>
                 </div>
 
-                <!-- Progress bar for this debt -->
+                <!-- Progress since the plan started -->
                 <div class="mt-4">
                   <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>Progress</span>
-                    <span>{{ getDebtProgress(debt.id) }}%</span>
+                    <span v-if="debt.paid_down_cents >= 0">
+                      Paid down since start: {{ formatCurrency(debt.paid_down_cents) }}
+                    </span>
+                    <span v-else class="text-red-600">
+                      Up {{ formatCurrency(-debt.paid_down_cents) }} since start
+                    </span>
+                    <span>{{ getDebtProgress(debt) }}%</span>
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
                     <div
                       class="bg-green-600 h-2 rounded-full transition-all duration-500"
-                      :style="{ width: `${getDebtProgress(debt.id)}%` }"
+                      :style="{ width: `${getDebtProgress(debt)}%` }"
                     ></div>
                   </div>
                   <div class="mt-1 text-xs text-gray-500">
@@ -186,7 +197,7 @@
                   class="w-4 h-4 rounded"
                   :style="{ backgroundColor: getDebtColor(index) }"
                 ></div>
-                <span class="text-sm text-gray-600">{{ debt.account.name }}</span>
+                <span class="text-sm text-gray-600">{{ debt.account?.name }}</span>
               </div>
             </div>
           </div>
@@ -195,14 +206,20 @@
         <!-- Financial Goals -->
         <div v-if="goalProjections.length > 0" class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
           <div class="p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Financial Goals</h3>
+            <h3 class="text-lg font-medium text-gray-900">Financial Goals</h3>
+            <p class="mt-1 mb-4 text-sm text-gray-500">
+              Goals are funded once every debt is paid off. The freed debt payments then go to the goals in priority order.
+            </p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div
                 v-for="goalProj in goalProjections"
                 :key="goalProj.goal_id"
                 class="border rounded-lg p-4"
               >
-                <h4 class="font-medium text-gray-900">{{ goalProj.name }}</h4>
+                <div class="flex items-center justify-between">
+                  <h4 class="font-medium text-gray-900">{{ goalProj.name }}</h4>
+                  <span class="text-xs text-gray-500">Priority {{ goalProj.priority }}</span>
+                </div>
                 <div class="mt-2 space-y-1">
                   <div class="flex items-center justify-between text-sm">
                     <span class="text-gray-500">Target</span>
@@ -212,9 +229,17 @@
                     <span class="text-gray-500">Monthly</span>
                     <span class="font-medium text-gray-900">{{ formatCurrency(goalProj.monthly_contribution) }}</span>
                   </div>
-                  <div v-if="goalProj.months_to_complete" class="flex items-center justify-between text-sm">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-500">Funding Starts</span>
+                    <span v-if="goalProj.contributions_start_date" class="font-medium text-gray-900">
+                      {{ formatPayoffDate(goalProj.contributions_start_date) }}
+                    </span>
+                    <span v-else class="font-medium text-red-600">Not while debts remain</span>
+                  </div>
+                  <div class="flex items-center justify-between text-sm">
                     <span class="text-gray-500">Complete By</span>
-                    <span class="font-medium text-green-600">{{ formatDate(goalProj.completion_date) }}</span>
+                    <span v-if="goalProj.completion_date" class="font-medium text-green-600">{{ formatDate(goalProj.completion_date) }}</span>
+                    <span v-else class="font-medium text-gray-500">Not reached</span>
                   </div>
                 </div>
               </div>
@@ -282,27 +307,19 @@ const timelineMilestones = computed(() => {
   const milestones = [];
   const timeline = props.debtProjection.timeline;
 
-  // Month 0 (start)
+  // Month 0 (start): today's balances, which the projection starts from
+  const totalStart = props.plan.debts.reduce((sum, d) => sum + d.current_balance_cents, 0);
+
   milestones.push({
     label: 'Start',
     month: 0,
-    total_balance: props.plan.debts.reduce((sum, d) => sum + d.starting_balance_cents, 0),
+    total_balance: totalStart,
     segments: props.plan.debts.map(debt => ({
-      name: debt.account.name,
-      balance: debt.starting_balance_cents,
-      width: 0
+      name: debt.account?.name,
+      balance: debt.current_balance_cents,
+      width: totalStart > 0 ? (debt.current_balance_cents / totalStart) * 100 : 0
     }))
   });
-
-  // Calculate total starting balance
-  const totalStart = props.plan.debts.reduce((sum, d) => sum + d.starting_balance_cents, 0);
-
-  // Initial segments
-  milestones[0].segments = props.plan.debts.map(debt => ({
-    name: debt.account.name,
-    balance: debt.starting_balance_cents,
-    width: (debt.starting_balance_cents / totalStart) * 100
-  }));
 
   // Every 6 months for first 5 years
   for (let i = 6; i <= 60; i += 6) {
@@ -358,52 +375,41 @@ const getDebtColor = (index) => {
   return colors[index % colors.length];
 };
 
-const getDebtProgress = (debtId) => {
-  // Find the debt in the final projection data
-  const debt = props.debtProjection.final_debt_data.find(d => d.id === debtId);
-  if (!debt) return 0;
+// Share of the starting balance paid down so far (live balance vs. starting balance).
+const getDebtProgress = (debt) => {
+  if (!debt.starting_balance_cents) return 0;
 
-  const originalBalance = props.plan.debts.find(d => d.id === debtId)?.starting_balance_cents || 0;
-  if (originalBalance === 0) return 0;
-
-  const remaining = debt.balance;
-  const paid = originalBalance - remaining;
-  return Math.min(Math.round((paid / originalBalance) * 100), 100);
+  const percent = Math.round((debt.paid_down_cents / debt.starting_balance_cents) * 100);
+  return Math.max(0, Math.min(percent, 100));
 };
 
 const getDebtPayoffMonth = (debtId) => {
   const finalDebt = props.debtProjection.final_debt_data.find(d => d.id === debtId);
   if (finalDebt?.never_paid_off) return 'Never (payments don\'t cover interest)';
 
-  // Find when this debt reaches 0
-  const timeline = props.debtProjection.timeline;
-  for (let i = 0; i < timeline.length; i++) {
-    const month = timeline[i];
-    const debtData = month.debts.find(d => d.id === debtId);
-    if (debtData && debtData.balance === 0) {
-      const years = Math.floor(i / 12);
-      const months = i % 12;
-      if (years === 0) {
-        return `${months} month${months !== 1 ? 's' : ''}`;
-      } else if (months === 0) {
-        return `${years} year${years !== 1 ? 's' : ''}`;
-      } else {
-        return `${years} year${years !== 1 ? 's' : ''}, ${months} month${months !== 1 ? 's' : ''}`;
-      }
-    }
+  const paidOffMonth = finalDebt?.paid_off_month;
+  if (paidOffMonth === null || paidOffMonth === undefined) return 'Unknown';
+  if (paidOffMonth === 0) return 'Already paid off';
+
+  const years = Math.floor(paidOffMonth / 12);
+  const months = paidOffMonth % 12;
+  if (years === 0) {
+    return `${months} month${months !== 1 ? 's' : ''}`;
+  } else if (months === 0) {
+    return `${years} year${years !== 1 ? 's' : ''}`;
   }
-  return 'Unknown';
+  return `${years} year${years !== 1 ? 's' : ''}, ${months} month${months !== 1 ? 's' : ''}`;
 };
 
 const formatPayoffDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', timeZone: 'UTC' });
 };
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 };
 </script>

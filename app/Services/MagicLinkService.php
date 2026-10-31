@@ -38,7 +38,11 @@ class MagicLinkService
         ]);
 
         // Send the email
-        Mail::to($user->email)->send(new MagicLinkEmail($user, $url));
+        $mail = Mail::to($user->email);
+        $message = new MagicLinkEmail($user, $url);
+
+        // Queue only when a worker is known to be running (auth.magic_link_queue).
+        config('auth.magic_link_queue') ? $mail->queue($message) : $mail->send($message);
 
         return $magicLinkToken;
     }

@@ -32,7 +32,8 @@ steps:
 postconditions:
   - PlaidAccount liability fields and statement history are refreshed
 business_rules:
-  - despite the /admin prefix these routes are not admin-gated; any authenticated user sees only connections on budgets they own (budget.user_id match)
+  - "the admin page lists and refreshes only connections of budgets the user owns (primary owner or owner member, Budget::scopeOwnedBy); editors and viewers of a shared budget see nothing and get 403 on refresh"
+  - despite the /admin prefix these routes are not admin-gated; any authenticated user sees only connections on budgets they own (see the previous rule)
   - update-connection is limited to 10/minute, update-all to 3/minute
   - only accounts with account_type credit and subtype "credit card" are included
 scenarios:
@@ -79,6 +80,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidLiabilitiesConnectionTest.php::refreshing another users connection is forbidden and calls no Plaid endpoint
+  - id: shared_budget_owners_only
+    kind: authorization
+    description: Editors see no shared connections and get 403 refreshing one; an owner member sees it.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::the liabilities admin page shows and refreshes connections only for budgets the user owns
 known_issues:
   - the route path/name (/admin/plaid-liabilities, admin.*) suggests admin-only access that is not enforced.
 confidence: high

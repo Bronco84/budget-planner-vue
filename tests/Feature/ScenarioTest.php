@@ -204,13 +204,21 @@ test('user cannot access scenarios from another users budget', function () {
         'user_id' => $otherUser->id,
     ]);
 
-    $response = $this->actingAs($this->user)
-        ->getJson(route('budgets.scenarios.show', [
+    $this->actingAs($this->user)
+        ->patchJson(route('budgets.scenarios.update', [
             'budget' => $otherBudget->id,
             'scenario' => $otherScenario->id,
-        ]));
+        ]), ['name' => 'Hijacked'])
+        ->assertStatus(403);
 
-    $response->assertStatus(403);
+    $this->actingAs($this->user)
+        ->deleteJson(route('budgets.scenarios.destroy', [
+            'budget' => $otherBudget->id,
+            'scenario' => $otherScenario->id,
+        ]))
+        ->assertStatus(403);
+
+    expect($otherScenario->fresh()->name)->not->toBe('Hijacked');
 });
 
 test('scenario adjustments must have valid account from budget', function () {

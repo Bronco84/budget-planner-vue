@@ -46,6 +46,7 @@ business_rules:
   - every action is guarded by can:view,budget; create-templates additionally requires the budget update ability
   - each selected_patterns item is validated (description, frequency, start date, amounts, days, transaction ids); a modal confirmation links the transactions that formed the pattern (transaction_ids), limited to the budget's own transactions
   - full success flashes message; any per-item failure flashes error "Created X of Y templates. N could not be created."
+  - confirmed templates store average_amount in cents (the confirmed amount); pattern transactions are linked with link_source analysis
 scenarios:
   - id: detects_monthly_pattern
     kind: happy_path
@@ -65,6 +66,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringAnalysisTemplateCreationTest.php::templates confirmed in the modal link the budgets transactions that formed the pattern
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::templates created from analysis link their pattern transactions with the analysis source
+  - id: confirmed_average_amount_in_cents
+    kind: edge
+    description: A confirmed pattern's amount is stored as the template's average_amount in cents.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAverageAmountCentsTest.php::templates confirmed from analysis store the starting average in cents
   - id: below_min_occurrences_ignored
     kind: edge
     description: Groups with fewer occurrences than min_occurrences are not reported.
@@ -146,8 +154,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringAnalysisTemplateCreationTest.php::partial template creation failures use the error flash instead of the success flash
-known_issues:
-  - average_amount is treated as dollars everywhere it is read (forms, RecurringTransactionService, calculateDynamicAmount) while min_amount/max_amount are cents, and the column is an integer, so fractional dollars are rounded/truncated on MySQL; calculateDynamicAmount also treats the cents min/max midpoint as dollars. Fixing units needs a schema change plus a data migration and updates to every reader.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/RecurringTransactionAnalysisController.php

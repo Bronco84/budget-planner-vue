@@ -36,6 +36,30 @@ test('requesting a magic link emails a single-use link and stores only a hash', 
     Mail::assertSent(MagicLinkEmail::class, fn ($mail) => $mail->hasTo($user->email));
 });
 
+test('the magic link email is sent synchronously when the queue flag is off', function () {
+    config(['auth.magic_link_queue' => false]);
+    Mail::fake();
+    $user = User::factory()->create();
+
+    $this->post(route('magic-link.store'), ['email' => $user->email])->assertRedirect();
+
+    Mail::assertSent(MagicLinkEmail::class, fn ($mail) => $mail->hasTo($user->email));
+    Mail::assertNothingQueued();
+});
+
+test('the magic link email is queued when the queue flag is on', function () {
+    config(['auth.magic_link_queue' => true]);
+    Mail::fake();
+    $user = User::factory()->create();
+
+    $this->post(route('magic-link.store'), ['email' => $user->email])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    Mail::assertQueued(MagicLinkEmail::class, fn ($mail) => $mail->hasTo($user->email));
+    Mail::assertNotSent(MagicLinkEmail::class);
+});
+
 test('magic link requests require a valid email address', function () {
     Mail::fake();
 

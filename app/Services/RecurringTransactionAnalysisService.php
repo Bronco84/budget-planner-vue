@@ -532,7 +532,7 @@ class RecurringTransactionAnalysisService
                 'first_day_of_month' => $isBimonthly ? ($patternData['bimonthly_first_day'] ?? null) : null,
                 'day_of_week' => $patternData['day_of_week'] ?? null,
                 'is_dynamic_amount' => $isDynamic,
-                'average_amount' => $patternData['amount'] ?? null,
+                'average_amount' => isset($patternData['amount']) ? $amountInCents : null, // cents
                 'min_amount' => $minAmount,
                 'max_amount' => $maxAmount,
                 'plaid_entity_id' => $patternData['plaid_entity_id'] ?? null,
@@ -554,7 +554,7 @@ class RecurringTransactionAnalysisService
                 'day_of_week' => $patternData['day_of_week'],
                 'first_day_of_month' => $patternData['first_day_of_month'],
                 'is_dynamic_amount' => $patternData['is_dynamic_amount'],
-                'average_amount' => $patternData['is_dynamic_amount'] ? ($patternData['amount_stats']['average'] / 100) : ($patternData['amount_in_cents'] / 100),
+                'average_amount' => $patternData['is_dynamic_amount'] ? (int) round($patternData['amount_stats']['average']) : $patternData['amount_in_cents'], // cents
                 'min_amount' => $patternData['is_dynamic_amount'] ? $patternData['amount_stats']['min'] : null,
                 'max_amount' => $patternData['is_dynamic_amount'] ? $patternData['amount_stats']['max'] : null,
                 'plaid_entity_id' => $patternData['plaid_entity_id'] ?? null,
@@ -586,7 +586,7 @@ class RecurringTransactionAnalysisService
         // Ids come from the request payload, so only link this budget's transactions.
         return Transaction::whereIn('id', $transactionIds)
             ->where('budget_id', $template->budget_id)
-            ->update(['recurring_transaction_template_id' => $template->id]);
+            ->update(['recurring_transaction_template_id' => $template->id, 'link_source' => Transaction::LINK_SOURCE_ANALYSIS]);
     }
 
     /**

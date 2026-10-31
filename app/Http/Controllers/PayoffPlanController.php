@@ -6,6 +6,7 @@ use App\Models\Budget;
 use App\Models\PayoffPlan;
 use App\Services\PayoffPlanService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -55,7 +56,7 @@ class PayoffPlanController extends Controller
                 'id' => $account->id,
                 'name' => $account->name,
                 'type' => $account->type,
-                'current_balance_cents' => $account->current_balance_cents,
+                'current_balance_cents' => PayoffPlanService::debtBalanceCents($account),
             ];
         });
 
@@ -91,6 +92,7 @@ class PayoffPlanController extends Controller
             'goals.*.monthly_contribution_cents' => 'required|integer|min:0',
             'goals.*.target_date' => 'nullable|date',
             'goals.*.goal_type' => 'required|in:savings,investment,purchase,other',
+            'goals.*.priority' => 'nullable|integer|min:0',
         ]);
 
         // All-or-nothing: a failure must not leave the budget without its active plan.
@@ -114,7 +116,7 @@ class PayoffPlanController extends Controller
 
                 $plan->debts()->create([
                     'account_id' => $account->id,
-                    'starting_balance_cents' => $account->current_balance_cents,
+                    'starting_balance_cents' => PayoffPlanService::debtBalanceCents($account),
                     'interest_rate' => $debtData['interest_rate'],
                     'minimum_payment_cents' => $debtData['minimum_payment_cents'],
                     'priority' => $debtData['priority'] ?? 0,
@@ -124,7 +126,7 @@ class PayoffPlanController extends Controller
             // Create goals if provided
             if (! empty($validated['goals'])) {
                 foreach ($validated['goals'] as $goalData) {
-                    $plan->goals()->create($goalData);
+                    $plan->goals()->create(array_merge($goalData, ['priority' => $goalData['priority'] ?? 0]));
                 }
             }
 
@@ -142,11 +144,13 @@ class PayoffPlanController extends Controller
     {
         $this->authorize('view', $budget);
 
-        $plan = $payoff_plan->load(['debts.account', 'goals']);
+        $plan = $this->loadPlan($payoff_plan);
+        $plan->debts->each->append(['current_balance_cents', 'paid_down_cents']);
 
-        // Calculate projections
+        // Calculate projections (from the debts' live balances; goals are
+        // funded once the debts are paid off)
         $debtProjection = $this->payoffPlanService->calculatePayoffProjection($plan);
-        $goalProjections = $this->payoffPlanService->calculateGoalProjections($plan);
+        $goalProjections = $this->payoffPlanService->calculateGoalProjections($plan, $debtProjection);
 
         return Inertia::render('PayoffPlans/Show', [
             'budget' => $budget,
@@ -163,7 +167,8 @@ class PayoffPlanController extends Controller
     {
         $this->authorize('update', $budget);
 
-        $plan = $payoff_plan->load(['debts.account', 'goals']);
+        $plan = $this->loadPlan($payoff_plan);
+        $plan->debts->each->append('current_balance_cents');
 
         return Inertia::render('PayoffPlans/Edit', [
             'budget' => $budget,
@@ -184,6 +189,17 @@ class PayoffPlanController extends Controller
             'strategy' => 'required|in:snowball,avalanche,custom',
             'monthly_extra_payment_cents' => 'required|integer|min:0',
             'is_active' => 'boolean',
+            'debts' => 'sometimes|array',
+            'debts.*.id' => ['required', 'integer', Rule::exists('payoff_plan_debts', 'id')->where('payoff_plan_id', $payoff_plan->id)],
+            'debts.*.interest_rate' => 'required|numeric|min:0|max:100',
+            'debts.*.minimum_payment_cents' => 'required|integer|min:0',
+            'debts.*.priority' => 'nullable|integer|min:0',
+            'goals' => 'sometimes|array',
+            'goals.*.id' => ['required', 'integer', Rule::exists('payoff_plan_goals', 'id')->where('payoff_plan_id', $payoff_plan->id)],
+            'goals.*.name' => 'required|string|max:255',
+            'goals.*.target_amount_cents' => 'required|integer|min:0',
+            'goals.*.monthly_contribution_cents' => 'required|integer|min:0',
+            'goals.*.priority' => 'nullable|integer|min:0',
         ]);
 
         // Only one plan per budget may be active (same invariant as store).
@@ -195,7 +211,21 @@ class PayoffPlanController extends Controller
                     ->update(['is_active' => false]);
             }
 
-            $payoff_plan->update($validated);
+            $payoff_plan->update(Arr::except($validated, ['debts', 'goals']));
+
+            foreach ($validated['debts'] ?? [] as $debtData) {
+                $payoff_plan->debts()->whereKey($debtData['id'])->firstOrFail()->update(array_filter(
+                    Arr::only($debtData, ['interest_rate', 'minimum_payment_cents', 'priority']),
+                    fn ($value) => $value !== null
+                ));
+            }
+
+            foreach ($validated['goals'] ?? [] as $goalData) {
+                $payoff_plan->goals()->whereKey($goalData['id'])->firstOrFail()->update(array_filter(
+                    Arr::only($goalData, ['name', 'target_amount_cents', 'monthly_contribution_cents', 'priority']),
+                    fn ($value) => $value !== null
+                ));
+            }
         });
 
         return redirect()->route('payoff-plans.show', ['budget' => $budget, 'payoff_plan' => $payoff_plan])
@@ -216,30 +246,13 @@ class PayoffPlanController extends Controller
     }
 
     /**
-     * Preview strategy comparisons before creating a plan.
+     * Load a plan with its debts (and accounts) and its goals in funding order.
      */
-    public function preview(Request $request, Budget $budget)
+    protected function loadPlan(PayoffPlan $plan): PayoffPlan
     {
-        $this->authorize('view', $budget);
-
-        $validated = $request->validate([
-            'debts' => 'required|array|min:1',
-            'debts.*.account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
-            'debts.*.balance' => 'required|integer|min:0',
-            'debts.*.interest_rate' => 'required|numeric|min:0|max:100',
-            'debts.*.minimum_payment' => 'required|integer|min:0',
-            'monthly_extra_payment' => 'required|integer|min:0',
-        ]);
-
-        // Computed in memory on unsaved models; nothing is written.
-        $comparisons = $this->payoffPlanService->compareStrategies(
-            $budget,
-            $validated['debts'],
-            $validated['monthly_extra_payment']
-        );
-
-        return response()->json([
-            'comparisons' => $comparisons,
+        return $plan->load([
+            'debts.account',
+            'goals' => fn ($query) => $query->orderBy('priority')->orderBy('id'),
         ]);
     }
 }

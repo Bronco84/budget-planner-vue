@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\BudgetRole;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -64,11 +66,75 @@ class Budget extends Model
     }
 
     /**
-     * Get users connected to this budget.
+     * Get users connected to this budget (shared members, excluding the primary owner).
      */
     public function connected_users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class);
+        return $this->belongsToMany(User::class)->withPivot('access_level')->withTimestamps();
+    }
+
+    /**
+     * Alias of {@see connected_users()} whose name matches the `{member}` route
+     * parameter, so scoped route bindings resolve a member through the budget.
+     */
+    public function members(): BelongsToMany
+    {
+        return $this->connected_users();
+    }
+
+    /**
+     * Invitations to join this budget.
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(BudgetInvitation::class);
+    }
+
+    /**
+     * The user's role on this budget: owner for the primary owner, the pivot
+     * access level for a shared member, or null when the user has no access.
+     * This is the single source of truth for budget authorization.
+     */
+    public function roleFor(?User $user): ?BudgetRole
+    {
+        if (! $user) {
+            return null;
+        }
+
+        if ((int) $this->user_id === (int) $user->id) {
+            return BudgetRole::Owner;
+        }
+
+        $level = $this->connected_users()
+            ->where('users.id', $user->id)
+            ->value('budget_user.access_level');
+
+        return $level === null ? null : BudgetRole::fromStored($level);
+    }
+
+    /**
+     * Whether the user is the primary owner (the budget's creator, or whoever
+     * primary ownership was transferred to).
+     */
+    public function isPrimaryOwner(?User $user): bool
+    {
+        return $user !== null && (int) $this->user_id === (int) $user->id;
+    }
+
+    /**
+     * Budgets the user owns, either as primary owner or as an owner member.
+     *
+     * @param  Builder<Budget>  $query
+     */
+    public function scopeOwnedBy(Builder $query, User $user): void
+    {
+        $query->where(function (Builder $query) use ($user) {
+            $query->where('budgets.user_id', $user->id)
+                ->orWhereHas('connected_users', function (Builder $query) use ($user) {
+                    $query->where('users.id', $user->id)
+                        ->whereIn('budget_user.access_level', ['owner', 'admin']);
+                });
+        });
     }
 
     /**
@@ -197,6 +263,7 @@ class Budget extends Model
         // Get all transactions for the current month
         /** @var Collection<int, Transaction> $matchingTransactions */
         $matchingTransactions = $this->transactions()
+            ->with('budgetCategory')
             ->whereDate('date', '>=', $start)
             ->whereDate('date', '<=', $end)
             ->get();
@@ -208,13 +275,13 @@ class Budget extends Model
         // Group by category
         $byCategory = $matchingTransactions
             ->groupBy(function (Transaction $transaction) {
-                return $transaction->category;
+                return $transaction->category_name;
             })
             ->map(function ($transactions) {
                 $first = $transactions->first();
 
                 return (object) [
-                    'category' => $first instanceof Transaction ? $first->category : null,
+                    'category' => $first instanceof Transaction ? $first->category_name : null,
                     'total' => $transactions->sum('amount_in_cents'),
                 ];
             })
@@ -224,6 +291,7 @@ class Budget extends Model
         $prevMonth = $start->copy()->subMonth();
         /** @var Collection<int, Transaction> $prevMonthTransactions */
         $prevMonthTransactions = $this->transactions()
+            ->with('budgetCategory')
             ->whereDate('date', '>=', $prevMonth->startOfMonth())
             ->whereDate('date', '<=', $prevMonth->endOfMonth())
             ->get();
@@ -234,13 +302,13 @@ class Budget extends Model
         // Group previous month by category
         $prevMonthByCategory = $prevMonthTransactions
             ->groupBy(function (Transaction $transaction) {
-                return $transaction->category;
+                return $transaction->category_name;
             })
             ->map(function ($transactions) {
                 $first = $transactions->first();
 
                 return (object) [
-                    'category' => $first instanceof Transaction ? $first->category : null,
+                    'category' => $first instanceof Transaction ? $first->category_name : null,
                     'total' => $transactions->sum('amount_in_cents'),
                 ];
             })
@@ -375,7 +443,7 @@ class Budget extends Model
         $totalSpent = 0;
         foreach ($this->categories as $category) {
             $spent = $this->transactions()
-                ->where('category', $category->name)
+                ->inCategory($category)
                 ->where('amount_in_cents', '<', 0)
                 ->sum('amount_in_cents');
             $totalSpent += abs($spent);
@@ -399,7 +467,7 @@ class Budget extends Model
         $totalSpent = 0;
         foreach ($this->categories as $category) {
             $spent = $this->transactions()
-                ->where('category', $category->name)
+                ->inCategory($category)
                 ->where('amount_in_cents', '<', 0)
                 ->sum('amount_in_cents');
             $totalSpent += abs($spent);

@@ -31,7 +31,8 @@ class PlaidLiabilitiesController extends Controller
 
         // Get all Plaid connections for the user's budgets with their credit card accounts
         $connections = PlaidConnection::whereHas('budget', function ($query) use ($user) {
-            $query->where('user_id', $user->id);
+            // Bank connections are an owner concern (primary or owner members).
+            $query->ownedBy($user);
         })
             ->with(['plaidAccounts' => function ($query) {
                 $query->where('account_type', 'credit')
@@ -81,8 +82,8 @@ class PlaidLiabilitiesController extends Controller
     {
         $user = Auth::user();
 
-        // Verify the connection belongs to the user
-        abort_if($connection->budget->user_id !== $user->id, 403);
+        // Only owners of the connection's budget manage its bank connection.
+        abort_unless($user->can('manageConnections', $connection->budget), 403);
 
         // Get all credit card accounts for this connection
         $creditCards = $connection->plaidAccounts()
@@ -133,7 +134,8 @@ class PlaidLiabilitiesController extends Controller
 
         // Get all Plaid connections for the user's budgets that have credit card accounts
         $connections = PlaidConnection::whereHas('budget', function ($query) use ($user) {
-            $query->where('user_id', $user->id);
+            // Bank connections are an owner concern (primary or owner members).
+            $query->ownedBy($user);
         })
             ->whereHas('plaidAccounts', function ($query) {
                 $query->where('account_type', 'credit')

@@ -121,6 +121,7 @@
                     v-model="form.adjustments[index]"
                     :index="index"
                     :accounts="accounts"
+                    :recurring-templates="recurringTemplates"
                     @remove="removeAdjustment(index)"
                   />
                 </div>
@@ -182,6 +183,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  recurringTemplates: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const emit = defineEmits(['close', 'save']);
@@ -233,6 +238,8 @@ watch(() => props.scenario, (newScenario) => {
         adjustment_type: adj.adjustment_type,
         account_id: adj.account_id,
         amount_in_cents: adj.amount_in_cents,
+        percent_change: adj.percent_change ?? null,
+        target_recurring_template_id: adj.target_recurring_template_id ?? '',
         start_date: adj.start_date,
         end_date: adj.end_date || '',
         frequency: adj.frequency || '',
@@ -260,6 +267,8 @@ const addAdjustment = () => {
     adjustment_type: '',
     account_id: '',
     amount_in_cents: 0,
+    percent_change: null,
+    target_recurring_template_id: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: '',
     frequency: '',
@@ -295,6 +304,11 @@ const handleSubmit = async () => {
       error.value = `Adjustment ${i + 1}: Please select a type`;
       return;
     }
+    const isModify = adj.adjustment_type === 'modify_existing';
+    if (isModify && !adj.target_recurring_template_id) {
+      error.value = `Adjustment ${i + 1}: Please select the recurring transaction to modify`;
+      return;
+    }
     if (!adj.account_id) {
       error.value = `Adjustment ${i + 1}: Please select an account`;
       return;
@@ -303,7 +317,7 @@ const handleSubmit = async () => {
       error.value = `Adjustment ${i + 1}: Please enter a start date`;
       return;
     }
-    if (adj.adjustment_type !== 'one_time_expense' && !adj.frequency) {
+    if (!['one_time_expense', 'modify_existing'].includes(adj.adjustment_type) && !adj.frequency) {
       error.value = `Adjustment ${i + 1}: Please select a frequency`;
       return;
     }

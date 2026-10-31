@@ -64,7 +64,7 @@ test('chat messages are validated before anything is stored or sent to the provi
         ->assertUnprocessable()
         ->assertJsonValidationErrors($errorKey);
 
-    $this->actingAs($user)->getJson(route('chat.stream', $payload))
+    $this->actingAs($user)->postJson(route('chat.stream.start'), $payload)
         ->assertUnprocessable()
         ->assertJsonValidationErrors($errorKey);
 
@@ -121,8 +121,7 @@ test('the stream emits the conversation id, a text delta per word and a stream e
     Prism::fake([TextResponseFake::make()->withText('You spent $200.')]);
     $user = User::factory()->create();
 
-    $body = $this->actingAs($user)
-        ->get(route('chat.stream', ['message' => 'How much did I spend?']))
+    $body = streamChat($this->actingAs($user), ['message' => 'How much did I spend?'])
         ->assertOk()
         ->assertHeader('Content-Type', 'text/event-stream; charset=UTF-8')
         ->streamedContent();
@@ -168,8 +167,7 @@ test('provider failures while streaming send the specific safe message in band a
     failChatProviderWith($exception);
     $user = User::factory()->create();
 
-    $body = $this->actingAs($user)
-        ->get(route('chat.stream', ['message' => 'How much did I spend?']))
+    $body = streamChat($this->actingAs($user), ['message' => 'How much did I spend?'])
         ->assertOk()
         ->streamedContent();
 

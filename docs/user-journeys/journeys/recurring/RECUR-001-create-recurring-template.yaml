@@ -44,6 +44,8 @@ business_rules:
   - bimonthly requires first_day_of_month and it must differ from day_of_month
   - amount is required unless is_dynamic_amount is true; dynamic templates store amount_in_cents 0
   - min_amount/max_amount are stored in cents with the sign of the main amount
+  - average_amount (a dynamic template's starting average) is entered in dollars and stored in cents with the sign entered; it is the projected amount while a dynamic template has no matching transactions
+  - the "Make Recurring" source transaction is linked with link_source manual; transactions linked by inline rules get link_source rule
   - end_date must be on or after start_date
   - create and store require the budget update ability; index requires view
 scenarios:
@@ -59,12 +61,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateCreateTest.php::inline rules are saved in order and existing matching transactions are linked
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::inline rules on a new template link existing matches with the rule source
   - id: make_recurring_from_transaction
     kind: alternate
     description: Creating from an existing transaction prefills the form and links that transaction after save.
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateCreateTest.php::making a transaction recurring prefills the form and links that transaction after save
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::linking the source transaction of make recurring records a manual link
   - id: redirect_without_active_budget
     kind: edge
     description: /recurring-transactions sends a user with no active budget to budgets.create.
@@ -98,6 +102,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateAmountTest.php::storing a recurring template converts amounts to the exact cent value
+  - id: average_amount_in_cents
+    kind: edge
+    description: The starting average entered in dollars (e.g. -84.37) is stored as cents (-8437), and a dynamic template without transactions projects that cent amount.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAverageAmountCentsTest.php::storing and updating a template converts the starting average from dollars to cents
+      - tests/Feature/Recurring/RecurringAverageAmountCentsTest.php::a dynamic template without transactions projects its starting average in cents
+      - tests/Feature/Recurring/RecurringAverageAmountCentsTest.php::the conversion migration turns stored dollars into cents and back
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot list, open the create form for, or store a template in a budget they do not own (403).

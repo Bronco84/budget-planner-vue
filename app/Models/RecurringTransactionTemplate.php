@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncsCategoryAssignment;
 use App\Services\BudgetService;
 use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RecurringTransactionTemplate extends Model
 {
-    use HasFactory;
+    use HasFactory, SyncsCategoryAssignment;
 
     /**
      * Boot the model.
@@ -51,9 +52,9 @@ class RecurringTransactionTemplate extends Model
                 BudgetService::clearAccountCaches($template->account_id);
             }
 
-            // Clear the recurring_transaction_template_id on all linked transactions
+            // Unlink all linked transactions (and forget how they were linked)
             Transaction::where('recurring_transaction_template_id', $template->id)
-                ->update(['recurring_transaction_template_id' => null]);
+                ->update(['recurring_transaction_template_id' => null, 'link_source' => null]);
         });
     }
 
@@ -71,6 +72,7 @@ class RecurringTransactionTemplate extends Model
         'description',
         'friendly_label',
         'category',
+        'category_id',
         'amount_in_cents',
         'frequency',
         'start_date',
@@ -103,7 +105,7 @@ class RecurringTransactionTemplate extends Model
         'min_amount' => 'integer',
         'max_amount' => 'integer',
         'last_generated_date' => 'datetime',
-        'average_amount' => 'float',
+        'average_amount' => 'integer', // cents, like min_amount/max_amount
     ];
 
     /**
@@ -156,6 +158,15 @@ class RecurringTransactionTemplate extends Model
     public function budget(): BelongsTo
     {
         return $this->belongsTo(Budget::class);
+    }
+
+    /**
+     * Get the budget category the template is assigned to (the legacy
+     * `category` column keeps a copy of its name).
+     */
+    public function budgetCategory(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'category_id');
     }
 
     /**
@@ -572,13 +583,13 @@ class RecurringTransactionTemplate extends Model
      */
     public function calculateDynamicAmount(): float
     {
-        // If average_amount is set, use it (assume it's stored in dollars)
+        // average_amount, min_amount and max_amount are stored in cents
         if (! is_null($this->average_amount)) {
-            return (float) $this->average_amount;
+            return $this->average_amount / 100;
         }
-        // If both min and max are set, use their midpoint (assume stored in dollars)
+        // If both min and max are set, use their midpoint
         if (! is_null($this->min_amount) && ! is_null($this->max_amount)) {
-            return (float) (($this->min_amount + $this->max_amount) / 2);
+            return ($this->min_amount + $this->max_amount) / 2 / 100;
         }
 
         // Fallback to static amount (convert from cents to dollars)

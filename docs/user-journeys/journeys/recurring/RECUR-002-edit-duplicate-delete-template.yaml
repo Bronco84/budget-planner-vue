@@ -39,6 +39,9 @@ business_rules:
   - submitted rules (new and existing) get priority = position in the payload + 1, matching store
   - duplicate copies the template and its rules in one DB transaction
   - the template is resolved through the budget (scoped binding), so a template from another budget returns 404
+  - average_amount is edited in dollars (the form divides the stored cents by 100) and stored in cents
+  - the index (transactions_count per template) and the detail page (recurringTransaction.transactions_count) carry the number of linked transactions; the delete confirmation states how many will be unlinked
+  - deleting a template unlinks its transactions (recurring_transaction_template_id and link_source set to null) and keeps them
   - all four actions require the budget update ability
 scenarios:
   - id: edit_page_renders
@@ -63,16 +66,25 @@ scenarios:
       - tests/Feature/Recurring/RecurringTemplateEditTest.php::duplicating a template copies its schedule, amounts and dynamic flag
   - id: delete_template
     kind: alternate
-    description: Delete removes the template and returns to the index.
+    description: Delete removes the template and returns to the index; its linked transactions are kept but unlinked (link source cleared).
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateEditTest.php::deleting a template removes it and returns to the index
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::deleting a template unlinks its transactions and clears their link source
+  - id: delete_confirmation_link_count
+    kind: edge
+    description: The delete confirmation knows how many linked transactions will lose their link (transactions_count on the index and detail page).
+    coverage: partial
+    tests:
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::the delete confirmation knows how many transactions will lose their link
+    note: the count prop is asserted; the confirmation dialog text in Index.vue / RecurringTransactionOverview.vue has no browser test.
   - id: update_cents_conversion_precision
     kind: edge
     description: Updating with decimal amounts such as 19.99 stores the exact cent value.
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateAmountTest.php::updating a recurring template converts amounts to the exact cent value
+      - tests/Feature/Recurring/RecurringAverageAmountCentsTest.php::storing and updating a template converts the starting average from dollars to cents
   - id: update_validation
     kind: validation
     description: Invalid frequency/day combinations or end_date before start_date are rejected on update.
@@ -98,8 +110,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::updating a template to reference accounts from another budget is rejected and the template is unchanged
-known_issues:
-  - Delete relies on the transactions FK to unlink linked transactions; there is no confirmation of how many transactions lose their link.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/RecurringTransactionController.php edit/update/duplicate/destroy

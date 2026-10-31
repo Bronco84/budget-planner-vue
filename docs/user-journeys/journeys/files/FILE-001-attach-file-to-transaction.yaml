@@ -14,7 +14,7 @@ summary: >
 actors:
   - budget owner
 preconditions:
-  - user owns (or is connected to) the transaction's budget
+  - user is a member of the transaction's budget (editor or owner to upload or delete)
 routes:
   - transactions.files.upload
   - transactions.files.index
@@ -41,9 +41,10 @@ steps:
 postconditions:
   - FileAttachment linked to the transaction (or removed)
 business_rules:
+  - "roles: viewer read-only, editor/owner read-write"
   - max 10MB; allowed MIME types pdf, jpeg, png, gif, webp, txt, doc/docx, xls/xlsx, json, csv; extension must match MIME type
   - upload is throttled to 10 requests per minute
-  - access allowed to the budget owner or a connected user
+  - any budget member may list and download attachments; uploading and deleting needs the editor role (FileService::canUserAccessAttachment with write, BudgetPolicy::update)
   - de-duplication is scoped to the uploading user (files unique on hash + uploaded_by), so a user never sees another user's filename
   - upload/delete failures return a generic error; only FileValidationException messages are shown to the user
 scenarios:
@@ -106,8 +107,16 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Files/TransactionFileAuthorizationTest.php::upload list download and delete on another users transaction files are forbidden and nothing changes
+  - id: shared_budget_roles
+    kind: authorization
+    description: On a shared budget viewers can list and download transaction attachments but get 403 uploading or deleting; editors can upload and delete.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetRoleMatrixTest.php::each budget route enforces its role requirement
 known_issues:
-  - "Access check allows connected users, while TransactionPolicy and BudgetPolicy are owner-only; file routes are not nested under {budget} so scopeBindings does not apply."
+  - 'Viewers can list and download transaction attachments through the API, but the UI only shows them on the transaction edit page, which needs edit access; viewers have no screen that shows a transaction''s receipts.'
+  - "File routes are not nested under {budget}, so scopeBindings and AuthorizeBudgetAccess do not apply; FileController checks the transaction's budget role itself."
+  - "Viewers can reach attachments only through the transaction edit page, which requires the editor role."
 confidence: high
 evidence:
   - app/Http/Controllers/FileController.php uploadToTransaction/getTransactionAttachments/download/delete

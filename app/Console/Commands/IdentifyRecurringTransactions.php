@@ -132,8 +132,7 @@ class IdentifyRecurringTransactions extends Command
 
                 // Update existing transactions to link them to the template
                 $group->each(function ($transaction) use ($template) {
-                    $transaction->recurring_transaction_template_id = $template->id;
-                    $transaction->save();
+                    $transaction->linkToRecurringTemplate($template->id, Transaction::LINK_SOURCE_ANALYSIS);
                 });
             }
         }

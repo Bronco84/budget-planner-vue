@@ -35,6 +35,7 @@ postconditions:
   - a PlaidAccount points the local account at an active PlaidConnection
   - transactions for the account have been synced (best effort)
 business_rules:
+  - "linking an account (plaid.link, plaid.store) is owner-only (BudgetPolicy::manageConnections); editors and viewers get 403"
   - an existing active connection is matched by plaid_item_id first, then institution_id (when not null), scoped to the budget
   - an account that already has a PlaidAccount is re-linked in place instead of duplicated
   - metadata.institution.institution_id and metadata.item.id (or metadata.item_id) are optional, validated and used for connection matching and creation; a missing item id gets a generated plaid-item-<uniqid> on the server (Link.vue sends null rather than inventing one)
@@ -103,6 +104,12 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a Plaid error when linking an account shows a generic message without the raw Plaid text
       - tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php::a connect timeout on token exchange shows a could not reach message without the cURL error
+  - id: shared_budget_non_owner_denied
+    kind: authorization
+    description: Editors and viewers of a shared budget get 403 on the link page and store, and nothing reaches Plaid.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::editors and viewers cannot connect, re-authenticate or unlink bank connections
 known_issues: []
 confidence: high
 evidence:

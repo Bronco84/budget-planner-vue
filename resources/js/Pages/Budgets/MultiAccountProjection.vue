@@ -268,6 +268,7 @@
       :show="showScenarioForm"
       :scenario="editingScenario"
       :accounts="budget.accounts"
+      :recurring-templates="recurringTemplates"
       @close="showScenarioForm = false; editingScenario = null"
       @save="handleSaveScenario"
     />
@@ -292,6 +293,10 @@ const props = defineProps({
   scenarioProjections: Object,
   scenarios: Array,
   activeScenarios: Array,
+  recurringTemplates: {
+    type: Array,
+    default: () => [],
+  },
   monthsAhead: Number,
 });
 

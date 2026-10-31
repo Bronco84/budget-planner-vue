@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Budget;
+use App\Models\Category;
 use App\Models\PlaidTransaction;
 use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
@@ -39,6 +40,7 @@ class RecurringTransactionController extends Controller
 
         $recurringTransactions = $budget->recurringTransactionTemplates()
             ->with('account')
+            ->withCount('transactions') // linked transactions, shown in the delete confirmation
             ->orderBy('description')
             ->get();
 
@@ -73,6 +75,7 @@ class RecurringTransactionController extends Controller
         return Inertia::render('RecurringTransactions/Create', [
             'budget' => $budget,
             'accounts' => $budget->accounts,
+            'categories' => Category::optionsForBudget($budget->id),
             'sourceTransaction' => $sourceTransaction,
             'eligibleCreditCards' => $eligibleCreditCards,
         ]);
@@ -111,7 +114,8 @@ class RecurringTransactionController extends Controller
             'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
             'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'linked_credit_card_account_id' => ['nullable', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
-            'category' => 'required|string|max:255',
+            'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')->where('budget_id', $budget->id)],
+            'category' => 'nullable|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -152,6 +156,11 @@ class RecurringTransactionController extends Controller
         // Convert amount to cents
         $validated = $this->getArr($validated);
 
+        // Link the chosen category by id and keep the legacy name in sync
+        $validated = array_merge($validated, Category::resolveAssignment(
+            $budget->id, $validated['category_id'] ?? null, $validated['category'] ?? null
+        ));
+
         // Convert is_dynamic_amount to boolean (handle both string and boolean inputs)
         $validated['is_dynamic_amount'] = filter_var($validated['is_dynamic_amount'], FILTER_VALIDATE_BOOLEAN);
 
@@ -191,8 +200,7 @@ class RecurringTransactionController extends Controller
                 ->first();
 
             if ($sourceTransaction) {
-                $sourceTransaction->recurring_transaction_template_id = $recurringTransaction->id;
-                $sourceTransaction->save();
+                $sourceTransaction->linkToRecurringTemplate($recurringTransaction->id, Transaction::LINK_SOURCE_MANUAL);
 
                 \Log::debug('Linked source transaction to new recurring template:', [
                     'transaction_id' => $sourceTransaction->id,
@@ -246,7 +254,8 @@ class RecurringTransactionController extends Controller
         return Inertia::render('RecurringTransactions/Show', [
             'budget' => $budget,
             'accounts' => $budget->accounts,
-            'recurringTransaction' => $recurring_transaction->load(['account', 'linkedCreditCard']),
+            'categories' => Category::optionsForBudget($budget->id),
+            'recurringTransaction' => $recurring_transaction->load(['account', 'linkedCreditCard'])->loadCount('transactions'),
             'rules' => $rules,
             'linkedTransactions' => $linkedTransactions,
             'fieldOptions' => RecurringTransactionRule::getFieldOptions(),
@@ -275,7 +284,8 @@ class RecurringTransactionController extends Controller
             'amount' => 'nullable|numeric|required_if:is_dynamic_amount,false',
             'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'linked_credit_card_account_id' => ['nullable', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
-            'category' => 'required|string|max:255',
+            'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')->where('budget_id', $budget->id)],
+            'category' => 'nullable|string|max:255',
             'frequency' => 'required|string|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -322,6 +332,11 @@ class RecurringTransactionController extends Controller
 
         // Convert amount to cents
         $validated = $this->getArr($validated);
+
+        // Link the chosen category by id and keep the legacy name in sync
+        $validated = array_merge($validated, Category::resolveAssignment(
+            $budget->id, $validated['category_id'] ?? null, $validated['category'] ?? null
+        ));
 
         // Log after conversion
         Log::debug('After getArr conversion:', [
@@ -477,6 +492,11 @@ class RecurringTransactionController extends Controller
         if (isset($validated['max_amount']) && $validated['max_amount'] !== null) {
             $maxCents = (int) round(abs($validated['max_amount']) * 100);
             $validated['max_amount'] = $isExpense ? -$maxCents : $maxCents;
+        }
+
+        // The starting average is entered in dollars and stored in cents.
+        if (array_key_exists('average_amount', $validated) && $validated['average_amount'] !== null) {
+            $validated['average_amount'] = (int) round($validated['average_amount'] * 100);
         }
 
         Log::debug('getArr - Output:', ['validated' => $validated]);

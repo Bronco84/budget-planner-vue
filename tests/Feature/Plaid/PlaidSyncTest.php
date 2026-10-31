@@ -8,11 +8,12 @@ use App\Models\PlaidStatementHistory;
 use App\Models\PlaidTransaction;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\PlaidService;
 use Tests\Support\FakePlaidApi;
 
 /*
  * PLAID-003: sync one Plaid-linked account (transactions + balance, liabilities and
- * holdings refresh) and the narrower refresh endpoints. Plaid is faked at the Guzzle
+ * holdings refresh) and the refresh service methods sync uses. Plaid is faked at the Guzzle
  * boundary by Tests\Support\FakePlaidApi.
  */
 
@@ -206,58 +207,34 @@ test('syncing an investment account also refreshes its holdings', function () {
         ->and($plaidAccount->account->fresh()->current_balance_cents)->toBe(1075000);
 });
 
-test('refresh endpoints refuse an account that is not linked to Plaid', function () {
+test('sync refuses an account that is not linked to Plaid', function () {
     $account = Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
 
-    foreach (['plaid.sync', 'plaid.balance', 'plaid.liabilities', 'plaid.investments'] as $routeName) {
-        $this->actingAs($this->user)
-            ->from(route('budgets.show', $this->budget))
-            ->post(route($routeName, [$this->budget, $account]))
-            ->assertRedirect(route('budgets.show', $this->budget))
-            ->assertSessionHas('error', 'Account is not linked to Plaid.');
-    }
-
-    expect($this->plaid->requests)->toBe([]);
-});
-
-test('liabilities refresh is refused for a non credit card account', function () {
-    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
-
     $this->actingAs($this->user)
-        ->post(route('plaid.liabilities', [$this->budget, $plaidAccount->account]))
-        ->assertSessionHas('error', 'Liability data is only available for credit card accounts.');
+        ->from(route('budgets.show', $this->budget))
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertRedirect(route('budgets.show', $this->budget))
+        ->assertSessionHas('error', 'Account is not linked to Plaid.');
 
     expect($this->plaid->requests)->toBe([]);
 });
 
-test('investments refresh is refused for a non investment account', function () {
-    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'credit', 'credit card', 'credit card');
-
-    $this->actingAs($this->user)
-        ->post(route('plaid.investments', [$this->budget, $plaidAccount->account]))
-        ->assertSessionHas('error', 'Investment data is only available for investment accounts.');
-
-    expect($this->plaid->requests)->toBe([]);
-});
-
-test('balance refresh endpoint reports success and Plaid failures', function () {
+test('balance refresh updates the balance and reports Plaid failures', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking', 100000);
-    $route = route('plaid.balance', [$this->budget, $plaidAccount->account]);
+    $service = app(PlaidService::class);
 
     $this->plaid->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 1500.25, 1400.00));
-    $this->actingAs($this->user)->post($route)
-        ->assertSessionHas('message', 'Account balance updated successfully.');
-    expect($plaidAccount->account->fresh()->current_balance_cents)->toBe(150025);
+    expect($service->updateAccountBalance($plaidAccount))->toBeTrue()
+        ->and($plaidAccount->account->fresh()->current_balance_cents)->toBe(150025);
 
     $this->plaid->on('/accounts/get', FakePlaidApi::error('ITEM_LOGIN_REQUIRED', 'the login details of this item have changed'));
-    $this->actingAs($this->user)->post($route)
-        ->assertSessionHas('error', 'Failed to update account balance.');
-    expect($plaidAccount->account->fresh()->current_balance_cents)->toBe(150025);
+    expect($service->updateAccountBalance($plaidAccount->fresh()))->toBeFalse()
+        ->and($plaidAccount->account->fresh()->current_balance_cents)->toBe(150025);
 });
 
-test('liabilities refresh endpoint updates statement data and reports when none is available', function () {
+test('liabilities refresh updates statement data and reports when none is available', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'credit', 'credit card', 'credit card');
-    $route = route('plaid.liabilities', [$this->budget, $plaidAccount->account]);
+    $service = app(PlaidService::class);
 
     $this->plaid
         ->on('/accounts/get', plaidSyncAccountsResponse('plaid-credit-card', 100.00, 900.00, 1000.00))
@@ -265,13 +242,11 @@ test('liabilities refresh endpoint updates statement data and reports when none 
             'account_id' => 'plaid-credit-card', 'last_statement_balance' => 80.00,
             'last_statement_issue_date' => '2026-03-01', 'minimum_payment_amount' => 25.00,
         ]]]]);
-    $this->actingAs($this->user)->post($route)
-        ->assertSessionHas('message', 'Statement balance and payment information updated successfully.');
-    expect($plaidAccount->fresh()->last_statement_balance_cents)->toBe(8000);
+    expect($service->updateLiabilityData($plaidAccount))->toBeTrue()
+        ->and($plaidAccount->fresh()->last_statement_balance_cents)->toBe(8000);
 
     $this->plaid->on('/liabilities/get', FakePlaidApi::error('PRODUCTS_NOT_SUPPORTED', 'not supported'));
-    $this->actingAs($this->user)->post($route)
-        ->assertSessionHas('error', 'Failed to update statement data. This feature may not be available for all credit card providers.');
+    expect($service->updateLiabilityData($plaidAccount->fresh()))->toBeFalse();
 });
 
 test('a login required error during sync shows a re-authenticate error and marks the connection as errored', function () {
@@ -292,21 +267,19 @@ test('a login required error during sync shows a re-authenticate error and marks
         ->error_message->not->toBeNull();
 });
 
-test('a login required error on a balance, liabilities or investments refresh marks the connection as errored', function (string $route, string $path, array $account) {
+test('a login required error on a balance, liabilities or investments refresh marks the connection as errored', function (string $method, string $path, array $account) {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, ...$account);
     $this->plaid->on($path, FakePlaidApi::error('ITEM_LOGIN_REQUIRED', 'the login details of this item have changed'));
 
-    $this->actingAs($this->user)
-        ->post(route($route, [$this->budget, $plaidAccount->account]))
-        ->assertSessionHas('error');
+    expect(app(PlaidService::class)->{$method}($plaidAccount))->toBeFalse();
 
     expect($plaidAccount->plaidConnection->fresh())
         ->status->toBe(PlaidConnection::STATUS_ERROR)
         ->error_message->toContain('ITEM_LOGIN_REQUIRED');
 })->with([
-    'balance' => ['plaid.balance', '/accounts/get', ['depository', 'checking', 'checking']],
-    'liabilities' => ['plaid.liabilities', '/liabilities/get', ['credit', 'credit card', 'credit card']],
-    'investments' => ['plaid.investments', '/investments/holdings/get', ['investment', 'brokerage', 'brokerage']],
+    'balance' => ['updateAccountBalance', '/accounts/get', ['depository', 'checking', 'checking']],
+    'liabilities' => ['updateLiabilityData', '/liabilities/get', ['credit', 'credit card', 'credit card']],
+    'investments' => ['updateInvestmentData', '/investments/holdings/get', ['investment', 'brokerage', 'brokerage']],
 ]);
 
 test('a Plaid error or timeout during sync shows a failure instead of a zero count success', function (mixed $response, string $expected) {

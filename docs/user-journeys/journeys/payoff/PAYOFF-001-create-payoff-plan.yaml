@@ -6,22 +6,21 @@ status: implemented
 priority: high
 summary: >
   From "Debt Payoff" in the sidebar the user sees their plans and starts the create
-  wizard, which shows projected monthly cash flow and the budget's liability accounts with
-  a positive balance. The user picks debts with APR and minimum payment, a strategy
-  (snowball, avalanche or custom priority), a monthly extra payment and optional savings
-  goals, then saves. The new plan becomes the only active plan and its projection opens.
+  wizard, which shows projected monthly cash flow and the budget's liability accounts that
+  carry a balance (stored positive or negative). The user picks debts with APR and minimum
+  payment, a strategy (snowball, avalanche or custom priority), a monthly extra payment and
+  optional savings goals (funded in the order added once the debts are paid off), then saves. The new plan becomes the only active plan and its projection opens.
 actors:
   - authenticated budget owner
 preconditions:
-  - user owns a budget; at least one liability account with a positive balance for a useful plan
+  - user owns a budget; at least one liability account with a nonzero balance for a useful plan
 routes:
   - payoff-plans.index
   - payoff-plans.create
   - payoff-plans.store
-  - payoff-plans.preview
 depends_on:
   - path: app/Services/PayoffPlanService.php
-    reason: calculateAvailableCashFlow, getDebtAccounts and compareStrategies
+    reason: calculateAvailableCashFlow, getDebtAccounts and debtBalanceCents
   - path: resources/js/Components/Sidebar.vue
     reason: Debt Payoff navigation entry in the sidebar
 integrations: []
@@ -29,20 +28,20 @@ steps:
   - action: open budget/{budget}/payoff-plans
     expected: PayoffPlans/Index lists plans (active first, newest first) with debts and goals; empty state with a create link when none
   - action: open the wizard (GET .../payoff-plans/create)
-    expected: PayoffPlans/Create with availableCashFlow and debtAccounts (liabilities with balance > 0); empty state when none
+    expected: PayoffPlans/Create with availableCashFlow and debtAccounts (liabilities with a nonzero balance, current_balance_cents reported as abs(balance)); empty state when none
   - action: submit the wizard (POST .../payoff-plans)
-    expected: existing active plans deactivated; plan, debts (starting balance = account's current balance) and goals created; redirect to payoff-plans.show
-  - action: (API only) POST .../payoff-plans/preview with debts and extra payment
-    expected: JSON comparisons for snowball and avalanche (total_months, payoff_date, total_interest_paid)
+    expected: existing active plans deactivated; plan, debts (starting balance = abs(account's current balance)) and goals (priority = order added) created; redirect to payoff-plans.show
 postconditions:
   - exactly one active payoff plan exists for the budget (the new one)
 business_rules:
   - strategy is snowball, avalanche or custom; at least one debt is required
   - interest_rate 0-100; minimum_payment_cents and monthly_extra_payment_cents are non-negative integers
-  - each debt account must belong to the budget (scoped exists validation on store and preview)
-  - store runs in a DB transaction, so a failure keeps the existing active plan; preview computes each strategy in memory (unsaved PayoffPlan/PayoffPlanDebt models passed to PayoffPlanService::calculatePayoffProjection) and writes nothing
-  - goal_type is savings, investment, purchase or other
-  - index and preview need budget view; create and store need budget update
+  - each debt account must belong to the budget (scoped exists validation on store)
+  - a liability's balance is debt whatever its stored sign (debt = abs(current_balance_cents), as net worth and projections read liabilities); liabilities with a zero balance are not offered
+  - store runs in a DB transaction, so a failure keeps the existing active plan
+  - goal_type is savings, investment, purchase or other; goals.*.priority is an optional non-negative integer (the wizard sends 1, 2, ... in the order goals were added)
+  - there is no strategy-comparison endpoint (the unused payoff-plans.preview route and PayoffPlanService::compareStrategies were removed)
+  - index needs budget view; create and store need budget update
 scenarios:
   - id: create_plan
     kind: happy_path
@@ -50,7 +49,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::storing a plan persists debts and goals, makes it the only active plan and redirects to it
-      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::create wizard offers only liability accounts with a positive balance
+      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::create wizard offers only liability accounts that carry a balance
   - id: index_lists_plans
     kind: happy_path
     description: Plans index lists the budget's plans with the active one first.
@@ -60,16 +59,13 @@ scenarios:
       - tests/playwright/smoke.spec.js::payoff plans index page loads
   - id: compare_strategies_math
     kind: alternate
-    description: Strategy comparison puts avalanche total interest at or below snowball when the higher-rate debt is larger.
+    description: For the same debts, an avalanche plan's total interest is at or below a snowball plan's when the higher-rate debt is larger.
     coverage: covered
     tests:
       - tests/Feature/Services/PayoffPlanServiceTest.php::avalanche pays no more interest than snowball
-      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::preview compares snowball and avalanche and leaves no temporary plans behind
-      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::preview computes the comparison in memory without writing any plan rows
-    note: the payoff-plans.preview endpoint is exercised over HTTP but is not called by the UI.
   - id: no_debt_accounts
     kind: empty_state
-    description: A budget without liabilities that have a positive balance shows the wizard's empty state; index shows the no-plans state.
+    description: A budget without liabilities that carry a balance shows the wizard's empty state; index shows the no-plans state.
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::create wizard has no debt accounts when the budget has no liabilities
@@ -82,39 +78,35 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::storing a plan rejects invalid wizard input without creating anything
   - id: negative_liability_balance_excluded
     kind: edge
-    description: Liability accounts stored with a negative balance should still be offered as debts.
-    coverage: uncovered
-    note: getDebtAccounts filters current_balance_cents > 0, so cards stored as negative balances (a convention BudgetServiceTest accepts) are hidden.
+    description: A liability stored with a negative balance is offered as a debt of abs(balance), and storing it records that positive starting balance.
+    coverage: covered
+    tests:
+      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::create wizard offers a liability stored with a negative balance as a positive debt
   - id: foreign_debt_account_rejected
     kind: authorization
-    description: A debt account from another budget is rejected on store and preview with a validation error, without side effects.
+    description: A debt account from another budget is rejected on store with a validation error, without side effects.
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::storing a plan with a debt account from another budget is rejected and attaches no foreign debt
       - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::storing a plan with a debt account from another budget is rejected and the active plan is untouched
-      - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::preview rejects a debt account from another budget
   - id: failure_rolls_back
     kind: recovery
-    description: A failure while storing a plan or computing a preview leaves the existing active plan intact and no temporary plan rows.
+    description: A failure while storing a plan leaves the existing active plan intact and no partial plan rows.
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::a failure while storing a plan rolls back and keeps the existing active plan
-      - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::preview leaves no temporary plans behind when the calculation fails
   - id: cross_user_budget_forbidden
     kind: authorization
-    description: Another user cannot list, open the wizard for, store or preview plans in a budget they do not own (403).
+    description: Another user cannot list, open the wizard for or store plans in a budget they do not own (403).
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot list payoff plans in a budget they do not own
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot open the payoff plan wizard for a budget they do not own
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot store a payoff plan in a budget they do not own
-      - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot preview payoff strategies in a budget they do not own
-known_issues:
-  - payoff-plans.preview is not called anywhere in resources/js; the wizard has no live strategy comparison.
-  - starting_balance_cents is copied from the account's current balance at creation time and never refreshed.
+known_issues: []
 confidence: high
 evidence:
-  - app/Http/Controllers/PayoffPlanController.php index/create/store/preview
+  - app/Http/Controllers/PayoffPlanController.php index/create/store
   - app/Services/PayoffPlanService.php
   - resources/js/Pages/PayoffPlans/Index.vue, Create.vue
 last_verified: null

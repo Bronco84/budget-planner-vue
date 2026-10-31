@@ -190,18 +190,6 @@ test('importing creates local accounts for only the selected Plaid accounts unde
         ->and($connection->fresh()->last_sync_at)->not->toBeNull();
 });
 
-test('the setup import route imports accounts the same way', function () {
-    stubSuccessfulPlaidImport($this->plaid);
-
-    $this->actingAs($this->user)
-        ->post(route('budgets.setup.import', $this->budget), plaidImportPayload(['selected_accounts' => ['acc-checking']]))
-        ->assertRedirect(route('budgets.show', $this->budget))
-        ->assertSessionHas('message', 'Successfully imported 1 accounts from Plaid.');
-
-    expect($this->budget->accounts()->pluck('name')->all())->toBe(['Everyday Checking'])
-        ->and(PlaidConnection::where('budget_id', $this->budget->id)->count())->toBe(1);
-});
-
 test('import requires a public token, institution name and selected accounts', function () {
     $this->actingAs($this->user)
         ->from(route('plaid.discover', $this->budget))
@@ -296,7 +284,6 @@ test('another users budget cannot be discovered, set up or imported into', funct
     $this->actingAs($intruder)->get(route('plaid.discover', $this->budget))->assertForbidden();
     $this->actingAs($intruder)->get(route('budgets.setup.connect', $this->budget))->assertForbidden();
     $this->actingAs($intruder)->post(route('plaid.import', $this->budget), plaidImportPayload())->assertForbidden();
-    $this->actingAs($intruder)->post(route('budgets.setup.import', $this->budget), plaidImportPayload())->assertForbidden();
 
     expect($this->plaid->requests)->toBe([])
         ->and(PlaidConnection::count())->toBe(0);

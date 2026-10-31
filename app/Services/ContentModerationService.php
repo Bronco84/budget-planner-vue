@@ -235,6 +235,18 @@ class ContentModerationService
     }
 
     /**
+     * Lift a chat ban and clear the offense history that would otherwise
+     * re-trigger an automatic ban on the next offense.
+     */
+    public function liftBan(User $user): void
+    {
+        Cache::forget("chat_ban_user_{$user->id}");
+        Cache::forget("chat_offenses_user_{$user->id}");
+
+        Log::info('Chat ban lifted', ['user_id' => $user->id]);
+    }
+
+    /**
      * Log suspicious activity for review
      */
     private function logSuspiciousActivity(User $user, string $type, string $content): void

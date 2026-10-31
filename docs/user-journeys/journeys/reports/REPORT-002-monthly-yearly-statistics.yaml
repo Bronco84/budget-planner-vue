@@ -26,9 +26,9 @@ depends_on:
     reason: getMonthlyStatistics and getYearlyStatistics
 integrations: []
 steps:
-  - action: open budget/{budget}/statistics/monthly/{month?}/{year?}
+  - action: click "Monthly Statistics" in the sidebar (or open budget/{budget}/statistics/monthly/{month?}/{year?})
     expected: monthly statistics for the given (default current) month
-  - action: open budget/{budget}/statistics/yearly?year=YYYY
+  - action: click "Yearly Statistics" in the sidebar (or open budget/{budget}/statistics/yearly?year=YYYY)
     expected: per-month statistics for the given (default current) year with prior-year comparison
 postconditions:
   - nothing is persisted
@@ -77,8 +77,7 @@ scenarios:
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users monthly statistics
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users yearly statistics
-known_issues:
-  - The only links to these routes are on the Monthly/Yearly pages themselves, so they are also unreachable from navigation.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetController.php monthlyStatistics/yearlyStatistics

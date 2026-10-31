@@ -88,8 +88,7 @@ test('another users budget files cannot be listed, uploaded, downloaded or delet
 
     $this->actingAs($this->user)
         ->post(route('budgets.files.upload', $foreignBudget), ['file' => UploadedFile::fake()->image('x.png')])
-        ->assertForbidden()
-        ->assertJson(['error' => 'Unauthorized']);
+        ->assertForbidden();
 
     expect(FileAttachment::where('attachable_id', $foreignBudget->id)->count())->toBe(1)
         ->and(FileAttachment::find($attachment->id))->not->toBeNull();

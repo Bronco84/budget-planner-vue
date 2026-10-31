@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\Category;
 use App\Models\Transaction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -108,11 +109,17 @@ class TransactionController extends Controller
             ->with('account')
             ->get();
 
-        // Get pre-fill data from query parameters
+        // Get pre-fill data from query parameters. A category name (e.g. from a
+        // recurring projection) is mapped onto the budget's matching category.
+        $prefillCategory = $request->filled('category_id')
+            ? $budget->categories()->whereKey((int) $request->query('category_id'))->first()
+            : Category::findForBudgetByName($budget->id, $request->query('category'));
+
         $prefillData = [
             'description' => $request->query('description', ''),
             'account_id' => $request->query('account_id', ''),
-            'category' => $request->query('category', ''),
+            'category' => $prefillCategory?->name ?? $request->query('category', ''),
+            'category_id' => $prefillCategory?->id ?? '',
             'date' => $request->query('date', ''),
             'amount' => $request->query('amount', ''),
             'recurring_transaction_template_id' => $request->query('recurring_transaction_template_id', ''),
@@ -121,6 +128,7 @@ class TransactionController extends Controller
         return Inertia::render('Transactions/Create', [
             'budget' => $budget,
             'accounts' => $accounts,
+            'categories' => Category::optionsForBudget($budget->id),
             'recurringTemplates' => $recurringTemplates,
             'prefillData' => $prefillData,
         ]);
@@ -136,7 +144,8 @@ class TransactionController extends Controller
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric',
             'date' => 'required|date',
-            'category' => 'required|string|max:255',
+            'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')->where('budget_id', $budget->id)],
+            'category' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'recurring_transaction_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);
@@ -150,9 +159,10 @@ class TransactionController extends Controller
             'description' => $validated['description'],
             'amount_in_cents' => $amountInCents,
             'date' => $validated['date'],
-            'category' => $validated['category'],
+            ...Category::resolveAssignment($budget->id, $validated['category_id'] ?? null, $validated['category'] ?? null),
             'notes' => $validated['notes'] ?? null,
             'recurring_transaction_template_id' => $validated['recurring_transaction_template_id'] ?? null,
+            'link_source' => empty($validated['recurring_transaction_template_id']) ? null : Transaction::LINK_SOURCE_MANUAL,
         ]);
 
         return redirect()->route('budget.transaction.edit', [$budget, $transaction])
@@ -185,6 +195,7 @@ class TransactionController extends Controller
             'budget' => $budget,
             'transaction' => $transaction,
             'accounts' => $accounts,
+            'categories' => Category::optionsForBudget($budget->id),
             'recurringTemplates' => $recurringTemplates,
             'recurringTemplate' => $recurringTemplate,
             'rules' => $rules,
@@ -207,10 +218,20 @@ class TransactionController extends Controller
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric',
             'date' => 'required|date',
-            'category' => 'required|string|max:255',
+            'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')->where('budget_id', $budget->id)],
+            'category' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'recurring_transaction_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);
+
+        // Choosing a (different) template here is a manual link; an unchanged
+        // link keeps the source it already had.
+        $templateId = $validated['recurring_transaction_template_id'] ?? null;
+        $linkSource = match (true) {
+            empty($templateId) => null,
+            (int) $templateId === $transaction->recurring_transaction_template_id => $transaction->link_source,
+            default => Transaction::LINK_SOURCE_MANUAL,
+        };
 
         // Update transaction
         $transaction->update([
@@ -218,9 +239,10 @@ class TransactionController extends Controller
             'description' => $validated['description'],
             'amount_in_cents' => (int) round($validated['amount'] * 100),
             'date' => $validated['date'],
-            'category' => $validated['category'],
+            ...Category::resolveAssignment($budget->id, $validated['category_id'] ?? null, $validated['category'] ?? null),
             'notes' => $validated['notes'] ?? null,
-            'recurring_transaction_template_id' => $validated['recurring_transaction_template_id'] ?? null,
+            'recurring_transaction_template_id' => $templateId,
+            'link_source' => $linkSource,
         ]);
 
         return redirect()->route('budget.transaction.index', $budget)

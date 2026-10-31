@@ -47,3 +47,38 @@ test('is_admin cannot be mass-assigned via fill', function () {
     expect($user->is_admin)->toBeFalse();
     expect($user->can('viewNova'))->toBeFalse();
 });
+
+test('nova access depends on is_admin only, not on an email allowlist', function () {
+    $owner = User::factory()->create(['email' => 'bamccoley@gmail.com']);
+    $owner->is_admin = false;
+    $owner->save();
+
+    expect($owner->fresh()->can('viewNova'))->toBeFalse();
+});
+
+test('the owner admin migration grants is_admin to the previously allowlisted email', function () {
+    $owner = User::factory()->create(['email' => 'BAMcColey@gmail.com']);
+    $other = User::factory()->create();
+    $owner->is_admin = false;
+    $owner->save();
+
+    $migration = require database_path('migrations/2026_10_31_250000_grant_admin_to_owner_account.php');
+    $migration->up();
+
+    expect($owner->fresh()->is_admin)->toBeTrue()
+        ->and($other->fresh()->is_admin)->toBeFalse()
+        ->and($owner->fresh()->can('viewNova'))->toBeTrue();
+
+    // down() is a deliberate no-op so a rollback never locks the owner out.
+    $migration->down();
+    expect($owner->fresh()->is_admin)->toBeTrue();
+});
+
+test('the owner admin migration is a no-op when the owner account does not exist', function () {
+    $user = User::factory()->create();
+
+    $migration = require database_path('migrations/2026_10_31_250000_grant_admin_to_owner_account.php');
+    $migration->up();
+
+    expect($user->fresh()->is_admin)->toBeFalse();
+});

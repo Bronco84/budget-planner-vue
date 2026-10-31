@@ -26,7 +26,11 @@ depends_on:
   - path: app/Models/RecurringTransactionRule.php
     reason: matchesTransaction implements each operator (contains, equals, starts_with, ends_with, regex, greater_than, less_than)
   - path: app/Services/RecurringTransactionService.php
-    reason: reevaluateTransactionLinks re-links/unlinks after rule update or delete
+    reason: reevaluateTransactionLinks re-links/unlinks after rule update or delete; link sources for every linking path
+  - path: app/Models/Transaction.php
+    reason: link_source constants, linkToRecurringTemplate and clearing link_source on unlink
+  - path: app/Http/Controllers/TransactionController.php
+    reason: choosing a template on the transaction form records a manual link
   - path: resources/js/Pages/RecurringTransactions/Partials/RecurringTransactionRules.vue
     reason: rules tab on the template detail page uses the same endpoints
 integrations: []
@@ -54,12 +58,15 @@ business_rules:
   - "{rule} is scoped to the template and the template to the budget, so foreign ids return 404"
   - index, test and preview need budget view; store, update, destroy and apply need budget update
   - a regex rule value is a full PCRE pattern including delimiters (e.g. /^netflix/); store, update and test reject patterns preg_match cannot compile (lowercased first unless case sensitive, as matchesTransaction does)
+  - every link records transactions.link_source - manual (Make Recurring, the transaction form, bulk-linking chosen suggestions), rule (apply, re-evaluation, inline rules, Plaid auto-link by rules), entity (Plaid entity id), description (description match) or analysis (pattern confirmation); unlinking clears it; links made before the column existed are null (unknown)
+  - re-evaluation after a rule update or delete only unlinks links whose link_source is rule; manual, entity, description, analysis and null links are never removed; newly matching unlinked transactions are linked with link_source rule; with no active rules left nothing is re-evaluated
 scenarios:
   - id: add_rule_and_apply
     kind: happy_path
-    description: Owner adds a rule, previews matches and applies them, linking the matching transactions.
+    description: Owner adds a rule, previews matches and applies them, linking the matching transactions with link_source rule.
     coverage: covered
     tests:
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::applying rules records rule as the link source
       - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::storing a regex rule with a valid pattern succeeds and previews matches
       - tests/Feature/Recurring/RecurringRuleManagementTest.php::an owner adds a rule, previews its matches and applies them to link the transactions
   - id: test_draft_rule
@@ -70,9 +77,10 @@ scenarios:
       - tests/Feature/Recurring/RecurringRuleManagementTest.php::testing a draft rule shows its matches without saving the rule
   - id: update_rule_reevaluates_links
     kind: alternate
-    description: Editing a rule unlinks transactions that no longer match and links newly matching ones.
+    description: Editing a rule unlinks rule-made links that no longer match and links newly matching ones.
     coverage: covered
     tests:
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::a manual link survives rule re-evaluation while a stale rule link is unlinked
       - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::updating a rule to a delimited regex links matching transactions
       - tests/Feature/Recurring/RecurringRuleManagementTest.php::editing a rule unlinks transactions that no longer match and links newly matching ones
   - id: reevaluation_uses_rule_matching
@@ -110,7 +118,22 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::deleting the last rule keeps transactions linked by other means
-    note: link source is not recorded on transactions, so rule-made links also stay linked after the last rule is deleted.
+  - id: non_rule_links_survive_reevaluation
+    kind: edge
+    description: Re-evaluation never unlinks manual, entity, description, analysis or unknown (null) links, even when they fail the current rules.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::a manual link survives rule re-evaluation while a stale rule link is unlinked
+  - id: link_source_recorded
+    kind: edge
+    description: Each linking path records its source (manual, rule, entity, description, analysis) and unlinking clears it.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::plaid auto-linking records whether the entity, a rule or the description matched
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::choosing a template on the transaction form records a manual link and keeps it while unchanged
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::unlinking a transaction clears its link source
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::bulk linking selected suggestions records a manual link
+      - tests/Feature/Recurring/RecurringLinkSourceTest.php::templates created from analysis link their pattern transactions with the analysis source
   - id: cross_budget_template_not_found
     kind: authorization
     description: Rules routes for a template that belongs to another budget return 404.
@@ -132,7 +155,7 @@ scenarios:
     tests:
       - tests/Feature/Recurring/RecurringRuleRoutesTest.php::testing and previewing rules for a template without an account returns empty results
 known_issues:
-  - Transactions don't record how they were linked (entity, description, manual, rule). While rules remain, reevaluateTransactionLinks still unlinks any linked transaction that fails the rules, including entity-, description- or manually-linked ones; with no rules left it unlinks nothing.
+  - Rule-made links stay linked after the last active rule is deleted (with no rules there is nothing to re-evaluate against).
 confidence: high
 evidence:
   - app/Http/Controllers/RecurringTransactionRuleController.php

@@ -17,7 +17,7 @@ preconditions:
   - user is authenticated
 routes:
   - chat.send
-  - chat.stream
+  - chat.stream.start
 depends_on:
   - path: app/Services/ContentModerationService.php
     reason: isUserBanned, checkRateLimit, sanitizeContent, checkContent, determineAction
@@ -38,7 +38,8 @@ business_rules:
   - the per-user moderation counter allows 30 messages per fixed one-hour window starting at the first message (Laravel RateLimiter); reset_in_seconds is the time left in that window
   - rejections past the hourly limit are logged but are not offenses
   - every content flag and more than 10 new conversations in 10 minutes ('rapid_conversation_creation') count as offenses; messages in an existing conversation are not tracked; 5 offenses in 24 hours trigger an automatic 24-hour ban
-  - route throttles - 30 per minute each for send and stream (own rate-limit keys chat-send / chat-stream, so one request is not counted twice against the group key), 60 per minute for the chat group
+  - route throttles - 30 per minute each for send, stream start and stream open (own rate-limit keys chat-send / chat-stream / chat-stream-open, so one request is not counted twice against the group key), 60 per minute for the chat group
+  - for streamed turns moderation runs on POST /chat/stream (stream start), before any stream id is issued, so refusals are JSON the panel can read
   - send and stream use the same status codes for moderation refusals - 403 banned, 429 hourly limit, 400 blocked; only provider/server failures return 500
 scenarios:
   - id: clean_message_allowed
@@ -94,6 +95,18 @@ scenarios:
     tests:
       - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::a fifth offense within 24 hours bans the user from chat for 24 hours'
       - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::offenses older than 24 hours do not count toward the automatic ban'
+  - id: stream_start_refusals
+    kind: validation
+    description: Starting a stream returns JSON 400 (blocked, flagged), 403 (banned) and 429 (hourly limit) without a stream id, storing no messages and calling no provider.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::moderation refusals are returned as json when starting a stream'
+  - id: flagged_allowed_stream
+    kind: edge
+    description: A flagged-but-allowed streamed question is recorded against the conversation it is then streamed into.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::a flagged but allowed question is streamed into the conversation it was recorded against'
   - id: banned_user_refused
     kind: authorization
     description: A temporarily banned user receives 403 and no provider call is made.
@@ -102,9 +115,9 @@ scenarios:
       - tests/Feature/Chat/ChatModerationLimitsTest.php::a banned user sending a chat message is refused with 403
   - id: stream_refusal_visible
     kind: recovery
-    description: When the stream endpoint returns a JSON 400/403/429 the user is told why.
+    description: When starting a stream returns a JSON 400/403/429 the user is told why.
     coverage: uncovered
-    note: EventSource cannot read non-SSE error bodies; the panel shows a generic connection error.
+    note: the refusal is now returned as JSON by POST /chat/stream (asserted in ChatStreamStartTest) and ChatPanel shows its error text; the panel display itself needs a browser test.
   - id: blocked_foreign_conversation
     kind: authorization
     description: A message aimed at another user's conversation_id returns 404 before moderation, so nothing is flagged against that conversation.

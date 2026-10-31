@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
 use Tests\Support\SoftwareAuthenticator;
 use Tests\TestCase;
@@ -95,4 +96,20 @@ function enrolPasskey(User $user, SoftwareAuthenticator $authenticator): WebAuth
         ->assertNoContent();
 
     return WebAuthnCredential::findOrFail($authenticator->credentialId());
+}
+
+/**
+ * Start a streamed chat turn (POST /chat/stream) and, when it is accepted,
+ * open the stream it returns (GET /chat/stream/{streamId}). A refused start
+ * (validation, 403, 404, 429, 400) is returned as-is.
+ */
+function streamChat(Illuminate\Foundation\Testing\TestCase $test, array $payload): TestResponse
+{
+    $start = $test->postJson(route('chat.stream.start'), $payload);
+
+    if ($start->status() !== 200) {
+        return $start;
+    }
+
+    return $test->get(route('chat.stream', $start->json('stream_id')));
 }

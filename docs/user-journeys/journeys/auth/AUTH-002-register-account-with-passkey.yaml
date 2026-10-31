@@ -5,9 +5,11 @@ domain: auth
 status: implemented
 priority: critical
 summary: >
-  A guest fills in name and email on the registration form. If the email is the
-  single allowlisted owner address an account is created without a password, the
-  user is logged in and sent to the passkey registration page, where a WebAuthn
+  A guest fills in name and email on the registration form. Open registration is
+  closed: an account is created (without a password) only for an email on the
+  configured allowlist, or through a valid budget invitation link for the invited
+  email, in which case the new user also joins that budget with the invited role.
+  The user is logged in and sent to the passkey registration page, where a WebAuthn
   attestation ceremony stores the first passkey and issues a trusted-device cookie
   before redirecting to /budgets.
 actors:
@@ -22,6 +24,10 @@ routes:
   - webauthn.register.options
   - webauthn.register
 depends_on:
+  - path: app/Services/BudgetSharingService.php
+    reason: accepts the invitation when registering through an invitation link
+  - path: config/auth.php
+    reason: registration_allowlist
   - path: app/Services/DeviceTokenService.php
     reason: creates the TrustedDevice and cookie after a passkey is saved
   - path: app/Services/DeviceFingerprintService.php
@@ -42,7 +48,9 @@ postconditions:
   - user exists and has one WebAuthn credential
   - a TrustedDevice record exists for this browser (auth_method passkey)
 business_rules:
-  - registration is restricted to one hardcoded email in PasskeyAuthController::registerStore; any other valid email gets an "is currently restricted" error
+  - "GET /register?invitation=<token> pre-fills (read-only) the invited email and shows the budget; an invalid token shows invitationError"
+  - registration needs a valid invitation token for the same email (single use, 7-day expiry, see SHARE-001) or an email in config('auth.registration_allowlist') (REGISTRATION_ALLOWLIST, default the owner address, case-insensitive); anything else gets an "is currently restricted" error
+  - registering through an invitation marks the email verified and joins the budget with the invited role
   - name required max 255; email required, valid, unique (uniqueness is checked before the allowlist)
   - POST /register is throttled to 6 requests per minute
   - webauthn register routes require auth and are excluded from HandleInertiaRequests so they return JSON
@@ -116,8 +124,27 @@ scenarios:
     tests:
       - tests/Feature/Auth/PasskeyEnforcementTest.php::the passkey registration page receives the account created status so it can be shown
     note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
-known_issues:
-  - Registration allowlist is a hardcoded email literal in the controller rather than configuration.
+  - id: invitation_registration
+    kind: alternate
+    description: An invited unknown email registers through the invitation and joins the budget with the invited role.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/InvitationRegistrationTest.php::an invited unknown email registers through the invitation and joins the budget with the invited role
+  - id: invalid_invitation_rejected
+    kind: validation
+    description: Expired, used, tampered or different-email invitations cannot register an account.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/InvitationRegistrationTest.php::expired, used and tampered invitation tokens cannot be used to register
+      - tests/Feature/Auth/InvitationRegistrationTest.php::registering with an invitation for a different email is rejected
+  - id: configured_allowlist
+    kind: alternate
+    description: An email on config('auth.registration_allowlist') registers without an invitation; the default keeps the owner email.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/InvitationRegistrationTest.php::an email on the configured registration allowlist registers without an invitation
+      - tests/Feature/Auth/InvitationRegistrationTest.php::the registration allowlist defaults to the owner email
+known_issues: []
 confidence: high
 evidence:
   - routes/auth.php guest group (register) and auth group (passkey.register)

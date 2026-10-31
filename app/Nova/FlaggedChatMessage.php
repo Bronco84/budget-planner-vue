@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use App\Nova\Actions\LiftChatBan;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\Code;
@@ -50,6 +51,8 @@ class FlaggedChatMessage extends Resource
 
     public function actions(NovaRequest $request): array
     {
-        return [];
+        return [
+            new LiftChatBan,
+        ];
     }
 }

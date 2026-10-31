@@ -28,6 +28,7 @@ steps:
 postconditions:
   - all linked accounts in the budget have fresh transactions and balances
 business_rules:
+  - "syncing needs the editor role (BudgetPolicy::sync): editors and owners may sync, viewers get 403"
   - limited to 3 requests per minute
   - PRODUCT_NOT_READY accounts are skipped silently
   - when every attempted account failed, the user gets a user-safe error flash ("Failed to sync transactions. Please try again." or the could-not-reach message)
@@ -78,6 +79,13 @@ scenarios:
     tests:
       - 'tests/Feature/Security/RouteThrottleIsolationTest.php::requests to one throttled route do not use up another routes limit'
       - 'tests/Feature/Security/RouteThrottleIsolationTest.php::each throttled route still enforces its own limit'
+  - id: shared_budget_editor_syncs_viewer_denied
+    kind: authorization
+    description: On a shared budget an editor may sync; a viewer gets 403 and nothing reaches Plaid.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::an editor may sync a linked account and the whole budget
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::a viewer cannot sync
 known_issues: []
 confidence: high
 evidence:

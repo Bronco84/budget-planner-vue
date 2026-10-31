@@ -57,14 +57,15 @@
 
           <!-- Category -->
           <div>
-            <InputLabel for="category" value="Category" />
-            <TextInput
-              id="category"
-              type="text"
+            <InputLabel for="category_id" value="Category" />
+            <CategorySelect
+              id="category_id"
               class="mt-1 block w-full"
-              v-model="form.category"
+              :categories="categories"
+              v-model:category-id="form.category_id"
+              v-model:category="form.category"
             />
-            <InputError class="mt-2" :message="form.errors.category" />
+            <InputError class="mt-2" :message="form.errors.category_id || form.errors.category" />
           </div>
 
           <!-- Amount Type -->
@@ -640,6 +641,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } fro
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import SelectInput from '@/Components/SelectInput.vue';
+import CategorySelect from '@/Components/CategorySelect.vue';
 import InputError from '@/Components/InputError.vue';
 import { formatCurrency } from '@/utils/format.js';
 import { useToast } from '@/composables/useToast';
@@ -655,6 +657,10 @@ const props = defineProps({
   budget: Object,
   recurringTransaction: Object,
   accounts: Array,
+  categories: {
+    type: Array,
+    default: () => [],
+  },
   linkedTransactions: Array,
   rules: Array,
   eligibleCreditCards: {
@@ -669,11 +675,13 @@ const form = useForm({
   friendly_label: props.recurringTransaction.friendly_label,
   description: props.recurringTransaction.description,
   category: props.recurringTransaction.category,
+  category_id: props.recurringTransaction.category_id || null,
   amount: props.recurringTransaction.amount_in_cents / 100,
   is_dynamic_amount: props.recurringTransaction.is_dynamic_amount,
   min_amount: props.recurringTransaction.min_amount ? Math.abs(props.recurringTransaction.min_amount / 100) : '',
   max_amount: props.recurringTransaction.max_amount ? Math.abs(props.recurringTransaction.max_amount / 100) : '',
-  average_amount: props.recurringTransaction.average_amount ?? '',
+  // Stored in cents; edited in dollars.
+  average_amount: props.recurringTransaction.average_amount != null ? props.recurringTransaction.average_amount / 100 : '',
   frequency: props.recurringTransaction.frequency,
   day_of_week: props.recurringTransaction.day_of_week,
   day_of_month: props.recurringTransaction.day_of_month,
@@ -730,10 +738,18 @@ const submit = () => {
   });
 };
 
+const deleteConfirmationMessage = (template) => {
+  const linked = template.transactions_count ?? props.linkedTransactions?.length ?? 0;
+  const unlinkNote = linked > 0
+    ? ` ${linked} linked transaction${linked === 1 ? '' : 's'} will be unlinked (the transactions themselves are kept).`
+    : '';
+  return `Are you sure you want to delete the recurring transaction "${template.description}"?${unlinkNote}`;
+};
+
 const confirmDelete = async () => {
   const confirmed = await toast.confirm({
     title: 'Delete Recurring Transaction',
-    message: `Are you sure you want to delete the recurring transaction "${props.recurringTransaction.description}"?`,
+    message: deleteConfirmationMessage(props.recurringTransaction),
     confirmText: 'Delete',
     cancelText: 'Cancel',
     type: 'danger'

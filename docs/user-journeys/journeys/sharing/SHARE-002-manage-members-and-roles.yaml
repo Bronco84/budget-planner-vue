@@ -1,0 +1,144 @@
+schema: 1
+id: SHARE-002
+name: Owner manages budget members and their roles
+domain: sharing
+status: implemented
+priority: critical
+summary: >
+  Any member opens the budget's Sharing page to see who has access and their
+  roles (viewer, editor, owner; the primary owner listed first). Owners change a
+  member's role (including promoting to owner) and remove members. Roles are
+  enforced on every budget route: viewers read only, editors change budget data
+  and sync banks, owners also manage settings, deletion, sharing and bank
+  connections.
+actors:
+  - budget owner
+  - budget editor
+  - budget viewer
+preconditions:
+  - user is a member of the budget
+routes:
+  - budgets.sharing.index
+  - budgets.members.update
+  - budgets.members.destroy
+depends_on:
+  - path: app/Enums/BudgetRole.php
+    reason: role vocabulary (legacy 'admin' maps to owner)
+  - path: app/Models/Budget.php
+    reason: roleFor() is the single source of truth for budget roles; members() scoped binding
+  - path: app/Policies/BudgetPolicy.php
+    reason: view / update (edit data) / updateSettings / delete / manageMembers / manageConnections / transferOwnership
+  - path: app/Policies/AccountPolicy.php
+    reason: delegates to the budget role
+  - path: app/Policies/TransactionPolicy.php
+    reason: delegates to the budget role
+  - path: app/Http/Middleware/AuthorizeBudgetAccess.php
+    reason: every {budget} route needs view for safe methods and update (editor) for writes
+  - path: app/Services/BudgetSharingService.php
+    reason: changeRole / removeMember / membersFor; the primary owner is never a pivot member
+  - path: app/Http/Middleware/HandleInertiaRequests.php
+    reason: shares budgetAccess (role + can.edit/manage) and per-budget roles in userBudgets/activeBudget
+  - path: resources/js/composables/useBudgetAccess.js
+    reason: hides edit/owner controls for viewers and editors (presentation only)
+  - path: resources/js/Pages/Budgets/Sharing.vue
+    reason: members list, role selects, remove buttons
+steps:
+  - action: open the Sharing page (GET budgets/{budget}/sharing)
+    expected: Budgets/Sharing with members (primary owner first), your role and can.manage/can.transfer
+  - action: owner picks a new role (PATCH budgets/{budget}/members/{member})
+    expected: pivot access_level updated; flash message
+  - action: owner removes a member (DELETE budgets/{budget}/members/{member})
+    expected: pivot row deleted; the member's stale active budget falls back on their next request
+postconditions:
+  - budget_user reflects the new role or the member is gone
+business_rules:
+  - "view: any member; update (budget data, bank sync, edit forms): editor or owner; updateSettings, delete, manageMembers, manageConnections: owner; transferOwnership: primary owner"
+  - AuthorizeBudgetAccess requires view for GET/HEAD and update for every other method on a {budget} route, so a viewer can never write even through an action missing its own check
+  - "{member} resolves through budget->members() (pivot only), so the primary owner and non-members 404 on member routes: the primary owner can't be downgraded or removed"
+  - budgets always keep at least one owner (the primary owner)
+  - the legacy 'admin' access level is treated as owner (and migrated to 'owner')
+  - viewers get a read-only dashboard (no edit, sync, add or connect controls); editors see edit controls but not owner controls
+scenarios:
+  - id: members_listed_with_roles
+    kind: happy_path
+    description: Any member sees the primary owner first and every member with their role, with a Sharing breadcrumb.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::the sharing page lists the primary owner first and every member with their role
+  - id: owner_changes_role
+    kind: happy_path
+    description: Owner changes a member's role, including promoting them to owner, who can then manage members.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::an owner changes a member role, including promoting them to owner
+  - id: owner_removes_member
+    kind: happy_path
+    description: Owner removes a member, who loses access and whose active budget falls back to their own.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::an owner removes a member, whose stale active budget then falls back
+  - id: role_matrix_enforced
+    kind: authorization
+    description: For every budget route, viewers can read but get 403 on writes; editors can write data but not change settings, delete, share or manage bank connections; owners can do everything; non-members get 403.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetRoleMatrixTest.php::each budget route enforces its role requirement
+      - tests/Feature/Sharing/BudgetRoleMatrixTest.php::a viewer cannot change any budget data through a write route
+  - id: every_budget_route_classified
+    kind: edge
+    description: A new budget-scoped route that is not classified in the role matrix fails the suite.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetRoleMatrixTest.php::every budget scoped route is classified in the role matrix
+  - id: non_owner_cannot_manage
+    kind: authorization
+    description: Editors and viewers cannot change roles (including their own) or remove members.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::editors and viewers cannot change roles or remove members
+  - id: primary_owner_protected
+    kind: edge
+    description: The primary owner cannot be downgraded or removed through member routes (404), and non-members 404 too.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::the primary owner cannot be removed, downgraded or reached through member routes
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::a non-member cannot be changed through member routes
+  - id: invalid_role_rejected
+    kind: validation
+    description: A role outside viewer/editor/owner fails validation.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::an invalid role is rejected
+  - id: role_reflected_in_ui_props
+    kind: alternate
+    description: Shared props expose the role (budgetAccess, activeBudget.role, userBudgets role/shared) so viewers get read-only controls and editors no owner controls.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::shared budgets appear in the switcher with the member role and become the active budget
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::editors see edit controls but not owner controls
+  - id: legacy_admin_is_owner
+    kind: edge
+    description: A legacy 'admin' access level is treated as owner.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::a legacy admin access level is treated as owner
+  - id: stranger_cannot_view_sharing
+    kind: authorization
+    description: A non-member gets 403 on the Sharing page.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::a stranger cannot leave or view the sharing page
+  - id: sharing_ui_end_to_end
+    kind: happy_path
+    description: The Sharing page and read-only dashboard render correctly for each role in a browser.
+    coverage: uncovered
+    note: no Playwright spec yet; feature tests assert the Inertia props that drive the UI.
+known_issues:
+  - "Some edit-form pages stay viewable by viewers (account create, property create/edit, transfer edit, transaction create); saving from them is still rejected (403). The dashboard hides the links."
+  - "Transaction detail (and its attachments) is only reachable through the edit page, which requires the editor role, so viewers cannot open a transaction's receipts from the UI."
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetSharingController.php index/update/destroy
+  - app/Http/Middleware/AuthorizeBudgetAccess.php
+  - app/Policies/BudgetPolicy.php
+last_verified: null

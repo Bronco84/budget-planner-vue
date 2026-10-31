@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BudgetRole;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -92,7 +93,7 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
      */
     public function linked_budgets(): BelongsToMany
     {
-        return $this->belongsToMany(Budget::class);
+        return $this->belongsToMany(Budget::class)->withPivot('access_level')->withTimestamps();
     }
 
     /**
@@ -168,11 +169,43 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
     }
 
     /**
-     * Check if the user has access to a specific budget
+     * The user's role on the budget, or null without access. See {@see Budget::roleFor()}.
+     */
+    public function budgetRole(Budget $budget): ?BudgetRole
+    {
+        return $budget->roleFor($this);
+    }
+
+    /**
+     * Any member (viewer, editor or owner) can view the budget.
+     */
+    public function canViewBudget(Budget $budget): bool
+    {
+        return $this->budgetRole($budget) !== null;
+    }
+
+    /**
+     * Editors and owners can change the budget's data.
+     */
+    public function canEditBudget(Budget $budget): bool
+    {
+        return $this->budgetRole($budget)?->canEdit() ?? false;
+    }
+
+    /**
+     * Owners (primary or member) have full control of the budget.
+     */
+    public function ownsBudget(Budget $budget): bool
+    {
+        return $this->budgetRole($budget)?->isOwner() ?? false;
+    }
+
+    /**
+     * Check if the user has access to a specific budget (any role).
      */
     public function hasBudget(Budget $budget): bool
     {
-        return $this->linked_budgets->contains($budget) || $this->id === $budget->user_id;
+        return $this->canViewBudget($budget);
     }
 
     /**
@@ -182,9 +215,30 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
     {
         return Budget::where('user_id', $this->id)
             ->orWhereHas('connected_users', function ($query) {
-                $query->where('user_id', $this->id);
+                $query->where('users.id', $this->id);
             })
+            ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * The user's role on each accessible budget, keyed by budget id.
+     *
+     * @return array<int, BudgetRole>
+     */
+    public function budgetRoles(): array
+    {
+        $roles = [];
+
+        foreach ($this->linked_budgets()->pluck('budget_user.access_level', 'budgets.id') as $budgetId => $level) {
+            $roles[(int) $budgetId] = BudgetRole::fromStored($level);
+        }
+
+        foreach (Budget::where('user_id', $this->id)->pluck('id') as $budgetId) {
+            $roles[(int) $budgetId] = BudgetRole::Owner;
+        }
+
+        return $roles;
     }
 
     /**

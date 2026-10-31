@@ -24,7 +24,7 @@ test('a guest json request to an authenticated route gets 401 instead of a redir
         ->assertHeaderMissing('Location');
 })->with([
     'active budget' => ['GET', 'preferences.active-budget.get'],
-    'account type order' => ['GET', 'preferences.account-type-order.get'],
+    'account type order' => ['POST', 'preferences.account-type-order.update'],
     'dashboard' => ['GET', 'dashboard'],
 ]);
 

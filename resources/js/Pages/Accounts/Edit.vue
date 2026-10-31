@@ -451,6 +451,7 @@ import SelectInput from '@/Components/SelectInput.vue';
 import Modal from '@/Components/Modal.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import InstitutionLogo from '@/Components/InstitutionLogo.vue';
+import { resizeLogo } from '@/utils/logoImage.js';
 
 // Define props to receive the budget and account
 const props = defineProps({
@@ -579,32 +580,25 @@ const handleLogoUpload = async (event) => {
     return;
   }
   
-  // Validate file size (max 2MB)
-  if (file.size > 2 * 1024 * 1024) {
-    alert('Image must be less than 2MB');
+  // The image is resized in the browser, so only reject absurdly large files.
+  if (file.size > 10 * 1024 * 1024) {
+    alert('Image must be less than 10MB');
     return;
   }
-  
+
   logoUploading.value = true;
-  
+
   try {
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      form.custom_logo = e.target.result;
-      // Clear logo_url since custom_logo takes precedence
-      form.logo_url = null;
-      logoUploading.value = false;
-    };
-    reader.onerror = () => {
-      alert('Failed to read file');
-      logoUploading.value = false;
-    };
-    reader.readAsDataURL(file);
+    // Resize to at most 128x128 and compress so it fits the server's limit.
+    form.custom_logo = await resizeLogo(file);
+    // Clear logo_url since custom_logo takes precedence
+    form.logo_url = null;
   } catch (error) {
     console.error('Error uploading logo:', error);
-    alert('Failed to upload logo');
+    alert(error.message || 'Failed to upload logo');
+  } finally {
     logoUploading.value = false;
+    event.target.value = '';
   }
 };
 

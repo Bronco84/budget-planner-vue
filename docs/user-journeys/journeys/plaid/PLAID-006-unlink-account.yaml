@@ -24,6 +24,7 @@ postconditions:
   - the local account and its transactions remain but are no longer linked
   - an empty PlaidConnection is removed locally and its Plaid item is removed at Plaid
 business_rules:
+  - "unlinking is owner-only (BudgetPolicy::manageConnections), including owner members; editors and viewers get 403"
   - when the last account is unlinked the connection is (soft) deleted and its item is removed at Plaid (/item/remove) so the access token is revoked; a Plaid failure is logged and does not block the local unlink
 scenarios:
   - id: unlink_account
@@ -63,6 +64,18 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidUnlinkEdgeCasesTest.php::disconnecting another users account is forbidden and leaves the link in place
+  - id: shared_budget_non_owner_denied
+    kind: authorization
+    description: Editors and viewers of a shared budget get 403 when unlinking and the link is kept.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::editors and viewers cannot connect, re-authenticate or unlink bank connections
+  - id: co_owner_unlinks
+    kind: alternate
+    description: An owner member (not the primary owner) may unlink.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::a co-owner may manage bank connections
 known_issues: []
 confidence: high
 evidence:

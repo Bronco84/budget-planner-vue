@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Budget;
+use App\Models\Category;
 use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -44,6 +46,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'activeBudget' => $this->getActiveBudget($request),
             'userBudgets' => $this->getUserBudgets($request),
+            'budgetAccess' => $this->getBudgetAccess($request),
             'breadcrumbs' => $this->getBreadcrumbs($request),
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
@@ -79,12 +82,15 @@ class HandleInertiaRequests extends Middleware
             'name' => $activeBudget->name,
             'description' => $activeBudget->description,
             'color' => $activeBudget->color,
+            'role' => $activeBudget->roleFor($user)?->value,
             'starting_balance' => $activeBudget->starting_balance,
             'accounts' => $activeBudget->accounts->map(fn ($account) => [
                 'id' => $account->id,
                 'name' => $account->name,
                 'type' => $account->type,
             ])->toArray(),
+            // For the quick-add category picker.
+            'categories' => Category::optionsForBudget($activeBudget->id),
         ];
     }
 
@@ -100,13 +106,45 @@ class HandleInertiaRequests extends Middleware
         }
 
         $budgets = $user->accessibleBudgets();
+        $roles = $user->budgetRoles();
 
         return $budgets->map(fn ($budget) => [
             'id' => $budget->id,
             'name' => $budget->name,
             'description' => $budget->description,
             'color' => $budget->color,
+            'role' => ($roles[$budget->id] ?? null)?->value,
+            'shared' => (int) $budget->user_id !== (int) $user->id,
         ])->toArray();
+    }
+
+    /**
+     * The current user's role and abilities on the budget in the current route,
+     * so pages can hide controls the user can't use. Server-side policies are
+     * the real enforcement; this is presentation only. Null off budget routes.
+     *
+     * @return array{budget_id: int, role: string|null, can: array<string, bool>}|null
+     */
+    protected function getBudgetAccess(Request $request): ?array
+    {
+        $user = $request->user();
+        $budget = $request->route()?->parameter('budget');
+
+        if (! $user || ! $budget instanceof Budget) {
+            return null;
+        }
+
+        $role = $budget->roleFor($user);
+
+        return [
+            'budget_id' => $budget->id,
+            'role' => $role?->value,
+            'can' => [
+                'edit' => $role?->canEdit() ?? false,
+                'manage' => $role?->isOwner() ?? false,
+                'manage_connections' => $role?->isOwner() ?? false,
+            ],
+        ];
     }
 
     /**

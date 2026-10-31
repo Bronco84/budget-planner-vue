@@ -38,19 +38,3 @@ test('deleting a category that transactions use is blocked with an error flash',
 
     expect(Category::find($this->category->id))->not->toBeNull();
 });
-
-test('reordering categories with a malformed payload is rejected', function (array $payload, string $field) {
-    $payload = json_decode(str_replace('__ID__', (string) $this->category->id, json_encode($payload)), true);
-
-    $this->actingAs($this->user)
-        ->post(route('budgets.categories.reorder', $this->budget), $payload)
-        ->assertSessionHasErrors($field);
-
-    expect($this->category->fresh()->order)->toBe(3);
-})->with([
-    'missing categories' => [[], 'categories'],
-    'categories not an array' => [['categories' => 'nope'], 'categories'],
-    'negative order' => [['categories' => [['id' => '__ID__', 'order' => -1]]], 'categories.0.order'],
-    'missing order' => [['categories' => [['id' => '__ID__']]], 'categories.0.order'],
-    'unknown id' => [['categories' => [['id' => 999999, 'order' => 0]]], 'categories.0.id'],
-]);

@@ -23,7 +23,7 @@ class CategoryContextBuilder implements ContextBuilderInterface
             ->map(function ($category) use ($budget, $startOfMonth, $endOfMonth) {
                 // Calculate spent amount for this month
                 $spent = abs($budget->transactions()
-                    ->where('category', $category->name)
+                    ->inCategory($category)
                     ->where('amount_in_cents', '<', 0)
                     ->whereBetween('date', [$startOfMonth, $endOfMonth])
                     ->sum('amount_in_cents')) / 100;

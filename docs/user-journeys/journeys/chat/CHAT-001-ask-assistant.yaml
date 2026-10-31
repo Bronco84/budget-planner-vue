@@ -6,8 +6,11 @@ status: implemented
 priority: high
 summary: >
   From the chat panel in the authenticated layout the user types a question. The panel
-  opens an EventSource to GET /chat/stream; the server moderates and stores the user
-  message, builds budget-scoped data tools (accounts, transactions, categories,
+  POSTs it to /chat/stream with the conversation id and the current page's budget id (the
+  page's budget, else the active budget); the server validates it, checks the user can
+  view the budget, runs moderation and parks the turn under a random single-use stream id
+  (cache, bound to the user, 2-minute TTL). The panel then opens an EventSource to GET
+  /chat/stream/{streamId}; the server stores the user message, builds budget-scoped data tools (accounts, transactions, categories,
   projections, ...), runs a Prism tool loop (openai gpt-4o-mini) and streams the final
   text word-by-word as SSE (conversation_id, text_delta, stream_end). Before streaming,
   the server validates the generated text and stores it as the assistant message
@@ -19,25 +22,28 @@ actors:
 preconditions:
   - an AI provider key is configured for Prism
 routes:
+  - chat.stream.start
   - chat.stream
   - chat.stream.complete
   - chat.send
 depends_on:
   - path: app/Services/ChatService.php
-    reason: processMessageStream (validates and persists the streamed reply), processMessage, provider error translation
+    reason: prepareStream (moderation before streaming), streamReply (validates and persists the streamed reply), processMessage, provider error translation
   - path: app/Services/Chat/**
     reason: AssistantToolFactory and context builders that back the model's tools
   - path: app/Services/ContentModerationService.php
     reason: sanitise input, safe system prompt, response validation
   - path: resources/js/Components/ChatPanel.vue
-    reason: chat UI (EventSource streaming, save on stream_end)
+    reason: chat UI (POST to start, EventSource streaming, save on stream_end)
   - path: resources/js/Layouts/AuthenticatedLayout.vue
     reason: mounts the chat panel
 integrations:
   - Prism (prism-php) with OpenAI gpt-4o-mini
 steps:
   - action: type a question in the chat panel
-    expected: GET /chat/stream?message=...&conversation_id=... opens an SSE stream
+    expected: POST /chat/stream {message, conversation_id?, budget_id?} returns {stream_id} (or a JSON moderation/validation refusal shown in the panel)
+  - action: panel opens the stream
+    expected: GET /chat/stream/{streamId} opens an SSE stream
   - action: receive events
     expected: conversation_id event; the reply is validated and stored server-side (conversation titled), then text_delta events, then stream_end
   - action: panel posts to /chat/stream/complete
@@ -46,9 +52,12 @@ postconditions:
   - the conversation contains the user message and the assistant reply
 business_rules:
   - message is required, max 2000 chars; conversation_id and budget_id must exist
+  - the question is sent in the POST body, never in a URL; GET /chat/stream with a query string is not a route (405)
+  - starting a stream with a budget the user cannot view (BudgetPolicy view) returns 403 before moderation
+  - a stream id is 40 random characters, bound to the user who started it, single use (claimed atomically) and expires after 2 minutes; other users', reused, expired or unknown ids return 404
   - a conversation_id that belongs to another user returns 404 on send, stream and stream/complete, before moderation or any write
   - the assistant turn is always the server-generated text; a reply failing validateResponse is neither sent nor stored (in-band SSE error instead)
-  - tools are scoped to the requested budget only if the user owns it, else to the user's active budget; with no budget no tools are offered
+  - tools are scoped to the requested budget only if the user can view it (BudgetPolicy view), else to the user's active budget; with no budget no tools are offered
   - transaction queries are clamped to the last 12 months and the result count is capped
   - provider rate-limit/overload/too-large errors map to specific safe messages; anything else to a generic message; raw provider text is never returned
   - when the provider fails or the reply fails validation, the persisted user message is deleted (and a conversation created by that request, if nothing else references it), matching the panel, which drops the turn
@@ -60,9 +69,45 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/ChatAssistantTest.php::chat assistant returns and persists a reply via the tool-loop flow
+  - id: stream_start_returns_id
+    kind: happy_path
+    description: POST /chat/stream moderates the question and returns a stream id without calling the provider; opening it streams and persists the reply.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::starting a stream moderates the question and returns a stream id without calling the provider'
+  - id: question_not_in_url
+    kind: validation
+    description: The old GET /chat/stream?message= path no longer exists.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::the question is no longer accepted in the stream query string'
+  - id: stream_id_single_use
+    kind: authorization
+    description: A stream id cannot be opened by another user (without consuming it), reused, opened after two minutes, or guessed.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::a stream id cannot be opened by another user, reused or opened after it expires'
+  - id: stream_guest
+    kind: authentication
+    description: Guests cannot start or open a stream.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::guests cannot start or open a stream'
+  - id: stream_uses_page_budget
+    kind: alternate
+    description: The budget sent with the question (not the active budget) scopes the tools and prompt.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::the stream uses the budget sent with the question'
+  - id: stream_forbidden_budget
+    kind: authorization
+    description: Starting a stream with a budget the user cannot view returns 403 and nothing is stored or generated.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatStreamStartTest.php::starting a stream with a budget the user cannot view is forbidden'
   - id: stream_returns_events
     kind: happy_path
-    description: GET /chat/stream emits conversation_id, text_delta and stream_end events.
+    description: GET /chat/stream/{streamId} emits conversation_id, text_delta and stream_end events.
     coverage: covered
     tests:
       - 'tests/Feature/ChatAssistantTest.php::the stream persists the assistant reply the server generated'
@@ -112,7 +157,7 @@ scenarios:
       - 'tests/Feature/AssistantToolFactoryTest.php::transaction query caps the requested limit'
   - id: message_validation
     kind: validation
-    description: Empty, over-2000-char messages or unknown conversation/budget ids fail validation (422).
+    description: Empty, over-2000-char messages or unknown conversation/budget ids fail validation (422) on send and stream start.
     coverage: covered
     tests:
       - 'tests/Feature/Chat/ChatAssistantRequestTest.php::chat messages are validated before anything is stored or sent to the provider'
@@ -152,11 +197,10 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Chat/ChatAssistantRequestTest.php::passing another users budget id does not expose that budget to the assistant'
-known_issues:
-  - ChatPanel does not send budget_id, so tools always use the active budget; the question text travels in the GET query string (logged by web servers).
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/ChatController.php
   - app/Services/ChatService.php processMessageStream(), processMessage(), resolveBudget(), userFacingProviderError()
-  - resources/js/Components/ChatPanel.vue sendMessage()
+  - resources/js/Components/ChatPanel.vue sendMessage(), currentBudgetId
 last_verified: null

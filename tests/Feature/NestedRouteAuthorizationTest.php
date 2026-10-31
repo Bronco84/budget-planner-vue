@@ -38,23 +38,9 @@ test('statement history rejects an account that does not belong to the budget', 
         ->assertNotFound();
 });
 
-test('user cannot update liabilities on another users account', function () {
-    $this->actingAs($this->user1)
-        ->post(route('plaid.liabilities', [$this->budget2, $this->account2]))
-        ->assertForbidden();
-});
-
 test('user cannot view another users multi-account projection', function () {
     $this->actingAs($this->user1)
         ->get(route('budget.projections.multi-account', $this->budget2))
-        ->assertForbidden();
-});
-
-test('user cannot reorder another users categories', function () {
-    $this->actingAs($this->user1)
-        ->post(route('budgets.categories.reorder', $this->budget2), [
-            'categories' => [['id' => 1, 'order' => 0]],
-        ])
         ->assertForbidden();
 });
 
@@ -100,9 +86,6 @@ test('user cannot view another users budget via calendar budget_id param', funct
 
 dataset('plaid_post_routes', [
     'plaid.sync',
-    'plaid.balance',
-    'plaid.liabilities',
-    'plaid.investments',
     'plaid.upgrade-link-token',
     'plaid.update-connection',
 ]);
@@ -215,8 +198,14 @@ test('scenario routes reject a cross-budget scenario with 404', function () {
     ]);
 
     $this->actingAs($this->user1)
-        ->get(route('budgets.scenarios.show', [$this->budget1, $scenario]))
+        ->patchJson(route('budgets.scenarios.update', [$this->budget1, $scenario]), ['name' => 'Hijacked'])
         ->assertNotFound();
+
+    $this->actingAs($this->user1)
+        ->deleteJson(route('budgets.scenarios.destroy', [$this->budget1, $scenario]))
+        ->assertNotFound();
+
+    expect($scenario->fresh()->name)->not->toBe('Hijacked');
 });
 
 test('account resource routes reject a cross-budget account with 404', function () {

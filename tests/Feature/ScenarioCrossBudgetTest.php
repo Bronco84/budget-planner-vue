@@ -76,7 +76,7 @@ test('a scenario store failure returns a generic error without the exception tex
         ->postJson(route('budgets.scenarios.store', $this->budget), [
             'name' => 'Buy car',
             'color' => '#3b82f6',
-            'adjustments' => [scenarioAdjustmentPayload(['account_id' => $this->account->id])],
+            'adjustments' => [scenarioAdjustmentPayload(['adjustment_type' => 'one_time_expense', 'account_id' => $this->account->id])],
         ])
         ->assertServerError()
         ->assertJsonMissingPath('error')

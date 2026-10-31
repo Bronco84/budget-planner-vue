@@ -102,6 +102,24 @@
             </form>
           </div>
         </div>
+
+        <!-- Sharing -->
+        <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+          <div class="p-6 flex items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-medium text-gray-900">Sharing</h3>
+              <p class="mt-1 text-sm text-gray-600">
+                Invite people by email as viewers, editors or owners, and manage who has access.
+              </p>
+            </div>
+            <Link
+              :href="route('budgets.sharing.index', budget.id)"
+              class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500 transition ease-in-out duration-150"
+            >
+              Manage sharing
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
     

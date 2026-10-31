@@ -9,7 +9,8 @@ summary: >
   accounts and a horizon (1-60 months, default 12) and sees a base weekly balance
   projection per account plus one projection per active scenario, where each scenario's
   adjustments (one-time or recurring expenses, debt paydown, savings contributions) are
-  layered on top. Scenarios can be toggled on and off from the side panel.
+  layered on top and "modify existing" adjustments change a recurring template's projected
+  occurrences inside their date range. Scenarios can be toggled on and off from the side panel.
 actors:
   - authenticated budget owner
 preconditions:
@@ -26,13 +27,13 @@ depends_on:
   - path: resources/js/Components/ScenarioManager.vue
     reason: scenario side panel
   - path: app/Models/ScenarioAdjustment.php
-    reason: generateProjectedTransactions for each adjustment
+    reason: generateProjectedTransactions for each adjustment; modifiesTransaction/applyToExistingTransaction for modify_existing
   - path: app/Services/RecurringTransactionService.php
     reason: base projectTransactions and autopay projections
 integrations: []
 steps:
   - action: open budget/{budget}/projections/multi-account (optionally ?account_ids[]=..&scenario_ids[]=..&months=N)
-    expected: Budgets/MultiAccountProjection with accounts, baseProjections, scenarioProjections, scenarios, activeScenarios, monthsAhead and breadcrumbs
+    expected: Budgets/MultiAccountProjection with accounts, baseProjections, scenarioProjections, scenarios, activeScenarios, recurringTemplates (for the modify-existing picker), monthsAhead and breadcrumbs
   - action: list scenarios (GET budgets/{budget}/scenarios, JSON)
     expected: scenarios with adjustments and accounts, newest first
   - action: toggle a scenario (POST budgets/{budget}/scenarios/{scenario}/toggle)
@@ -43,6 +44,7 @@ business_rules:
   - with no account_ids all budget accounts are used; any account not in the budget aborts 422
   - with no scenario_ids the scenarios flagged is_active are applied; scenario_ids are filtered to the budget's scenarios
   - each scenario projection = base projection + that scenario's adjustments for the account
+  - a modify_existing adjustment changes every projected occurrence of its target template dated within [start_date, end_date] (end optional) in that scenario only - by percent_change (amount x (1 + pct/100), rounded) when set, otherwise to amount_in_cents with the occurrence's income/expense sign; other templates and other scenarios are unaffected
   - monthly and bimonthly adjustment days are clamped to the month's last day (no overflow into the next month)
   - months 1-60; page needs budget view (middleware); toggle needs budget update
 scenarios:
@@ -82,6 +84,18 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/ScenarioProjectionQueryTest.php::multi account projection matches the pinned base and scenario values
+  - id: modify_existing_amount_in_window
+    kind: alternate
+    description: A modify-existing adjustment with a new amount changes only the target template's occurrences inside its window, keeping the template's sign.
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioModifyExistingTest.php::a new amount replaces the template occurrences only inside the window, keeping the template sign
+  - id: modify_existing_percentage
+    kind: alternate
+    description: A modify-existing adjustment with a percentage scales only the target template from its start date; other templates are unaffected.
+    coverage: covered
+    tests:
+      - tests/Feature/Scenarios/ScenarioModifyExistingTest.php::a percentage change scales only the target template from its start date
   - id: base_projection_reused_across_scenarios
     kind: edge
     description: Each account's base projected transactions (recurring, autopay, future manual) are built once and reused for every active scenario.
@@ -124,8 +138,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Scenarios/ScenarioAccessAndValidationTest.php::another user cannot list or toggle scenarios on a budget they do not own
-known_issues:
-  - "modify_existing adjustments are accepted by validation and offered in ScenarioAdjustmentRow.vue, but generateProjectedTransactions returns nothing for them and no other code handles them, so they have no effect on the projection."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/ProjectionsController.php showMultiAccountProjection/applyScenarioAdjustments

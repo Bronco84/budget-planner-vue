@@ -104,7 +104,7 @@ test('testing a draft rule shows its matches without saving the rule', function 
 
 test('editing a rule unlinks transactions that no longer match and links newly matching ones', function () {
     $rule = recurRuleCreate($this->template, ['value' => 'netflix']);
-    $noLongerMatching = recurRuleTransaction($this->account, 'Netflix basic', ['recurring_transaction_template_id' => $this->template->id]);
+    $noLongerMatching = recurRuleTransaction($this->account, 'Netflix basic', ['recurring_transaction_template_id' => $this->template->id, 'link_source' => Transaction::LINK_SOURCE_RULE]);
     $newlyMatching = recurRuleTransaction($this->account, 'Netflix premium');
     $params = recurRuleParams($this->budget, $this->template, ['rule' => $rule]);
 

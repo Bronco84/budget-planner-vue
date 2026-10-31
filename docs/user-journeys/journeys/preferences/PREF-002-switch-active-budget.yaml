@@ -43,8 +43,10 @@ scenarios:
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can switch their active budget'
   - id: switch_to_shared_budget
     kind: alternate
-    description: A budget shared with the user via linked_budgets can be made active.
-    coverage: uncovered
+    description: A budget shared with the user via linked_budgets can be made active, and the switcher lists it with the member's role.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::shared budgets appear in the switcher with the member role and become the active budget
   - id: invalid_budget_rejected
     kind: validation
     description: A missing, non-integer or non-existent budget_id fails validation.

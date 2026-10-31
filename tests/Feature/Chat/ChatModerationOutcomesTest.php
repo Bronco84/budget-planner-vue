@@ -63,7 +63,7 @@ test('chat send and stream requests beyond thirty per minute are throttled by th
     $this->actingAs($user)->json($method, route($route))->assertStatus(429);
 })->with([
     'send' => ['POST', 'chat.send'],
-    'stream' => ['GET', 'chat.stream'],
+    'stream' => ['POST', 'chat.stream.start'],
 ]);
 
 test('the chat route throttle resets after a minute', function () {

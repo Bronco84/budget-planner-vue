@@ -23,8 +23,8 @@ class FileController extends Controller
      */
     public function uploadToTransaction(Request $request, Transaction $transaction): JsonResponse
     {
-        // Check if user can access this transaction
-        if (! $this->canUserAccessTransaction($transaction, Auth::id())) {
+        // Attaching a file is a write: editors and owners only
+        if (! Auth::user()->can('update', $transaction->budget)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -70,8 +70,8 @@ class FileController extends Controller
      */
     public function uploadToBudget(Request $request, Budget $budget): JsonResponse
     {
-        // Check if user can access this budget
-        if (! $this->canUserAccessBudget($budget, Auth::id())) {
+        // Attaching a file is a write: editors and owners only
+        if (! Auth::user()->can('update', $budget)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -117,8 +117,8 @@ class FileController extends Controller
      */
     public function getTransactionAttachments(Transaction $transaction): JsonResponse
     {
-        // Check if user can access this transaction
-        if (! $this->canUserAccessTransaction($transaction, Auth::id())) {
+        // Any budget member may list attachments
+        if (! Auth::user()->can('view', $transaction->budget)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -148,8 +148,8 @@ class FileController extends Controller
      */
     public function getBudgetAttachments(Budget $budget): JsonResponse
     {
-        // Check if user can access this budget
-        if (! $this->canUserAccessBudget($budget, Auth::id())) {
+        // Any budget member may list attachments
+        if (! Auth::user()->can('view', $budget)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -223,8 +223,8 @@ class FileController extends Controller
      */
     public function delete(FileAttachment $attachment): JsonResponse
     {
-        // Check if user can access this attachment
-        if (! $this->fileService->canUserAccessAttachment($attachment, Auth::id())) {
+        // Removing an attachment is a write: editors and owners only
+        if (! $this->fileService->canUserAccessAttachment($attachment, Auth::id(), write: true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -241,23 +241,5 @@ class FileController extends Controller
 
             return response()->json(['error' => 'Failed to delete file. Please try again.'], 500);
         }
-    }
-
-    /**
-     * Check if user can access transaction.
-     */
-    private function canUserAccessTransaction(Transaction $transaction, int $userId): bool
-    {
-        return $transaction->budget->user_id === $userId ||
-               $transaction->budget->connected_users()->where('user_id', $userId)->exists();
-    }
-
-    /**
-     * Check if user can access budget.
-     */
-    private function canUserAccessBudget(Budget $budget, int $userId): bool
-    {
-        return $budget->user_id === $userId ||
-               $budget->connected_users()->where('user_id', $userId)->exists();
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Scenario;
+use App\Models\ScenarioAdjustment;
 use App\Models\Transaction;
 use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
@@ -428,6 +429,10 @@ class ProjectionsController extends Controller
             'scenarioProjections' => $scenarioProjections,
             'scenarios' => $allScenarios,
             'activeScenarios' => $activeScenarios->values(),
+            // Templates a modify_existing adjustment can target.
+            'recurringTemplates' => $budget->recurringTransactionTemplates()
+                ->orderBy('description')
+                ->get(['id', 'description', 'friendly_label', 'account_id', 'amount_in_cents', 'is_dynamic_amount']),
             'monthsAhead' => $monthsAhead,
             'breadcrumbs' => \Breadcrumbs::generate('budget.projections.multi-account', $budget),
         ]);
@@ -468,18 +473,32 @@ class ProjectionsController extends Controller
         Carbon $startDate,
         Carbon $endDate
     ): array {
-        // Get adjustments for this account
-        $adjustments = $scenario->adjustments()
-            ->where('account_id', $account->id)
-            ->get();
+        $adjustments = $scenario->relationLoaded('adjustments')
+            ? $scenario->adjustments
+            : $scenario->adjustments()->get();
 
-        if ($adjustments->isEmpty()) {
+        // modify_existing adjustments change their target template's occurrences
+        // (which only appear in that template's account's projection); the other
+        // types add transactions to their own account.
+        $modifications = $adjustments->where('adjustment_type', ScenarioAdjustment::TYPE_MODIFY_EXISTING);
+        $additions = $adjustments
+            ->where('adjustment_type', '!=', ScenarioAdjustment::TYPE_MODIFY_EXISTING)
+            ->where('account_id', $account->id);
+
+        if ($modifications->isEmpty() && $additions->isEmpty()) {
             return $baseTransactions;
+        }
+
+        foreach ($modifications as $modification) {
+            $baseTransactions = array_map(
+                fn (array $transaction) => $modification->applyToExistingTransaction($transaction),
+                $baseTransactions
+            );
         }
 
         // Generate additional transactions from adjustments
         $additionalTransactions = [];
-        foreach ($adjustments as $adjustment) {
+        foreach ($additions as $adjustment) {
             $adjustmentTransactions = $adjustment->generateProjectedTransactions($startDate, $endDate);
             $additionalTransactions = array_merge($additionalTransactions, $adjustmentTransactions);
         }

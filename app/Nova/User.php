@@ -2,17 +2,16 @@
 
 namespace App\Nova;
 
+use App\Nova\Actions\LiftChatBan;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\MergeValue;
 use Laravel\Nova\Actions\Action;
-use Laravel\Nova\Auth\PasswordValidationRules;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsToMany;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\Gravatar;
 use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
-use Laravel\Nova\Fields\Password;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Filters\Filter;
 use Laravel\Nova\Http\Requests\NovaRequest;
@@ -22,8 +21,6 @@ use Laravel\Nova\ResourceTool;
 
 class User extends Resource
 {
-    use PasswordValidationRules;
-
     /**
      * The model the resource corresponds to.
      *
@@ -68,11 +65,6 @@ class User extends Resource
                 ->rules('required', 'email', 'max:254')
                 ->creationRules('unique:users,email')
                 ->updateRules('unique:users,email,{{resourceId}}'),
-
-            Password::make('Password')
-                ->onlyOnForms()
-                ->creationRules($this->passwordRules())
-                ->updateRules($this->optionalPasswordRules()),
 
             HasMany::make('Budgets'),
 
@@ -119,6 +111,8 @@ class User extends Resource
      */
     public function actions(NovaRequest $request): array
     {
-        return [];
+        return [
+            new LiftChatBan,
+        ];
     }
 }

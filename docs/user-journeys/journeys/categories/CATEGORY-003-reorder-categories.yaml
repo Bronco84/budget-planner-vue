@@ -2,56 +2,46 @@ schema: 1
 id: CATEGORY-003
 name: Owner reorders categories
 domain: categories
-status: implemented
+status: deprecated
 priority: low
 summary: >
-  A client posts a list of category ids with new order values; categories that
-  belong to the budget get the new order, others are silently skipped. No Vue page
-  currently calls this endpoint, so it is reachable only as an API.
+  Deprecated: the category reorder endpoint (POST /budgets/{budget}/categories/reorder,
+  budgets.categories.reorder) had no frontend caller and was removed together with
+  CategoryController@reorder. New categories are still appended at the end of the
+  order (CATEGORY-001) and lists keep ordering by the `order` column.
 actors:
   - budget owner
 preconditions:
   - user owns the budget
-routes:
-  - budgets.categories.reorder
+routes: []
 integrations: []
-steps:
-  - action: POST /budgets/{budget}/categories/reorder with categories[{id, order}]
-    expected: matching categories updated; back with flash message
-postconditions:
-  - category order values updated
+steps: []
+postconditions: []
 business_rules:
-  - categories.*.id must exist; order is an integer >= 0
-  - ids belonging to other budgets are ignored rather than rejected
-  - Category has a global scope ordering by order, so lists reflect the new order
+  - Category has a global scope ordering by order, so lists reflect the stored order
 scenarios:
   - id: reorder_own_categories
     kind: happy_path
     description: Posting new orders for the budget's categories persists them.
-    coverage: covered
-    tests:
-      - tests/Feature/Categories/CategoryDeleteAndReorderTest.php::reordering the budgets categories persists the new order
+    coverage: not_applicable
+    note: the reorder endpoint was removed (no frontend caller); there is no way to reorder categories.
   - id: invalid_payload_rejected
     kind: validation
     description: Missing categories array or a negative order returns validation errors.
-    coverage: covered
-    tests:
-      - tests/Feature/Categories/CategoryValidationTest.php::reordering categories with a malformed payload is rejected
+    coverage: not_applicable
+    note: the reorder endpoint was removed.
   - id: foreign_category_ids_ignored
     kind: edge
     description: A category id from another budget in the payload is left unchanged.
-    coverage: covered
-    tests:
-      - tests/Feature/Categories/CategoryDeleteAndReorderTest.php::reordering ignores category ids from another budget
+    coverage: not_applicable
+    note: the reorder endpoint was removed.
   - id: other_users_budget_forbidden
     kind: authorization
     description: Reordering another user's categories returns 403.
-    coverage: covered
-    tests:
-      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot reorder another users categories
-known_issues:
-  - "No frontend caller: nothing in resources/js references the reorder route, so the drag-and-drop ordering this endpoint implies is not exposed in the UI."
-confidence: medium
+    coverage: not_applicable
+    note: the reorder endpoint was removed.
+known_issues: []
+confidence: high
 evidence:
-  - app/Http/Controllers/CategoryController.php reorder
+  - routes/web.php (no budgets.categories.reorder route)
 last_verified: null

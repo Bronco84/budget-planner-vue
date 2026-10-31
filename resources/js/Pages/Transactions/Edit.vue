@@ -72,15 +72,15 @@
 
                   <!-- Category -->
                   <div>
-                    <InputLabel for="category" value="Category" />
-                    <TextInput
-                      id="category"
-                      type="text"
+                    <InputLabel for="category_id" value="Category" />
+                    <CategorySelect
+                      id="category_id"
                       class="mt-1 block w-full"
-                      v-model="form.category"
-                      required
+                      :categories="categories"
+                      v-model:category-id="form.category_id"
+                      v-model:category="form.category"
                     />
-                    <InputError class="mt-2" :message="form.errors.category" />
+                    <InputError class="mt-2" :message="form.errors.category_id || form.errors.category" />
                   </div>
 
                   <!-- Amount -->
@@ -232,6 +232,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import TextArea from '@/Components/TextArea.vue';
 import SelectInput from '@/Components/SelectInput.vue';
+import CategorySelect from '@/Components/CategorySelect.vue';
 import InputError from '@/Components/InputError.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import FileUpload from '@/Components/FileUpload.vue';
@@ -247,6 +248,10 @@ const props = defineProps({
   budget: Object,
   transaction: Object,
   accounts: Array,
+  categories: {
+    type: Array,
+    default: () => [],
+  },
   recurringTemplates: Array,
   edit: Boolean,
   patterns: Object,
@@ -295,6 +300,7 @@ const form = useForm({
   amount: (props.transaction.amount_in_cents / 100).toString(),
   account_id: props.transaction.account_id,
   category: props.transaction.category,
+  category_id: props.transaction.category_id || null,
   date: props.transaction.date,
   notes: props.transaction.notes || '',
   recurring_transaction_template_id: props.transaction.recurring_transaction_template_id || '',

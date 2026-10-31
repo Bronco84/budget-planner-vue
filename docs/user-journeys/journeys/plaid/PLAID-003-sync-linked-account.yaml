@@ -7,18 +7,15 @@ priority: critical
 summary: >
   On the Bank Connection page the user clicks "Sync" for one linked account. A single
   sync pulls 180 days of transactions and also refreshes the balance, credit-card
-  liability data and investment holdings. Narrower refresh endpoints exist for
-  balance-only, liabilities-only (credit cards) and investments-only (investment
-  accounts). All endpoints are throttled and redirect back with a flash message.
+  liability data and investment holdings. The endpoint is throttled and redirects
+  back with a flash message. (The unused balance/liabilities/investments-only
+  endpoints were removed; sync still runs those refreshes.)
 actors:
   - budget owner
 preconditions:
   - the account is linked to Plaid with an active connection access token
 routes:
   - plaid.sync
-  - plaid.balance
-  - plaid.liabilities
-  - plaid.investments
 depends_on:
   - path: app/Services/PlaidService.php
     reason: syncTransactions, updateAccountBalance, updateLiabilityData, updateInvestmentData
@@ -29,15 +26,14 @@ integrations:
 steps:
   - action: click Sync on Plaid/Link (POST budget/{budget}/account/{account}/plaid/sync)
     expected: redirect back with "Synced N new and updated M transactions."; page reloads plaidAccount/account props
-  - action: optionally POST plaid/balance, plaid/liabilities or plaid/investments
-    expected: redirect back with a type-specific success or error flash
 postconditions:
   - new Plaid transactions are imported and existing ones updated
   - PlaidAccount and Account balances reflect Plaid's latest values
 business_rules:
-  - plaid.sync is limited to 5 requests/minute; balance, liabilities and investments to 10/minute
+  - "syncing needs the editor role (BudgetPolicy::sync): editors and owners may sync, viewers get 403"
+  - plaid.sync is limited to 5 requests/minute
   - balance uses Plaid current, falling back to available; if both are missing the last known balance is kept
-  - liabilities refresh is only allowed for credit card accounts; investments refresh only for investment accounts
+  - sync refreshes liabilities only for credit card accounts and holdings only for investment accounts
   - an account with no PlaidAccount gets "Account is not linked to Plaid."
   - Plaid errors during sync reach the controller (PlaidService rethrows, prefixed with the Plaid error code) and are flashed as user-safe errors; raw Plaid text is only logged
   - PRODUCT_NOT_READY yields the "still being processed, try again in 1-3 days" message
@@ -71,22 +67,20 @@ scenarios:
       - tests/Feature/Services/PlaidBalanceSyncTest.php::keeps the last known balance when Plaid omits both balances
   - id: not_linked_account
     kind: edge
-    description: Sync/balance/liabilities/investments on an unlinked account redirect back with "Account is not linked to Plaid."
+    description: Sync on an unlinked account redirects back with "Account is not linked to Plaid."
     coverage: covered
     tests:
-      - tests/Feature/Plaid/PlaidSyncTest.php::refresh endpoints refuse an account that is not linked to Plaid
+      - tests/Feature/Plaid/PlaidSyncTest.php::sync refuses an account that is not linked to Plaid
   - id: liabilities_rejected_for_non_credit_card
     kind: validation
     description: Liabilities refresh on a non-credit-card account is refused with an explanatory error.
-    coverage: covered
-    tests:
-      - tests/Feature/Plaid/PlaidSyncTest.php::liabilities refresh is refused for a non credit card account
+    coverage: not_applicable
+    note: the liabilities-only endpoint (plaid.liabilities) was removed as it had no frontend caller; sync only refreshes liabilities for credit cards.
   - id: investments_rejected_for_non_investment
     kind: validation
     description: Investments refresh on a non-investment account is refused with an explanatory error.
-    coverage: covered
-    tests:
-      - tests/Feature/Plaid/PlaidSyncTest.php::investments refresh is refused for a non investment account
+    coverage: not_applicable
+    note: the investments-only endpoint (plaid.investments) was removed as it had no frontend caller; sync only refreshes holdings for investment accounts.
   - id: sync_rate_limited
     kind: edge
     description: The sixth sync within a minute returns 429.
@@ -108,11 +102,10 @@ scenarios:
       - tests/Feature/Plaid/PlaidSyncTest.php::PRODUCT_NOT_READY during sync shows the still being processed message
   - id: cross_user_denied
     kind: authorization
-    description: Every refresh endpoint returns 403 for another user's budget and account.
+    description: Sync returns 403 for another user's budget and account.
     coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::plaid POST route rejects another users budget+account with 403
-      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot update liabilities on another users account
   - id: cross_budget_account_not_found
     kind: authorization
     description: Using one's own budget with another budget's account returns 404 via scoped bindings.
@@ -128,22 +121,28 @@ scenarios:
       - tests/Feature/Plaid/PlaidSyncTest.php::syncing an investment account also refreshes its holdings
   - id: refresh_endpoints_report_outcome
     kind: recovery
-    description: The balance and liabilities refresh endpoints flash a success message when Plaid returns data and an error flash when Plaid fails or has no data.
+    description: The balance and liabilities refreshes that sync runs store Plaid's data and report failure (false) when Plaid fails or has no data, leaving the stored values unchanged.
     coverage: covered
     tests:
-      - tests/Feature/Plaid/PlaidSyncTest.php::balance refresh endpoint reports success and Plaid failures
-      - tests/Feature/Plaid/PlaidSyncTest.php::liabilities refresh endpoint updates statement data and reports when none is available
+      - tests/Feature/Plaid/PlaidSyncTest.php::balance refresh updates the balance and reports Plaid failures
+      - tests/Feature/Plaid/PlaidSyncTest.php::liabilities refresh updates statement data and reports when none is available
   - id: login_required_flagged_on_refresh
     kind: integration
     description: ITEM_LOGIN_REQUIRED on a balance, liabilities or investments refresh puts the connection into 'error' so re-authentication is needed.
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::a login required error on a balance, liabilities or investments refresh marks the connection as errored
-known_issues:
-  - plaid.balance, plaid.liabilities and plaid.investments have no caller in resources/js; they are reachable only by direct POST.
+  - id: shared_budget_editor_syncs_viewer_denied
+    kind: authorization
+    description: On a shared budget an editor may sync; a viewer gets 403 and nothing reaches Plaid.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::an editor may sync a linked account and the whole budget
+      - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::a viewer cannot sync
+known_issues: []
 confidence: high
 evidence:
-  - app/Http/Controllers/PlaidController.php syncTransactions(), updateBalance(), updateLiabilities(), updateInvestments(), handleSyncException()
+  - app/Http/Controllers/PlaidController.php syncTransactions(), handleSyncException()
   - app/Services/PlaidService.php syncTransactions() outer try/catch (logs, marks login-required connections, rethrows)
   - resources/js/Pages/Plaid/Link.vue syncAllData()
 last_verified: null

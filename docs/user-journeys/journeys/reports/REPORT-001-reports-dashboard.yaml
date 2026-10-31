@@ -34,6 +34,7 @@ business_rules:
   - net worth = assets minus abs(liability balances); sampling interval is 1, 3, 7, 15 or 30 days depending on range length
   - savings rate = avg net cash flow / avg income x 100, 0 when there is no income
   - budget performance allocation = category monthly amount x months in the range, where each partial calendar month counts as days covered / days in that month
+  - budget performance and spending-by-category match transactions to categories by category_id, falling back to the legacy category string for unlinked rows (spending patterns group by the linked category's current name)
   - income vs expenses values each template at its projected amount (RecurringTransactionService::projectedAmount, so dynamic templates use their calculated amount), uses only active templates (started, not ended) and normalises frequencies to monthly (weekly x4.33, biweekly x2.17, bimonthly x2, quarterly /3, yearly /12, daily x30.44)
   - requires budget view ability
 scenarios:

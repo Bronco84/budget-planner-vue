@@ -4,6 +4,8 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Api\UserPreferencesController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\BudgetFilesController;
+use App\Http\Controllers\BudgetInvitationController;
+use App\Http\Controllers\BudgetSharingController;
 use App\Http\Controllers\CalendarConnectionController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CategoryController;
@@ -25,6 +27,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\WebAuthn\WebAuthnLoginController;
 use App\Http\Controllers\WebAuthn\WebAuthnRegisterController;
+use App\Http\Middleware\AuthorizeBudgetAccess;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Budget;
 use Illuminate\Support\Facades\Route;
@@ -66,6 +69,12 @@ Route::withoutMiddleware([HandleInertiaRequests::class])->group(function () {
     });
 });
 
+// Emailed budget invitation link; works for guests (sign in / register) and
+// signed-in users (accept).
+Route::get('invitations/{token}', [BudgetInvitationController::class, 'show'])
+    ->middleware('throttle:30,1,invitations.show')
+    ->name('invitations.show');
+
 Route::get('/dashboard', function () {
     // Redirect to the budget index, which will redirect to the active budget
     return redirect()->route('budgets.index');
@@ -76,7 +85,9 @@ Route::get('/dashboard', function () {
 // relationship, returning 404 automatically when a child does not belong to the
 // budget in the URL. This enforces ownership-chain integrity at the routing layer
 // so controllers no longer need manual `$child->budget_id !== $budget->id` checks.
-Route::middleware('auth')->scopeBindings()->group(function () {
+// AuthorizeBudgetAccess then requires budget membership for reads and the
+// editor role for every write on a {budget} route (see BudgetPolicy).
+Route::middleware(['auth', AuthorizeBudgetAccess::class])->scopeBindings()->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -121,8 +132,6 @@ Route::middleware('auth')->scopeBindings()->group(function () {
         ->name('budgets.setup');
     Route::get('budgets/{budget}/setup/connect', [PlaidController::class, 'discover'])
         ->name('budgets.setup.connect');
-    Route::post('budgets/{budget}/setup/connect', [PlaidController::class, 'import'])
-        ->name('budgets.setup.import');
     Route::get('budgets/{budget}/setup/manual', [AccountController::class, 'create'])
         ->name('budgets.setup.manual');
 
@@ -146,8 +155,6 @@ Route::middleware('auth')->scopeBindings()->group(function () {
         ->name('budgets.scenarios.index');
     Route::post('budgets/{budget}/scenarios', [ScenarioController::class, 'store'])
         ->name('budgets.scenarios.store');
-    Route::get('budgets/{budget}/scenarios/{scenario}', [ScenarioController::class, 'show'])
-        ->name('budgets.scenarios.show');
     Route::patch('budgets/{budget}/scenarios/{scenario}', [ScenarioController::class, 'update'])
         ->name('budgets.scenarios.update');
     Route::delete('budgets/{budget}/scenarios/{scenario}', [ScenarioController::class, 'destroy'])
@@ -171,8 +178,6 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::resource('budgets.properties', PropertyController::class);
 
     Route::resource('budgets.categories', CategoryController::class)->except(['create', 'show', 'edit']);
-    Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])
-        ->name('budgets.categories.reorder');
 
     Route::get('budget/{budget}/transactions', [TransactionController::class, 'index'])
         ->name('budget.transaction.index');
@@ -280,8 +285,6 @@ Route::middleware('auth')->scopeBindings()->group(function () {
         ->name('payoff-plans.update');
     Route::delete('budget/{budget}/payoff-plans/{payoff_plan}', [PayoffPlanController::class, 'destroy'])
         ->name('payoff-plans.destroy');
-    Route::post('budget/{budget}/payoff-plans/preview', [PayoffPlanController::class, 'preview'])
-        ->name('payoff-plans.preview');
 
     // Plaid integration routes
     Route::get('budget/{budget}/plaid/discover', [PlaidController::class, 'discover'])
@@ -295,15 +298,6 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::post('budget/{budget}/account/{account}/plaid/sync', [PlaidController::class, 'syncTransactions'])
         ->middleware('throttle:5,1,plaid.sync')
         ->name('plaid.sync');
-    Route::post('budget/{budget}/account/{account}/plaid/balance', [PlaidController::class, 'updateBalance'])
-        ->middleware('throttle:10,1,plaid.balance')
-        ->name('plaid.balance');
-    Route::post('budget/{budget}/account/{account}/plaid/liabilities', [PlaidController::class, 'updateLiabilities'])
-        ->middleware('throttle:10,1,plaid.liabilities')
-        ->name('plaid.liabilities');
-    Route::post('budget/{budget}/account/{account}/plaid/investments', [PlaidController::class, 'updateInvestments'])
-        ->middleware('throttle:10,1,plaid.investments')
-        ->name('plaid.investments');
     Route::post('budget/{budget}/account/{account}/plaid/upgrade-link-token', [PlaidController::class, 'upgradeLinkToken'])
         ->middleware('throttle:10,1,plaid.upgrade-link-token')
         ->name('plaid.upgrade-link-token');
@@ -344,17 +338,36 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::delete('files/{attachment}', [FileController::class, 'delete'])
         ->name('files.delete');
 
+    // Budget sharing: members, roles and invitations (owners manage; any member
+    // can view the page and leave). See BudgetPolicy and BudgetSharingService.
+    Route::get('budgets/{budget}/sharing', [BudgetSharingController::class, 'index'])
+        ->name('budgets.sharing.index');
+    Route::post('budgets/{budget}/invitations', [BudgetInvitationController::class, 'store'])
+        ->middleware('throttle:10,1,budgets.invitations.store')
+        ->name('budgets.invitations.store');
+    Route::delete('budgets/{budget}/invitations/{invitation}', [BudgetInvitationController::class, 'destroy'])
+        ->name('budgets.invitations.destroy');
+    Route::patch('budgets/{budget}/members/{member}', [BudgetSharingController::class, 'update'])
+        ->name('budgets.members.update');
+    Route::delete('budgets/{budget}/members/{member}', [BudgetSharingController::class, 'destroy'])
+        ->name('budgets.members.destroy');
+    Route::post('budgets/{budget}/transfer-ownership', [BudgetSharingController::class, 'transferOwnership'])
+        ->name('budgets.ownership.transfer');
+    // Viewers may leave too, so this write opts out of the editor-only middleware.
+    Route::delete('budgets/{budget}/membership', [BudgetSharingController::class, 'leave'])
+        ->withoutMiddleware(AuthorizeBudgetAccess::class)
+        ->name('budgets.membership.leave');
+    Route::post('invitations/{token}/accept', [BudgetInvitationController::class, 'accept'])
+        ->middleware('throttle:10,1,invitations.accept')
+        ->name('invitations.accept');
+
     // User preferences routes (JSON API but accessible from frontend)
-    Route::get('/api/preferences/account-type-order', [UserPreferencesController::class, 'getAccountTypeOrder'])
-        ->name('preferences.account-type-order.get');
     Route::post('/api/preferences/account-type-order', [UserPreferencesController::class, 'updateAccountTypeOrder'])
         ->name('preferences.account-type-order.update');
     Route::get('/api/preferences/active-budget', [UserPreferencesController::class, 'getActiveBudget'])
         ->name('preferences.active-budget.get');
     Route::post('/api/preferences/active-budget', [UserPreferencesController::class, 'setActiveBudget'])
         ->name('preferences.active-budget.set');
-    Route::get('/api/preferences/{key}', [UserPreferencesController::class, 'show'])
-        ->name('preferences.show');
     Route::post('/api/preferences/{key}', [UserPreferencesController::class, 'update'])
         ->name('preferences.update');
 
@@ -363,7 +376,10 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     // the third argument gives send/stream their own counters.
     Route::prefix('chat')->name('chat.')->middleware('throttle:60,1,chat')->group(function () {
         Route::post('/message', [ChatController::class, 'send'])->middleware('throttle:30,1,chat-send')->name('send');
-        Route::get('/stream', [ChatController::class, 'stream'])->middleware('throttle:30,1,chat-stream')->name('stream');
+        // The question is POSTed (moderated, parked under a single-use id), then the
+        // EventSource opens GET /stream/{streamId} to receive the reply.
+        Route::post('/stream', [ChatController::class, 'startStream'])->middleware('throttle:30,1,chat-stream')->name('stream.start');
+        Route::get('/stream/{streamId}', [ChatController::class, 'stream'])->where('streamId', '[A-Za-z0-9]{40}')->middleware('throttle:30,1,chat-stream-open')->name('stream');
         Route::post('/stream/complete', [ChatController::class, 'streamComplete'])->name('stream.complete');
         Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations');
         Route::get('/conversations/{id}', [ChatController::class, 'show'])->name('conversations.show');

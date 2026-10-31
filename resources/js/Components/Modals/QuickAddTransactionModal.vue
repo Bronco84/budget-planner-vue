@@ -4,6 +4,7 @@ import { useForm, usePage } from '@inertiajs/vue3';
 import Modal from '../Modal.vue';
 import InputLabel from '../InputLabel.vue';
 import TextInput from '../TextInput.vue';
+import CategorySelect from '../CategorySelect.vue';
 import SelectInput from '../SelectInput.vue';
 import InputError from '../InputError.vue';
 import PrimaryButton from '../PrimaryButton.vue';
@@ -20,10 +21,12 @@ const emit = defineEmits(['close']);
 const page = usePage();
 const activeBudget = computed(() => page.props.activeBudget);
 const accounts = computed(() => activeBudget.value?.accounts || []);
+const categories = computed(() => activeBudget.value?.categories || []);
 
 const form = useForm({
     account_id: '',
     description: '',
+    category_id: null,
     category: '',
     amount: '',
     date: new Date().toISOString().split('T')[0],
@@ -94,16 +97,15 @@ const submit = () => {
 
                     <!-- Category -->
                     <div>
-                        <InputLabel for="category" value="Category" />
-                        <TextInput
-                            id="category"
-                            v-model="form.category"
-                            type="text"
+                        <InputLabel for="quick_add_category_id" value="Category" />
+                        <CategorySelect
+                            id="quick_add_category_id"
                             class="mt-1 block w-full"
-                            placeholder="e.g., Food & Dining"
-                            required
+                            :categories="categories"
+                            v-model:category-id="form.category_id"
+                            v-model:category="form.category"
                         />
-                        <InputError :message="form.errors.category" class="mt-2" />
+                        <InputError :message="form.errors.category_id || form.errors.category" class="mt-2" />
                     </div>
 
                     <!-- Amount -->

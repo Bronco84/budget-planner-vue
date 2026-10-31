@@ -373,7 +373,8 @@
                 </div>
 
                 <p class="text-sm text-gray-500 mb-4">
-                  Set aside funds for other financial goals like vacation, emergency fund, or retirement alongside debt payoff.
+                  Plan for other financial goals like a vacation, emergency fund, or retirement. Goals are funded once
+                  your debts are paid off: the freed debt payments go to them in the order you add them.
                 </p>
 
                 <div v-if="form.goals.length === 0" class="text-center py-8 bg-gray-50 rounded-lg">
@@ -701,6 +702,7 @@ const addGoal = () => {
     monthly_contribution_cents: 0,
     target_date: null,
     goal_type: 'savings',
+    priority: index + 1,
   });
   goalTargetDollars.value[index] = 0;
   goalContributionDollars.value[index] = 0;
@@ -708,6 +710,9 @@ const addGoal = () => {
 
 const removeGoal = (index) => {
   form.goals.splice(index, 1);
+  form.goals.forEach((goal, position) => {
+    goal.priority = position + 1;
+  });
   delete goalTargetDollars.value[index];
   delete goalContributionDollars.value[index];
 };

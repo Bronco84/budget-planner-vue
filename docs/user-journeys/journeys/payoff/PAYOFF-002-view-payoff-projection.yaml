@@ -5,10 +5,13 @@ domain: payoff
 status: implemented
 priority: critical
 summary: >
-  Opening a payoff plan shows a month-by-month simulation from the plan's start date:
-  monthly interest accrues on each debt, minimum payments are applied, and the monthly
-  extra payment is focused on the first unpaid debt in strategy order. The page shows the
-  timeline, total months, payoff date, total interest and goal completion estimates.
+  Opening a payoff plan shows a month-by-month simulation from the debts' current account
+  balances, starting on the plan's start date (or today once that has passed): month 1
+  applies payments before any interest, later months accrue interest first, minimum
+  payments are applied, and the monthly extra payment is focused on the first unpaid debt
+  in strategy order. Goals are funded once the debts are paid off. The page shows each
+  debt's current and starting balance with the amount paid down since the start, the
+  timeline, total months, payoff date, total interest and goal funding/completion dates.
 actors:
   - authenticated budget owner
 preconditions:
@@ -17,19 +20,24 @@ routes:
   - payoff-plans.show
 depends_on:
   - path: app/Services/PayoffPlanService.php
-    reason: calculatePayoffProjection and calculateGoalProjections
+    reason: calculatePayoffProjection, calculateGoalProjections and projectionStartDate
+  - path: app/Models/PayoffPlanDebt.php
+    reason: current_balance_cents / paid_down_cents accessors appended to the plan's debts
 integrations: []
 steps:
   - action: open budget/{budget}/payoff-plans/{payoff_plan}
-    expected: PayoffPlans/Show with plan, debtProjection (timeline, total_months, never_paid_off, payoff_date, total_interest_paid, final_debt_data with per-debt paid_off_month/never_paid_off) and goalProjections
+    expected: PayoffPlans/Show with plan (debts carry starting_balance_cents, current_balance_cents and paid_down_cents), debtProjection (projection_start_date, timeline, total_months, monthly_payment_budget, never_paid_off, payoff_date, total_interest_paid, final_debt_data with per-debt starting/current balance, paid_off_month and never_paid_off) and goalProjections (priority, contributions_start_month/date, months_to_complete, completion_date)
 postconditions:
   - nothing is persisted
 business_rules:
-  - interest per month = round(balance x APR / 100 / 12), applied before payments
+  - each debt is projected from its account's live balance (abs(current_balance_cents)); starting_balance_cents stays the balance at plan creation and is only used for progress (paid_down = starting - current, negative when the debt grew)
+  - the projection starts on the plan's start_date, or today when that date has passed; timeline month m is dated start + (m - 1) months and payoff_date = start + total_months (month-end safe)
+  - month 1 applies payments before any interest (no interest is charged in month 1; the interest on what remains is first charged in month 2); from month 2 on, interest per month = round(balance x APR / 100 / 12) is applied before that month's payments
   - minimum payments are capped at the remaining balance
   - the monthly payment budget is the sum of every debt's minimum plus the extra payment; minimums are paid on all open debts, then the remainder (extra + minimums freed by paid-off debts + anything a debt didn't need) goes to open debts in order after sorting (snowball = smallest balance, avalanche = highest APR, custom = priority)
   - simulation stops when all balances are zero or after 600 months; if any balance remains, never_paid_off is true, payoff_date is null and the page shows a "never pays off" warning
-  - goal months_to_complete = ceil(target / monthly_contribution); null when contribution is 0
+  - goal contributions start the month after every debt is paid off (month 1 when no debt carries a balance); each month's goal budget = the goals' own monthly contributions + the freed debt payments (all minimums + extra); each unfinished goal first gets its own contribution, then the rest goes to unfinished goals in priority order (lowest priority, then id), so finished goals free their share too
+  - goal months_to_complete counts months from the projection start (completion_date = start + months_to_complete); while the debts are never paid off, or with no goal budget at all, goals get no start month and a null completion
   - payoff_plan is scoped to the budget; needs budget view
 scenarios:
   - id: zero_interest_payoff
@@ -53,10 +61,37 @@ scenarios:
       - tests/Feature/Services/PayoffPlanServiceTest.php::extra payments shorten the payoff timeline
   - id: interest_accrual
     kind: edge
-    description: 12% APR accrues 1% per month on the running balance (traced to 1525 cents over 3 months).
+    description: 12% APR accrues 1% per month on the running balance after month 1's payment (traced to 505 cents over 3 months).
     coverage: covered
     tests:
-      - tests/Feature/Services/PayoffPlanServiceTest.php::accrues interest month over month
+      - tests/Feature/Services/PayoffPlanServiceTest.php::accrues interest month over month after the first payment
+  - id: first_month_payment_before_interest
+    kind: edge
+    description: Month 1 applies the payment before any interest, so a debt cleared by its first payment costs no interest.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/PayoffPlanServiceTest.php::the first month applies the payment before any interest is charged
+  - id: live_balances
+    kind: alternate
+    description: The projection uses the debt accounts' current balances (negative liability balances as positive debt); the page shows the current and starting balance and the amount paid down since the start.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/PayoffPlanServiceTest.php::projects from the debt accounts current balances and keeps the starting balance for progress
+      - tests/Feature/Services/PayoffPlanServiceTest.php::a liability stored with a negative balance is projected as a positive debt
+      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::the projection uses the debt accounts current balance and shows how much was paid down since the start
+  - id: past_start_projects_from_today
+    kind: edge
+    description: A plan whose start date has passed is projected from today.
+    coverage: covered
+    tests:
+      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::a plan that started in the past is projected from today
+  - id: goals_after_debts
+    kind: alternate
+    description: Goal contributions start after the debts are paid off, and freed debt payments roll into goals in priority order.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/PayoffPlanServiceTest.php::goal contributions start after the debts are paid off and freed payments roll into goals in priority order
+      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::owner sees the plan page with the month-by-month projection and goal estimates
   - id: payoff_never_reached
     kind: edge
     description: When minimum plus extra payments do not exceed monthly interest, the plan reports never_paid_off (plan and per debt) with a null payoff_date.
@@ -67,10 +102,10 @@ scenarios:
     note: the Show.vue warning banner rendering itself is not browser-tested.
   - id: zero_balance_debt
     kind: edge
-    description: A plan whose debts all start at zero balance returns an empty timeline and total_months 0.
+    description: A plan whose debt accounts are all at a zero balance returns an empty timeline and total_months 0.
     coverage: covered
     tests:
-      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::a plan whose debts all start at zero balance has an empty timeline and zero months
+      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::a plan whose debts are all paid off has an empty timeline and zero months
   - id: multi_debt_rollover
     kind: edge
     description: With several debts, leftover extra payment and freed minimums from a paid-off debt roll into the next debt.
@@ -80,10 +115,13 @@ scenarios:
       - tests/Feature/Services/PayoffPlanServiceTest.php::rolls the extra payment remainder into the next debt in the same month
   - id: goal_with_zero_contribution
     kind: edge
-    description: A goal with 0 monthly contribution has null months_to_complete.
+    description: A goal with 0 monthly contribution is funded by the freed debt payments after payoff; while the debts are never paid off it has null months_to_complete.
     coverage: covered
     tests:
-      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::a goal with no monthly contribution has no completion estimate
+      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::a goal with no monthly contribution is funded by the freed debt payments
+      - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::a goal has no completion estimate while the debts are never paid off
+      - tests/Feature/Services/PayoffPlanServiceTest.php::a goal with no contribution of its own is funded by the freed debt payments
+      - tests/Feature/Services/PayoffPlanServiceTest.php::goals are never funded while the debts are never paid off
   - id: cross_user_or_cross_budget
     kind: authorization
     description: Another user's plan returns 403 (budget not owned) or 404 (plan not in the URL budget).
@@ -92,9 +130,7 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot view a payoff plan in a budget they do not own
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject a plan addressed through another budget with 404
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject the owners plan addressed through the owners other budget with 404
-known_issues:
-  - Interest accrues before payments every month including month 1, so a plan starting on the statement date charges a full month of interest immediately.
-  - Goal projections ignore the debt timeline (contributions start at plan start rather than after debts are paid).
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/PayoffPlanController.php show

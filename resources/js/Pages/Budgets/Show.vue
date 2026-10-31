@@ -31,8 +31,18 @@
                           </svg>
                         </button>
 
-                        <!-- Edit Budget Icon -->
+                        <!-- Sharing Icon (any member can see who has access) -->
                         <Link
+                          :href="route('budgets.sharing.index', budget.id)"
+                          class="inline-flex items-center justify-center p-1.5 bg-indigo-100 hover:bg-indigo-200 rounded-md transition-colors"
+                          :title="role && role !== 'owner' ? `Sharing (you are ${role === 'editor' ? 'an' : 'a'} ${role})` : 'Sharing'"
+                        >
+                          <UserGroupIcon class="w-4 h-4 text-indigo-700" />
+                        </Link>
+
+                        <!-- Edit Budget Icon (owners only) -->
+                        <Link
+                          v-if="canManage"
                           :href="route('budgets.edit', budget.id)"
                           class="inline-flex items-center justify-center p-1.5 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                           title="Edit Budget"
@@ -42,7 +52,7 @@
 
                         <!-- Refresh Plaid Feed Icon (only if has Plaid accounts) -->
                         <button
-                          v-if="hasPlaidAccounts"
+                          v-if="hasPlaidAccounts && canEdit"
                           @click="importFromBank"
                           class="inline-flex items-center justify-center p-1.5 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors"
                           :disabled="syncingTransactions"
@@ -254,7 +264,7 @@
                                     Visit Bank Website
                                   </a>
                                   <Link
-                                    v-if="account.plaid_account"
+                                    v-if="account.plaid_account && canManageConnections"
                                     :href="route('plaid.link', [budget.id, account.id])"
                                     class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                   >
@@ -264,7 +274,7 @@
                                     Bank Sync
                                   </Link>
                                   <Link
-                                    v-if="!account.plaid_account"
+                                    v-if="!account.plaid_account && canManageConnections"
                                     :href="route('plaid.link', [budget.id, account.id])"
                                     class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                   >
@@ -283,6 +293,7 @@
                                     Balance Chart
                                   </Link>
                                   <Link
+                                    v-if="canEdit"
                                     :href="route('budgets.accounts.edit', [budget.id, account.id])"
                                     class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                   >
@@ -427,6 +438,7 @@
                       </div>
                       <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">No properties yet</p>
                       <Link
+                        v-if="canEdit"
                         :href="route('budgets.properties.create', budget.id)"
                         class="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                       >
@@ -453,7 +465,7 @@
                   <p class="text-gray-600 mb-6 max-w-md mx-auto">
                     Get started by adding your first account. You can connect to your bank automatically or add an account manually.
                   </p>
-                  <div class="flex justify-center">
+                  <div v-if="canEdit" class="flex justify-center">
                     <Link
                       :href="route('budgets.accounts.create', budget.id)"
                       class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 border border-transparent rounded-md font-semibold text-sm text-white hover:bg-blue-500 transition-colors"
@@ -688,8 +700,8 @@
                                 </div>
                               </div>
                             </template>
-                            <!-- Regular transaction actions -->
-                            <template v-else>
+                            <!-- Regular transaction actions (editors and owners) -->
+                            <template v-else-if="canEdit">
                               <button
                                 @click="toggleTransactionDropdown(transaction.id)"
                                 class="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -1002,7 +1014,8 @@ import {
   TruckIcon,
   DocumentTextIcon,
   CubeIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  UserGroupIcon
 } from "@heroicons/vue/24/outline/index.js";
 import Modal from '@/Components/Modal.vue';
 import FileUpload from '@/Components/FileUpload.vue';
@@ -1015,6 +1028,7 @@ import BudgetProjectionModal from '@/Components/BudgetProjectionModal.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable';
 import { useToast } from '@/composables/useToast';
+import { useBudgetAccess } from '@/composables/useBudgetAccess';
 import { apiFetch } from '@/utils/http.js';
 
 // Define props
@@ -1032,6 +1046,9 @@ const props = defineProps({
 
 // Initialize toast
 const toast = useToast();
+
+// Role on this budget (viewers get a read-only dashboard; the server enforces it)
+const { role, canEdit, canManage, canManageConnections } = useBudgetAccess();
 
 // Form state for account selection
 const form = reactive({

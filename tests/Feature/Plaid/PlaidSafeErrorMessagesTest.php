@@ -105,7 +105,7 @@ test('a Plaid error creating an update-mode link token returns a generic JSON er
     expect($response->getContent())->not->toContain('secret internal plaid detail');
 });
 
-test('a Plaid error re-authenticating leaves the connection unchanged and shows a generic message', function () {
+test('re-authenticating does not call Plaid, so a Plaid token error cannot surface or replace the access token', function () {
     $plaidAccount = linkedPlaidAccountForSafeErrors($this->account, $this->budget);
     $this->plaid->on('/item/public_token/exchange', FakePlaidApi::error('INVALID_PUBLIC_TOKEN', 'provided public token is expired'));
 
@@ -114,8 +114,8 @@ test('a Plaid error re-authenticating leaves the connection unchanged and shows 
             'public_token' => 'public-sandbox-abc',
             'metadata' => ['institution' => ['name' => 'First Platypus Bank']],
         ])
-        ->assertSessionHas('error', 'Failed to re-authenticate. Please try again.');
+        ->assertSessionMissing('error');
 
-    expect(session('error'))->not->toContain('expired')
+    expect($this->plaid->paths())->not->toContain('/item/public_token/exchange')
         ->and($plaidAccount->plaidConnection->fresh()->access_token)->toBe('access-sandbox-original');
 });

@@ -25,7 +25,7 @@ depends_on:
   - path: resources/js/Components/BudgetSwitcher.vue
     reason: switcher UI that sets the active budget and re-navigates
   - path: app/Http/Middleware/HandleInertiaRequests.php
-    reason: shares activeBudget and userBudgets with every page
+    reason: shares activeBudget and userBudgets (with each budget's role) with every page
 integrations: []
 steps:
   - action: visit /budgets
@@ -37,6 +37,7 @@ steps:
 postconditions:
   - active_budget_id preference points to an accessible budget (stale ids are cleared)
 business_rules:
+  - "a shared member can make the shared budget active and land on it; a removed member is sent to their next accessible budget"
   - a stale active_budget_id (deleted budget or lost access) is cleared and the first accessible budget is used
   - setting the active budget requires an existing budget the user hasBudget() (owned or connected)
 scenarios:
@@ -76,8 +77,19 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::setting another users budget as active fails validation and leaves the preference unchanged
-known_issues:
-  - "A connected (shared) user can set a shared budget as active (hasBudget allows it), but BudgetPolicy is owner-only, so the subsequent redirect to budgets.show is 403. Sharing is a deferred follow-up."
+  - id: shared_budget_active_and_opens
+    kind: alternate
+    description: A viewer sets a shared budget active, /budgets redirects to it and the dashboard opens (no 403).
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::shared budgets appear in the switcher with the member role and become the active budget
+  - id: removed_member_falls_back
+    kind: edge
+    description: After being removed from a shared active budget, /budgets clears the stale preference and redirects to the member's own budget.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::an owner removes a member, whose stale active budget then falls back
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetController.php index

@@ -256,9 +256,7 @@ class RecurringTransactionRuleController extends Controller
             }
 
             if ($matchesAllRules) {
-                $transaction->update([
-                    'recurring_transaction_template_id' => $recurring_transaction->id,
-                ]);
+                $transaction->linkToRecurringTemplate($recurring_transaction->id, Transaction::LINK_SOURCE_RULE);
                 $matchCount++;
             }
         }
@@ -296,6 +294,7 @@ class RecurringTransactionRuleController extends Controller
 
         $transaction->update([
             'recurring_transaction_template_id' => null,
+            'link_source' => null,
         ]);
 
         return back()->with('message', 'Transaction unlinked successfully');

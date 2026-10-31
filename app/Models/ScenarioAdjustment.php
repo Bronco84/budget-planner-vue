@@ -34,6 +34,7 @@ class ScenarioAdjustment extends Model
         'account_id',
         'adjustment_type',
         'amount_in_cents',
+        'percent_change',
         'start_date',
         'end_date',
         'frequency',
@@ -51,6 +52,7 @@ class ScenarioAdjustment extends Model
      */
     protected $casts = [
         'amount_in_cents' => 'integer',
+        'percent_change' => 'decimal:2',
         'start_date' => 'date:Y-m-d',
         'end_date' => 'date:Y-m-d',
         'day_of_week' => 'integer',
@@ -127,8 +129,8 @@ class ScenarioAdjustment extends Model
                 break;
 
             case self::TYPE_MODIFY_EXISTING:
-                // This type modifies existing transactions rather than creating new ones
-                // Handled separately in the projection calculation
+                // Changes existing template occurrences instead of adding transactions;
+                // see applyToExistingTransaction().
                 break;
         }
 
@@ -329,18 +331,52 @@ class ScenarioAdjustment extends Model
     }
 
     /**
-     * Apply this adjustment to an existing transaction (for modify_existing type).
+     * Whether this modify_existing adjustment changes the given projected
+     * transaction: an occurrence of the target template dated inside the
+     * adjustment's start/end window.
+     */
+    public function modifiesTransaction(array $transaction): bool
+    {
+        if ($this->adjustment_type !== self::TYPE_MODIFY_EXISTING || ! $this->target_recurring_template_id) {
+            return false;
+        }
+
+        if ((int) ($transaction['recurring_transaction_template_id'] ?? 0) !== (int) $this->target_recurring_template_id) {
+            return false;
+        }
+
+        $date = Carbon::parse($transaction['date'])->startOfDay();
+
+        return $date->greaterThanOrEqualTo($this->start_date->copy()->startOfDay())
+            && ($this->end_date === null || $date->lessThanOrEqualTo($this->end_date->copy()->startOfDay()));
+    }
+
+    /**
+     * Apply this adjustment to an existing projected transaction (modify_existing).
+     *
+     * With percent_change the occurrence is scaled by that percentage;
+     * otherwise it becomes amount_in_cents, keeping the occurrence's
+     * income/expense sign (so a bill entered as 120.00 stays an expense).
      *
      * @return array Modified transaction
      */
     public function applyToExistingTransaction(array $transaction): array
     {
-        if ($this->adjustment_type !== self::TYPE_MODIFY_EXISTING) {
+        if (! $this->modifiesTransaction($transaction)) {
             return $transaction;
         }
 
-        // Modify the transaction amount
-        $transaction['amount_in_cents'] += $this->amount_in_cents;
+        $original = (int) $transaction['amount_in_cents'];
+
+        if ($this->percent_change !== null) {
+            $amount = (int) round($original * (1 + (float) $this->percent_change / 100));
+        } elseif ($original === 0) {
+            $amount = (int) $this->amount_in_cents;
+        } else {
+            $amount = abs((int) $this->amount_in_cents) * ($original < 0 ? -1 : 1);
+        }
+
+        $transaction['amount_in_cents'] = $amount;
         $transaction['modified_by_scenario'] = true;
 
         return $transaction;

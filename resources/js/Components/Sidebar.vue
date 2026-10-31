@@ -16,7 +16,9 @@ import {
     CreditCardIcon,
     DocumentTextIcon,
     ChartPieIcon,
-    ArrowsRightLeftIcon
+    ArrowsRightLeftIcon,
+    ArrowTrendingUpIcon,
+    PresentationChartBarIcon
 } from '@heroicons/vue/24/outline';
 import BudgetSwitcher from '@/Components/BudgetSwitcher.vue';
 
@@ -50,6 +52,9 @@ const navigationItems = computed(() => [
     { name: 'Scenarios', href: 'budget.projections.multi-account', icon: PresentationChartLineIcon, route: 'budget.projections.multi-account', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null, color: 'text-indigo-500/70 dark:text-indigo-400/70', hoverColor: 'group-hover:text-indigo-600 dark:group-hover:text-indigo-400' },
     { name: 'Calendar', href: 'calendar.index', icon: CalendarIcon, route: 'calendar.*', color: 'text-pink-500/70 dark:text-pink-400/70', hoverColor: 'group-hover:text-pink-600 dark:group-hover:text-pink-400' },
     { name: 'Reports', href: 'reports.index', icon: ChartBarIcon, route: 'reports.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null, color: 'text-orange-500/70 dark:text-orange-400/70', hoverColor: 'group-hover:text-orange-600 dark:group-hover:text-orange-400' },
+    { name: 'Monthly Statistics', href: 'budget.statistics.monthly', icon: PresentationChartBarIcon, route: 'budget.statistics.monthly', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null, color: 'text-teal-500/70 dark:text-teal-400/70', hoverColor: 'group-hover:text-teal-600 dark:group-hover:text-teal-400' },
+    { name: 'Yearly Statistics', href: 'budget.statistics.yearly', icon: ChartBarIcon, route: 'budget.statistics.yearly', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null, color: 'text-teal-500/70 dark:text-teal-400/70', hoverColor: 'group-hover:text-teal-600 dark:group-hover:text-teal-400' },
+    { name: 'Projections', href: 'budget.projections', icon: ArrowTrendingUpIcon, route: 'budget.projections', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null, color: 'text-sky-500/70 dark:text-sky-400/70', hoverColor: 'group-hover:text-sky-600 dark:group-hover:text-sky-400' },
     { name: 'Files', href: 'budgets.files.index', icon: DocumentTextIcon, route: 'budgets.files.*', disabled: !hasActiveBudget.value, params: hasActiveBudget.value ? { budget: activeBudget.value.id } : null, color: 'text-cyan-500/70 dark:text-cyan-400/70', hoverColor: 'group-hover:text-cyan-600 dark:group-hover:text-cyan-400' },
 ]);
 

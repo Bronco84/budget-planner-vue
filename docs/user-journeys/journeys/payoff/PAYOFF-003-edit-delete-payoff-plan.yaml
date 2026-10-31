@@ -6,8 +6,8 @@ status: implemented
 priority: medium
 summary: >
   From a plan's page the user opens Edit to change the plan's name, description,
-  strategy, monthly extra payment or active flag, or deletes the plan. Debts and goals
-  cannot be edited after creation.
+  strategy, monthly extra payment or active flag, each debt's APR and minimum payment,
+  and each goal's name, target, monthly contribution and priority, or deletes the plan.
 actors:
   - authenticated budget owner
 preconditions:
@@ -19,16 +19,18 @@ routes:
 integrations: []
 steps:
   - action: open budget/{budget}/payoff-plans/{payoff_plan}/edit
-    expected: PayoffPlans/Edit with the plan, debts and goals
+    expected: PayoffPlans/Edit with the plan, debts (with account and current_balance_cents) and goals (in priority order)
   - action: save changes (PATCH)
-    expected: plan updated; redirect to payoff-plans.show with "Payoff plan updated successfully"
+    expected: plan, debts and goals updated in one DB transaction; redirect to payoff-plans.show with "Payoff plan updated successfully"
   - action: delete from the edit page (DELETE)
     expected: plan removed; redirect to payoff-plans.index with "Payoff plan deleted successfully"
 postconditions:
   - plan reflects the edits, or no longer exists
 business_rules:
   - name required (max 255); strategy in snowball, avalanche, custom; monthly_extra_payment_cents integer >= 0
-  - only plan-level fields are editable; debts and goals are not
+  - optional debts[] items (id of a debt in this plan, interest_rate 0-100, minimum_payment_cents integer >= 0, optional priority) update those debts; account and starting balance are not editable
+  - optional goals[] items (id of a goal in this plan, name required max 255, target_amount_cents and monthly_contribution_cents integers >= 0, optional priority integer >= 0) update those goals; debts and goals cannot be added or removed here
+  - debt or goal ids from another plan fail validation and nothing is changed
   - at most one plan per budget is active; activating a plan through update deactivates the others
   - all three actions require the budget update ability; plan is scoped to the budget
 scenarios:
@@ -39,6 +41,18 @@ scenarios:
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::updating a plan persists the changes and the show page reflects the recalculated projection
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::edit page renders the plan with its debts and goals
+  - id: edit_debts_and_goals
+    kind: alternate
+    description: Owner edits a debt's APR and minimum payment and a goal's name, target, contribution and priority.
+    coverage: covered
+    tests:
+      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::updating a plan edits its debts APR and minimum payment and its goals
+  - id: debt_goal_validation
+    kind: validation
+    description: APR above 100, a negative minimum payment, a goal without a name or with a negative target, or a debt from another plan is rejected and nothing changes.
+    coverage: covered
+    tests:
+      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::updating debts and goals rejects invalid values and records from another plan
   - id: delete_plan
     kind: alternate
     description: Owner deletes a plan and returns to the plans index.
@@ -67,8 +81,7 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot delete a payoff plan they do not own
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject a plan addressed through another budget with 404
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject the owners plan addressed through the owners other budget with 404
-known_issues:
-  - Debts (APR, minimum payment) and goals cannot be changed after creation; the only fix for a typo is deleting and recreating the plan.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/PayoffPlanController.php edit/update/destroy

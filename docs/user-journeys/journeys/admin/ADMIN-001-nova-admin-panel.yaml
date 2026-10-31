@@ -9,30 +9,41 @@ summary: >
   accounts, transactions, Plaid connections/accounts/transactions/holdings, payoff plans,
   recurring templates, chat conversations and messages, files, preferences) through
   Laravel Nova resources and the Main dashboard. Access is controlled by the viewNova
-  gate. Nova registers its own routes, so none appear in the route files.
+  gate (is_admin only). Nova has no login or password reset of its own: it shares the
+  app's web session, so an admin signs in with a passkey or magic link and guests are
+  redirected to the app's /login. Nova registers its own routes, so none appear in the
+  route files.
 actors:
   - administrator
 preconditions:
-  - user has is_admin true (or is the hard-coded allowlisted email)
+  - user has is_admin true
+  - user is signed in to the app (passkey or magic link)
 routes: []
 depends_on:
   - path: app/Nova/**
     reason: Nova resources and the Main dashboard
   - path: app/Providers/NovaServiceProvider.php
-    reason: viewNova gate, Nova routes (with auth and password-reset routes) and Fortify features
+    reason: viewNova gate (is_admin only), Nova routes without auth/password-reset routes (login redirects to the app's /login), no Fortify password features
   - path: config/nova.php
     reason: path (/nova), guard and middleware stack
+  - path: database/migrations/2026_10_31_250000_grant_admin_to_owner_account.php
+    reason: grants is_admin to the previously allowlisted owner email so the gate change cannot lock the owner out
+  - path: app/Nova/Actions/LiftChatBan.php
+    reason: User resource action to lift a chat ban (see ADMIN-002)
 integrations:
   - Laravel Nova
 steps:
-  - action: visit /nova as an admin
-    expected: Nova dashboard loads
+  - action: sign in to the app (passkey or magic link), then visit /nova as an admin
+    expected: Nova dashboard loads using the app session
   - action: open a resource (e.g. Users, Plaid Connections) and view or edit a record
     expected: resource index/detail/edit pages work
 postconditions:
   - edits are persisted via Nova
 business_rules:
-  - viewNova passes when is_admin === true or the email is in the hard-coded allowlist
+  - viewNova passes only when is_admin === true (no email allowlist)
+  - Nova has no password login, password reset or password update; /nova/login redirects to the app's /login and Nova logout uses the app's logout route
+  - the Nova User resource has no Password field (accounts are passwordless)
+  - a one-off data migration set is_admin for the previously allowlisted owner email; its down() is a no-op so a rollback cannot lock the owner out
   - is_admin is not mass-assignable
 scenarios:
   - id: admin_gate_allows
@@ -74,13 +85,36 @@ scenarios:
       - tests/Feature/Admin/NovaHttpAccessTest.php::a non-admin requesting nova over http receives 403
   - id: guest_redirected
     kind: authentication
-    description: A guest requesting /nova is sent to a login page.
+    description: A guest requesting /nova is redirected to the app's /login (passkey / magic link).
     coverage: covered
     tests:
-      - tests/Feature/Admin/NovaHttpAccessTest.php::a guest requesting nova is redirected to the nova login page
-known_issues:
-  - the viewNova gate hard-codes an allowlisted email address, granting access independent of is_admin; it should rely on is_admin alone.
-  - Nova is registered withAuthenticationRoutes() and withPasswordResetRoutes() and the Nova User resource has a Password field, although the app removed password login in favour of passkeys; this keeps a password-based login surface at /nova.
+      - tests/Feature/Admin/NovaHttpAccessTest.php::a guest requesting nova is redirected to the app login page
+  - id: admin_uses_app_session
+    kind: happy_path
+    description: An admin signed in through the app's web session reaches Nova without a separate Nova login.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaHttpAccessTest.php::an admin signed in through the app session reaches nova
+  - id: no_password_login
+    kind: authentication
+    description: Nova's login only redirects to the app login (posting a password does not sign in), and the password reset and password update routes do not exist.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaHttpAccessTest.php::nova has no password login or password reset routes
+  - id: email_allowlist_removed
+    kind: authorization
+    description: The previously allowlisted email without is_admin is denied.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityNovaAccessTest.php::nova access depends on is_admin only, not on an email allowlist
+  - id: owner_keeps_access_after_deploy
+    kind: recovery
+    description: The data migration grants is_admin to the previously allowlisted owner (case-insensitive), touches no one else, is a no-op when the owner does not exist, and its down() does not revoke it.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityNovaAccessTest.php::the owner admin migration grants is_admin to the previously allowlisted email
+      - tests/Feature/SecurityNovaAccessTest.php::the owner admin migration is a no-op when the owner account does not exist
+known_issues: []
 confidence: medium
 evidence:
   - app/Providers/NovaServiceProvider.php gate(), routes()

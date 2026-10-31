@@ -7,7 +7,8 @@ priority: low
 summary: >
   Messages flagged by chat moderation (CHAT-002) are stored as FlaggedChatMessage rows
   with flag type, content excerpt, action taken and request metadata. An administrator
-  reviews them in the Nova FlaggedChatMessage resource and can mark them reviewed.
+  reviews them in the Nova FlaggedChatMessage resource and can mark them reviewed. The
+  Lift Chat Ban action (on Flagged Chat Messages and Users) lifts a user's chat ban.
 actors:
   - administrator
 preconditions:
@@ -21,6 +22,10 @@ depends_on:
     reason: flagged message model
   - path: app/Services/ChatService.php
     reason: flagMessage() creates the rows
+  - path: app/Nova/Actions/LiftChatBan.php
+    reason: Nova action that lifts the chat ban of selected users / flag authors
+  - path: app/Services/ContentModerationService.php
+    reason: liftBan() clears the ban and offense cache entries
 integrations:
   - Laravel Nova
 steps:
@@ -28,10 +33,13 @@ steps:
     expected: list of flags with user, conversation and flag type
   - action: open a record and set Reviewed
     expected: record saved as reviewed
+  - action: run Lift Chat Ban on a flagged message (or on a user)
+    expected: the author's chat ban and offense history are cleared; they can chat again
 postconditions:
   - reviewed flags are distinguishable from unreviewed ones
 business_rules:
   - stored content is truncated to 1000 characters; metadata includes IP and user agent
+  - lifting a ban clears both the ban and the offense history (otherwise the next offense would re-ban immediately); the hourly message limit is not reset
   - the Message relation is optional in Nova; ChatService::flagMessage() never sets message_id (blocked messages are not stored), so a required field would make every flag unsavable
 scenarios:
   - id: review_flag
@@ -53,8 +61,17 @@ scenarios:
     tests:
       - tests/Feature/SecurityNovaAccessTest.php::non-admin users cannot access nova
       - tests/Feature/Admin/NovaHttpAccessTest.php::a non-admin cannot list or update flagged chat messages over http
+  - id: lift_chat_ban
+    kind: recovery
+    description: An admin lifts a chat ban from a user or a flagged message; only the selected users' ban and offense history are cleared.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/LiftChatBanTest.php::liftBan clears the users chat ban and offense history only
+      - tests/Feature/Admin/LiftChatBanTest.php::the lift chat ban action lifts the ban for selected users
+      - tests/Feature/Admin/LiftChatBanTest.php::the lift chat ban action lifts the ban for the author of a flagged message
+      - tests/Feature/Admin/LiftChatBanTest.php::the lift chat ban action is offered on the user and flagged message resources
 known_issues:
-  - no Nova action exists to ban/unban a user or act on a flag; bans are automatic and cache-only (ContentModerationService), so an admin cannot lift a mistaken 24-hour ban from Nova.
+  - there is no manual ban action; bans are automatic and cache-only, so they are lost if the cache is cleared.
 confidence: medium
 evidence:
   - app/Nova/FlaggedChatMessage.php

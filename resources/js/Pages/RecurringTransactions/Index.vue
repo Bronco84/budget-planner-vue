@@ -358,10 +358,18 @@ const fixedTransactionsCount = computed(() => {
   return props.recurringTransactions.filter(t => !t.is_dynamic_amount).length;
 });
 
+const deleteConfirmationMessage = (template) => {
+  const linked = template.transactions_count ?? 0;
+  const unlinkNote = linked > 0
+    ? ` ${linked} linked transaction${linked === 1 ? '' : 's'} will be unlinked (the transactions themselves are kept).`
+    : '';
+  return `Are you sure you want to delete the recurring transaction "${template.description}"?${unlinkNote}`;
+};
+
 const confirmDelete = async (template) => {
   const confirmed = await toast.confirm({
     title: 'Delete Recurring Transaction',
-    message: `Are you sure you want to delete the recurring transaction "${template.description}"?`,
+    message: deleteConfirmationMessage(template),
     confirmText: 'Delete',
     cancelText: 'Cancel',
     type: 'danger'

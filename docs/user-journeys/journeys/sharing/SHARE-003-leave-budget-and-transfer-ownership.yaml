@@ -1,0 +1,83 @@
+schema: 1
+id: SHARE-003
+name: Member leaves a budget or the owner transfers primary ownership
+domain: sharing
+status: implemented
+priority: high
+summary: >
+  Any member can leave a shared budget from its Sharing page, except the last
+  owner. A primary owner who leaves hands primary ownership to the
+  longest-standing owner member. The primary owner can also transfer primary
+  ownership to any member; the previous primary owner stays on as an owner.
+actors:
+  - budget member
+  - primary owner
+preconditions:
+  - user is a member of the budget
+routes:
+  - budgets.membership.leave
+  - budgets.ownership.transfer
+depends_on:
+  - path: app/Services/BudgetSharingService.php
+    reason: leave (successor selection, last-owner guard) and transferOwnership
+  - path: resources/js/Pages/Budgets/Sharing.vue
+    reason: Leave budget and Make primary owner actions
+steps:
+  - action: member clicks Leave budget (DELETE budgets/{budget}/membership)
+    expected: pivot row removed, redirect to budgets.index (which falls back to another budget)
+  - action: primary owner clicks Make primary owner on a member (POST budgets/{budget}/transfer-ownership)
+    expected: budgets.user_id becomes that member (their pivot row removed); the previous primary owner becomes an owner member
+postconditions:
+  - the budget still has a primary owner
+business_rules:
+  - leaving is allowed for viewers too, so the route opts out of AuthorizeBudgetAccess and authorizes view itself
+  - the last owner cannot leave (validation error on membership)
+  - a leaving primary owner is replaced by the owner member who joined first
+  - only the primary owner can transfer primary ownership, and only to a current member
+scenarios:
+  - id: member_leaves
+    kind: happy_path
+    description: A viewer, editor or owner member leaves and loses access.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::a member leaves a budget
+  - id: primary_owner_transfers
+    kind: happy_path
+    description: The primary owner transfers primary ownership and stays on as an owner, who the new primary owner can then downgrade.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::the primary owner transfers primary ownership and stays on as an owner
+  - id: primary_owner_leaves_with_successor
+    kind: alternate
+    description: A primary owner who leaves hands primary ownership to the longest-standing owner member.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::a primary owner who leaves hands primary ownership to the longest-standing owner
+  - id: last_owner_cannot_leave
+    kind: edge
+    description: The last owner gets a validation error and the budget is unchanged.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::the last owner cannot leave the budget
+  - id: transfer_restricted
+    kind: authorization
+    description: Only the primary owner may transfer, and only to a current member.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::ownership can only be transferred by the primary owner to a current member
+  - id: stranger_cannot_leave
+    kind: authorization
+    description: A non-member gets 403 when leaving.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::a stranger cannot leave or view the sharing page
+  - id: invalid_transfer_target
+    kind: validation
+    description: A transfer to someone who is not a member fails validation.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetMemberManagementTest.php::ownership can only be transferred by the primary owner to a current member
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetSharingController.php leave/transferOwnership
+last_verified: null

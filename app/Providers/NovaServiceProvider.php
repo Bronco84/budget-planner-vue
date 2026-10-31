@@ -5,7 +5,6 @@ namespace App\Providers;
 use App\Models\User;
 use App\Nova\Dashboards\Main;
 use Illuminate\Support\Facades\Gate;
-use Laravel\Fortify\Features;
 use Laravel\Nova\Dashboard;
 use Laravel\Nova\Nova;
 use Laravel\Nova\NovaApplicationServiceProvider;
@@ -29,22 +28,24 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
     protected function fortify(): void
     {
         Nova::fortify()
-            ->features([
-                Features::updatePasswords(),
-                // Features::emailVerification(),
-                // Features::twoFactorAuthentication(['confirm' => true, 'confirmPassword' => true]),
-            ])
+            // Passwords are not used (passkeys / magic links only), so Nova offers
+            // no password update, verification or two-factor features.
+            ->features([])
             ->register();
     }
 
     /**
      * Register the Nova routes.
+     *
+     * Nova has no login or password reset of its own: it shares the app's web
+     * session, guests are sent to the app's passkey / magic link login, and
+     * signing out uses the app's logout route.
      */
     protected function routes(): void
     {
         Nova::routes()
-            ->withAuthenticationRoutes()
-            ->withPasswordResetRoutes()
+            ->withoutAuthenticationRoutes(login: '/login', logout: '/logout')
+            ->withoutPasswordResetRoutes(forgotPassword: false, resetPassword: false)
             ->withoutEmailVerificationRoutes()
             ->register();
     }
@@ -53,13 +54,12 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
      * Register the Nova gate.
      *
      * This gate determines who can access Nova in non-local environments.
+     * Access depends on the users.is_admin flag only.
      */
     protected function gate(): void
     {
         Gate::define('viewNova', function (User $user) {
-            return $user->is_admin === true || in_array(strtolower($user->email), [
-                'bamccoley@gmail.com',
-            ]);
+            return $user->is_admin === true;
         });
     }
 

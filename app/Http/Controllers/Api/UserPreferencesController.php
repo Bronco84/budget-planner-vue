@@ -15,20 +15,6 @@ use Illuminate\Validation\ValidationException;
 class UserPreferencesController extends Controller
 {
     /**
-     * Get user preferences for a specific key.
-     */
-    public function show(string $key): JsonResponse
-    {
-        $user = Auth::user();
-        $preference = $user->getPreference($key);
-
-        return response()->json([
-            'key' => $key,
-            'value' => $preference,
-        ]);
-    }
-
-    /**
      * Update user preferences.
      */
     public function update(Request $request, string $key): JsonResponse
@@ -73,19 +59,6 @@ class UserPreferencesController extends Controller
         return response()->json([
             'order' => $validated['order'],
             'message' => 'Account type order updated successfully',
-        ]);
-    }
-
-    /**
-     * Get account type order.
-     */
-    public function getAccountTypeOrder(): JsonResponse
-    {
-        $user = Auth::user();
-        $order = $user->getAccountTypeOrder();
-
-        return response()->json([
-            'order' => $order,
         ]);
     }
 

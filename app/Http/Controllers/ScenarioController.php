@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Budget;
 use App\Models\Scenario;
+use App\Models\ScenarioAdjustment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,8 +60,13 @@ class ScenarioController extends Controller
             // Bimonthly (twice a month): first day here, second day in day_of_month.
             'adjustments.*.first_day_of_month' => 'exclude_unless:adjustments.*.frequency,bimonthly|nullable|integer|min:1|max:31|required_if:adjustments.*.frequency,bimonthly|different:adjustments.*.day_of_month',
             'adjustments.*.description' => 'nullable|string',
-            'adjustments.*.target_recurring_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
+            // modify_existing targets one of the budget's templates and changes its
+            // occurrences to amount_in_cents, or by percent_change when given.
+            'adjustments.*.target_recurring_template_id' => ['nullable', 'required_if:adjustments.*.adjustment_type,modify_existing', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
+            'adjustments.*.percent_change' => 'nullable|numeric|min:-100|max:1000',
         ]);
+
+        $validated['adjustments'] = $this->normalizeAdjustments($budget, $validated['adjustments']);
 
         // Validate that all accounts belong to this budget
         $accountIds = collect($validated['adjustments'])->pluck('account_id')->unique();
@@ -109,23 +115,6 @@ class ScenarioController extends Controller
     }
 
     /**
-     * Display the specified scenario.
-     *
-     * @return JsonResponse
-     */
-    public function show(Budget $budget, Scenario $scenario)
-    {
-        // Ensure user has access to this budget
-        $this->authorize('view', $budget);
-
-        $scenario->load('adjustments.account');
-
-        return response()->json([
-            'scenario' => $scenario,
-        ]);
-    }
-
-    /**
      * Update the specified scenario.
      *
      * @return JsonResponse
@@ -153,11 +142,15 @@ class ScenarioController extends Controller
             // Bimonthly (twice a month): first day here, second day in day_of_month.
             'adjustments.*.first_day_of_month' => 'exclude_unless:adjustments.*.frequency,bimonthly|nullable|integer|min:1|max:31|required_if:adjustments.*.frequency,bimonthly|different:adjustments.*.day_of_month',
             'adjustments.*.description' => 'nullable|string',
-            'adjustments.*.target_recurring_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
+            // modify_existing targets one of the budget's templates and changes its
+            // occurrences to amount_in_cents, or by percent_change when given.
+            'adjustments.*.target_recurring_template_id' => ['nullable', 'required_if:adjustments.*.adjustment_type,modify_existing', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
+            'adjustments.*.percent_change' => 'nullable|numeric|min:-100|max:1000',
         ]);
 
         // Validate that all accounts belong to this budget (if adjustments provided)
         if (isset($validated['adjustments'])) {
+            $validated['adjustments'] = $this->normalizeAdjustments($budget, $validated['adjustments']);
             $accountIds = collect($validated['adjustments'])->pluck('account_id')->unique();
             $validAccountIds = $budget->accounts()->whereIn('id', $accountIds)->pluck('id');
 
@@ -260,5 +253,27 @@ class ScenarioController extends Controller
                 'message' => 'Failed to toggle scenario.',
             ], 500);
         }
+    }
+
+    /**
+     * A modify_existing adjustment applies to its target template's account, so
+     * take the account from the template. Other types carry no percentage.
+     */
+    protected function normalizeAdjustments(Budget $budget, array $adjustments): array
+    {
+        $templateAccounts = $budget->recurringTransactionTemplates()
+            ->whereIn('id', collect($adjustments)->pluck('target_recurring_template_id')->filter()->unique())
+            ->pluck('account_id', 'id');
+
+        return array_map(function (array $adjustment) use ($templateAccounts) {
+            if ($adjustment['adjustment_type'] === ScenarioAdjustment::TYPE_MODIFY_EXISTING) {
+                $adjustment['account_id'] = $templateAccounts->get($adjustment['target_recurring_template_id'])
+                    ?? $adjustment['account_id'];
+            } else {
+                $adjustment['percent_change'] = null;
+            }
+
+            return $adjustment;
+        }, $adjustments);
     }
 }

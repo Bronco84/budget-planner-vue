@@ -5,11 +5,10 @@ use App\Models\Budget;
 use App\Models\PayoffPlan;
 use App\Models\PayoffPlanDebt;
 use App\Models\User;
-use App\Services\PayoffPlanService;
 
 /*
  * PAYOFF-001: debt account ids must belong to the budget in the route, and a
- * failed store or preview must leave no partial state behind.
+ * failed store must leave no partial state behind.
  */
 
 beforeEach(function () {
@@ -70,37 +69,4 @@ test('a failure while storing a plan rolls back and keeps the existing active pl
 
     expect(PayoffPlan::count())->toBe(1)
         ->and($this->activePlan->fresh()->is_active)->toBeTrue();
-});
-
-test('preview rejects a debt account from another budget', function () {
-    $this->actingAs($this->user)
-        ->postJson(route('payoff-plans.preview', $this->budget), [
-            'monthly_extra_payment' => 0,
-            'debts' => [
-                ['account_id' => $this->foreignCard->id, 'balance' => 50000, 'interest_rate' => 10, 'minimum_payment' => 2500],
-            ],
-        ])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('debts.0.account_id');
-
-    expect(PayoffPlan::count())->toBe(1)
-        ->and(PayoffPlanDebt::count())->toBe(0);
-});
-
-test('preview leaves no temporary plans behind when the calculation fails', function () {
-    $this->partialMock(PayoffPlanService::class)
-        ->shouldReceive('calculatePayoffProjection')
-        ->andThrow(new RuntimeException('boom'));
-
-    $this->actingAs($this->user)
-        ->postJson(route('payoff-plans.preview', $this->budget), [
-            'monthly_extra_payment' => 0,
-            'debts' => [
-                ['account_id' => $this->card->id, 'balance' => 250000, 'interest_rate' => 20, 'minimum_payment' => 7500],
-            ],
-        ])
-        ->assertServerError();
-
-    expect(PayoffPlan::count())->toBe(1)
-        ->and(PayoffPlanDebt::count())->toBe(0);
 });

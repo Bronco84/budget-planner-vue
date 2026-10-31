@@ -67,11 +67,35 @@ test('a non-admin requesting nova over http receives 403', function () {
         ->assertForbidden();
 });
 
-test('a guest requesting nova is redirected to the nova login page', function () {
-    $this->get('/nova')->assertRedirect(url('/nova/login'));
-    $this->get('/nova/dashboards/main')->assertRedirect(url('/nova/login'));
+test('a guest requesting nova is redirected to the app login page', function () {
+    $this->get('/nova')->assertRedirect('/login');
+    $this->get('/nova/dashboards/main')->assertRedirect('/login');
 
     $this->getJson('/nova-api/users')->assertUnauthorized();
+});
+
+test('nova has no password login or password reset routes', function () {
+    // Nova's own login page only redirects to the app's passkey / magic link login.
+    $this->get('/nova/login')->assertRedirect('/login');
+    $admin = novaAdmin();
+    $admin->forceFill(['password' => bcrypt('secret')])->save();
+    $this->post('/nova/login', ['email' => $admin->email, 'password' => 'secret'])
+        ->assertRedirect('/login');
+    $this->assertGuest();
+
+    $this->get('/nova/password/reset')->assertNotFound();
+    $this->post('/nova/password/email', ['email' => 'a@example.com'])->assertNotFound();
+    $this->post('/nova/password/reset', ['email' => 'a@example.com'])->assertNotFound();
+    $this->put('/nova/user-security/password')->assertNotFound();
+});
+
+test('an admin signed in through the app session reaches nova', function () {
+    $admin = novaAdmin();
+
+    // The app's web guard session (passkey / magic link) is the Nova session.
+    $this->actingAs($admin, 'web')
+        ->get('/nova/dashboards/main')
+        ->assertOk();
 });
 
 test('an admin can list flagged chat messages and mark one reviewed', function () {

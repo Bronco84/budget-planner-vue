@@ -6,6 +6,10 @@ use App\Models\Account;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
+/**
+ * Delegates to the parent budget's sharing role: members can view, editors
+ * and owners can change. See BudgetPolicy.
+ */
 class AccountPolicy
 {
     use HandlesAuthorization;
@@ -23,7 +27,7 @@ class AccountPolicy
      */
     public function view(User $user, Account $account): bool
     {
-        return $user->id === $account->budget->user_id;
+        return $user->canViewBudget($account->budget);
     }
 
     /**
@@ -39,7 +43,7 @@ class AccountPolicy
      */
     public function update(User $user, Account $account): bool
     {
-        return $user->id === $account->budget->user_id;
+        return $user->canEditBudget($account->budget);
     }
 
     /**
@@ -47,7 +51,7 @@ class AccountPolicy
      */
     public function delete(User $user, Account $account): bool
     {
-        return $user->id === $account->budget->user_id;
+        return $user->canEditBudget($account->budget);
     }
 
     /**
@@ -55,7 +59,7 @@ class AccountPolicy
      */
     public function restore(User $user, Account $account): bool
     {
-        return $user->id === $account->budget->user_id;
+        return $user->canEditBudget($account->budget);
     }
 
     /**
@@ -63,6 +67,6 @@ class AccountPolicy
      */
     public function forceDelete(User $user, Account $account): bool
     {
-        return $user->id === $account->budget->user_id;
+        return $user->canEditBudget($account->budget);
     }
 }

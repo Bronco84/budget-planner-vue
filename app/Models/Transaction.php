@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\BudgetService;
 use App\Services\RecurringTransactionService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -210,7 +211,7 @@ class Transaction extends Model
         return '$'.number_format($this->amount_in_cents / 100, 2);
     }
 
-    public function scopeFromFuture(\Illuminate\Database\Eloquent\Builder $query, ?string $date = null): \Illuminate\Database\Eloquent\Builder
+    public function scopeFromFuture(Builder $query, ?string $date = null): Builder
     {
         return $query->when(
             isset($date),

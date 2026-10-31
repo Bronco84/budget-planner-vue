@@ -4,8 +4,8 @@ use App\Models\TrustedDevice;
 use App\Models\User;
 
 /*
- * AUTH-001. Non-ceremony behaviour of the passkey login endpoints. A valid
- * assertion needs a WebAuthn fixture and is not covered here.
+ * AUTH-001. Non-ceremony behaviour of the passkey login endpoints. Real
+ * assertion ceremonies are in PasskeyLoginCeremonyTest.
  */
 
 test('passkey login option requests beyond ten per minute are throttled', function () {

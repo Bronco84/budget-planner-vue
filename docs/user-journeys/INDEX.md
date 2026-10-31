@@ -7,9 +7,9 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 ## Summary
 
-| Journeys | At risk | Covered | Deprecated | Partial |
-|---|---|---|---|---|
-| 69 | 3 | 53 | 1 | 12 |
+| Journeys | Covered | Deprecated | Partial |
+|---|---|---|---|
+| 69 | 56 | 1 | 12 |
 
 | Domain | Critical | High | Medium | Low |
 |---|---|---|---|---|
@@ -44,8 +44,8 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [ACCOUNT-003](journeys/accounts/ACCOUNT-003-configure-autopay.yaml) | Owner configures credit-card autopay from a checking or savings account | medium | yes | yes | yes | yes | missing | no | **covered** |
 | [ADMIN-001](journeys/admin/ADMIN-001-nova-admin-panel.yaml) | Administrator manages application data in the Nova panel | medium | yes | yes | yes | missing | missing | no | **covered** |
 | [ADMIN-002](journeys/admin/ADMIN-002-review-flagged-chat-messages.yaml) | Administrator reviews flagged chat messages in Nova | low | yes | yes | yes | missing | missing | no | **covered** |
-| [AUTH-001](journeys/auth/AUTH-001-passkey-login.yaml) | Guest signs in with a passkey | critical | partial | yes | n/a | missing | missing | no | **at risk** |
-| [AUTH-002](journeys/auth/AUTH-002-register-account-with-passkey.yaml) | Guest registers an account and enrols a first passkey | critical | partial | yes | yes | missing | yes | no | **at risk** |
+| [AUTH-001](journeys/auth/AUTH-001-passkey-login.yaml) | Guest signs in with a passkey | critical | yes | yes | n/a | yes | missing | no | **covered** |
+| [AUTH-002](journeys/auth/AUTH-002-register-account-with-passkey.yaml) | Guest registers an account and enrols a first passkey | critical | yes | yes | yes | missing | yes | no | **covered** |
 | [AUTH-003](journeys/auth/AUTH-003-magic-link-sign-in.yaml) | Guest signs in with an emailed magic link | high | yes | yes | yes | yes | yes | no | **covered** |
 | [AUTH-004](journeys/auth/AUTH-004-invalid-magic-link.yaml) | Guest opens an expired, used or tampered magic link | high | yes | yes | yes | missing | yes | no | **covered** |
 | [AUTH-005](journeys/auth/AUTH-005-trusted-device-auto-login.yaml) | Returning user is signed in automatically on a trusted device | critical | yes | yes | yes | missing | yes | no | **covered** |
@@ -54,7 +54,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [AUTH-008](journeys/auth/AUTH-008-guest-redirected-to-login.yaml) | Unauthenticated visitor is redirected to sign in | high | yes | yes | yes | yes | missing | no | **covered** |
 | [AUTH-009](journeys/auth/AUTH-009-csrf-session-refresh.yaml) | Stale CSRF token is re-synced so writes keep working | high | yes | yes | n/a | missing | partial | no | **partial** |
 | [AUTH-010](journeys/auth/AUTH-010-verify-email.yaml) | User verifies their email address | low | yes | yes | yes | yes | missing | no | **covered** |
-| [AUTH-011](journeys/auth/AUTH-011-manage-passkeys.yaml) | User adds, renames and removes passkeys | high | partial | yes | yes | partial | missing | no | **at risk** |
+| [AUTH-011](journeys/auth/AUTH-011-manage-passkeys.yaml) | User adds, renames and removes passkeys | high | yes | yes | yes | partial | missing | no | **partial** |
 | [AUTH-012](journeys/auth/AUTH-012-manage-trusted-devices.yaml) | User reviews and revokes trusted devices | high | yes | yes | yes | missing | yes | no | **covered** |
 | [BUDGET-001](journeys/budgets/BUDGET-001-create-budget.yaml) | User creates a budget and is routed into connection-first setup | critical | yes | yes | yes | yes | yes | no | **covered** |
 | [BUDGET-002](journeys/budgets/BUDGET-002-view-budget-dashboard.yaml) | Owner views the budget dashboard and account ledger | critical | yes | yes | yes | yes | missing | yes | **covered** |
@@ -88,7 +88,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [PREF-001](journeys/preferences/PREF-001-reorder-account-type-sections.yaml) | User reorders account type sections and the order persists | medium | yes | yes | yes | yes | no | no | **partial** |
 | [PREF-002](journeys/preferences/PREF-002-switch-active-budget.yaml) | User switches their active budget | high | yes | yes | yes | no | yes | no | **partial** |
 | [PROFILE-001](journeys/profile/PROFILE-001-update-profile-information.yaml) | User updates their name and email | medium | yes | yes | yes | yes | missing | no | **covered** |
-| [PROFILE-002](journeys/profile/PROFILE-002-delete-account.yaml) | User deletes their account | medium | yes | yes | yes | missing | partial | no | **partial** |
+| [PROFILE-002](journeys/profile/PROFILE-002-delete-account.yaml) | User deletes their account | medium | yes | yes | yes | missing | yes | no | **covered** |
 | [PROJECT-001](journeys/projections/PROJECT-001-account-balance-projection.yaml) | User views an account's projected balance | critical | yes | yes | yes | missing | missing | yes | **covered** |
 | [PROJECT-002](journeys/projections/PROJECT-002-budget-projected-transactions.yaml) | User views projected transactions for the whole budget | low | yes | yes | yes | missing | missing | no | **covered** |
 | [PROPERTY-001](journeys/properties/PROPERTY-001-add-property.yaml) | Owner records a property or vehicle asset | medium | yes | yes | yes | missing | missing | no | **covered** |
@@ -111,10 +111,8 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 ## Open gaps (critical and high priority)
 
-- **AUTH-001** — successful_assertion_signs_in (happy_path) is uncovered: requires WebAuthn fixture
-- **AUTH-002** — passkey_attestation_saved (happy_path) is uncovered: requires WebAuthn fixture
 - **AUTH-009** — axios_419_retry (recovery) is uncovered: client-side behaviour (axios interceptor, and apiFetch for fetch() writes); no JS unit tests exist and Playwright specs are stale.; inertia_419_reload (recovery) is uncovered: client-side behaviour; needs a browser test.
-- **AUTH-011** — add_additional_passkey (happy_path) is uncovered: requires WebAuthn fixture; add_passkey_returns_to_profile (alternate) is partial: asserts the redirectTo prop; the client-side redirect after the ceremony is not browser tested.
+- **AUTH-011** — add_passkey_returns_to_profile (alternate) is partial: asserts the redirectTo prop; the client-side redirect after the ceremony is not browser tested.
 - **CHAT-001** — stream_error_ui_recovery (recovery) is uncovered: client-side behaviour (ChatPanel.vue); needs a browser test.
 - **CHAT-002** — stream_refusal_visible (recovery) is uncovered: EventSource cannot read non-SSE error bodies; the panel shows a generic connection error.
 - **PAYOFF-001** — negative_liability_balance_excluded (edge) is uncovered: getDebtAccounts filters current_balance_cents > 0, so cards stored as negative balances (a convention BudgetServiceTest accepts) are hidden.
@@ -150,10 +148,10 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **AUTH-001** Guest signs in with a passkey _(implemented, critical)_
   - Routes: `login`, `GET /`, `webauthn.login.options`, `webauthn.login`
-  - Tests: `tests/Feature/Auth/AuthenticationTest.php`, `tests/Feature/Auth/PasskeyLoginEndpointTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`
+  - Tests: `tests/Feature/Auth/AuthenticationTest.php`, `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/Auth/PasskeyLoginEndpointTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`
 - **AUTH-002** Guest registers an account and enrols a first passkey _(implemented, critical)_
   - Routes: `register`, `POST /register`, `passkey.register`, `webauthn.register.options`, `webauthn.register`
-  - Tests: `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/PasskeyRegistrationErrorTest.php`, `tests/Feature/Auth/RegistrationFlowTest.php`, `tests/Feature/Auth/RegistrationTest.php`
+  - Tests: `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php`, `tests/Feature/Auth/PasskeyRegistrationErrorTest.php`, `tests/Feature/Auth/RegistrationFlowTest.php`, `tests/Feature/Auth/RegistrationTest.php`
 - **AUTH-003** Guest signs in with an emailed magic link _(implemented, high)_
   - Routes: `magic-link.request`, `magic-link.store`, `magic-link.authenticate`
   - Tests: `tests/Feature/Auth/MagicLinkFlowTest.php`, `tests/Feature/Auth/MagicLinkTest.php`
@@ -180,7 +178,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Auth/EmailVerificationAccessTest.php`, `tests/Feature/Auth/EmailVerificationTest.php`, `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Profile/ProfileValidationTest.php`
 - **AUTH-011** User adds, renames and removes passkeys _(implemented, high)_
   - Routes: `profile.edit`, `passkey.register`, `webauthn.register.options`, `webauthn.register`, `passkeys.update`, `passkeys.destroy`
-  - Tests: `tests/Feature/Auth/PasskeyAndDeviceManagementTest.php`, `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/ProfilePasskeyListTest.php`
+  - Tests: `tests/Feature/Auth/PasskeyAndDeviceManagementTest.php`, `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php`, `tests/Feature/Auth/ProfilePasskeyListTest.php`
 - **AUTH-012** User reviews and revokes trusted devices _(implemented, high)_
   - Routes: `profile.edit`, `trusted-devices.revoke`, `trusted-devices.revoke-all`
   - Tests: `tests/Feature/Auth/PasskeyAndDeviceManagementTest.php`, `tests/Feature/Auth/TrustedDeviceFingerprintTest.php`, `tests/Feature/Auth/TrustedDeviceRevocationTest.php`
@@ -307,7 +305,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Auth/GuestAccessTest.php`, `tests/Feature/Profile/ProfileValidationTest.php`, `tests/Feature/ProfileTest.php`
 - **PROFILE-002** User deletes their account _(implemented, medium)_
   - Routes: `profile.edit`, `profile.destroy`
-  - Tests: `tests/Feature/DeleteAccountTest.php`, `tests/Feature/ProfileTest.php`
+  - Tests: `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/DeleteAccountTest.php`, `tests/Feature/ProfileTest.php`
 
 ### projections
 

@@ -4,6 +4,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Tests\Support\SoftwareAuthenticator;
 use Tests\TestCase;
 
 /*
@@ -60,4 +61,38 @@ function createPasskey(User $user, ?string $id = null): WebAuthnCredential
         'public_key' => 'test-public-key',
         'attestation_format' => 'none',
     ]);
+}
+
+/*
+| WebAuthn ceremonies against a real software authenticator (tests/Support).
+| The relying party is pinned here so the ceremonies don't depend on the local
+| .env (WEBAUTHN_ID / APP_URL).
+*/
+const WEBAUTHN_TEST_RP_ID = 'budget-planner-vue.test';
+const WEBAUTHN_TEST_ORIGIN = 'https://budget-planner-vue.test';
+
+function useWebAuthnTestRelyingParty(): void
+{
+    config([
+        'webauthn.relying_party.id' => WEBAUTHN_TEST_RP_ID,
+        'webauthn.origins' => null,
+    ]);
+}
+
+/**
+ * Run the full attestation ceremony (register options -> authenticator ->
+ * webauthn.register) for the user and return the stored credential.
+ */
+function enrolPasskey(User $user, SoftwareAuthenticator $authenticator): WebAuthnCredential
+{
+    $options = test()->actingAs($user)
+        ->postJson(route('webauthn.register.options'))
+        ->assertOk()
+        ->json();
+
+    test()->actingAs($user)
+        ->postJson(route('webauthn.register'), $authenticator->attest($options, WEBAUTHN_TEST_ORIGIN))
+        ->assertNoContent();
+
+    return WebAuthnCredential::findOrFail($authenticator->credentialId());
 }

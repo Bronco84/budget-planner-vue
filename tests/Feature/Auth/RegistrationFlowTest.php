@@ -5,7 +5,7 @@ use App\Models\User;
 
 /*
  * AUTH-002. Account creation and the guards around passkey enrolment. The
- * attestation ceremony itself needs a WebAuthn fixture and is not covered here.
+ * attestation ceremony itself is in PasskeyRegistrationCeremonyTest.
  */
 
 const REGISTRATION_OWNER_EMAIL = 'bamccoley@gmail.com';

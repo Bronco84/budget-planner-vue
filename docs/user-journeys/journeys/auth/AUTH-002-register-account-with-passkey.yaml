@@ -63,8 +63,9 @@ scenarios:
   - id: passkey_attestation_saved
     kind: happy_path
     description: A valid attestation stores the credential, creates a trusted device, queues the cookie and returns 204.
-    coverage: uncovered
-    note: 'requires WebAuthn fixture'
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::a new account enrols its first passkey through a real attestation ceremony'
   - id: non_allowlisted_email_rejected
     kind: validation
     description: Any email other than the allowlisted one is rejected with an email error and no user is created.
@@ -89,7 +90,7 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/RegistrationFlowTest.php::a failed passkey attestation returns an error and stores no credential or trusted device'
-    note: 'uses a malformed attestation; a structurally valid but cryptographically bad attestation needs a WebAuthn fixture.'
+      - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::an attestation for a different origin or challenge is rejected and stores nothing'
   - id: registration_failure_message_is_generic
     kind: recovery
     description: An exception while saving the passkey returns JSON 500 "Failed to register passkey. Please try again."; the raw exception is only logged.

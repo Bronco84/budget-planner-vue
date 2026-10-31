@@ -41,6 +41,7 @@ business_rules:
   - a user may not delete their last passkey (errors.passkey)
   - both mutations abort 403 when the credential's authenticatable_id is not the current user
   - deleting a passkey does not revoke trusted devices
+  - additional passkeys reuse the user's existing WebAuthn user handle (user_id) and the register options list existing credentials in excludeCredentials; a credential id that already exists is rejected
   - the profile's "Add New Passkey" links pass return=profile; PasskeyRegister then returns to profile.edit (only when the user already has a passkey), otherwise to budgets.index
 scenarios:
   - id: profile_lists_passkeys
@@ -52,8 +53,16 @@ scenarios:
   - id: add_additional_passkey
     kind: happy_path
     description: An existing user completes a second attestation and now has two credentials.
-    coverage: uncovered
-    note: 'requires WebAuthn fixture'
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::a user who already has a passkey can add a second one'
+  - id: duplicate_credential_rejected
+    kind: validation
+    description: Re-registering a credential id that is already stored is rejected with 422 (attestation error) and no second row is created; the options also list existing credentials in excludeCredentials.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::replaying an attestation for an already registered credential is rejected'
+      - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::a user who already has a passkey can add a second one'
   - id: add_passkey_returns_to_profile
     kind: alternate
     description: Registration started from the profile (return=profile) sends the user back to the profile; first-passkey enrolment and unknown return values go to /budgets.

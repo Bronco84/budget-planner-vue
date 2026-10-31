@@ -68,11 +68,11 @@ scenarios:
   - id: login_paths_record_authentication_time
     kind: integration
     description: Every login path stamps auth.authenticated_at in the session.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::signing in with a magic link records the authentication time used by account deletion
       - tests/Feature/DeleteAccountTest.php::a trusted device auto login records the authentication time
-    note: the passkey assertion path (Laragear AssertedRequest::login -> SessionGuard::attempt) fires the same Login event but has no fixture to exercise it.
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::signing in with a passkey records the authentication time used by account deletion'
   - id: related_data_cleanup
     kind: integration
     description: Deleting the user removes their passkeys, trusted devices and magic-link tokens.

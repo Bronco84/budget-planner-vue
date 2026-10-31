@@ -35,6 +35,8 @@ postconditions:
 business_rules:
   - login options are rate limited to 10/min and are not guest-only, so an auto-logged-in request still receives JSON
   - a failed assertion returns 422 without creating a session
+  - challenges are single use (pulled from the session on the first attempt)
+  - an assertion whose signature counter does not advance past the stored one is treated as a cloned authenticator and the credential is disabled; authenticators that always report 0 (synced passkeys) are allowed
 scenarios:
   - id: login_page_renders
     kind: happy_path
@@ -57,8 +59,9 @@ scenarios:
   - id: successful_assertion_signs_in
     kind: happy_path
     description: A valid assertion authenticates the user and issues a trusted-device cookie.
-    coverage: uncovered
-    note: 'requires WebAuthn fixture'
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a valid passkey assertion signs the user in and issues a trusted device cookie'
   - id: invalid_assertion_rejected
     kind: validation
     description: An invalid or unknown assertion returns 422 and no session is created.
@@ -66,6 +69,21 @@ scenarios:
     tests:
       - 'tests/Feature/Auth/PasskeyLoginEndpointTest.php::an invalid passkey assertion is rejected with 422 and no session or device is created'
       - 'tests/Feature/Auth/PasskeyLoginEndpointTest.php::a malformed passkey assertion payload is rejected with 422'
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a tampered or mismatched passkey assertion is rejected with 422 and no session'
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::an assertion without a prior challenge is rejected'
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a replayed assertion is rejected because the challenge is single use'
+  - id: cloned_authenticator_disabled
+    kind: edge
+    description: An assertion whose signature counter does not advance (cloned authenticator) is rejected with 422 and the credential is disabled so it can no longer sign in.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a cloned authenticator whose counter does not advance is rejected and the credential disabled'
+  - id: counterless_authenticator_signs_in
+    kind: alternate
+    description: An authenticator that always reports a zero signature counter (e.g. synced passkeys) can sign in repeatedly.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::authenticators that do not implement a signature counter can sign in repeatedly'
   - id: options_rate_limited
     kind: edge
     description: Login option requests beyond 10 per minute are throttled.

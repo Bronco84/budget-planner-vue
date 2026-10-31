@@ -52,15 +52,17 @@
             "login_page_renders": "covered",
             "options_return_challenge": "covered",
             "authenticated_options_stay_json": "covered",
-            "successful_assertion_signs_in": "uncovered",
+            "successful_assertion_signs_in": "covered",
             "invalid_assertion_rejected": "covered",
+            "cloned_authenticator_disabled": "covered",
+            "counterless_authenticator_signs_in": "covered",
             "options_rate_limited": "covered",
             "authorization": "not_applicable"
         },
         "AUTH-002": {
             "registration_form_renders": "covered",
             "allowlisted_email_creates_account": "covered",
-            "passkey_attestation_saved": "uncovered",
+            "passkey_attestation_saved": "covered",
             "non_allowlisted_email_rejected": "covered",
             "invalid_or_duplicate_email_rejected": "covered",
             "registration_throttled": "covered",
@@ -148,7 +150,8 @@
         },
         "AUTH-011": {
             "profile_lists_passkeys": "covered",
-            "add_additional_passkey": "uncovered",
+            "add_additional_passkey": "covered",
+            "duplicate_credential_rejected": "covered",
             "add_passkey_returns_to_profile": "partial",
             "rename_passkey": "covered",
             "delete_passkey": "covered",
@@ -489,7 +492,7 @@
             "wrong_password_rejected": "covered",
             "passkey_only_user_can_delete": "covered",
             "stale_session_rejected": "covered",
-            "login_paths_record_authentication_time": "partial",
+            "login_paths_record_authentication_time": "covered",
             "related_data_cleanup": "covered",
             "device_cookie_cleared": "covered",
             "guest_cannot_delete": "covered"

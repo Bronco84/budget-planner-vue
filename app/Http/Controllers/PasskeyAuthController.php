@@ -50,9 +50,17 @@ class PasskeyAuthController extends Controller
         // Check if this is a new user from query param or if they have no passkeys
         $isNewUser = $request->query('new_user', false) || ($user && ! $hasExistingPasskeys);
 
+        // Adding another passkey from the profile returns there; first-passkey
+        // enrolment always continues to the budgets page. Only known values are
+        // honoured so this cannot become an open redirect.
+        $redirectTo = $hasExistingPasskeys && $request->query('return') === 'profile'
+            ? route('profile.edit')
+            : route('budgets.index');
+
         return Inertia::render('Auth/PasskeyRegister', [
             'hasExistingPasskeys' => $hasExistingPasskeys,
             'isNewUser' => $isNewUser,
+            'redirectTo' => $redirectTo,
         ])->with('breadcrumbs', function () {
             return Breadcrumbs::generate('passkey.register');
         });

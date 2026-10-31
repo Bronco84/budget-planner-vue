@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Notification;
 
 /*
  * PROFILE-001: a missing name or a malformed, uppercase or already-taken email is
@@ -35,3 +37,26 @@ test('updating the profile with a missing name or invalid email is rejected', fu
     'email taken by another user' => [['email' => 'taken@example.com'], 'email'],
     'missing email' => [['email' => ''], 'email'],
 ]);
+
+test('changing the email sends a new verification email', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->patch(route('profile.update'), ['name' => $user->name, 'email' => 'new-address@example.com'])
+        ->assertSessionHasNoErrors();
+
+    expect($user->refresh()->email_verified_at)->toBeNull();
+    Notification::assertSentTo($user, VerifyEmail::class);
+});
+
+test('saving the profile without changing the email sends no verification email', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->patch(route('profile.update'), ['name' => 'Renamed', 'email' => $user->email])
+        ->assertSessionHasNoErrors();
+
+    Notification::assertNothingSent();
+});

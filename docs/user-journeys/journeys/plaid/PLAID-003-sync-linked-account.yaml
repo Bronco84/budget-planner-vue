@@ -133,6 +133,12 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::balance refresh endpoint reports success and Plaid failures
       - tests/Feature/Plaid/PlaidSyncTest.php::liabilities refresh endpoint updates statement data and reports when none is available
+  - id: login_required_flagged_on_refresh
+    kind: integration
+    description: ITEM_LOGIN_REQUIRED on a balance, liabilities or investments refresh puts the connection into 'error' so re-authentication is needed.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncTest.php::a login required error on a balance, liabilities or investments refresh marks the connection as errored
 known_issues:
   - plaid.balance, plaid.liabilities and plaid.investments have no caller in resources/js; they are reachable only by direct POST.
 confidence: high

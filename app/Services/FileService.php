@@ -7,8 +7,10 @@ use App\Models\Budget;
 use App\Models\File;
 use App\Models\FileAttachment;
 use App\Models\Transaction;
+use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class FileService
@@ -229,6 +231,61 @@ class FileService
 
             return true;
         });
+    }
+
+    /**
+     * Stream an attachment's stored object (s3 disk, keyed by content hash) as a download.
+     */
+    public function downloadResponse(FileAttachment $attachment): Response
+    {
+        $file = $attachment->file;
+
+        return response(Storage::disk('s3')->get($file->hash), 200, [
+            'Content-Type' => $file->mime_type,
+            'Content-Disposition' => $this->getContentDispositionHeader($file->original_name),
+            'Content-Length' => $file->size_bytes,
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    }
+
+    /**
+     * Delete every attachment on a budget and on its transactions (polymorphic, so
+     * not cascaded by the database), then remove each file that is no longer used.
+     * Storage failures are logged so they never block deleting the budget.
+     */
+    public function deleteBudgetAttachments(Budget $budget): void
+    {
+        $attachments = FileAttachment::query()
+            ->where(fn ($query) => $query
+                ->where('attachable_type', Budget::class)
+                ->where('attachable_id', $budget->id))
+            ->orWhere(fn ($query) => $query
+                ->where('attachable_type', Transaction::class)
+                ->whereIn('attachable_id', $budget->transactions()->select('id')))
+            ->with('file')
+            ->get();
+
+        if ($attachments->isEmpty()) {
+            return;
+        }
+
+        FileAttachment::whereKey($attachments->modelKeys())->delete();
+
+        foreach ($attachments->pluck('file')->filter()->unique('id') as $file) {
+            try {
+                if ($file->deleteFromS3IfUnused()) {
+                    $file->delete();
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to remove an unused file while deleting a budget', [
+                    'budget_id' => $budget->id,
+                    'file_id' => $file->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**

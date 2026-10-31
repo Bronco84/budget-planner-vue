@@ -36,15 +36,21 @@ business_rules:
   - only credit cards with statement data are eligible
   - source account is required when enabling, must be in the same budget, must be Plaid depository checking/savings, and cannot be the card itself
   - amount override is a non-negative integer of cents
+  - source account and amount override are optional keys; omitted means null
+  - the account must pass AccountPolicy::update (budget owner), like the other account mutators
 scenarios:
   - id: enable_autopay
     kind: happy_path
     description: Enabling autopay with a valid source account saves the configuration.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AutopayValidationTest.php::enabling autopay with a checking source saves the configuration
   - id: disable_autopay
     kind: alternate
-    description: Disabling autopay clears the source account.
-    coverage: uncovered
+    description: Disabling autopay clears the source account, even when the optional fields are omitted from the request.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AutopayValidationTest.php::disabling autopay without sending the optional fields clears the configuration
   - id: ineligible_account_rejected
     kind: validation
     description: Non-credit-card or no-statement accounts get an error flash and no change.
@@ -64,10 +70,11 @@ scenarios:
   - id: other_users_account_forbidden
     kind: authorization
     description: Posting autopay for another user's budget returns 403 (can:view,budget); cross-budget account returns 404.
-    coverage: uncovered
-known_issues:
-  - "updateAutopay has no $this->authorize('update', $account) call, unlike the other AccountController mutators; it relies solely on the budget-level can:view middleware plus scopeBindings."
-  - "The controller indexes $validated['autopay_source_account_id'] and ['autopay_amount_override_cents'] directly; omitting those nullable keys (instead of sending null) causes an undefined array key error."
+    coverage: partial
+    tests:
+      - tests/Feature/Accounts/AutopayValidationTest.php::autopay cannot be configured on another users account
+    note: the 403 for another user's budget is covered; the cross-budget 404 is not asserted.
+known_issues: []
 confidence: medium
 evidence:
   - app/Http/Controllers/AccountController.php updateAutopay

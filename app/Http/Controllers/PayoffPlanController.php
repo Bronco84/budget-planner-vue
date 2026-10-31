@@ -186,7 +186,17 @@ class PayoffPlanController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $payoff_plan->update($validated);
+        // Only one plan per budget may be active (same invariant as store).
+        DB::transaction(function () use ($budget, $payoff_plan, $validated) {
+            if (! empty($validated['is_active'])) {
+                $budget->payoffPlans()
+                    ->where('is_active', true)
+                    ->whereKeyNot($payoff_plan->id)
+                    ->update(['is_active' => false]);
+            }
+
+            $payoff_plan->update($validated);
+        });
 
         return redirect()->route('payoff-plans.show', ['budget' => $budget, 'payoff_plan' => $payoff_plan])
             ->with('message', 'Payoff plan updated successfully');

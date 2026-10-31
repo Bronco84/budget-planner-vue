@@ -39,6 +39,7 @@ business_rules:
   - "/csrf-token is a public GET in the web group returning {csrf_token}"
   - each axios request is retried at most once (_retry flag)
   - raw fetch() callers (e.g. Budgets/Show account-type-order, PasskeyRegister) read the meta tag and get no automatic retry
+  - CSRF is enforced by the framework's ValidateCsrfToken with no app-level exceptions; webauthn/* requests send X-CSRF-TOKEN from the meta tag
 scenarios:
   - id: inertia_shares_live_token
     kind: happy_path
@@ -81,7 +82,6 @@ scenarios:
     coverage: not_applicable
     note: no resource ownership; same-origin policy prevents other sites reading the response.
 known_issues:
-  - App\Http\Middleware\VerifyCsrfToken is never registered (Laravel 12 uses ValidateCsrfToken), so its $except list including webauthn/* has no effect; webauthn routes are CSRF-protected in practice.
   - Raw fetch() writes do not go through the axios 419 retry, so they still fail if the page never navigated after a rotation.
 confidence: medium
 evidence:

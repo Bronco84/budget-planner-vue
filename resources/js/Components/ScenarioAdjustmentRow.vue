@@ -114,6 +114,7 @@
           <option value="weekly">Weekly</option>
           <option value="biweekly">Every Two Weeks</option>
           <option value="monthly">Monthly</option>
+          <option value="bimonthly">Twice a Month</option>
           <option value="quarterly">Quarterly</option>
           <option value="yearly">Yearly</option>
         </select>
@@ -138,9 +139,23 @@
         </select>
       </div>
 
-      <!-- Day of Month (for monthly/quarterly/yearly) -->
+      <!-- First Day of Month (for bimonthly / twice a month) -->
+      <div v-if="isBimonthly">
+        <label class="block text-sm font-medium text-gray-700 mb-1">First Day of Month</label>
+        <input
+          type="number"
+          min="1"
+          max="31"
+          :value="modelValue.first_day_of_month"
+          @input="updateField('first_day_of_month', parseInt($event.target.value))"
+          class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          placeholder="1-31"
+        />
+      </div>
+
+      <!-- Day of Month (for monthly/quarterly/yearly; second day for bimonthly) -->
       <div v-if="needsDayOfMonth">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Day of Month</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ isBimonthly ? 'Second Day of Month' : 'Day of Month' }}</label>
         <input
           type="number"
           min="1"
@@ -219,8 +234,10 @@ const needsDayOfWeek = computed(() => {
   return ['weekly', 'biweekly'].includes(props.modelValue.frequency);
 });
 
+const isBimonthly = computed(() => props.modelValue.frequency === 'bimonthly');
+
 const needsDayOfMonth = computed(() => {
-  return ['monthly', 'quarterly', 'yearly'].includes(props.modelValue.frequency);
+  return ['monthly', 'bimonthly', 'quarterly', 'yearly'].includes(props.modelValue.frequency);
 });
 
 const filteredAccounts = computed(() => {

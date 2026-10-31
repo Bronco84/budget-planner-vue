@@ -5,6 +5,7 @@ use App\Models\Budget;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\TransferService;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -184,3 +185,41 @@ test('updating a transaction converts dollars to the exact cent amount', functio
     '19.99' => [19.99, 1999],
     '-19.99' => [-19.99, -1999],
 ]);
+
+function transferLeg(): Transaction
+{
+    $transfer = app(TransferService::class)->create([
+        'budget_id' => test()->budget->id,
+        'from_account_id' => test()->account->id,
+        'to_account_id' => test()->savings->id,
+        'amount_in_cents' => 5000,
+        'date' => '2026-06-01',
+        'description' => 'Move to savings',
+    ]);
+
+    return $transfer->transactions()->where('account_id', test()->account->id)->sole();
+}
+
+test('updating a transfer leg is blocked and points to the transfer edit page', function () {
+    $leg = transferLeg();
+    $before = $leg->only(['account_id', 'description', 'amount_in_cents', 'date', 'category']);
+
+    $this->actingAs($this->user)
+        ->patch(route('budget.transaction.update', [$this->budget, $leg]), validTransactionUpdate())
+        ->assertRedirect(route('budget.transfers.edit', [$this->budget, $leg->transfer_id]))
+        ->assertSessionHas('error');
+
+    expect($leg->fresh()->only(array_keys($before)))->toEqual($before);
+});
+
+test('deleting a transfer leg is blocked and points to the transfer edit page', function () {
+    $leg = transferLeg();
+
+    $this->actingAs($this->user)
+        ->delete(route('budget.transaction.destroy', [$this->budget, $leg]))
+        ->assertRedirect(route('budget.transfers.edit', [$this->budget, $leg->transfer_id]))
+        ->assertSessionHas('error');
+
+    expect(Transaction::whereKey($leg->id)->exists())->toBeTrue()
+        ->and(Transaction::where('transfer_id', $leg->transfer_id)->count())->toBe(2);
+});

@@ -71,6 +71,9 @@
                         Multiple accounts at once
                       </div>
                     </div>
+                    <p v-if="!linkToken" class="mt-4 text-sm text-amber-600 dark:text-amber-400">
+                      Bank connections are unavailable right now. Try again later.
+                    </p>
                   </div>
                   <div class="absolute top-4 right-4">
                     <div class="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 text-xs font-medium px-2 py-1 rounded-full">

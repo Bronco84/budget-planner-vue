@@ -41,6 +41,7 @@ business_rules:
   - a user may not delete their last passkey (errors.passkey)
   - both mutations abort 403 when the credential's authenticatable_id is not the current user
   - deleting a passkey does not revoke trusted devices
+  - the profile's "Add New Passkey" links pass return=profile; PasskeyRegister then returns to profile.edit (only when the user already has a passkey), otherwise to budgets.index
 scenarios:
   - id: profile_lists_passkeys
     kind: happy_path
@@ -54,6 +55,14 @@ scenarios:
     description: An existing user completes a second attestation and now has two credentials.
     coverage: uncovered
     note: requires a WebAuthn attestation fixture.
+  - id: add_passkey_returns_to_profile
+    kind: alternate
+    description: Registration started from the profile (return=profile) sends the user back to the profile; first-passkey enrolment and unknown return values go to /budgets.
+    coverage: partial
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::adding a passkey from the profile returns to the profile afterwards'
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::first passkey enrolment and unknown return values go to the budgets page afterwards'
+    note: asserts the redirectTo prop; the client-side redirect after the ceremony is not browser tested.
   - id: rename_passkey
     kind: happy_path
     description: Renaming updates the alias and flashes a status.
@@ -85,8 +94,7 @@ scenarios:
     tests:
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot rename another users passkey'
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot delete another users passkey'
-known_issues:
-  - After adding a passkey PasskeyRegister always hard-redirects to /budgets rather than back to the profile.
+known_issues: []
 confidence: high
 evidence:
   - routes/auth.php auth group

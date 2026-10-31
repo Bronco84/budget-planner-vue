@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\DeviceFingerprintService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,9 +19,10 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): Response
+    public function edit(Request $request, DeviceFingerprintService $fingerprintService): Response
     {
         $user = $request->user();
+        $currentFingerprint = $fingerprintService->generate($request);
 
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
@@ -35,6 +37,7 @@ class ProfileController extends Controller
                     'last_used' => $credential->updated_at,
                 ]),
             'trustedDevices' => $user->trustedDevices()
+                ->valid()
                 ->orderBy('last_used_at', 'desc')
                 ->get()
                 ->map(fn ($device) => [
@@ -46,6 +49,7 @@ class ProfileController extends Controller
                     'auth_method' => $device->auth_method,
                     'last_used_at' => $device->last_used_at,
                     'created_at' => $device->created_at,
+                    'is_current' => hash_equals($device->device_fingerprint, $currentFingerprint),
                 ]),
         ]);
     }
@@ -57,11 +61,17 @@ class ProfileController extends Controller
     {
         $request->user()->fill($request->validated());
 
-        if ($request->user()->isDirty('email')) {
+        $emailChanged = $request->user()->isDirty('email');
+
+        if ($emailChanged) {
             $request->user()->email_verified_at = null;
         }
 
         $request->user()->save();
+
+        if ($emailChanged) {
+            $request->user()->sendEmailVerificationNotification();
+        }
 
         return Redirect::route('profile.edit');
     }

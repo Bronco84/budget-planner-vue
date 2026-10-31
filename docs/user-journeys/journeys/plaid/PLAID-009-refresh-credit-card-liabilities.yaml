@@ -62,10 +62,12 @@ scenarios:
     coverage: uncovered
   - id: other_users_connection_refused
     kind: authorization
-    description: Updating another user's connection redirects back with "Unauthorized access to this connection." and makes no Plaid call.
-    coverage: uncovered
+    description: Updating another user's connection returns 403 and makes no Plaid call.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLiabilitiesConnectionTest.php::refreshing another users connection is forbidden and calls no Plaid endpoint
 known_issues:
-  - the cross-user refusal is a redirect with an error flash (HTTP 302) rather than a 403, and the route path/name suggests admin-only access that is not enforced.
+  - the route path/name (/admin/plaid-liabilities, admin.*) suggests admin-only access that is not enforced.
 confidence: high
 evidence:
   - app/Http/Controllers/PlaidLiabilitiesController.php

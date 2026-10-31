@@ -195,6 +195,8 @@ const sendMessage = async () => {
     };
     messages.value.push(assistantMessage);
 
+    const previousConversationId = currentConversationId.value;
+
     try {
         // Build URL with query params for GET request (EventSource requirement)
         const url = new URL(route('chat.stream'), window.location.origin);
@@ -272,9 +274,23 @@ const sendMessage = async () => {
         });
 
         // Handle errors
+        // Fires for both the server's in-band `event: error` (a MessageEvent
+        // carrying a safe message in event.data) and transport failures (no data).
         eventSource.addEventListener('error', (event) => {
             console.error('❌ EventSource error:', event);
-            error.value = 'Connection error. Check console for details.';
+            let serverMessage = null;
+            if (event.data) {
+                try {
+                    serverMessage = JSON.parse(event.data).error || null;
+                } catch {
+                    serverMessage = null;
+                }
+            }
+            error.value = serverMessage || 'Connection error. Please try again.';
+
+            // The server discards a failed turn (and a conversation it just
+            // created), so fall back to the conversation we started from.
+            currentConversationId.value = previousConversationId;
             
             // Mark as no longer streaming
             const lastMessage = messages.value[messages.value.length - 1];

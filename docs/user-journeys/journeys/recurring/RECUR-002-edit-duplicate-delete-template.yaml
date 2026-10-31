@@ -36,6 +36,8 @@ postconditions:
 business_rules:
   - update uses the same validation as store (frequency/day rules, bimonthly distinct days, amount required unless dynamic)
   - rules omitted from the update payload are deleted; rule ids not belonging to the template are ignored
+  - submitted rules (new and existing) get priority = position in the payload + 1, matching store
+  - duplicate copies the template and its rules in one DB transaction
   - the template is resolved through the budget (scoped binding), so a template from another budget returns 404
   - all four actions require the budget update ability
 scenarios:
@@ -45,12 +47,18 @@ scenarios:
     coverage: uncovered
   - id: update_template_and_sync_rules
     kind: happy_path
-    description: Updating with a changed rule list updates, creates and deletes rules accordingly.
-    coverage: uncovered
+    description: Updating with a changed rule list updates, creates and deletes rules accordingly; every submitted rule gets priority = its position + 1, as on create.
+    coverage: partial
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateLifecycleTest.php::rules saved through the update form get priorities in submitted order
+    note: create and update of rules with priorities are asserted; deletion of omitted rules is not.
   - id: duplicate_template
     kind: alternate
-    description: Duplicate creates "Copy of ..." with the same schedule and dynamic flag.
-    coverage: uncovered
+    description: Duplicate creates "Copy of ..." with the same schedule and dynamic flag, and copies the template's matching rules (field, operator, value, case sensitivity, priority, active flag).
+    coverage: partial
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateLifecycleTest.php::duplicating a template copies its matching rules
+    note: rule copying and the "Copy of" name are asserted; schedule and dynamic flag are not compared field by field.
   - id: delete_template
     kind: alternate
     description: Delete removes the template and returns to the index.
@@ -85,8 +93,6 @@ scenarios:
     tests:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::updating a template to reference accounts from another budget is rejected and the template is unchanged
 known_issues:
-  - duplicate uses replicate() on the template only; matching rules are not copied, so the copy silently stops matching transactions that the original matched by rules.
-  - rules created through the update form get no priority value (store assigns index+1, update does not).
   - Delete relies on the transactions FK to unlink linked transactions; there is no confirmation of how many transactions lose their link.
 confidence: high
 evidence:

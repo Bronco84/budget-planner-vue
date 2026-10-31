@@ -28,20 +28,25 @@ business_rules:
   - users without a budget are redirected to budgets.create with a message
   - budget_id must pass BudgetPolicy view (owner only)
   - only events from active calendar connections are shown
+  - year (integer 1900-2100) and month (integer 1-12) are optional and validated; invalid values fail with 422 / validation redirect
 scenarios:
   - id: month_renders
     kind: happy_path
     description: The current month renders transactions, projected recurring items and calendar events.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Calendar/CalendarMonthValidationTest.php::the calendar renders the requested month
+    note: asserts the page and currentMonth only; calendar day contents are not asserted.
   - id: no_budget_redirect
     kind: empty_state
     description: A user with no budgets is redirected to budget creation.
     coverage: uncovered
   - id: invalid_month_params
     kind: validation
-    description: Non-numeric or out-of-range year/month parameters are handled.
-    coverage: uncovered
-    note: year/month are not validated before Carbon::create, see known_issues.
+    description: Non-numeric or out-of-range year/month parameters are rejected by validation instead of rolling over or raising a 500.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarMonthValidationTest.php::the calendar rejects an out of range or non-numeric year or month
   - id: inactive_connection_events_hidden
     kind: edge
     description: Events from a disabled connection are not shown.
@@ -52,8 +57,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users budget via calendar budget_id param
-known_issues:
-  - year and month query params are passed unvalidated to Carbon::create, so values like month=13 roll over silently and non-numeric values can raise a 500.
+known_issues: []
 confidence: medium
 evidence:
   - app/Http/Controllers/CalendarController.php index(), generateCalendarData(), projectRecurringTransactions()

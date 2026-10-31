@@ -38,7 +38,8 @@ business_rules:
   - order must be an array of strings each in User::ACCOUNT_TYPES
   - default order is User::ACCOUNT_TYPES when nothing is saved
   - on a failed save the client rebuilds the previous order
-  - generic POST /api/preferences/{key} accepts any key with a nullable value, except account_type_order which must be an array of known types; theme, notifications_enabled and show_balance_projection map to dedicated columns
+  - generic POST /api/preferences/{key} only accepts whitelisted keys (currently account_type_order, validated as a distinct array of known types); any other key is rejected with 422 on 'key'
+  - Show.vue's save sends Accept application/json so validation failures come back as 422 JSON
 scenarios:
   - id: save_order
     kind: happy_path
@@ -57,7 +58,16 @@ scenarios:
   - id: generic_preference_round_trip
     kind: alternate
     description: Writing a value via POST /api/preferences/{key} is returned by GET /api/preferences/{key}.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceValidationTest.php::a whitelisted preference written via the generic endpoint is returned by it
+  - id: generic_endpoint_whitelist
+    kind: validation
+    description: The generic endpoint rejects keys outside the whitelist (e.g. active_budget_id, budget_*_projection_months) and invalid values for whitelisted keys with 422, storing nothing.
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceValidationTest.php::the generic preference endpoint rejects keys outside the whitelist
+      - tests/Feature/Preferences/PreferenceValidationTest.php::the generic preference endpoint validates whitelisted values
   - id: failed_save_reverts_ui
     kind: recovery
     description: When the save fails the dragged sections snap back to the previous order.
@@ -69,8 +79,6 @@ scenarios:
     coverage: uncovered
 known_issues:
   - "Suspected: account types are free text (AccountController validates string max 50) but the order validator only allows User::ACCOUNT_TYPES, so a budget with any other type (e.g. a Plaid-provided type) can never save its order."
-  - "Show.vue's fetch omits Accept: application/json, so a validation failure becomes a 302 back to the page rather than a 422 JSON error."
-  - "Generic POST /api/preferences/{key} accepts arbitrary keys and unvalidated values (e.g. active_budget_id, budget_*_projection_months), bypassing the dedicated endpoints' validation."
   - GET /api/preferences/account-type-order and the generic show/update endpoints have no frontend caller.
 confidence: medium
 evidence:

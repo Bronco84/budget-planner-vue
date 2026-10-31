@@ -40,7 +40,8 @@ postconditions:
 business_rules:
   - include_in_budget toggles exclude_from_total_balance to its inverse
   - logo_url must be a URL (max 500)
-  - accounts with any transactions cannot be deleted
+  - custom_logo is optional; when present it must be a base64 data:image/(png|jpeg|gif|webp|svg+xml) URL or an https URL, at most 65535 characters (the TEXT column size)
+  - accounts with any transactions cannot be deleted; an account that is part of a transfer is refused with "This account has transfers. Delete its transfers first, then delete the account."
   - fetch-logo falls back to the account name when there is no Plaid institution, and flashes an error when no domain mapping exists
 scenarios:
   - id: edit_form_renders
@@ -52,7 +53,16 @@ scenarios:
   - id: owner_updates_account
     kind: happy_path
     description: Valid update persists and redirects to the dashboard.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Accounts/AccountEditTest.php::a valid custom logo is saved
+    note: only the custom_logo update is asserted; name/type/include_in_budget persistence is not.
+  - id: custom_logo_validated
+    kind: validation
+    description: A custom_logo that is not an image data URL or https URL, or is larger than the column, is rejected and nothing is saved.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountEditTest.php::a custom logo must be an image data URL or https URL within the size limit
   - id: fetch_and_clear_logo
     kind: alternate
     description: Fetch-logo stores a favicon URL for a mapped institution; clear-logo removes both logo fields.
@@ -73,6 +83,12 @@ scenarios:
     kind: edge
     description: Deleting an account that has transactions is refused with an error flash.
     coverage: uncovered
+  - id: delete_blocked_with_transfers
+    kind: edge
+    description: Deleting an account that is part of a transfer is refused with a flash explaining its transfers must be deleted first.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountEditTest.php::deleting an account that has transfers explains the transfers must be deleted first
   - id: other_users_account_forbidden
     kind: authorization
     description: Edit, update and delete on another user's budget/account return 403 and nothing changes.
@@ -98,9 +114,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access accounts
-known_issues:
-  - "custom_logo accepts an arbitrary unbounded string (base64 image) with no size or content validation."
-  - "Since transfers create transactions on both accounts, any account that was ever part of a transfer can only be deleted after its transfers are deleted; the error message does not explain this."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/AccountController.php edit/update/fetchLogo/clearLogo/destroy

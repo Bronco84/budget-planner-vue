@@ -71,11 +71,10 @@ class MagicLinkController extends Controller
             'email' => 'required|email',
         ]);
 
-        // Verify the token
-        $user = $this->magicLinkService->verifyToken($request->token);
+        // Verify the token (only consumed when it belongs to this email)
+        $user = $this->magicLinkService->verifyToken($request->token, $request->email);
 
-        // Also verify the email matches
-        if ($user && $user->email === $request->email) {
+        if ($user) {
             Auth::login($user);
             $request->session()->regenerate();
 

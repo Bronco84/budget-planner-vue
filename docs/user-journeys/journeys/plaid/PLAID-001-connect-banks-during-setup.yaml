@@ -47,6 +47,7 @@ business_rules:
   - initial balance is Plaid current balance in cents, or 0 when missing
   - institution details are looked up by metadata.institution.institution_id, falling back to a name search; missing details are tolerated
   - the connection is keyed by metadata.item.id (or metadata.item_id), so re-importing the same item reuses its connection; a random plaid-item-<uniqid> id is generated only when Link sends none
+  - an account already linked under that item keeps its local Account on re-import (no duplicate is created)
   - local account creation and linking run in one DB transaction; any failure rolls back every local write
   - an /accounts/get failure is an import error, not a zero-account success
   - a failed initial transaction sync keeps the imported accounts and adds a user-safe error flash
@@ -119,6 +120,12 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidImportTest.php::import uses the institution id and Plaid item id from Link metadata
       - tests/Feature/Plaid/PlaidImportTest.php::re-importing the same Plaid item reuses its connection
+  - id: reimport_linked_account_reuses_local_account
+    kind: edge
+    description: Re-importing an account already linked from the same item (same Plaid account id) reuses its local Account instead of creating a duplicate.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::re-importing an account that is already linked reuses its local account
   - id: import_is_atomic
     kind: recovery
     description: A failure while creating or linking the local accounts rolls back every local write, leaving no orphan accounts, PlaidAccounts or connection.
@@ -146,7 +153,6 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidImportTest.php::another users budget cannot be discovered, set up or imported into
 known_issues:
-  - 're-importing an account that is already linked (same Plaid item and account id) creates a second local Account and re-points the existing PlaidAccount at it, leaving the first local Account unlinked (inferred from linkAccountToConnection updateOrCreate on plaid_account_id+connection; not confirmed by a test).'
   - budgets.setup.import (POST budgets/{budget}/setup/connect) is not used by the UI; Discover.vue always posts to plaid.import.
 confidence: high
 evidence:

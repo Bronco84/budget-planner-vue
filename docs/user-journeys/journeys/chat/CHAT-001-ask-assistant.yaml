@@ -51,6 +51,8 @@ business_rules:
   - tools are scoped to the requested budget only if the user owns it, else to the user's active budget; with no budget no tools are offered
   - transaction queries are clamped to the last 12 months and the result count is capped
   - provider rate-limit/overload/too-large errors map to specific safe messages; anything else to a generic message; raw provider text is never returned
+  - when the provider fails or the reply fails validation, the persisted user message is deleted (and a conversation created by that request, if nothing else references it), matching the panel, which drops the turn
+  - ChatPanel shows the in-band SSE error message (event.data) when present, otherwise a generic connection error, and falls back to the conversation id it started from
 scenarios:
   - id: send_returns_reply
     kind: happy_path
@@ -116,11 +118,24 @@ scenarios:
   - id: provider_error_safe_message
     kind: integration
     description: Provider rate limit, overload or request-too-large failures return the specific safe message (JSON 500 on send, in-band SSE error event on stream) and log the real cause.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/ChatAssistantTest.php::a provider failure on send returns the safe message and leaves no orphan user message
+      - tests/Feature/ChatAssistantTest.php::a provider failure while streaming sends the safe message in-band and leaves no orphan user message
+    note: covers the rate-limit mapping only; overload, too-large and logging are not asserted.
+  - id: failed_turn_not_persisted
+    kind: recovery
+    description: A provider failure leaves no orphan user message, and no empty conversation when the conversation was new.
+    coverage: covered
+    tests:
+      - tests/Feature/ChatAssistantTest.php::a provider failure on send returns the safe message and leaves no orphan user message
+      - tests/Feature/ChatAssistantTest.php::a provider failure while streaming sends the safe message in-band and leaves no orphan user message
+      - tests/Feature/ChatAssistantTest.php::a provider failure while streaming a new conversation leaves no empty conversation behind
   - id: stream_error_ui_recovery
     kind: recovery
-    description: On a stream error the panel removes the pending messages and restores the input text.
+    description: On a stream error the panel shows the server's safe message (or a generic connection error), removes the pending messages and restores the input text.
     coverage: uncovered
+    note: client-side behaviour (ChatPanel.vue); needs a browser test.
   - id: other_users_conversation
     kind: authorization
     description: Sending, streaming or completing into another user's conversation_id returns 404 and does not append to it.
@@ -134,8 +149,6 @@ scenarios:
     description: Passing another user's budget_id does not expose that budget's data to the tools.
     coverage: uncovered
 known_issues:
-  - ChatPanel.vue's 'error' listener ignores event.data, so the safe provider message sent in-band is never shown; the user sees "Connection error. Check console for details."
-  - the user message is persisted before the provider call, but on error the panel pops it from the UI, so reloaded history shows a user message with no reply.
   - ChatPanel does not send budget_id, so tools always use the active budget; the question text travels in the GET query string (logged by web servers).
 confidence: high
 evidence:

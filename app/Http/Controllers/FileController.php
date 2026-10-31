@@ -197,20 +197,7 @@ class FileController extends Controller
                 ->log('downloaded');
 
             // Stream file from S3 through Laravel
-            $file = $attachment->file;
-            $fileContents = Storage::disk('s3')->get($file->hash);
-
-            // Get properly formatted Content-Disposition header with original filename
-            $contentDisposition = $this->fileService->getContentDispositionHeader($file->original_name);
-
-            return response($fileContents, 200, [
-                'Content-Type' => $file->mime_type,
-                'Content-Disposition' => $contentDisposition,
-                'Content-Length' => $file->size_bytes,
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
-                'Pragma' => 'no-cache',
-                'Expires' => '0',
-            ]);
+            return $this->fileService->downloadResponse($attachment);
         } catch (\Exception $e) {
             abort(500, 'Failed to download file');
         }

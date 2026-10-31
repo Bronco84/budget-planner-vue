@@ -374,15 +374,6 @@ class ProjectionsController extends Controller
             $endDate
         );
 
-        \Log::info('Autopay projections generated', [
-            'count' => $autopayProjections->count(),
-            'projections' => $autopayProjections->map(fn ($p) => [
-                'account_id' => $p->account_id,
-                'date' => $p->date->format('Y-m-d'),
-                'amount' => $p->amount_in_cents,
-            ])->toArray(),
-        ]);
-
         // Convert autopay projections from objects to arrays for consistency
         $autopayProjections = $autopayProjections->map(function ($projection) {
             return (array) $projection;

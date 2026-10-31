@@ -92,8 +92,13 @@ scenarios:
     tests:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::storing a template with an account from another budget is rejected and nothing is saved
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::storing a template with an autopay card from another budget is rejected and nothing is saved
-known_issues:
-  - index logs the full first account record to the info log on every request (leftover debug logging).
+  - id: index_does_not_log_accounts
+    kind: edge
+    description: Opening the recurring index writes no account records to the info log.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateLifecycleTest.php::the recurring index does not write account records to the log
+known_issues: []
 confidence: high
 evidence:
   - routes/web.php recurring-transactions.redirect closure and recurring-transactions routes

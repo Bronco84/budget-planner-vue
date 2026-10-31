@@ -42,6 +42,8 @@ steps:
 postconditions:
   - incorrectly matched transactions are no longer linked to the template
 business_rules:
+  - the linked list is filtered to the budget in the URL
+  - test-matching entity matches check merchant_entity_id and the entity_id of each counterparty (array cast; a raw JSON string is searched as text)
   - test-matching precedence is Plaid entity id, then all active rules, then description (exact, contains when template description is 5+ chars, fuzzy at 70% similarity)
   - unlink returns 403 if the transaction belongs to another budget and 400 if it is not linked to this template
   - diagnostics, test-matching and linked need budget view; unlink needs budget update
@@ -62,6 +64,24 @@ scenarios:
     kind: validation
     description: Unlinking a transaction that is not linked to this template returns 400.
     coverage: uncovered
+  - id: linked_list_scoped_to_budget
+    kind: authorization
+    description: The linked list only shows transactions from the budget in the URL, even if another budget's transaction carries the template id.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleRoutesTest.php::the linked list only shows transactions from the routed budget
+  - id: test_matching_entity_from_array_counterparties
+    kind: edge
+    description: Test matching reports an entity_id match when the Plaid transaction's counterparties (cast to an array) or merchant_entity_id contain the template's plaid_entity_id.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleRoutesTest.php::test matching reports plaid entity id matches from array counterparties
+  - id: test_matching_without_account
+    kind: edge
+    description: Test matching for a template whose account was deleted returns zero tested and zero matches instead of erroring.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleRoutesTest.php::test matching for a template without an account returns no matches
   - id: no_linked_transactions
     kind: empty_state
     description: Linked list for a template with no links renders an empty page.
@@ -74,10 +94,7 @@ scenarios:
     kind: authorization
     description: Another user cannot read diagnostics, test matching or linked lists for a budget they do not own.
     coverage: uncovered
-known_issues:
-  - rules.linked lists Transaction::where('recurring_transaction_template_id', ...) without a budget filter; combined with the unscoped linking in RECUR-005/RECUR-006 a user can link another budget's transaction to their own template and then read it here.
-  - test-matching only checks the Plaid entity id when counterparties is_string, but PlaidTransaction casts counterparties to an array, so entity_id matches are never reported (and merchant_entity_id is not checked) even though findMatchingTransactionsForTemplates would match them; test results disagree with real matching.
-  - test-matching dereferences $recurring_transaction->account without a null check.
+known_issues: []
 confidence: medium
 evidence:
   - app/Http/Controllers/RecurringTransactionController.php diagnostics/testMatching

@@ -55,6 +55,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Services/TransferServiceTest.php::delete removes the transfer and its paired transactions
+  - id: clear_description
+    kind: edge
+    description: Saving with an empty description clears it, and both legs fall back to the default description.
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferPagesTest.php::updating a transfer with an empty description clears it back to the default
   - id: missing_leg_recreated
     kind: recovery
     description: If a leg was deleted separately, update recreates it.
@@ -90,8 +96,7 @@ scenarios:
       - tests/Feature/Transfers/TransferPagesTest.php::the transfers index url redirects to the budget dashboard
       - tests/Feature/Transfers/TransferPagesTest.php::the transfer show url redirects to its edit page
       - tests/Feature/Transfers/TransferPagesTest.php::another users transfer urls are forbidden
-known_issues:
-  - "Update uses ?? for description, so a description cannot be cleared back to the default once set."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/TransferController.php index/show/edit/update/destroy

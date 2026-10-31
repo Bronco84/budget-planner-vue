@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PlaidConnection;
+use App\Models\Transfer;
 use App\Services\PlaidService;
 use App\Traits\InstitutionDomainMapping;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class AccountController extends Controller
@@ -46,7 +48,7 @@ class AccountController extends Controller
         $linkToken = null;
         try {
             $plaidService = app(PlaidService::class);
-            $linkToken = $plaidService->createLinkToken($budget);
+            $linkToken = $plaidService->createLinkToken((string) Auth::id());
         } catch (\Exception $e) {
             \Log::error('Failed to create Plaid link token: '.$e->getMessage());
         }
@@ -114,8 +116,18 @@ class AccountController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:50',
             'include_in_budget' => 'boolean',
-            'custom_logo' => 'nullable|string',
+            // A base64 image data URL (from the upload control) or an https URL,
+            // capped at the size of the TEXT column that stores it.
+            'custom_logo' => [
+                'nullable',
+                'string',
+                'max:65535',
+                'regex:~^(data:image/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}|https://\S+)$~',
+            ],
             'logo_url' => 'nullable|string|url|max:500',
+        ], [
+            'custom_logo.max' => 'The logo image is too large. Please choose an image under about 48 KB.',
+            'custom_logo.regex' => 'The logo must be a PNG, JPEG, GIF, WebP or SVG image, or an https URL.',
         ]);
 
         // Auto-sync: excluded accounts are also excluded from total balance
@@ -218,6 +230,15 @@ class AccountController extends Controller
     {
         $this->authorize('delete', $account);
 
+        // Transfers create a transaction on both accounts, so they must go first.
+        $hasTransfers = Transfer::where('from_account_id', $account->id)
+            ->orWhere('to_account_id', $account->id)
+            ->exists();
+
+        if ($hasTransfers) {
+            return back()->with('error', 'This account has transfers. Delete its transfers first, then delete the account.');
+        }
+
         // Don't allow deletion if there are transactions
         if ($account->transactions()->count() > 0) {
             return back()->with('error', 'Cannot delete account with existing transactions.');
@@ -235,6 +256,8 @@ class AccountController extends Controller
      */
     public function updateAutopay(Request $request, Budget $budget, Account $account): RedirectResponse
     {
+        $this->authorize('update', $account);
+
         // Validate account is a credit card
         if (! $account->isAutopayEligible()) {
             return redirect()->back()->with('error', 'Autopay is only available for credit card accounts with statement data.');
@@ -246,6 +269,10 @@ class AccountController extends Controller
             'autopay_source_account_id' => 'nullable|exists:accounts,id',
             'autopay_amount_override_cents' => 'nullable|integer|min:0',
         ]);
+
+        // Both fields are optional; an omitted key means null.
+        $validated['autopay_source_account_id'] ??= null;
+        $validated['autopay_amount_override_cents'] ??= null;
 
         // Additional validation: source account must be specified if autopay enabled
         if ($validated['autopay_enabled'] && ! $validated['autopay_source_account_id']) {

@@ -421,6 +421,8 @@ async function createTemplates() {
             // Include Plaid entity information for reliable matching
             plaid_entity_id: pattern.original.plaid_entity_id || null,
             plaid_entity_name: pattern.original.plaid_entity_name || null,
+            // Link the transactions that formed the pattern to the new template
+            transaction_ids: (pattern.original.transactions || []).map(t => t.id),
         }))
 
         await emit('create', templatesData)

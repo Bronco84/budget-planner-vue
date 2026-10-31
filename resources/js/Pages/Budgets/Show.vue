@@ -1308,6 +1308,7 @@ const saveAccountTypeOrder = async (order) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
     },
     body: JSON.stringify({ order })
@@ -1373,7 +1374,9 @@ onUnmounted(() => {
 
 const loadBudgetAttachments = async () => {
   try {
-    const response = await fetch(`/budgets/${props.budget.id}/files`);
+    const response = await fetch(`/budgets/${props.budget.id}/files`, {
+      headers: { Accept: 'application/json' },
+    });
     if (response.ok) {
       const data = await response.json();
       budgetAttachments.value = data.attachments;

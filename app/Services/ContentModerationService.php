@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 
 class ContentModerationService
 {
@@ -82,12 +83,6 @@ class ContentModerationService
             }
         }
 
-        // Check length - extremely long messages might be an attack
-        if (strlen($content) > 5000) {
-            $flags[] = 'excessive_length';
-            $this->logSuspiciousActivity($user, 'excessive_length', substr($content, 0, 200).'...');
-        }
-
         // Check for repeated characters (possible spam)
         if (preg_match('/(.)\1{20,}/', $content)) {
             $flags[] = 'repeated_characters';
@@ -116,7 +111,7 @@ class ContentModerationService
         }
 
         // Warn for less severe issues
-        if (in_array('excessive_length', $flags) || in_array('repeated_characters', $flags)) {
+        if (in_array('repeated_characters', $flags)) {
             return 'warn';
         }
 
@@ -129,41 +124,41 @@ class ContentModerationService
     }
 
     /**
-     * Check rate limits for a user
+     * Check rate limits for a user: 30 messages per fixed one-hour window that
+     * starts with the first message. Rejections are logged but are not
+     * offenses, so retrying past the limit cannot escalate to a ban.
      */
     public function checkRateLimit(User $user): array
     {
-        $cacheKey = "chat_rate_limit_user_{$user->id}";
-        $requests = Cache::get($cacheKey, 0);
-
-        // Allow 30 messages per hour
+        $key = "chat_messages_user_{$user->id}";
         $limit = 30;
-        $remaining = max(0, $limit - $requests);
 
-        if ($requests >= $limit) {
-            $this->logSuspiciousActivity($user, 'rate_limit_exceeded', "User exceeded {$limit} messages per hour");
+        if (RateLimiter::tooManyAttempts($key, $limit)) {
+            Log::warning('Chat rate limit exceeded', [
+                'user_id' => $user->id,
+                'limit' => $limit,
+            ]);
 
             return [
                 'allowed' => false,
                 'remaining' => 0,
                 'limit' => $limit,
-                'reset_in_seconds' => Cache::get("{$cacheKey}_ttl", 3600),
+                'reset_in_seconds' => RateLimiter::availableIn($key),
             ];
         }
 
-        // Increment counter
-        Cache::put($cacheKey, $requests + 1, now()->addHour());
-        Cache::put("{$cacheKey}_ttl", 3600, now()->addHour());
+        RateLimiter::hit($key, 3600);
 
         return [
             'allowed' => true,
-            'remaining' => $remaining - 1,
+            'remaining' => RateLimiter::remaining($key, $limit),
             'limit' => $limit,
         ];
     }
 
     /**
-     * Track conversation for suspicious patterns
+     * Track newly created conversations for rapid-creation abuse. Callers
+     * pass only conversations created by the current request.
      */
     public function trackConversationActivity(User $user, int $conversationId): void
     {

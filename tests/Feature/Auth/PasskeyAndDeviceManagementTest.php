@@ -5,6 +5,7 @@ use App\Models\Budget;
 use App\Models\TrustedDevice;
 use App\Models\User;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia;
 
 function trustedDevice(User $user, array $overrides = []): TrustedDevice
 {
@@ -147,4 +148,23 @@ test('the new device login email links to the profile page to manage devices', f
     $html = (new NewDeviceLogin($user, $device))->render();
 
     expect($html)->toContain(route('profile.edit'));
+});
+
+test('the profile lists only unexpired trusted devices and flags the current one', function () {
+    $user = User::factory()->create();
+    $headers = ['User-Agent' => 'PestBrowser/1.0', 'Accept-Language' => 'en-US', 'Accept-Encoding' => 'gzip'];
+    $fingerprint = hash('sha256', implode('|', array_values($headers)));
+
+    $current = trustedDevice($user, ['device_fingerprint' => $fingerprint]);
+    $other = trustedDevice($user);
+    trustedDevice($user, ['expires_at' => now()->subDay()]);
+
+    $this->actingAs($user)
+        ->withHeaders($headers)
+        ->get(route('profile.edit'))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Profile/Edit')
+            ->has('trustedDevices', 2)
+            ->where('trustedDevices', fn ($devices) => collect($devices)->pluck('is_current', 'id')->sortKeys()->all()
+                === collect([$current->id => true, $other->id => false])->sortKeys()->all()));
 });

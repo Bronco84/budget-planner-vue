@@ -95,7 +95,6 @@ scenarios:
       - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access budgets
 known_issues:
   - "BudgetService::getAccountTransactions only returns past-dated rows that have a plaid_transaction_id (Plaid is treated as source of truth), so manual transactions dated today or earlier never appear in the dashboard ledger, even for manual-only accounts. Ledger tests therefore use future-dated manual transactions."
-  - "Budgets/Show.vue loadBudgetAttachments() fetch()es GET /budgets/{id}/files expecting JSON, but that route is BudgetFilesController@index (an Inertia page). response.json() fails and the error is swallowed, so the dashboard's budget-attachment list never loads. FileController@getBudgetAttachments (the JSON variant) has no route."
   - "Shared budgets: User::hasBudget/accessibleBudgets include connected_users, but BudgetPolicy::view is owner-only, so a connected user who selects a shared budget gets 403 here."
 confidence: high
 evidence:

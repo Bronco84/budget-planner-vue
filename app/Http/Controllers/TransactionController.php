@@ -198,6 +198,10 @@ class TransactionController extends Controller
     {
         $this->authorize('update', $transaction);
 
+        if ($transaction->transfer_id) {
+            return $this->redirectToTransfer($budget, $transaction);
+        }
+
         $validated = $request->validate([
             'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'description' => 'required|string|max:255',
@@ -230,10 +234,24 @@ class TransactionController extends Controller
     {
         $this->authorize('delete', $transaction);
 
+        if ($transaction->transfer_id) {
+            return $this->redirectToTransfer($budget, $transaction);
+        }
+
         $transaction->delete();
 
         return redirect()->route('budget.transaction.index', $budget)
             ->with('message', 'Transaction deleted successfully');
+    }
+
+    /**
+     * Transfer legs are kept in sync by TransferService, so they can only be
+     * changed through their transfer.
+     */
+    private function redirectToTransfer(Budget $budget, Transaction $transaction): RedirectResponse
+    {
+        return redirect()->route('budget.transfers.edit', [$budget, $transaction->transfer_id])
+            ->with('error', 'This transaction is part of a transfer. Edit or delete the transfer instead.');
     }
 
     /**

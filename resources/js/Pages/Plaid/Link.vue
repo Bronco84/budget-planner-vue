@@ -281,10 +281,14 @@
               </p>
               <button
                 @click="openPlaidLink"
-                class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                :disabled="!linkToken"
+                class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-sm text-white uppercase tracking-widest hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ hasExistingConnection ? 'Add More Accounts' : 'Connect to Bank' }}
               </button>
+              <p v-if="!linkToken" class="mt-3 text-sm text-amber-600">
+                Bank connections are unavailable right now. Try again later.
+              </p>
             </div>
 
             <form
@@ -368,10 +372,10 @@ const initializePlaid = () => {
         publicTokenInput.value.value = public_token;
         metadataInput.value.value = JSON.stringify(metadata);
         
-        // Make sure metadata has the necessary structure for our controller
+        // The server generates an item id when Link metadata has none.
         const enhancedMetadata = {
           ...metadata,
-          item: metadata.item || { id: metadata.item_id || `plaid-item-${Date.now()}` }
+          item: metadata.item || { id: metadata.item_id || null }
         };
         
         // Use Inertia to post the data instead of a form submission

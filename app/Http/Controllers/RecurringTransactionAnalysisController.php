@@ -103,9 +103,43 @@ class RecurringTransactionAnalysisController extends Controller
      */
     public function createTemplates(Request $request, Budget $budget)
     {
+        // Creating templates writes to the budget; the controller middleware only checks view.
+        $this->authorize('update', $budget);
+
+        $frequencies = 'in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly';
+
         $validated = $request->validate([
             'account_id' => ['required', Rule::exists('accounts', 'id')->where('budget_id', $budget->id)],
             'selected_patterns' => 'required|array',
+            'selected_patterns.*' => 'array',
+            'selected_patterns.*.description' => 'required|string|max:255',
+            'selected_patterns.*.category' => 'nullable|string|max:255',
+            'selected_patterns.*.frequency' => 'required|string|'.$frequencies,
+            // Modal confirmations send start_date; raw analysis patterns send suggested_start_date.
+            'selected_patterns.*.start_date' => 'nullable|required_without:selected_patterns.*.suggested_start_date|date',
+            'selected_patterns.*.suggested_start_date' => 'nullable|date',
+            'selected_patterns.*.end_date' => 'nullable|date',
+            'selected_patterns.*.amount' => 'nullable|numeric',
+            'selected_patterns.*.amount_in_cents' => 'nullable|integer',
+            'selected_patterns.*.amount_type' => 'nullable|in:static,dynamic',
+            'selected_patterns.*.min_amount' => 'nullable|numeric',
+            'selected_patterns.*.max_amount' => 'nullable|numeric',
+            'selected_patterns.*.day_of_week' => 'nullable|integer|min:0|max:6',
+            'selected_patterns.*.day_of_month' => 'nullable|integer|min:1|max:31',
+            'selected_patterns.*.first_day_of_month' => 'nullable|integer|min:1|max:31',
+            'selected_patterns.*.bimonthly_first_day' => 'nullable|integer|min:1|max:31',
+            'selected_patterns.*.bimonthly_second_day' => 'nullable|integer|min:1|max:31',
+            'selected_patterns.*.plaid_entity_id' => 'nullable|string|max:255',
+            'selected_patterns.*.plaid_entity_name' => 'nullable|string|max:255',
+            'selected_patterns.*.transaction_ids' => 'nullable|array',
+            'selected_patterns.*.transaction_ids.*' => 'integer',
+            'selected_patterns.*.transactions' => 'nullable|array',
+            'selected_patterns.*.transactions.*.id' => 'integer',
+            // Raw analysis patterns (legacy path)
+            'selected_patterns.*.is_dynamic_amount' => 'nullable|boolean',
+            'selected_patterns.*.confidence_score' => 'nullable|numeric',
+            'selected_patterns.*.amount_stats' => 'nullable|array',
+            'selected_patterns.*.amount_stats.*' => 'nullable|numeric',
         ]);
 
         $account = Account::findOrFail($validated['account_id']);
@@ -129,15 +163,24 @@ class RecurringTransactionAnalysisController extends Controller
                 'templates' => $result['templates'],
             ];
 
+            $redirect = redirect()->route('recurring-transactions.index', $budget->id);
+
             if (! empty($result['errors'])) {
                 $response['errors'] = $result['errors'];
-                $response['message'] = 'Some templates could not be created. See errors for details.';
-            } else {
-                $response['message'] = 'Successfully created '.$result['created_templates'].' recurring transaction templates.';
+                $response['message'] = sprintf(
+                    'Created %d of %d templates. %d could not be created.',
+                    $result['created_templates'],
+                    $result['total_requested'],
+                    count($result['errors'])
+                );
+
+                return $redirect->with('error', $response['message'])
+                    ->with('template_creation_result', $response);
             }
 
-            return redirect()->route('recurring-transactions.index', $budget->id)
-                ->with('success', $response['message'])
+            $response['message'] = 'Successfully created '.$result['created_templates'].' recurring transaction templates.';
+
+            return $redirect->with('message', $response['message'])
                 ->with('template_creation_result', $response);
 
         } catch (\Exception $e) {

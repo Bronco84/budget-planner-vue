@@ -84,3 +84,30 @@ test('another users transfer urls are forbidden', function () {
         ->get(route('budget.transfers.show', [$this->budget, $this->transfer]))
         ->assertForbidden();
 });
+
+test('updating a transfer with an empty description clears it back to the default', function () {
+    $transfer = app(TransferService::class)->create([
+        'budget_id' => $this->budget->id,
+        'from_account_id' => $this->checking->id,
+        'to_account_id' => $this->savings->id,
+        'amount_in_cents' => 5000,
+        'date' => '2026-06-01',
+        'description' => 'Rainy day fund',
+    ]);
+
+    $this->actingAs($this->user)
+        ->patch(route('budget.transfers.update', [$this->budget, $transfer]), [
+            'from_account_id' => $this->checking->id,
+            'to_account_id' => $this->savings->id,
+            'amount' => 50,
+            'date' => '2026-06-01',
+            'description' => '',
+        ])
+        ->assertRedirect(route('budgets.show', $this->budget));
+
+    $transfer->refresh();
+
+    expect($transfer->description)->toBeNull()
+        ->and($transfer->transactions()->pluck('description')->unique()->all())
+        ->toBe([$transfer->default_description]);
+});

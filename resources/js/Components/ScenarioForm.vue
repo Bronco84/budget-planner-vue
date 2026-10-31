@@ -238,6 +238,7 @@ watch(() => props.scenario, (newScenario) => {
         frequency: adj.frequency || '',
         day_of_week: adj.day_of_week ?? '',
         day_of_month: adj.day_of_month ?? '',
+        first_day_of_month: adj.first_day_of_month ?? '',
         description: adj.description || '',
       })) || [],
     };
@@ -264,6 +265,7 @@ const addAdjustment = () => {
     frequency: '',
     day_of_week: '',
     day_of_month: '',
+    first_day_of_month: '',
     description: '',
   });
 };
@@ -303,6 +305,10 @@ const handleSubmit = async () => {
     }
     if (adj.adjustment_type !== 'one_time_expense' && !adj.frequency) {
       error.value = `Adjustment ${i + 1}: Please select a frequency`;
+      return;
+    }
+    if (adj.frequency === 'bimonthly' && (!adj.first_day_of_month || !adj.day_of_month || adj.first_day_of_month === adj.day_of_month)) {
+      error.value = `Adjustment ${i + 1}: Please enter two different days of the month`;
       return;
     }
   }

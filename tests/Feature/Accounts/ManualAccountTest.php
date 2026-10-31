@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\PlaidService;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\FakePlaidApi;
 
 /*
  * ACCOUNT-001: owner adds a manual account to a budget.
@@ -175,3 +176,14 @@ test('storing a manual account converts the balance to the exact cent amount', f
     '0.29' => [0.29, 29],
     '19.99' => [19.99, 1999],
 ]);
+
+test('create account page sends the user id as the Plaid client user id', function () {
+    $plaid = FakePlaidApi::install()->on('/link/token/create', ['link_token' => 'link-sandbox-account']);
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.accounts.create', $this->budget))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('linkToken', 'link-sandbox-account'));
+
+    expect($plaid->bodyFor('/link/token/create')['user']['client_user_id'])->toBe((string) $this->user->id);
+});

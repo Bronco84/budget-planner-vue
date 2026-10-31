@@ -28,7 +28,7 @@ postconditions:
   - guest remains unauthenticated
 business_rules:
   - a token is valid only while expires_at is in the future and used_at is null
-  - the email query parameter must equal the token owner's email
+  - the email query parameter must equal the token owner's email; MagicLinkService::verifyToken checks it before marking the token used, so a mismatched request does not consume the link
   - missing token or email fails request validation
 scenarios:
   - id: invalid_link_redirects_to_login
@@ -62,6 +62,12 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/MagicLinkTest.php::a magic link presented with a different email address is rejected'
+  - id: email_mismatch_does_not_consume_link
+    kind: edge
+    description: A mismatched-email attempt leaves the token unused, so the link still signs in its owner afterwards.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::a magic link presented with the wrong email is not consumed and still works for its owner'
   - id: error_reaches_login_page
     kind: recovery
     description: The login page receives errors.magic_link ("Invalid or expired magic link.") and PasskeyLogin.vue shows it in its error banner.
@@ -69,8 +75,7 @@ scenarios:
     tests:
       - tests/Feature/Auth/MagicLinkTest.php::the login page receives the invalid magic link error so it can be shown
     note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
-known_issues:
-  - verifyToken marks the token used before the controller checks the email, so a mismatched-email request burns a still-valid link.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/MagicLinkController.php authenticate()

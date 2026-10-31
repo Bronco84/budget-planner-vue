@@ -25,13 +25,9 @@ const formatDate = (dateString) => {
   });
 };
 
-const isCurrentDevice = (device) => {
-  if (props.trustedDevices.length === 0) return false;
-  const mostRecent = props.trustedDevices.reduce((prev, current) => {
-    return new Date(current.last_used_at) > new Date(prev.last_used_at) ? current : prev;
-  });
-  return device.id === mostRecent.id;
-};
+// The server flags the device whose fingerprint matches this request
+// (the one "revoke all others" keeps).
+const isCurrentDevice = (device) => device.is_current === true;
 
 const confirmRevoke = (device) => {
   deviceToRevoke.value = device;
@@ -84,7 +80,7 @@ const revokeAllDevices = () => {
     <div class="mt-6 flex justify-between items-center flex-wrap gap-4">
       <div>
         <Link
-          :href="route('passkey.register')"
+          :href="route('passkey.register', { return: 'profile' })"
           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,7 +151,7 @@ const revokeAllDevices = () => {
                     <svg class="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
-                    Current Device
+                    This device
                   </span>
                 </div>
                 <div class="mt-2 text-sm text-gray-500 dark:text-gray-400 space-y-1">

@@ -34,7 +34,7 @@ steps:
   - action: refresh the browser on the POST URL (GET .../analyze or GET .../create-templates)
     expected: redirected back to the analysis page instead of a 405
   - action: select patterns, confirm in the modal and submit (POST .../create-templates)
-    expected: templates created; redirect to recurring index with "Successfully created N recurring transaction templates."
+    expected: templates created and the pattern's transactions linked; redirect to recurring index with "Successfully created N recurring transaction templates."
 postconditions:
   - new RecurringTransactionTemplates exist for the account
 business_rules:
@@ -43,7 +43,9 @@ business_rules:
   - the account must belong to the budget in the URL (scoped exists validation, otherwise a validation error)
   - pattern transactions linked on create-templates are limited to the budget's own transactions
   - unexpected failures flash a generic "Analysis failed" / "Template creation failed" message; the exception is logged
-  - every action is guarded by can:view,budget (including template creation)
+  - every action is guarded by can:view,budget; create-templates additionally requires the budget update ability
+  - each selected_patterns item is validated (description, frequency, start date, amounts, days, transaction ids); a modal confirmation links the transactions that formed the pattern (transaction_ids), limited to the budget's own transactions
+  - full success flashes message; any per-item failure flashes error "Created X of Y templates. N could not be created."
 scenarios:
   - id: detects_monthly_pattern
     kind: happy_path
@@ -58,7 +60,9 @@ scenarios:
   - id: create_templates_from_confirmation
     kind: happy_path
     description: Confirmed patterns become templates and the user lands on the recurring index with a success flash.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisTemplateCreationTest.php::templates confirmed in the modal link the budgets transactions that formed the pattern
   - id: below_min_occurrences_ignored
     kind: edge
     description: Groups with fewer occurrences than min_occurrences are not reported.
@@ -112,11 +116,32 @@ scenarios:
     tests:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::analysis failures show a generic message instead of the exception text
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::template creation failures show a generic message instead of the exception text
+  - id: confirmed_templates_link_pattern_transactions
+    kind: alternate
+    description: Templates confirmed in the modal link the transactions that formed the pattern (budget-scoped), so they do not reappear in the next analysis.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisTemplateCreationTest.php::templates confirmed in the modal link the budgets transactions that formed the pattern
+  - id: create_templates_requires_update
+    kind: authorization
+    description: Creating templates requires the budget update ability, not just view.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisTemplateCreationTest.php::creating templates from analysis requires the budget update ability
+  - id: selected_patterns_validation
+    kind: validation
+    description: selected_patterns items with a missing description, unknown frequency, invalid start date, non-numeric amount or out-of-range day are rejected and nothing is created.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisTemplateCreationTest.php::selected pattern items with missing or invalid fields are rejected and nothing is created
+  - id: partial_failure_flash
+    kind: recovery
+    description: When some templates fail to be created the redirect uses the error flash with a created/requested count instead of the success flash.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisTemplateCreationTest.php::partial template creation failures use the error flash instead of the success flash
 known_issues:
-  - Confirmation-path templates store average_amount in dollars while min_amount/max_amount are stored in cents; the legacy path stores average in dollars and min/max from amount_stats, so units are inconsistent.
-  - Templates created via the confirmation modal never link the transactions that formed the pattern (linkMatchingTransactionsToTemplate returns 0), so the same transactions remain unlinked and reappear in the next analysis.
-  - selected_patterns items are not validated; failures become per-item errors stored in the template_creation_result session key, but the redirect always uses the success flash (with "Some templates could not be created" text), so partial failures are easy to miss.
-  - Template creation is a write action guarded only by the budget view ability.
+  - average_amount is treated as dollars everywhere it is read (forms, RecurringTransactionService, calculateDynamicAmount) while min_amount/max_amount are cents, and the column is an integer, so fractional dollars are rounded/truncated on MySQL; calculateDynamicAmount also treats the cents min/max midpoint as dollars. Fixing units needs a schema change plus a data migration and updates to every reader.
 confidence: high
 evidence:
   - app/Http/Controllers/RecurringTransactionAnalysisController.php

@@ -32,6 +32,7 @@ postconditions:
   - transaction updated or deleted; activity recorded
 business_rules:
   - same validation as create, scoped to the budget
+  - transfer legs (transfer_id set) cannot be updated or deleted here; the request redirects to the transfer's edit page with an error flash and nothing changes
 scenarios:
   - id: edit_page_renders
     kind: happy_path
@@ -86,14 +87,20 @@ scenarios:
     tests:
       - tests/Feature/SecurityAuthorizationTest.php::transaction must belong to budget in route
       - tests/Feature/NestedRouteAuthorizationTest.php::transaction routes reject a cross-budget transaction with 404
+  - id: transfer_leg_write_blocked
+    kind: validation
+    description: Updating or deleting a transaction that is a transfer leg is blocked and redirects to budget.transfers.edit with an error; both legs stay unchanged.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::updating a transfer leg is blocked and points to the transfer edit page
+      - tests/Feature/Transactions/EditTransactionTest.php::deleting a transfer leg is blocked and points to the transfer edit page
   - id: activity_log_cross_user
     kind: authorization
     description: Activity log for another user's transaction returns 403.
     coverage: covered
     tests:
       - tests/Feature/Transactions/EditTransactionTest.php::user cannot read the activity log of another users transaction
-known_issues:
-  - "Transfer legs (transactions with transfer_id) can be edited or deleted here independently; nothing blocks it, leaving the Transfer and its pair out of sync (TransferService only re-syncs on transfer update)."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/TransactionController.php edit/update/destroy/getActivityLog

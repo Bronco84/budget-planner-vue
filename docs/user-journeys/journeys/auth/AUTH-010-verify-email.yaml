@@ -17,6 +17,7 @@ routes:
   - verification.notice
   - verification.send
   - verification.verify
+  - profile.update
 integrations:
   - Mail (framework VerifyEmail notification)
 steps:
@@ -32,6 +33,8 @@ business_rules:
   - verify link requires a valid signature and the sha1 hash of the user's email; throttled 6/min
   - resend is throttled 6/min and is a no-op redirect for verified users
   - no route uses the verified middleware, so verification does not gate any feature
+  - changing the email on the profile clears email_verified_at and sends a new verification email
+  - passkey enforcement (AUTH-007) lets passkeyless users reach verify-email* and email/verification-notification
 scenarios:
   - id: prompt_renders
     kind: happy_path
@@ -54,7 +57,22 @@ scenarios:
   - id: resend_notification
     kind: alternate
     description: Requesting a new link sends the notification and flashes verification-link-sent.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a user without a passkey can still reach the email verification routes'
+  - id: email_change_sends_verification
+    kind: alternate
+    description: Changing the email on the profile sends a new verification email; saving without an email change sends none.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Profile/ProfileValidationTest.php::changing the email sends a new verification email'
+      - 'tests/Feature/Profile/ProfileValidationTest.php::saving the profile without changing the email sends no verification email'
+  - id: passkeyless_user_can_verify
+    kind: edge
+    description: With passkey enforcement on, a user without a passkey can still open the prompt and request a link.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a user without a passkey can still reach the email verification routes'
   - id: already_verified_redirected
     kind: edge
     description: A verified user hitting the prompt or resend is redirected to the dashboard.
@@ -63,9 +81,7 @@ scenarios:
     kind: authentication
     description: Unsigned/expired links or guests cannot verify an address.
     coverage: uncovered
-known_issues:
-  - Changing email on the profile clears email_verified_at but sends no new verification email.
-  - With passkey enforcement active, a passkeyless user is redirected away from the verify-email routes.
+known_issues: []
 confidence: high
 evidence:
   - routes/auth.php auth group

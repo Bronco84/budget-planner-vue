@@ -310,3 +310,26 @@ test('deleting a plan removes it with its debts and redirects to the plans index
         ->and(PayoffPlanDebt::where('payoff_plan_id', $plan->id)->exists())->toBeFalse()
         ->and($this->card->fresh())->not->toBeNull();
 });
+
+test('activating a plan through update deactivates the budgets other plans', function () {
+    $previous = lifecycleCreatePlan($this->budget, $this->card, ['name' => 'Current', 'is_active' => true]);
+    $plan = lifecycleCreatePlan($this->budget, $this->card, ['name' => 'Draft', 'is_active' => false]);
+
+    $otherBudget = Budget::factory()->create(['user_id' => $this->user->id]);
+    $otherCard = Account::factory()->creditCard()->create(['budget_id' => $otherBudget->id]);
+    $otherBudgetPlan = lifecycleCreatePlan($otherBudget, $otherCard, ['is_active' => true]);
+
+    $this->actingAs($this->user)
+        ->patch(route('payoff-plans.update', ['budget' => $this->budget, 'payoff_plan' => $plan]), [
+            'name' => 'Draft',
+            'strategy' => 'snowball',
+            'monthly_extra_payment_cents' => 0,
+            'is_active' => true,
+        ])
+        ->assertRedirect(route('payoff-plans.show', ['budget' => $this->budget, 'payoff_plan' => $plan]));
+
+    expect($plan->fresh()->is_active)->toBeTrue()
+        ->and($previous->fresh()->is_active)->toBeFalse()
+        ->and($this->budget->payoffPlans()->where('is_active', true)->count())->toBe(1)
+        ->and($otherBudgetPlan->fresh()->is_active)->toBeTrue();
+});

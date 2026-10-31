@@ -43,6 +43,7 @@ business_rules:
   - with no account_ids all budget accounts are used; any account not in the budget aborts 422
   - with no scenario_ids the scenarios flagged is_active are applied; scenario_ids are filtered to the budget's scenarios
   - each scenario projection = base projection + that scenario's adjustments for the account
+  - monthly and bimonthly adjustment days are clamped to the month's last day (no overflow into the next month)
   - months 1-60; page needs budget view (middleware); toggle needs budget update
 scenarios:
   - id: projection_structure
@@ -81,9 +82,16 @@ scenarios:
     coverage: uncovered
   - id: month_end_adjustment_day
     kind: edge
-    description: A monthly adjustment on day 29-31 lands on the last day of shorter months.
-    coverage: uncovered
-    note: generateRecurringTransactions uses Carbon day()/addMonth() which can overflow into the next month (see known_issues).
+    description: A monthly adjustment on day 29-31 lands on the last day of shorter months, including when the range starts after that day.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioAdjustmentScheduleTest.php::monthly adjustments on days 29 to 31 fall on the last day of shorter months
+  - id: projection_page_does_not_log_autopay
+    kind: edge
+    description: Opening the multi-account projection page writes nothing to the info log.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioAdjustmentScheduleTest.php::the multi account projection page does not write autopay projections to the log
   - id: no_scenarios
     kind: empty_state
     description: A budget with no scenarios shows the empty scenario panel and only base projections.
@@ -104,10 +112,7 @@ scenarios:
     coverage: uncovered
 known_issues:
   - "modify_existing adjustments are accepted by validation and offered in ScenarioAdjustmentRow.vue, but generateProjectedTransactions returns nothing for them and no other code handles them, so they have no effect on the projection."
-  - Monthly adjustments with day_of_month 29-31 use Carbon day()/addMonth() without clamping; the start date can overflow into the following month and later dates can drift.
   - For every scenario the base projection (projectTransactions and manual transactions) is recomputed per account, so cost grows as scenarios x accounts.
-  - The full autopay projection list is written to the info log on every page load.
-  - Toggle errors return the raw exception message in JSON.
 confidence: high
 evidence:
   - app/Http/Controllers/ProjectionsController.php showMultiAccountProjection/applyScenarioAdjustments

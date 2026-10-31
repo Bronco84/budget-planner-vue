@@ -28,15 +28,23 @@ class EnsureUserHasPasskey
             $hasPasskeys = $user->webAuthnCredentials()->exists();
 
             if (! $hasPasskeys) {
-                // Allow access to the passkey registration route itself and related routes
-                if (! $request->is('passkey/register') && ! $request->is('webauthn/*') && ! $request->is('logout')) {
+                // Allow access to passkey registration, sign-out and email verification
+                if (! $request->is('passkey/register', 'webauthn/*', 'logout', 'verify-email', 'verify-email/*', 'email/verification-notification')) {
                     \Log::info('User has no passkeys, redirecting to registration', [
                         'user_id' => $user->id,
                         'path' => $request->path(),
                     ]);
 
-                    return redirect()->route('passkey.register')
-                        ->with('error', 'You must register a passkey to continue.');
+                    $message = 'You must register a passkey to continue.';
+
+                    if ($request->expectsJson()) {
+                        return response()->json([
+                            'message' => $message,
+                            'redirect' => route('passkey.register'),
+                        ], 409);
+                    }
+
+                    return redirect()->route('passkey.register')->with('error', $message);
                 }
             }
         }

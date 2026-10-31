@@ -231,7 +231,16 @@ class PlaidController extends Controller
             ) {
                 $accountData = [];
                 foreach ($selectedPlaidAccounts as $plaidAccount) {
-                    $localAccount = $budget->accounts()->create([
+                    // An account already linked from this item keeps its local account
+                    // instead of getting a duplicate that steals the Plaid link.
+                    $localAccount = $itemId === null ? null : PlaidAccount::query()
+                        ->where('plaid_account_id', $plaidAccount['account_id'])
+                        ->whereHas('plaidConnection', fn ($query) => $query
+                            ->where('budget_id', $budget->id)
+                            ->where('plaid_item_id', $itemId))
+                        ->first()?->account;
+
+                    $localAccount ??= $budget->accounts()->create([
                         'name' => $plaidAccount['name'],
                         'type' => $this->plaidService->mapPlaidAccountType($plaidAccount),
                         'current_balance_cents' => isset($plaidAccount['balances']['current'])
@@ -830,6 +839,9 @@ class PlaidController extends Controller
             ]);
 
             $plaidConnection->delete();
+
+            // Revoke the access token at Plaid; a failure is logged, not shown.
+            $this->plaidService->removeConnectionItem($plaidConnection);
 
             return redirect()->back()->with('message',
                 'Account unlinked from Plaid. Connection to '.$plaidConnection->institution_name.' was also removed as it had no remaining accounts.');

@@ -41,6 +41,7 @@ postconditions:
 business_rules:
   - name required; color must be a #RRGGBB hex; at least one adjustment on create
   - adjustment_type in one_time_expense, recurring_expense, debt_paydown, savings_contribution, modify_existing
+  - frequency in daily, weekly, biweekly, monthly, bimonthly, quarterly, yearly; bimonthly (twice a month) needs two different days, first_day_of_month and day_of_month (same convention as recurring templates); first_day_of_month is dropped for other frequencies
   - every adjustment account must belong to the budget, else 422 with "One or more accounts do not belong to this budget."
   - create and update run in a DB transaction; scenario is scoped to the budget
   - store/update/destroy need budget update; show needs budget view
@@ -108,8 +109,21 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::scenario routes reject a cross-budget scenario with 404
+  - id: bimonthly_adjustment
+    kind: alternate
+    description: An adjustment can recur twice a month on two days; it is saved with both days and projects on both days each month, clamped to the month end.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioAdjustmentScheduleTest.php::a scenario can be saved with a bimonthly adjustment
+      - tests/Feature/ScenarioAdjustmentScheduleTest.php::bimonthly adjustments occur on both days of every month, clamped to the month end
+      - tests/Feature/ScenarioAdjustmentScheduleTest.php::a leftover first day is ignored for adjustments that are not bimonthly
+  - id: bimonthly_days_validation
+    kind: validation
+    description: A bimonthly adjustment missing either day, or using the same day twice, is rejected with 422.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioAdjustmentScheduleTest.php::a bimonthly adjustment needs two different days of the month
 known_issues:
-  - Scenario frequency options omit bimonthly, which recurring templates support.
   - budgets.scenarios.show is not called by the frontend.
 confidence: high
 evidence:

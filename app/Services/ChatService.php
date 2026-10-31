@@ -78,11 +78,13 @@ class ChatService
                 }
             }
 
-            // 5. Get or create conversation
-            $conversation = $this->getOrCreateConversation($user, $conversationId);
+            // 5. Get or create conversation (reusing one created while flagging)
+            $conversation ??= $this->getOrCreateConversation($user, $conversationId);
 
-            // 6. Track conversation activity
-            $this->moderationService->trackConversationActivity($user, $conversation->id);
+            // 6. Track new conversations for rapid-creation abuse
+            if ($conversation->wasRecentlyCreated) {
+                $this->moderationService->trackConversationActivity($user, $conversation->id);
+            }
 
             // 7. Store user message
             $userMessage = $this->storeMessage($conversation, 'user', $message);
@@ -115,7 +117,7 @@ class ChatService
             $userId = $user->id;
 
             // Create a simulated streaming response
-            return response()->stream(function () use ($messages, $tools, $conversation, $conversationId, $userId, $message) {
+            return response()->stream(function () use ($messages, $tools, $conversation, $conversationId, $userId, $message, $userMessage) {
                 // Send conversation_id event first
                 echo "event: conversation_id\n";
                 echo 'data: '.json_encode(['conversation_id' => $conversationId])."\n\n";
@@ -142,6 +144,8 @@ class ChatService
                             'conversation_id' => $conversationId,
                             'error' => $responseValidation['error'],
                         ]);
+
+                        $this->discardFailedTurn($conversation, $userMessage);
 
                         echo "event: error\n";
                         echo 'data: '.json_encode(['error' => 'Unable to generate a safe response. Please try rephrasing your question.'])."\n\n";
@@ -186,6 +190,8 @@ class ChatService
                         'exception' => $e::class,
                         'error' => $e->getMessage(),
                     ]);
+
+                    $this->discardFailedTurn($conversation, $userMessage);
 
                     echo "event: error\n";
                     echo 'data: '.json_encode(['error' => $this->userFacingProviderError($e)])."\n\n";
@@ -259,11 +265,13 @@ class ChatService
                 }
             }
 
-            // 5. Get or create conversation
-            $conversation = $this->getOrCreateConversation($user, $conversationId);
+            // 5. Get or create conversation (reusing one created while flagging)
+            $conversation ??= $this->getOrCreateConversation($user, $conversationId);
 
-            // 6. Track conversation activity
-            $this->moderationService->trackConversationActivity($user, $conversation->id);
+            // 6. Track new conversations for rapid-creation abuse
+            if ($conversation->wasRecentlyCreated) {
+                $this->moderationService->trackConversationActivity($user, $conversation->id);
+            }
 
             // 7. Store user message
             $userMessage = $this->storeMessage($conversation, 'user', $message);
@@ -304,6 +312,8 @@ class ChatService
                     'error' => $responseValidation['error'],
                 ]);
 
+                $this->discardFailedTurn($conversation, $userMessage);
+
                 return [
                     'error' => 'Unable to generate a safe response. Please try rephrasing your question.',
                     'success' => false,
@@ -325,6 +335,10 @@ class ChatService
                 'rate_limit' => $rateLimit,
             ];
         } catch (\Exception $e) {
+            if (isset($userMessage, $conversation)) {
+                $this->discardFailedTurn($conversation, $userMessage);
+            }
+
             Log::error('Chat service error', [
                 'user_id' => $user->id,
                 'exception' => $e::class,
@@ -352,6 +366,23 @@ class ChatService
             $e instanceof PrismRequestTooLargeException => 'That conversation is too long for the assistant to process. Start a new conversation and try again.',
             default => 'Something went wrong generating a response. Please try again.',
         };
+    }
+
+    /**
+     * Remove the user turn of an exchange that produced no reply, so the
+     * stored history matches what the chat panel shows (it drops the turn
+     * and restores the text to the input). A conversation created by this
+     * request is removed too when nothing else references it.
+     */
+    protected function discardFailedTurn(ChatConversation $conversation, ChatMessage $userMessage): void
+    {
+        $userMessage->delete();
+
+        if ($conversation->wasRecentlyCreated
+            && ! $conversation->messages()->exists()
+            && ! FlaggedChatMessage::where('conversation_id', $conversation->id)->exists()) {
+            $conversation->delete();
+        }
     }
 
     protected function flagMessage(User $user, ChatConversation $conversation, string $content, array $contentCheck): void

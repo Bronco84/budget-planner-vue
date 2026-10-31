@@ -73,6 +73,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Accounts/ManualAccountTest.php::create account page still renders with a null link token when plaid fails
+  - id: plaid_client_user_id_is_user
+    kind: integration
+    description: The Plaid link token is requested with the signed-in user's id as client_user_id (not the budget).
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::create account page sends the user id as the Plaid client user id
   - id: other_users_budget_forbidden
     kind: authorization
     description: Opening create or posting an account to another user's budget returns 403 (can:view,budget middleware).
@@ -80,8 +86,7 @@ scenarios:
     tests:
       - tests/Feature/Accounts/ManualAccountTest.php::user cannot open the create account page for another users budget
       - tests/Feature/Accounts/ManualAccountTest.php::user cannot add an account to another users budget
-known_issues:
-  - "AccountController@create calls PlaidService::createLinkToken($budget) with the Budget model where a user id is expected; (string)$budget serialises the whole budget JSON into Plaid's client_user_id. BudgetController@setup passes Auth::id() correctly."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/AccountController.php create/store

@@ -104,3 +104,39 @@ test('autopay is rejected for a missing, non-depository or self source account',
     'manual checking' => ['manual checking', 'Source account must be a checking or savings account.'],
     'the card itself' => ['the card itself', 'Source account must be a checking or savings account.'],
 ]);
+
+test('enabling autopay with a checking source saves the configuration', function () {
+    $this->actingAs($this->user)
+        ->post(route('accounts.updateAutopay', [$this->budget, $this->card]), [
+            'autopay_enabled' => true,
+            'autopay_source_account_id' => $this->checking->id,
+            'autopay_amount_override_cents' => 5000,
+        ])
+        ->assertSessionHas('message');
+
+    expect(autopayStateOf($this->card))->toBe(['enabled' => true, 'source' => $this->checking->id, 'override' => 5000]);
+});
+
+test('disabling autopay without sending the optional fields clears the configuration', function () {
+    $this->card->update(['autopay_enabled' => true, 'autopay_source_account_id' => $this->checking->id, 'autopay_amount_override_cents' => 5000]);
+
+    $this->actingAs($this->user)
+        ->post(route('accounts.updateAutopay', [$this->budget, $this->card]), ['autopay_enabled' => false])
+        ->assertRedirect()
+        ->assertSessionHas('message', 'Autopay disabled successfully.');
+
+    expect(autopayStateOf($this->card))->toBe(['enabled' => false, 'source' => null, 'override' => null]);
+});
+
+test('autopay cannot be configured on another users account', function () {
+    $other = User::factory()->create();
+
+    $this->actingAs($other)
+        ->post(route('accounts.updateAutopay', [$this->budget, $this->card]), [
+            'autopay_enabled' => true,
+            'autopay_source_account_id' => $this->checking->id,
+        ])
+        ->assertForbidden();
+
+    expect(autopayStateOf($this->card)['enabled'])->toBeFalse();
+});

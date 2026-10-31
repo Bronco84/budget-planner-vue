@@ -113,7 +113,7 @@ const formatRelativeTime = (dateString) => {
     <!-- Add Passkey Button -->
     <div class="mt-6">
       <Link
-        :href="route('passkey.register')"
+        :href="route('passkey.register', { return: 'profile' })"
         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
       >
         <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

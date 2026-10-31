@@ -53,9 +53,11 @@ class ScenarioController extends Controller
             'adjustments.*.amount_in_cents' => 'required|integer',
             'adjustments.*.start_date' => 'required|date',
             'adjustments.*.end_date' => 'nullable|date|after_or_equal:adjustments.*.start_date',
-            'adjustments.*.frequency' => 'nullable|in:daily,weekly,biweekly,monthly,quarterly,yearly',
+            'adjustments.*.frequency' => 'nullable|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'adjustments.*.day_of_week' => 'nullable|integer|min:0|max:6',
-            'adjustments.*.day_of_month' => 'nullable|integer|min:1|max:31',
+            'adjustments.*.day_of_month' => 'nullable|integer|min:1|max:31|required_if:adjustments.*.frequency,bimonthly',
+            // Bimonthly (twice a month): first day here, second day in day_of_month.
+            'adjustments.*.first_day_of_month' => 'exclude_unless:adjustments.*.frequency,bimonthly|nullable|integer|min:1|max:31|required_if:adjustments.*.frequency,bimonthly|different:adjustments.*.day_of_month',
             'adjustments.*.description' => 'nullable|string',
             'adjustments.*.target_recurring_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);
@@ -145,9 +147,11 @@ class ScenarioController extends Controller
             'adjustments.*.amount_in_cents' => 'required|integer',
             'adjustments.*.start_date' => 'required|date',
             'adjustments.*.end_date' => 'nullable|date|after_or_equal:adjustments.*.start_date',
-            'adjustments.*.frequency' => 'nullable|in:daily,weekly,biweekly,monthly,quarterly,yearly',
+            'adjustments.*.frequency' => 'nullable|in:daily,weekly,biweekly,monthly,bimonthly,quarterly,yearly',
             'adjustments.*.day_of_week' => 'nullable|integer|min:0|max:6',
-            'adjustments.*.day_of_month' => 'nullable|integer|min:1|max:31',
+            'adjustments.*.day_of_month' => 'nullable|integer|min:1|max:31|required_if:adjustments.*.frequency,bimonthly',
+            // Bimonthly (twice a month): first day here, second day in day_of_month.
+            'adjustments.*.first_day_of_month' => 'exclude_unless:adjustments.*.frequency,bimonthly|nullable|integer|min:1|max:31|required_if:adjustments.*.frequency,bimonthly|different:adjustments.*.day_of_month',
             'adjustments.*.description' => 'nullable|string',
             'adjustments.*.target_recurring_template_id' => ['nullable', Rule::exists('recurring_transaction_templates', 'id')->where('budget_id', $budget->id)],
         ]);

@@ -51,3 +51,45 @@ test('guests cannot read or set the active budget', function () {
 
     expect(UserPreference::count())->toBe(0);
 });
+
+test('the generic preference endpoint rejects keys outside the whitelist', function (string $key) {
+    $user = User::factory()->create();
+    $budget = Budget::factory()->create(['user_id' => $user->id]);
+    $key = str_replace('{budget}', (string) $budget->id, $key);
+
+    $this->actingAs($user)
+        ->postJson(route('preferences.update', $key), ['value' => 9999])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('key');
+
+    expect($user->fresh()->getPreference($key))->toBeNull();
+})->with([
+    'active budget bypass' => ['active_budget_id'],
+    'projection months bypass' => ['budget_{budget}_projection_months'],
+    'arbitrary key' => ['anything_at_all'],
+]);
+
+test('the generic preference endpoint validates whitelisted values', function () {
+    $user = User::factory()->create();
+    $user->setAccountTypeOrder(['savings', 'checking']);
+
+    $this->actingAs($user)
+        ->postJson(route('preferences.update', 'account_type_order'), ['value' => ['checking', 'crypto wallet']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('value.1');
+
+    expect($user->fresh()->getAccountTypeOrder())->toBe(['savings', 'checking']);
+});
+
+test('a whitelisted preference written via the generic endpoint is returned by it', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson(route('preferences.update', 'account_type_order'), ['value' => ['checking', 'savings']])
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->getJson(route('preferences.show', 'account_type_order'))
+        ->assertOk()
+        ->assertJson(['key' => 'account_type_order', 'value' => ['checking', 'savings']]);
+});

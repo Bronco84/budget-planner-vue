@@ -154,6 +154,21 @@ test('a failed token exchange shows a generic error and logs the real cause', fu
     Log::shouldHaveReceived('error')->once();
 });
 
+test('a google api failure during sync shows a generic error without the raw exception', function () {
+    Log::spy();
+    $this->google->shouldReceive('syncEvents')
+        ->once()
+        ->andThrow(new Exception('Google_Service_Exception: 403 internal google detail'));
+
+    $this->actingAs($this->user)
+        ->from(route('calendar.connections.index'))
+        ->post(route('calendar.connections.sync', $this->connection))
+        ->assertRedirect(route('calendar.connections.index'))
+        ->assertSessionHas('error', 'Sync failed. Please try again.');
+
+    Log::shouldHaveReceived('error')->once();
+});
+
 test('the connections page receives the flashed message so it can be shown', function () {
     $this->actingAs($this->user)
         ->from(route('calendar.connections.index'))

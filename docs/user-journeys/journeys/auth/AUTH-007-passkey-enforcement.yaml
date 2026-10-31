@@ -7,7 +7,9 @@ priority: critical
 summary: >
   Every web request from an authenticated user who has no WebAuthn credential is
   redirected to /passkey/register (flash error "You must register a passkey to
-  continue."), except the registration page itself, webauthn/* and logout. This
+  continue."), except the registration page itself, webauthn/*, logout and the
+  email verification routes. JSON requests (expectsJson) get a 409 JSON response
+  {message, redirect} instead of the redirect. This
   catches users who signed in by magic link or registered but abandoned the
   passkey ceremony, and users who somehow lost all credentials.
 actors:
@@ -31,7 +33,8 @@ steps:
 postconditions:
   - user cannot reach the app until a passkey exists
 business_rules:
-  - allowed without a passkey - passkey/register, webauthn/*, logout
+  - allowed without a passkey - passkey/register, webauthn/*, logout, verify-email, verify-email/*, email/verification-notification
+  - requests that expect JSON receive 409 {message, redirect} pointing at passkey.register; Inertia/HTML requests are redirected
   - the user model is refreshed from the database on every authenticated web request before checking credentials
   - guests are unaffected
   - tests disable this middleware globally in tests/TestCase.php; enforcement tests must opt back in
@@ -57,10 +60,19 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a user with a passkey is not redirected'
-  - id: json_endpoints_redirected
+  - id: json_endpoints_get_409
     kind: edge
-    description: JSON endpoints (e.g. /api/preferences/*, /csrf-token) also receive a 302 rather than a JSON error for passkeyless users.
-    coverage: uncovered
+    description: Requests that expect JSON (e.g. /api/preferences/*) get a 409 JSON response with the message and the passkey.register URL; Inertia visits are still redirected.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a json request from a user without a passkey gets a 409 with the registration url'
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::an inertia request from a user without a passkey is still redirected'
+  - id: verify_email_routes_allowed
+    kind: edge
+    description: A passkeyless user can still open the verify-email notice and request a new verification email.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a user without a passkey can still reach the email verification routes'
   - id: guest_not_affected
     kind: authentication
     description: Guests pass through the middleware untouched and are handled by auth/guest guards instead.
@@ -72,8 +84,7 @@ scenarios:
     tests:
       - tests/Feature/Auth/PasskeyEnforcementTest.php::the passkey registration page receives the enforcement error so it can be shown
     note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
-known_issues:
-  - The middleware returns an HTML redirect for JSON/XHR requests instead of a 403/409 JSON response.
+known_issues: []
 confidence: high
 evidence:
   - bootstrap/app.php web middleware append list

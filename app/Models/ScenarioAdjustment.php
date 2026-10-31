@@ -39,6 +39,7 @@ class ScenarioAdjustment extends Model
         'frequency',
         'day_of_week',
         'day_of_month',
+        'first_day_of_month',
         'description',
         'target_recurring_template_id',
     ];
@@ -54,6 +55,7 @@ class ScenarioAdjustment extends Model
         'end_date' => 'date:Y-m-d',
         'day_of_week' => 'integer',
         'day_of_month' => 'integer',
+        'first_day_of_month' => 'integer',
     ];
 
     /**
@@ -140,48 +142,31 @@ class ScenarioAdjustment extends Model
     {
         $transactions = [];
 
-        // For monthly frequency with a specific day_of_month, start from the first valid occurrence
-        if ($this->frequency === 'monthly' && $this->day_of_month !== null) {
-            $currentDate = $startDate->copy();
-
-            // If start date is after the target day of month, move to next month
-            if ($currentDate->day > $this->day_of_month) {
-                $currentDate->addMonth()->day($this->day_of_month);
-            } else {
-                // Set to the target day in the current month
-                $currentDate->day($this->day_of_month);
-            }
-        } else {
-            $currentDate = $startDate->copy();
+        // Day-of-month schedules are computed per calendar month so days 29-31
+        // clamp to the month's last day instead of overflowing into the next month.
+        if ($this->frequency === 'monthly') {
+            return $this->generateDayOfMonthTransactions($startDate, $endDate, [
+                $this->day_of_month ?? $this->start_date->day,
+            ]);
         }
 
+        if ($this->frequency === 'bimonthly') {
+            // Same convention as recurring templates: first day in first_day_of_month,
+            // second day in day_of_month (defaults 1st and 15th).
+            return $this->generateDayOfMonthTransactions($startDate, $endDate, [
+                $this->first_day_of_month ?? 1,
+                $this->day_of_month ?? 15,
+            ]);
+        }
+
+        $currentDate = $startDate->copy();
         $iterations = 0;
 
         while ($currentDate->lessThanOrEqualTo($endDate)) {
             $iterations++;
 
-            // For monthly with day_of_month, we've already set the correct day, so always generate
-            if ($this->frequency === 'monthly' && $this->day_of_month !== null) {
-                if ($currentDate->greaterThanOrEqualTo($startDate)) {
-                    $transactions[] = [
-                        'date' => $currentDate->format('Y-m-d'),
-                        'amount_in_cents' => $this->amount_in_cents,
-                        'description' => $this->description ?? 'Scenario adjustment',
-                        'is_projected' => true,
-                        'is_scenario_adjustment' => true,
-                    ];
-                }
-            } else {
-                // Use the old logic for other frequencies
-                if ($this->shouldGenerateForDate($currentDate)) {
-                    $transactions[] = [
-                        'date' => $currentDate->format('Y-m-d'),
-                        'amount_in_cents' => $this->amount_in_cents,
-                        'description' => $this->description ?? 'Scenario adjustment',
-                        'is_projected' => true,
-                        'is_scenario_adjustment' => true,
-                    ];
-                }
+            if ($this->shouldGenerateForDate($currentDate)) {
+                $transactions[] = $this->makeProjectedTransaction($currentDate);
             }
 
             $currentDate = $this->getNextDate($currentDate);
@@ -197,6 +182,49 @@ class ScenarioAdjustment extends Model
         }
 
         return $transactions;
+    }
+
+    /**
+     * Generate transactions on the given days of every month in the range,
+     * clamping each day to the month's length.
+     *
+     * @param  array<int>  $days
+     */
+    protected function generateDayOfMonthTransactions(Carbon $startDate, Carbon $endDate, array $days): array
+    {
+        $days = array_unique($days);
+        sort($days);
+
+        $transactions = [];
+        $month = $startDate->copy()->startOfMonth();
+
+        while ($month->lessThanOrEqualTo($endDate)) {
+            foreach ($days as $day) {
+                $date = $month->copy()->day(min($day, $month->daysInMonth));
+
+                if ($date->betweenIncluded($startDate->copy()->startOfDay(), $endDate)) {
+                    $transactions[] = $this->makeProjectedTransaction($date);
+                }
+            }
+
+            $month->addMonthNoOverflow();
+        }
+
+        return $transactions;
+    }
+
+    /**
+     * Build a projected transaction array for this adjustment on the given date.
+     */
+    protected function makeProjectedTransaction(Carbon $date): array
+    {
+        return [
+            'date' => $date->format('Y-m-d'),
+            'amount_in_cents' => $this->amount_in_cents,
+            'description' => $this->description ?? 'Scenario adjustment',
+            'is_projected' => true,
+            'is_scenario_adjustment' => true,
+        ];
     }
 
     /**

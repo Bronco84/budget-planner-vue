@@ -15,24 +15,36 @@ preconditions:
 routes:
   - plaid.destroy
 depends_on: []
-integrations: []
+integrations:
+  - Plaid API (/item/remove)
 steps:
   - action: confirm disconnect on Plaid/Link (DELETE budget/{budget}/account/{account}/plaid)
     expected: redirect back with "Account unlinked from Plaid."
 postconditions:
   - the local account and its transactions remain but are no longer linked
-  - an empty PlaidConnection is removed
+  - an empty PlaidConnection is removed locally and its Plaid item is removed at Plaid
 business_rules:
-  - the Plaid item is not removed at Plaid (/item/remove is not called); only local records are deleted
+  - when the last account is unlinked the connection is (soft) deleted and its item is removed at Plaid (/item/remove) so the access token is revoked; a Plaid failure is logged and does not block the local unlink
 scenarios:
   - id: unlink_account
     kind: happy_path
     description: Unlinking deletes the PlaidAccount and keeps the account and transactions.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidUnlinkTest.php::unlinking one of several accounts keeps the connection and its Plaid item
+    note: asserts the account stays and is unlinked; keeping its transactions is not asserted.
   - id: last_account_removes_connection
     kind: alternate
-    description: Unlinking the last account on a connection also deletes the connection and mentions the institution in the flash.
-    coverage: uncovered
+    description: Unlinking the last account on a connection also deletes the connection, removes its item at Plaid, and mentions the institution in the flash.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidUnlinkTest.php::unlinking the last account removes the connection and its Plaid item
+  - id: item_remove_failure_still_unlinks
+    kind: recovery
+    description: If Plaid /item/remove fails or times out, the account is still unlinked and the connection deleted locally (the failure is logged).
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidUnlinkTest.php::a Plaid failure removing the item still unlinks the last account locally
   - id: not_linked
     kind: edge
     description: Disconnecting an unlinked account redirects back with "Account is not linked to Plaid."
@@ -48,8 +60,7 @@ scenarios:
     description: Disconnecting another user's account via their budget URL returns 403.
     coverage: uncovered
     note: plaid.destroy is not in the 403 dataset in NestedRouteAuthorizationTest.
-known_issues:
-  - the Plaid item is never removed at Plaid when the last account is unlinked, so the access token stays valid at Plaid (and billable) after local deletion.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/PlaidController.php destroy()

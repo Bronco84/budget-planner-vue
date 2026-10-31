@@ -26,6 +26,7 @@ postconditions:
 business_rules:
   - name required max 255; email required, lowercase, valid, max 255, unique except self (ProfileUpdateRequest)
   - an unchanged email keeps email_verified_at
+  - a changed email clears email_verified_at and sends a new verification email (see AUTH-010)
 scenarios:
   - id: profile_page_renders
     kind: happy_path
@@ -45,6 +46,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/ProfileTest.php::test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged
+  - id: email_change_sends_verification
+    kind: alternate
+    description: Changing the email sends a VerifyEmail notification; an unchanged email sends none.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Profile/ProfileValidationTest.php::changing the email sends a new verification email'
+      - 'tests/Feature/Profile/ProfileValidationTest.php::saving the profile without changing the email sends no verification email'
   - id: invalid_or_taken_email_rejected
     kind: validation
     description: Missing name, malformed, uppercase or another user's email fails validation.
@@ -55,8 +63,7 @@ scenarios:
     kind: authentication
     description: Guests are redirected to login for GET and PATCH /profile.
     coverage: uncovered
-known_issues:
-  - Changing email sends no new verification email.
+known_issues: []
 confidence: high
 evidence:
   - routes/web.php profile routes

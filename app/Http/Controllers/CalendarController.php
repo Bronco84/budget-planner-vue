@@ -14,8 +14,12 @@ class CalendarController extends Controller
     public function index(Request $request)
     {
         // Get the current month or the requested month
-        $year = $request->input('year', now()->year);
-        $month = $request->input('month', now()->month);
+        $validated = $request->validate([
+            'year' => ['sometimes', 'integer', 'between:1900,2100'],
+            'month' => ['sometimes', 'integer', 'between:1,12'],
+        ]);
+        $year = (int) ($validated['year'] ?? now()->year);
+        $month = (int) ($validated['month'] ?? now()->month);
 
         // Get user's active budget
         $activeBudget = auth()->user()->getActiveBudget();

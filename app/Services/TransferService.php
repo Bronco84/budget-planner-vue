@@ -51,7 +51,7 @@ class TransferService
                 'to_account_id' => $data['to_account_id'] ?? $transfer->to_account_id,
                 'amount_in_cents' => isset($data['amount_in_cents']) ? abs($data['amount_in_cents']) : $transfer->amount_in_cents,
                 'date' => $data['date'] ?? $transfer->date,
-                'description' => $data['description'] ?? $transfer->description,
+                'description' => array_key_exists('description', $data) ? $data['description'] : $transfer->description,
                 'notes' => array_key_exists('notes', $data) ? $data['notes'] : $transfer->notes,
             ]);
 

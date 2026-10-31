@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Budget;
+use App\Models\PlaidTransaction;
 use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
@@ -11,6 +12,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -40,14 +42,7 @@ class RecurringTransactionController extends Controller
             ->orderBy('description')
             ->get();
 
-        // Get accounts with explicit loading
         $accounts = $budget->accounts()->get();
-
-        // Debug the data
-        info('Accounts being passed to Inertia:', [
-            'count' => $accounts->count(),
-            'first_account' => $accounts->first(),
-        ]);
 
         return Inertia::render('RecurringTransactions/Index', [
             'budget' => $budget,
@@ -359,9 +354,12 @@ class RecurringTransactionController extends Controller
             'is_dynamic_amount' => $request->input('is_dynamic_amount'),
         ]);
 
-        // Update or create rules
-        foreach ($rules as $ruleData) {
+        // Update or create rules; priority follows the submitted order (as in store).
+        // validated() can return the rule keys out of order, so sort by submitted index.
+        ksort($rules);
+        foreach (array_values($rules) as $index => $ruleData) {
             $ruleId = $ruleData['id'] ?? null;
+            $ruleData['priority'] = $index + 1;
 
             // Remove id from the data before create/update
             if (isset($ruleData['id'])) {
@@ -434,7 +432,15 @@ class RecurringTransactionController extends Controller
         // Ensure is_dynamic_amount is properly copied
         $duplicated->is_dynamic_amount = $recurring_transaction->is_dynamic_amount;
 
-        $duplicated->save();
+        DB::transaction(function () use ($duplicated, $recurring_transaction) {
+            $duplicated->save();
+
+            // Copy the matching rules too, otherwise the copy stops matching
+            // the transactions the original matches by rules.
+            foreach ($recurring_transaction->rules()->orderBy('priority')->get() as $rule) {
+                $duplicated->rules()->create($rule->replicate(['recurring_transaction_template_id'])->getAttributes());
+            }
+        });
 
         return redirect()->route('recurring-transactions.index', $budget)
             ->with('message', 'Recurring transaction duplicated successfully');
@@ -527,16 +533,18 @@ class RecurringTransactionController extends Controller
     {
         $this->authorize('view', $budget);
 
-        $account = $recurring_transaction->account;
         $rules = $recurring_transaction->rules()->where('is_active', true)->get();
 
-        // Get recent unlinked transactions (last 90 days)
-        $recentTransactions = Transaction::where('account_id', $account->id)
-            ->whereNull('recurring_transaction_template_id')
-            ->where('date', '>=', now()->subDays(90)->toDateString())
-            ->orderBy('date', 'desc')
-            ->with('plaidTransaction')
-            ->get();
+        // Get recent unlinked transactions (last 90 days); a template whose
+        // account was deleted has no account to search.
+        $recentTransactions = $recurring_transaction->account_id
+            ? Transaction::where('account_id', $recurring_transaction->account_id)
+                ->whereNull('recurring_transaction_template_id')
+                ->where('date', '>=', now()->subDays(90)->toDateString())
+                ->orderBy('date', 'desc')
+                ->with('plaidTransaction')
+                ->get()
+            : collect();
 
         $matches = [];
 
@@ -546,8 +554,7 @@ class RecurringTransactionController extends Controller
 
             // Test entity ID matching
             if ($recurring_transaction->plaid_entity_id && $transaction->plaidTransaction) {
-                $counterparties = $transaction->plaidTransaction->counterparties ?? '';
-                if (is_string($counterparties) && str_contains($counterparties, $recurring_transaction->plaid_entity_id)) {
+                if ($this->plaidTransactionHasEntity($transaction->plaidTransaction, $recurring_transaction->plaid_entity_id)) {
                     $matchMethod = 'entity_id';
                     $matchDetails = 'Matched by Plaid entity ID: '.$recurring_transaction->plaid_entity_name;
                 }
@@ -623,6 +630,26 @@ class RecurringTransactionController extends Controller
                 'active_rules_count' => $rules->count(),
             ],
         ]);
+    }
+
+    /**
+     * Whether a Plaid transaction references the entity id, either as its merchant
+     * or in its counterparties (cast to an array, but tolerate a raw JSON string).
+     */
+    private function plaidTransactionHasEntity(PlaidTransaction $plaidTransaction, string $entityId): bool
+    {
+        if ($plaidTransaction->merchant_entity_id === $entityId) {
+            return true;
+        }
+
+        $counterparties = $plaidTransaction->counterparties;
+
+        if (is_string($counterparties)) {
+            return str_contains($counterparties, $entityId);
+        }
+
+        return collect($counterparties ?? [])
+            ->contains(fn ($counterparty) => is_array($counterparty) && ($counterparty['entity_id'] ?? null) === $entityId);
     }
 
     /**

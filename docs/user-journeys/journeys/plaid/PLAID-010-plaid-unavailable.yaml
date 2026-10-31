@@ -27,7 +27,7 @@ integrations:
   - Plaid API
 steps:
   - action: open setup, discover or link page while createLinkToken throws
-    expected: page renders with linkToken null; error is logged; connect button disabled
+    expected: page renders with linkToken null; error is logged; connect button disabled with "Bank connections are unavailable right now. Try again later." beside it
   - action: submit import/store while token exchange fails
     expected: redirect back with "Failed to import accounts" / "Failed to link account" error flash
   - action: sync while Plaid errors
@@ -83,8 +83,7 @@ scenarios:
     description: Ownership enforcement for these routes is catalogued in PLAID-001/002/003.
     coverage: not_applicable
     note: this journey is about external failure handling; authorization is covered by the owning journeys.
-known_issues:
-  - the Link/Discover/Setup pages give no visible explanation when linkToken is null; the connect button is simply disabled.
+known_issues: []
 confidence: medium
 evidence:
   - app/Services/PlaidService.php createLinkToken(), getConnectionErrorMessage(), exchangePublicToken(), initializeClient() timeouts

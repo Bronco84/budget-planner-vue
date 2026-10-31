@@ -3,17 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\Budget;
-use App\Models\File;
 use App\Models\FileAttachment;
+use App\Services\FileService;
 use Diglactic\Breadcrumbs\Breadcrumbs;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class BudgetFilesController extends Controller
 {
-    public function index(Budget $budget)
+    public function __construct(private FileService $fileService) {}
+
+    public function index(Request $request, Budget $budget)
     {
         $this->authorize('view', $budget);
+
+        // The dashboard loads its attachment list as JSON from this URL.
+        if ($request->wantsJson()) {
+            return app(FileController::class)->getBudgetAttachments($budget);
+        }
 
         $files = $budget->fileAttachments()
             ->with('file')
@@ -47,10 +55,7 @@ class BudgetFilesController extends Controller
             abort(404);
         }
 
-        $file = $fileAttachment->file;
-        $path = 'files/'.$file->hash;
-
-        return Storage::download($path, $file->original_name);
+        return $this->fileService->downloadResponse($fileAttachment);
     }
 
     public function destroy(Budget $budget, FileAttachment $fileAttachment)
@@ -61,23 +66,9 @@ class BudgetFilesController extends Controller
             abort(404);
         }
 
-        $file = $fileAttachment->file;
-        $path = 'files/'.$file->hash;
+        // Removes the attachment, and the file and its S3 object once unused.
+        $this->fileService->detachFile($fileAttachment, Auth::id());
 
-        // Delete the attachment record
-        $fileAttachment->delete();
-
-        // Check if this file is still attached to other entities
-        $remainingAttachments = FileAttachment::where('file_id', $file->id)->count();
-
-        // If no other attachments exist, delete the file from storage and database
-        if ($remainingAttachments === 0) {
-            if (Storage::exists($path)) {
-                Storage::delete($path);
-            }
-            $file->delete();
-        }
-
-        return redirect()->back()->with('success', 'File deleted successfully.');
+        return redirect()->back()->with('message', 'File deleted successfully.');
     }
 }

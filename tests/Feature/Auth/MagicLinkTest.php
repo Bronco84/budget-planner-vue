@@ -117,6 +117,23 @@ test('a magic link presented with a different email address is rejected', functi
     $this->assertGuest();
 });
 
+test('a magic link presented with the wrong email is not consumed and still works for its owner', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    $token = issueMagicLink($user);
+
+    $this->get(route('magic-link.authenticate', ['token' => $token, 'email' => $other->email]))
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors('magic_link');
+
+    expect(MagicLinkToken::where('user_id', $user->id)->sole()->used_at)->toBeNull();
+
+    $this->get(route('magic-link.authenticate', ['token' => $token, 'email' => $user->email]))
+        ->assertRedirect(route('passkey.register'));
+
+    $this->assertAuthenticatedAs($user);
+});
+
 test('an unknown email gets the same response as a known one and no mail is sent', function () {
     Mail::fake();
     $user = User::factory()->create();

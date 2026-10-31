@@ -502,13 +502,15 @@ class RecurringTransactionAnalysisService
             // Ensure min/max have the same sign as the main amount
             // Frontend sends positive values, we apply the sign here
             $minAmount = null;
-            if ($patternData['amount_type'] === 'dynamic' && $patternData['min_amount'] !== null) {
+            $isDynamic = ($patternData['amount_type'] ?? 'static') === 'dynamic';
+
+            if ($isDynamic && ($patternData['min_amount'] ?? null) !== null) {
                 $minCents = (int) round(abs($patternData['min_amount']) * 100);
                 $minAmount = $isExpense ? -$minCents : $minCents;
             }
 
             $maxAmount = null;
-            if ($patternData['amount_type'] === 'dynamic' && $patternData['max_amount'] !== null) {
+            if ($isDynamic && ($patternData['max_amount'] ?? null) !== null) {
                 $maxCents = (int) round(abs($patternData['max_amount']) * 100);
                 $maxAmount = $isExpense ? -$maxCents : $maxCents;
             }
@@ -529,7 +531,7 @@ class RecurringTransactionAnalysisService
                     : ($patternData['day_of_month'] ?? null),
                 'first_day_of_month' => $isBimonthly ? ($patternData['bimonthly_first_day'] ?? null) : null,
                 'day_of_week' => $patternData['day_of_week'] ?? null,
-                'is_dynamic_amount' => $patternData['amount_type'] === 'dynamic',
+                'is_dynamic_amount' => $isDynamic,
                 'average_amount' => $patternData['amount'] ?? null,
                 'min_amount' => $minAmount,
                 'max_amount' => $maxAmount,
@@ -571,18 +573,15 @@ class RecurringTransactionAnalysisService
         $isConfirmationData = isset($patternData['description']) && isset($patternData['frequency']) &&
                               ! isset($patternData['suggested_start_date']) && ! isset($patternData['confidence_score']);
 
-        if ($isConfirmationData) {
-            // For confirmation data, we don't link transactions since the user is manually creating templates
-            // The user will need to link transactions manually or through a separate process
+        // Confirmation data (from the modal) carries the ids of the transactions that
+        // formed the pattern; raw analysis patterns carry the transactions themselves.
+        $transactionIds = $isConfirmationData
+            ? collect($patternData['transaction_ids'] ?? [])->all()
+            : collect($patternData['transactions'] ?? [])->pluck('id')->all();
+
+        if (empty($transactionIds)) {
             return 0;
         }
-
-        // Original logic for analysis-generated patterns
-        if (! isset($patternData['transactions'])) {
-            return 0;
-        }
-
-        $transactionIds = collect($patternData['transactions'])->pluck('id')->toArray();
 
         // Ids come from the request payload, so only link this budget's transactions.
         return Transaction::whereIn('id', $transactionIds)

@@ -44,9 +44,11 @@ class MagicLinkService
     }
 
     /**
-     * Verify a magic link token.
+     * Verify a magic link token for the given email. The token is only marked
+     * used when it belongs to that email, so a mismatched request cannot burn
+     * a still-valid link.
      */
-    public function verifyToken(string $token): ?User
+    public function verifyToken(string $token, string $email): ?User
     {
         // Hash the token to compare with stored hash
         $hashedToken = hash('sha256', $token);
@@ -56,7 +58,7 @@ class MagicLinkService
             ->valid()
             ->first();
 
-        if (! $magicLinkToken) {
+        if (! $magicLinkToken || $magicLinkToken->user?->email !== $email) {
             \Log::warning('Magic link verification failed', [
                 'token_length' => strlen($token),
                 'token_prefix' => substr($token, 0, 10).'...',

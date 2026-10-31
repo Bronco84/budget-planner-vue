@@ -100,6 +100,9 @@
                   </svg>
                   Add Another Bank
                 </button>
+                <p v-if="!linkToken" class="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                  Bank connections are unavailable right now. Try again later.
+                </p>
               </div>
               
               <!-- Full UI when no connections exist -->
@@ -125,6 +128,9 @@
                     </svg>
                     Connect Bank Account
                   </button>
+                  <p v-if="!linkToken" class="mt-3 text-sm text-amber-600 dark:text-amber-400">
+                    Bank connections are unavailable right now. Try again later.
+                  </p>
                 </div>
               </div>
             </div>

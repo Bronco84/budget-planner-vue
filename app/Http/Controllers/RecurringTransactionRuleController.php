@@ -7,6 +7,7 @@ use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Services\RecurringTransactionService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -102,7 +103,7 @@ class RecurringTransactionRuleController extends Controller
             $message .= sprintf(' (%d transactions linked, %d unlinked)', $results['linked'], $results['unlinked']);
         }
 
-        return redirect()->route('recurring-transactions.edit', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
+        return redirect()->route('recurring-transactions.rules.index', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
             ->with('message', $message);
     }
 
@@ -123,7 +124,7 @@ class RecurringTransactionRuleController extends Controller
             $message .= sprintf(' (%d transactions unlinked)', $results['unlinked']);
         }
 
-        return redirect()->route('recurring-transactions.edit', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
+        return redirect()->route('recurring-transactions.rules.index', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
             ->with('message', $message);
     }
 
@@ -145,12 +146,13 @@ class RecurringTransactionRuleController extends Controller
         $testRule = new RecurringTransactionRule($validated);
         $testRule->is_active = true;
 
-        // Get the account's recent transactions
-        $account = $recurring_transaction->account;
-        $transactions = Transaction::where('account_id', $account->id)
-            ->latest('date')
-            ->take(100)
-            ->get();
+        // Get the account's recent transactions (none when the template's account was deleted)
+        $transactions = $recurring_transaction->account_id
+            ? Transaction::where('account_id', $recurring_transaction->account_id)
+                ->latest('date')
+                ->take(100)
+                ->get()
+            : collect();
 
         // Test against each transaction
         $matchingTransactions = $transactions->filter(function ($transaction) use ($testRule) {
@@ -173,7 +175,6 @@ class RecurringTransactionRuleController extends Controller
     {
         $this->authorize('view', $budget);
 
-        $account = $recurring_transaction->account;
         $rules = $recurring_transaction->rules()
             ->where('is_active', true)
             ->orderBy('priority')
@@ -188,12 +189,7 @@ class RecurringTransactionRuleController extends Controller
             ]);
         }
 
-        // Get unlinked transactions from the last 90 days
-        $transactions = Transaction::where('account_id', $account->id)
-            ->whereNull('recurring_transaction_template_id')
-            ->where('date', '>=', now()->subDays(90)->toDateString())
-            ->latest('date')
-            ->get();
+        $transactions = $this->recentUnlinkedAccountTransactions($recurring_transaction);
 
         $matchingTransactions = [];
 
@@ -235,7 +231,6 @@ class RecurringTransactionRuleController extends Controller
     {
         $this->authorize('update', $budget);
 
-        $account = $recurring_transaction->account;
         $rules = $recurring_transaction->rules()
             ->where('is_active', true)
             ->orderBy('priority')
@@ -246,11 +241,7 @@ class RecurringTransactionRuleController extends Controller
                 ->with('warning', 'No active rules to apply');
         }
 
-        // Get unlinked transactions from the last 90 days
-        $transactions = Transaction::where('account_id', $account->id)
-            ->whereNull('recurring_transaction_template_id')
-            ->where('date', '>=', now()->subDays(90)->toDateString())
-            ->get();
+        $transactions = $this->recentUnlinkedAccountTransactions($recurring_transaction);
 
         $matchCount = 0;
 
@@ -318,6 +309,7 @@ class RecurringTransactionRuleController extends Controller
         $this->authorize('view', $budget);
 
         $linkedTransactions = Transaction::where('recurring_transaction_template_id', $recurring_transaction->id)
+            ->where('budget_id', $budget->id)
             ->with('account')
             ->latest('date')
             ->paginate(50);
@@ -327,6 +319,23 @@ class RecurringTransactionRuleController extends Controller
             'recurringTransaction' => $recurring_transaction,
             'linkedTransactions' => $linkedTransactions,
         ]);
+    }
+
+    /**
+     * Unlinked transactions from the template's account in the last 90 days.
+     * A template whose account was deleted has no account to search.
+     */
+    private function recentUnlinkedAccountTransactions(RecurringTransactionTemplate $template): Collection
+    {
+        if (! $template->account_id) {
+            return new Collection;
+        }
+
+        return Transaction::where('account_id', $template->account_id)
+            ->whereNull('recurring_transaction_template_id')
+            ->where('date', '>=', now()->subDays(90)->toDateString())
+            ->latest('date')
+            ->get();
     }
 
     /**

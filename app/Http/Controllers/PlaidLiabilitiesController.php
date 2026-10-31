@@ -82,9 +82,7 @@ class PlaidLiabilitiesController extends Controller
         $user = Auth::user();
 
         // Verify the connection belongs to the user
-        if ($connection->budget->user_id !== $user->id) {
-            return redirect()->back()->with('error', 'Unauthorized access to this connection.');
-        }
+        abort_if($connection->budget->user_id !== $user->id, 403);
 
         // Get all credit card accounts for this connection
         $creditCards = $connection->plaidAccounts()

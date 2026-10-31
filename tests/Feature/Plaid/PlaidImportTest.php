@@ -330,6 +330,22 @@ test('re-importing the same Plaid item reuses its connection', function () {
         ->and($connection->plaidAccounts()->pluck('plaid_account_id')->sort()->values()->all())->toBe(['acc-card', 'acc-checking']);
 });
 
+test('re-importing an account that is already linked reuses its local account', function () {
+    stubSuccessfulPlaidImport($this->plaid);
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.import', $this->budget), plaidImportPayload(['selected_accounts' => ['acc-checking']]));
+    $original = $this->budget->accounts()->sole();
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.import', $this->budget), plaidImportPayload(['selected_accounts' => ['acc-checking']]))
+        ->assertRedirect(route('budgets.show', $this->budget));
+
+    $plaidAccount = PlaidAccount::where('plaid_account_id', 'acc-checking')->sole();
+    expect($this->budget->accounts()->pluck('id')->all())->toBe([$original->id])
+        ->and($plaidAccount->account_id)->toBe($original->id);
+});
+
 test('an account fetch failure on import shows an error and creates nothing', function () {
     stubSuccessfulPlaidImport($this->plaid);
     $this->plaid->on('/accounts/get', FakePlaidApi::error('ITEM_LOGIN_REQUIRED', 'the login details of this item have changed'));

@@ -301,6 +301,55 @@ class PlaidService
     }
 
     /**
+     * Remove an item at Plaid (/item/remove), invalidating its access token.
+     *
+     * @throws \Exception when Plaid is unconfigured, unreachable or refuses
+     */
+    public function removeItem(string $accessToken): void
+    {
+        if (! $this->isConfigured) {
+            throw new \Exception('Plaid service is not properly configured');
+        }
+
+        try {
+            $this->client->post('/item/remove', [
+                'json' => [
+                    'access_token' => $accessToken,
+                ],
+            ]);
+        } catch (ConnectException $e) {
+            throw new \Exception($this->getConnectionErrorMessage($e), 0, $e);
+        } catch (RequestException $e) {
+            throw new \Exception($this->getRequestErrorMessage($e), 0, $e);
+        }
+    }
+
+    /**
+     * Best-effort removal of a connection's item at Plaid. A failure is logged and
+     * never thrown, so it cannot block the local delete that triggered it.
+     */
+    public function removeConnectionItem(PlaidConnection $connection): bool
+    {
+        if (! $connection->access_token) {
+            return false;
+        }
+
+        try {
+            $this->removeItem($connection->access_token);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Failed to remove Plaid item; its access token may still be valid at Plaid', [
+                'connection_id' => $connection->id,
+                'budget_id' => $connection->budget_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Search for institutions by name.
      *
      * @param  string  $query  The institution name to search for
@@ -524,6 +573,11 @@ class PlaidService
             $errorResponse = $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null;
             $errorCode = $errorResponse['error_code'] ?? null;
 
+            // The bank needs the user to log in again: let the caller flag the connection.
+            if ($errorCode === 'ITEM_LOGIN_REQUIRED') {
+                throw new \Exception('ITEM_LOGIN_REQUIRED: '.($errorResponse['error_message'] ?? 'Liabilities fetch failed'), 0, $e);
+            }
+
             // Handle ADDITIONAL_CONSENT_REQUIRED - user needs to re-link to grant liabilities permission
             if ($errorCode === 'ADDITIONAL_CONSENT_REQUIRED') {
                 Log::warning('Plaid liabilities requires additional consent - user must re-authenticate. '.
@@ -592,6 +646,11 @@ class PlaidService
             $errorDetails = null;
             if ($e->hasResponse()) {
                 $errorDetails = json_decode($e->getResponse()->getBody(), true);
+            }
+
+            // The bank needs the user to log in again: let the caller flag the connection.
+            if (($errorDetails['error_code'] ?? null) === 'ITEM_LOGIN_REQUIRED') {
+                throw new \Exception('ITEM_LOGIN_REQUIRED: '.($errorDetails['error_message'] ?? 'Investment holdings fetch failed'), 0, $e);
             }
 
             // Handle PRODUCTS_NOT_SUPPORTED error gracefully (institution doesn't support investments)
@@ -1218,13 +1277,20 @@ class PlaidService
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // The bank needs the user to log in again: flag the connection so the
-            // re-authenticate prompt can be shown.
-            if (str_contains($e->getMessage(), 'ITEM_LOGIN_REQUIRED')) {
-                $plaidAccount->plaidConnection->markAsError('ITEM_LOGIN_REQUIRED: the bank requires the user to log in again.');
-            }
+            $this->flagLoginRequired($plaidAccount, $e);
 
             throw $e;
+        }
+    }
+
+    /**
+     * When Plaid reports ITEM_LOGIN_REQUIRED, flag the connection so the
+     * re-authenticate prompt can be shown.
+     */
+    private function flagLoginRequired(PlaidAccount $plaidAccount, \Throwable $e): void
+    {
+        if (str_contains($e->getMessage(), 'ITEM_LOGIN_REQUIRED')) {
+            $plaidAccount->plaidConnection?->markAsError('ITEM_LOGIN_REQUIRED: the bank requires the user to log in again.');
         }
     }
 
@@ -1298,6 +1364,8 @@ class PlaidService
                 'plaid_account_id' => $plaidAccount->id,
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            $this->flagLoginRequired($plaidAccount, $e);
 
             return false;
         }
@@ -1432,6 +1500,8 @@ class PlaidService
                 'plaid_account_id' => $plaidAccount->id,
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            $this->flagLoginRequired($plaidAccount, $e);
 
             return false;
         }
@@ -1680,6 +1750,8 @@ class PlaidService
                 'plaid_account_id' => $plaidAccount->id,
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            $this->flagLoginRequired($plaidAccount, $e);
 
             return false;
         }

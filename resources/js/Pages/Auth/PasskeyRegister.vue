@@ -263,13 +263,14 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 
 const props = defineProps({
   hasExistingPasskeys: Boolean,
   isNewUser: Boolean,
+  redirectTo: { type: String, default: '/budgets' },
 });
 
 const page = usePage();
@@ -372,24 +373,9 @@ const registerPasskey = async () => {
       success.value = 'Passkey registered successfully! Redirecting...';
       passkeyName.value = '';
       
-      console.log('Passkey registration successful, redirecting to /budgets in 2 seconds');
-      
-      // Force redirect after successful registration
+      // Force a full reload so the session/passkey state is fresh.
       setTimeout(() => {
-        console.log('Executing redirect now to:', window.location.origin + '/budgets');
-        // Try multiple redirect methods for better compatibility
-        try {
-          window.location.href = '/budgets';
-        } catch (e) {
-          console.error('window.location.href failed:', e);
-          try {
-            window.location.replace('/budgets');
-          } catch (e2) {
-            console.error('window.location.replace failed:', e2);
-            // Last resort - use router
-            router.visit('/budgets', { method: 'get', replace: true });
-          }
-        }
+        window.location.href = props.redirectTo;
       }, 2000);
     } else {
       console.error('Registration response not OK. Status:', registerResponse.status);

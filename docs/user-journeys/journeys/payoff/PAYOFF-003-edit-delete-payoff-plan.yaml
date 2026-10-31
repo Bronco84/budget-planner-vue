@@ -29,6 +29,7 @@ postconditions:
 business_rules:
   - name required (max 255); strategy in snowball, avalanche, custom; monthly_extra_payment_cents integer >= 0
   - only plan-level fields are editable; debts and goals are not
+  - at most one plan per budget is active; activating a plan through update deactivates the others
   - all three actions require the budget update ability; plan is scoped to the budget
 scenarios:
   - id: update_plan
@@ -52,9 +53,10 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::updating a plan rejects invalid input and leaves the plan unchanged
   - id: reactivate_plan_keeps_single_active
     kind: edge
-    description: Setting is_active on one plan should deactivate the others, as store does.
-    coverage: uncovered
-    note: update does not deactivate other plans, so several plans can be active at once (see known_issues).
+    description: Setting is_active on one plan deactivates the budget's other plans (in a DB transaction), as store does; other budgets' plans are untouched.
+    coverage: covered
+    tests:
+      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::activating a plan through update deactivates the budgets other plans
   - id: cross_user_or_cross_budget
     kind: authorization
     description: Another user cannot edit, update or delete a plan (403 for foreign budget, 404 for plan outside the URL budget).
@@ -66,7 +68,6 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject a plan addressed through another budget with 404
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::payoff plan routes reject the owners plan addressed through the owners other budget with 404
 known_issues:
-  - update accepts is_active but never deactivates other plans, breaking the single-active-plan invariant enforced by store.
   - Debts (APR, minimum payment) and goals cannot be changed after creation; the only fix for a typo is deleting and recreating the plan.
 confidence: high
 evidence:

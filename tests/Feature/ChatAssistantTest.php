@@ -5,8 +5,14 @@ use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\FlaggedChatMessage;
 use App\Models\User;
+use Prism\Prism\Enums\Provider;
+use Prism\Prism\Exceptions\PrismRateLimitedException;
 use Prism\Prism\Facades\Prism;
+use Prism\Prism\PrismManager;
+use Prism\Prism\Testing\PrismFake;
 use Prism\Prism\Testing\TextResponseFake;
+use Prism\Prism\Text\Request as TextRequest;
+use Prism\Prism\Text\Response as TextResponse;
 
 test('chat assistant returns and persists a reply via the tool-loop flow', function () {
     Prism::fake([
@@ -126,4 +132,73 @@ test('stream complete for another users conversation returns 404', function () {
         ->assertNotFound();
 
     expect($victim->messages()->count())->toBe(1);
+});
+
+/** Make every Prism text call fail the way the provider would. */
+function fakePrismProviderFailure(Throwable $exception): void
+{
+    $fake = new class([]) extends PrismFake
+    {
+        public ?Throwable $exception = null;
+
+        public function text(TextRequest $request): TextResponse
+        {
+            throw $this->exception;
+        }
+    };
+    $fake->exception = $exception;
+
+    app()->instance(PrismManager::class, new class($fake) extends PrismManager
+    {
+        public function __construct(private readonly PrismFake $fake) {}
+
+        public function resolve(Provider|string $name, array $providerConfig = []): \Prism\Prism\Providers\Provider
+        {
+            return $this->fake;
+        }
+    });
+}
+
+test('a provider failure on send returns the safe message and leaves no orphan user message', function () {
+    fakePrismProviderFailure(PrismRateLimitedException::make());
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson('/chat/message', ['message' => 'How much did I spend?'])
+        ->assertStatus(500)
+        ->assertJson([
+            'success' => false,
+            'error' => 'The AI assistant is temporarily unavailable because the provider limit was reached. Please try again in a few minutes.',
+        ]);
+
+    expect(ChatMessage::count())->toBe(0)
+        ->and(ChatConversation::count())->toBe(0);
+});
+
+test('a provider failure while streaming sends the safe message in-band and leaves no orphan user message', function () {
+    fakePrismProviderFailure(PrismRateLimitedException::make());
+    $user = User::factory()->create();
+    $conversation = chatConversationFor($user);
+
+    $body = $this->actingAs($user)
+        ->get(route('chat.stream', ['message' => 'Follow-up question', 'conversation_id' => $conversation->id]))
+        ->assertOk()
+        ->streamedContent();
+
+    expect($body)->toContain('event: error')
+        ->and($body)->toContain('provider limit was reached')
+        ->and($conversation->messages()->pluck('content')->all())->toBe(['Hello']);
+});
+
+test('a provider failure while streaming a new conversation leaves no empty conversation behind', function () {
+    fakePrismProviderFailure(PrismRateLimitedException::make());
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('chat.stream', ['message' => 'First question']))
+        ->assertOk()
+        ->streamedContent();
+
+    expect(ChatConversation::count())->toBe(0)
+        ->and(ChatMessage::count())->toBe(0);
 });

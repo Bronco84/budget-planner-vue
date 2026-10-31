@@ -34,9 +34,10 @@ steps:
 postconditions:
   - blocked messages are not sent to the provider and not stored as chat messages
 business_rules:
-  - prompt_injection or harmful_instructions => block; excessive_length or repeated_characters => warn (allowed); abusive_content => log (allowed)
-  - the per-user moderation counter allows 30 messages per hour (cache based)
-  - every suspicious-activity event (any flag, moderation rate-limit hit, more than 10 tracked messages in 10 minutes) counts as an offense; 5 offenses in 24 hours trigger an automatic 24-hour ban
+  - prompt_injection or harmful_instructions => block; repeated_characters => warn (allowed); abusive_content => log (allowed); message length is capped at 2000 by request validation
+  - the per-user moderation counter allows 30 messages per fixed one-hour window starting at the first message (Laravel RateLimiter); reset_in_seconds is the time left in that window
+  - rejections past the hourly limit are logged but are not offenses
+  - every content flag and more than 10 new conversations in 10 minutes ('rapid_conversation_creation') count as offenses; messages in an existing conversation are not tracked; 5 offenses in 24 hours trigger an automatic 24-hour ban
   - route throttles - 30 per minute for send/stream, 60 per minute for the chat group
 scenarios:
   - id: clean_message_allowed
@@ -56,8 +57,24 @@ scenarios:
     coverage: uncovered
   - id: hourly_limit_exceeded
     kind: edge
-    description: The 31st message within an hour returns 429 with rate limit details.
-    coverage: uncovered
+    description: The 31st message within the fixed hourly window is refused with rate limit details, and the window resets an hour after its first message.
+    coverage: partial
+    tests:
+      - tests/Feature/Chat/ChatModerationLimitsTest.php::the hourly chat limit is a fixed window that resets an hour after the first message
+    note: exercises ContentModerationService::checkRateLimit directly; the HTTP 429 (stream) / 500 (send) responses are not asserted.
+  - id: limit_retries_not_offenses
+    kind: edge
+    description: Retrying after hitting the hourly limit does not add offenses or trigger a ban.
+    coverage: covered
+    tests:
+      - tests/Feature/Chat/ChatModerationLimitsTest.php::retrying past the hourly chat limit does not count as offenses or ban the user
+  - id: rapid_conversation_creation
+    kind: edge
+    description: Only new conversations count toward rapid-creation; many messages in one conversation are not an offense, while more than 10 new conversations in 10 minutes are.
+    coverage: covered
+    tests:
+      - tests/Feature/Chat/ChatModerationLimitsTest.php::sending many messages in one conversation is not flagged as rapid conversation creation
+      - tests/Feature/Chat/ChatModerationLimitsTest.php::creating many new conversations rapidly is still recorded as an offense
   - id: route_throttle
     kind: edge
     description: More than 30 send/stream requests per minute return 429 from the throttle middleware.
@@ -81,11 +98,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/ChatAssistantTest.php::a blocked message aimed at another users conversation returns 404 without flagging it
-known_issues:
-  - trackConversationActivity records every message (not just new conversations) and logs 'rapid_conversation_creation' as an offense once more than 10 messages are sent in 10 minutes, so an ordinary user sending about 15 messages in 10 minutes is auto-banned from chat for 24 hours.
-  - each rejected attempt after hitting the hourly limit is itself an offense, so a user who retries a few times past the limit escalates to a 24-hour ban.
-  - the moderation rate counter re-puts the cache key with a fresh one-hour TTL on every message, so it is a rolling window that never resets while the user keeps chatting, and reset_in_seconds is always 3600.
-  - over-length detection (>5000 chars) is unreachable because validation caps messages at 2000.
+known_issues: []
 confidence: high
 evidence:
   - app/Services/ChatService.php steps 1-4 of processMessage/processMessageStream, flagMessage()

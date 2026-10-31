@@ -292,6 +292,23 @@ test('a login required error during sync shows a re-authenticate error and marks
         ->error_message->not->toBeNull();
 });
 
+test('a login required error on a balance, liabilities or investments refresh marks the connection as errored', function (string $route, string $path, array $account) {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, ...$account);
+    $this->plaid->on($path, FakePlaidApi::error('ITEM_LOGIN_REQUIRED', 'the login details of this item have changed'));
+
+    $this->actingAs($this->user)
+        ->post(route($route, [$this->budget, $plaidAccount->account]))
+        ->assertSessionHas('error');
+
+    expect($plaidAccount->plaidConnection->fresh())
+        ->status->toBe(PlaidConnection::STATUS_ERROR)
+        ->error_message->toContain('ITEM_LOGIN_REQUIRED');
+})->with([
+    'balance' => ['plaid.balance', '/accounts/get', ['depository', 'checking', 'checking']],
+    'liabilities' => ['plaid.liabilities', '/liabilities/get', ['credit', 'credit card', 'credit card']],
+    'investments' => ['plaid.investments', '/investments/holdings/get', ['investment', 'brokerage', 'brokerage']],
+]);
+
 test('a Plaid error or timeout during sync shows a failure instead of a zero count success', function (mixed $response, string $expected) {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
     $account = $plaidAccount->account;

@@ -35,18 +35,28 @@ steps:
   - action: download (GET /budgets/{budget}/files/{fileAttachment}/download)
     expected: file download with original name
   - action: delete (DELETE /budgets/{budget}/files/{fileAttachment})
-    expected: attachment removed (file row removed when unused); back with success flash
+    expected: attachment removed via FileService::detachFile (file row and S3 object removed when unused); back with 'message' flash
 postconditions:
   - budget attachments reflect the change
 business_rules:
   - same file rules as FILE-001 (10MB, MIME allow-list, extension must match)
   - upload throttled to 10 per minute
   - download/destroy 404 when the attachment does not belong to this budget
+  - download/destroy use FileService (s3 disk, key = content hash), the same storage logic as upload
+  - GET budgets/{budget}/files returns the attachment list as JSON when the request wants JSON (used by the dashboard's attachment list in Budgets/Show.vue), otherwise the Inertia Files page
 scenarios:
   - id: files_page_renders
     kind: happy_path
     description: Owner sees the budget's files.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/BudgetFilesTest.php::the files page renders the budgets files
+  - id: index_json_for_dashboard
+    kind: alternate
+    description: Requesting the files index as JSON returns the attachments (with file details and uploader) for the dashboard list.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/BudgetFilesTest.php::the files index returns the attachments as JSON when JSON is requested
   - id: upload_valid_file
     kind: happy_path
     description: A PDF or image upload is accepted.
@@ -58,7 +68,10 @@ scenarios:
   - id: download_and_delete
     kind: happy_path
     description: Download returns the file and delete removes it.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/BudgetFilesTest.php::downloading a budget file streams the object stored on the s3 disk
+      - tests/Feature/Files/BudgetFilesTest.php::deleting a budget file removes the attachment, file and s3 object
   - id: oversized_file_rejected
     kind: validation
     description: Files over 10MB fail validation.
@@ -85,15 +98,14 @@ scenarios:
   - id: attachment_from_other_budget_not_found
     kind: authorization
     description: Downloading or deleting an attachment of another budget under the user's own budget URL returns 404.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/BudgetFilesTest.php::an attachment of another budget is not found under the users own budget
   - id: other_users_files_forbidden
     kind: authorization
     description: Index/download (view) and destroy (update) on another user's budget return 403; upload returns 403 JSON.
     coverage: uncovered
-known_issues:
-  - "BudgetFilesController download/destroy use the default disk with path 'files/{hash}', but FileService stores objects on the s3 disk at key '{hash}'. Download from the Files page therefore fails to find the file, and destroy deletes the File row without removing the S3 object (orphaned storage). FileController@download (files.download, used by the dashboard list) uses the correct disk."
-  - "Budgets/Show.vue loads budget attachments with fetch('/budgets/{id}/files') expecting JSON, but that route returns the Inertia Files page; the dashboard attachment list silently stays empty. FileController@getBudgetAttachments exists but has no route."
-  - "BudgetFilesController@destroy flashes 'success' while the rest of the app uses 'message'."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetFilesController.php

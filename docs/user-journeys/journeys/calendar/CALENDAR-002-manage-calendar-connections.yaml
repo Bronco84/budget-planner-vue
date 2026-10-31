@@ -35,6 +35,7 @@ postconditions:
   - inactive connections' events are excluded from the calendar month view (CALENDAR-003)
 business_rules:
   - only the owning user may sync, toggle or delete a connection
+  - sync failures flash a generic "Sync failed. Please try again."; the exception is only logged
   - an expired token without a refresh token fails with "No refresh token available"
 scenarios:
   - id: sync_connection
@@ -67,8 +68,10 @@ scenarios:
     coverage: uncovered
   - id: google_api_failure
     kind: integration
-    description: A Google API error during events.list is reported as a sync failure without 500.
-    coverage: uncovered
+    description: A Google API error during events.list is reported as a generic "Sync failed" flash (no raw exception text) without 500, and the real cause is logged.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::a google api failure during sync shows a generic error without the raw exception
   - id: cross_user_denied
     kind: authorization
     description: Another user's connection cannot be synced, toggled or deleted (403).
@@ -82,8 +85,7 @@ scenarios:
     tests:
       - tests/Feature/Calendar/CalendarConnectionTest.php::the connections page receives the flashed message so it can be shown
     note: asserts the Inertia prop; the Vue rendering itself is not unit tested.
-known_issues:
-  - sync error flashes include raw exception messages.
+known_issues: []
 confidence: medium
 evidence:
   - routes/web.php calendar.connections.* parameter names

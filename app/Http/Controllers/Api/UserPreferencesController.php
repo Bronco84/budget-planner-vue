@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UserPreferencesController extends Controller
 {
@@ -33,11 +34,17 @@ class UserPreferencesController extends Controller
     {
         $user = Auth::user();
 
-        // Validate based on preference key
-        $validationRules = $this->getValidationRulesForKey($key);
-        $validated = $request->validate([
-            'value' => $validationRules,
-        ]);
+        // Only whitelisted keys may be written here; everything else (e.g. the
+        // active budget or projection months) has a dedicated, validated path.
+        $rules = $this->writablePreferenceRules()[$key] ?? null;
+
+        if ($rules === null) {
+            throw ValidationException::withMessages([
+                'key' => 'This preference cannot be updated.',
+            ]);
+        }
+
+        $validated = $request->validate($rules);
 
         $user->setPreference($key, $validated['value']);
 
@@ -82,18 +89,19 @@ class UserPreferencesController extends Controller
     }
 
     /**
-     * Get validation rules for specific preference keys.
+     * Preferences writable through the generic endpoint, with the validation
+     * rules for their value. No frontend code currently uses this endpoint.
+     *
+     * @return array<string, array<string, array<int, mixed>>>
      */
-    private function getValidationRulesForKey(string $key): array
+    private function writablePreferenceRules(): array
     {
-        return match ($key) {
+        return [
             'account_type_order' => [
-                'required',
-                'array',
-                Rule::in(User::ACCOUNT_TYPES),
+                'value' => ['required', 'array'],
+                'value.*' => ['required', 'string', 'distinct', Rule::in(User::ACCOUNT_TYPES)],
             ],
-            default => ['nullable'],
-        };
+        ];
     }
 
     /**

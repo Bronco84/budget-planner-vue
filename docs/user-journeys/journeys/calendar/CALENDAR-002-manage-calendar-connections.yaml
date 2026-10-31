@@ -40,20 +40,27 @@ scenarios:
   - id: sync_connection
     kind: happy_path
     description: The owner re-syncs a connection and sees the synced count.
-    coverage: uncovered
-    note: currently fails with 403, see known_issues.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::the owner can sync a calendar connection
   - id: toggle_connection
     kind: happy_path
     description: The owner toggles a connection active/inactive.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::the owner can toggle a calendar connection
   - id: remove_connection
     kind: happy_path
     description: The owner removes a connection.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::the owner can remove a calendar connection
   - id: unknown_connection
     kind: edge
     description: A non-existent connection id returns 404.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::an unknown calendar connection returns 404
   - id: token_refresh_failure
     kind: recovery
     description: An expired token that cannot be refreshed (revoked access, no refresh token) redirects back with "Sync failed".
@@ -65,9 +72,10 @@ scenarios:
   - id: cross_user_denied
     kind: authorization
     description: Another user's connection cannot be synced, toggled or deleted (403).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::another user cannot sync toggle or remove a calendar connection
 known_issues:
-  - "route parameter is {calendarConnection} but the controller methods type-hint CalendarConnection $connection, so implicit binding does not apply; Laravel injects an empty model, the policy compares user id to null and every sync/toggle/destroy request returns 403 for the owner too (suspected, verify with a feature test)."
   - "success messages are flashed under 'success', which is not shared with Inertia, and Connections.vue renders no flash, so the user gets no feedback."
   - sync error flashes include raw exception messages.
 confidence: medium

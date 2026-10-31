@@ -8,6 +8,7 @@ use App\Models\PayoffPlanDebt;
 use App\Models\RecurringTransactionTemplate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,6 +20,11 @@ class ReportsController extends Controller
     public function index(Budget $budget, Request $request): Response
     {
         $this->authorize('view', $budget);
+
+        $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => ['nullable', 'date', Rule::when($request->filled('start_date'), 'after_or_equal:start_date')],
+        ]);
 
         // Load relationships
         $budget->load([

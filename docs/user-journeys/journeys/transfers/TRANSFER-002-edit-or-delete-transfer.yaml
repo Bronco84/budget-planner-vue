@@ -8,8 +8,8 @@ summary: >
   From a transfer leg in the dashboard ledger the owner opens the transfer edit
   page, changes accounts, amount, date or description (both paired transactions
   are re-synced) or deletes the transfer together with its transactions. After
-  either action the controller redirects to the transfers index, whose page does
-  not exist; index and show routes are otherwise unlinked.
+  either action the owner returns to the budget dashboard. The index and show URLs
+  have no pages of their own: index redirects to the dashboard, show to the edit form.
 actors:
   - budget owner
 preconditions:
@@ -30,9 +30,9 @@ steps:
   - action: click the transfer link on a ledger row (GET /budget/{budget}/transfers/{transfer}/edit)
     expected: Transfers/Edit rendered with the transfer, its accounts and the budget's accounts
   - action: save (PATCH)
-    expected: transfer and both legs updated in one DB transaction; redirect to budget.transfers.index
+    expected: transfer and both legs updated in one DB transaction; redirect to budgets.show
   - action: delete (DELETE)
-    expected: transfer and its transactions deleted; redirect to budget.transfers.index
+    expected: transfer and its transactions deleted; redirect to budgets.show
 postconditions:
   - transfer legs always mirror the transfer (missing legs are recreated on update)
 business_rules:
@@ -46,7 +46,9 @@ scenarios:
   - id: update_resyncs_legs
     kind: happy_path
     description: Updating amount/accounts/date updates both paired transactions.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferPagesTest.php::updating a transfer resyncs both legs and redirects to the budget dashboard
   - id: delete_removes_pair
     kind: happy_path
     description: Deleting removes the transfer and its paired transactions.
@@ -57,10 +59,13 @@ scenarios:
     kind: recovery
     description: If a leg was deleted separately, update recreates it.
     coverage: uncovered
-  - id: post_action_redirect_lands_on_missing_page
+  - id: post_action_redirect_to_dashboard
     kind: edge
-    description: After update/delete the redirect to budget.transfers.index renders the non-existent Transfers/Index page.
-    coverage: uncovered
+    description: After a non-JSON update/delete the owner is redirected to budgets.show (the page Transfers/Edit's cancel link returns to).
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferPagesTest.php::updating a transfer resyncs both legs and redirects to the budget dashboard
+      - tests/Feature/Transfers/TransferPagesTest.php::deleting a transfer redirects to the budget dashboard
   - id: invalid_update_rejected
     kind: validation
     description: Same from/to account or amount below 0.01 is rejected.
@@ -75,9 +80,15 @@ scenarios:
     kind: authorization
     description: Edit/update/delete under another user's budget return 403.
     coverage: uncovered
+  - id: index_and_show_redirect
+    kind: edge
+    description: GET index redirects to budgets.show and GET show redirects to the transfer's edit page; another user's budget returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferPagesTest.php::the transfers index url redirects to the budget dashboard
+      - tests/Feature/Transfers/TransferPagesTest.php::the transfer show url redirects to its edit page
+      - tests/Feature/Transfers/TransferPagesTest.php::another users transfer urls are forbidden
 known_issues:
-  - "update and destroy redirect (non-JSON) to budget.transfers.index, which renders Transfers/Index; that page does not exist, so the Inertia visit from Transfers/Edit fails to resolve a component after a successful save/delete."
-  - "show renders Transfers/Show, which does not exist; nothing links to it (only the cross-budget 404 test exercises the route)."
   - "Update uses ?? for description, so a description cannot be cleared back to the default once set."
 confidence: high
 evidence:

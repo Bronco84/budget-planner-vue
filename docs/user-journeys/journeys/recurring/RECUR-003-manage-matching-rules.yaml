@@ -51,11 +51,15 @@ business_rules:
   - field must be description, amount or category; operator must be one of the seven supported operators
   - "{rule} is scoped to the template and the template to the budget, so foreign ids return 404"
   - index, test and preview need budget view; store, update, destroy and apply need budget update
+  - a regex rule value is a full PCRE pattern including delimiters (e.g. /^netflix/); store, update and test reject patterns preg_match cannot compile (lowercased first unless case sensitive, as matchesTransaction does)
 scenarios:
   - id: add_rule_and_apply
     kind: happy_path
     description: Owner adds a rule, previews matches and applies them, linking the matching transactions.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::storing a regex rule with a valid pattern succeeds and previews matches
+    note: store and preview are asserted for a regex rule; apply (linking) is not exercised.
   - id: test_draft_rule
     kind: alternate
     description: Testing a draft rule shows matches without persisting the rule.
@@ -75,8 +79,11 @@ scenarios:
   - id: invalid_regex_rule
     kind: edge
     description: A regex rule with an invalid pattern should be rejected or handled without a server error.
-    coverage: uncovered
-    note: no pattern validation exists; preg_match on a malformed pattern raises a warning that Laravel turns into a 500 during test/preview/apply (see known_issues).
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::storing a regex rule with a malformed pattern is rejected
+      - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::updating a rule to a malformed regex pattern is rejected
+      - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::testing a draft rule with a malformed regex pattern is rejected
   - id: delete_last_rule_unlinks_everything
     kind: edge
     description: Deleting the only active rule triggers reevaluateTransactionLinks with no rules.
@@ -90,7 +97,7 @@ scenarios:
       - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction routes reject a cross-budget template with 404
     note: only rules.index is asserted; store/update/destroy/test/preview/apply and cross-user 403 are untested.
 known_issues:
-  - Regex rule values are stored without validating the pattern; a malformed pattern makes preg_match emit a warning, which surfaces as a 500 on test, preview, apply and any reevaluation.
+  - "Two regex conventions coexist: RecurringTransactionRule::matchesTransaction (test/preview/apply) passes the value to preg_match as a full pattern with delimiters, while RecurringTransactionService::evaluateRuleCondition (reevaluateTransactionLinks after update/destroy) wraps it as '/'.value.'/i' and swallows compile errors. A value valid for one is usually invalid for the other, so reevaluation silently treats delimited regex rules as non-matching."
   - reevaluateTransactionLinks unlinks ALL linked transactions when the template has no active rules left, so deleting the last rule wipes links created by Plaid entity matching, description matching or manual linking.
   - update and destroy redirect to recurring-transactions.edit while store and apply redirect to rules.index, so the Rules page and detail tab land on different pages after similar actions.
   - test and preview dereference $recurring_transaction->account without a null check; a template whose account was deleted errors.

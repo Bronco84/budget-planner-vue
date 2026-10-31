@@ -29,7 +29,7 @@ steps:
   - action: open /budgets/{budget}/properties/create
     expected: Properties/Create rendered with unlinked liability accounts and property types
   - action: submit (POST /budgets/{budget}/properties)
-    expected: property stored with api_source=manual and value_updated_at=now, chosen liability account linked
+    expected: property stored with api_source=manual and value_updated_at=now, chosen liability account linked; redirect to budgets.properties.index
 postconditions:
   - Property exists for the budget; optional liability account has property_id set
 business_rules:
@@ -44,8 +44,9 @@ scenarios:
   - id: create_property
     kind: happy_path
     description: Valid submission stores the property and returns the user to the list.
-    coverage: uncovered
-    note: currently fails after the insert because of the redirect bug in known_issues.
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyLifecycleTest.php::storing a property redirects to the properties list
   - id: no_properties_empty_state
     kind: empty_state
     description: A budget with no properties shows the empty state with a create link.
@@ -62,8 +63,7 @@ scenarios:
     kind: authorization
     description: Index/create return 403 (view) and store returns 403 (update) for another user's budget.
     coverage: uncovered
-known_issues:
-  - "PropertyController@store redirects to route('budgets.assets.index'), which does not exist (RouteNotFoundException). The property is created but the user gets a 500 instead of returning to the list. Same bug in update and destroy (PROPERTY-002)."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/PropertyController.php index/create/store

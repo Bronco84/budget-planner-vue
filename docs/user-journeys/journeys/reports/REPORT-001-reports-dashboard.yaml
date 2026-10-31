@@ -73,14 +73,15 @@ scenarios:
   - id: invalid_custom_range
     kind: validation
     description: An unparsable or inverted custom date range should be rejected.
-    coverage: uncovered
-    note: dates are not validated; Carbon::parse throws on garbage and a start after end leaves netWorth dataPoints empty (see known_issues).
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDateRangeTest.php::reports reject an unparsable or inverted custom date range
+      - tests/Feature/Reports/ReportsDateRangeTest.php::reports accept a valid custom date range
   - id: cross_user_forbidden
     kind: authorization
     description: Another user cannot open reports for a budget they do not own (403).
     coverage: uncovered
 known_issues:
-  - start_date/end_date are not validated; an unparsable value throws (500) and a start after end leaves dataPoints empty, so end($dataPoints)['date'] and $dataPoints[0] fail.
   - Dynamic-amount recurring templates (amount_in_cents 0) are excluded from income vs expenses totals.
   - calculateBalanceAtDate subtracts later transaction sums the same way for liabilities and assets; with positive-debt liability balances and negative purchase amounts, historical credit card balances move in the wrong direction.
   - Net worth issues one SUM query per account per data point (e.g. 'all' range over many years x accounts), which is slow.

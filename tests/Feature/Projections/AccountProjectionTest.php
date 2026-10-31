@@ -61,7 +61,7 @@ test('owner sees the weekly account projection rolled forward from the current b
     ]);
 
     $this->actingAs($this->user)
-        // Default window (3 months). An explicit ?months=N currently 500s; see PROJECT-001 known_issues.
+        // Default window (3 months).
         ->get(route('budget.account.projections', [$this->budget, $checking]))
         ->assertOk()
         ->assertInertia(function (AssertableInertia $page) {
@@ -224,3 +224,35 @@ test('balance projection rejects another users budget and account with 403', fun
         ->get(route('budget.account.balance-projection', [$otherBudget, $otherAccount]))
         ->assertForbidden();
 });
+
+test('account projections honour an explicit months parameter', function () {
+    $checking = Account::factory()->checking()->create([
+        'budget_id' => $this->budget->id,
+        'current_balance_cents' => 0,
+    ]);
+    projectionTemplate($checking, ['description' => 'Paycheck', 'amount_in_cents' => 1000, 'day_of_month' => 15]);
+
+    $this->actingAs($this->user)
+        ->get(route('budget.account.projections', [$this->budget, $checking, 'months' => 6]))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Accounts/Projections')
+            ->where('monthsAhead', 6)
+            // Mar 15 .. Aug 15 2026 (end is 2026-09-04).
+            ->has('projectedTransactions', 6));
+});
+
+test('projection pages reject an invalid months parameter', function (string $routeName, mixed $months) {
+    $checking = Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+
+    $this->actingAs($this->user)
+        ->get(route($routeName, [$this->budget, $checking, 'months' => $months]))
+        ->assertRedirect()
+        ->assertSessionHasErrors('months');
+})->with([
+    'projections, zero' => ['budget.account.projections', 0],
+    'projections, too large' => ['budget.account.projections', 61],
+    'projections, not a number' => ['budget.account.projections', 'abc'],
+    'balance projection, negative' => ['budget.account.balance-projection', -3],
+    'balance projection, too large' => ['budget.account.balance-projection', 1000],
+]);

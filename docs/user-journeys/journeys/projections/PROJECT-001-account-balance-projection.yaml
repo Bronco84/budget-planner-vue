@@ -73,8 +73,10 @@ scenarios:
   - id: months_parameter_bounds
     kind: validation
     description: Invalid or extreme months values should be rejected or clamped.
-    coverage: uncovered
-    note: months is not validated on either page, and on budget.account.projections any explicit ?months=N currently 500s (see known_issues).
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/AccountProjectionTest.php::account projections honour an explicit months parameter
+      - tests/Feature/Projections/AccountProjectionTest.php::projection pages reject an invalid months parameter
   - id: cross_budget_account_not_found
     kind: authorization
     description: An account from another budget addressed through the user's own budget returns 404.
@@ -90,8 +92,6 @@ scenarios:
       - tests/Feature/NestedRouteAuthorizationTest.php::account projections reject another users budget+account with 403
       - tests/Feature/Projections/AccountProjectionTest.php::balance projection rejects another users budget and account with 403
 known_issues:
-  - "budget.account.projections returns a 500 for any explicit ?months=N (e.g. ?months=6 from the page's own Months to Project selector): ProjectionsController.php:111 passes the raw query string to Carbon::addMonths(), which throws a TypeError (string given). showBudgetProjections (line 43) has the same pattern; showBalanceProjection wraps it in intval()."
-  - months is read straight from the query string with no validation on both routes; a very large value triggers an unbounded projection loop and a negative value returns an empty series.
   - getFutureManualTransactions includes transactions dated today, which are usually already reflected in current_balance_cents, so today's posted transactions are double-counted.
   - showBalanceProjection reads scenario and groupBy query parameters but never uses them.
   - The first weekly bucket starts at the beginning of the current week, so its date range includes days before today; there is no data point for "today".

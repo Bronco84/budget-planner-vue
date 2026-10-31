@@ -160,7 +160,7 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::get('budget/{budget}/reports', [ReportsController::class, 'index'])
         ->name('reports.index');
 
-    Route::resource('budgets.accounts', AccountController::class);
+    Route::resource('budgets.accounts', AccountController::class)->except(['index', 'show']);
     Route::post('budgets/{budget}/accounts/{account}/autopay', [AccountController::class, 'updateAutopay'])
         ->name('accounts.updateAutopay');
     Route::post('budgets/{budget}/accounts/{account}/fetch-logo', [AccountController::class, 'fetchLogo'])
@@ -171,7 +171,7 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     // Property routes
     Route::resource('budgets.properties', PropertyController::class);
 
-    Route::resource('budgets.categories', CategoryController::class);
+    Route::resource('budgets.categories', CategoryController::class)->except(['create', 'show', 'edit']);
     Route::post('budgets/{budget}/categories/reorder', [CategoryController::class, 'reorder'])
         ->name('budgets.categories.reorder');
 

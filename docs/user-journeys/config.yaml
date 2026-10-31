@@ -133,8 +133,3 @@ ignore:
 # Routes deliberately not mapped to any journey, with the reason.
 excluded_routes:
   'GET /api/user': Sanctum scaffold; nothing in the frontend calls it (returns the full User model, see AUTH known issues)
-  budgets.accounts.index: registered by Route::resource but AccountController has no index(); unreachable from the UI (should be removed with ->except())
-  budgets.accounts.show: registered by Route::resource but AccountController has no show(); unreachable from the UI (should be removed with ->except())
-  budgets.categories.create: registered by Route::resource but CategoryController has no create(); unreachable from the UI (should be removed with ->except())
-  budgets.categories.show: registered by Route::resource but CategoryController has no show(); unreachable from the UI (should be removed with ->except())
-  budgets.categories.edit: registered by Route::resource but CategoryController has no edit(); unreachable from the UI (should be removed with ->except())

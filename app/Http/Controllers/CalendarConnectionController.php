@@ -60,9 +60,16 @@ class CalendarConnectionController extends Controller
                 ->with('error', 'Calendar connection was cancelled or failed.');
         }
 
+        $code = $request->query('code');
+
+        if (! is_string($code) || $code === '') {
+            return redirect()->route('calendar.connections.index')
+                ->with('error', 'Calendar connection failed: no authorization code was returned.');
+        }
+
         try {
             $connection = $this->googleCalendarService->handleCallback(
-                $request->get('code'),
+                $code,
                 auth()->user()
             );
 
@@ -77,15 +84,15 @@ class CalendarConnectionController extends Controller
     /**
      * Sync events from a calendar connection.
      */
-    public function sync(CalendarConnection $connection): RedirectResponse
+    public function sync(CalendarConnection $calendarConnection): RedirectResponse
     {
-        $this->authorize('update', $connection);
+        $this->authorize('update', $calendarConnection);
 
         try {
-            $count = $this->googleCalendarService->syncEvents($connection);
+            $count = $this->googleCalendarService->syncEvents($calendarConnection);
 
             return redirect()->back()
-                ->with('success', "Synced {$count} events from {$connection->calendar_name}");
+                ->with('success', "Synced {$count} events from {$calendarConnection->calendar_name}");
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', 'Sync failed: '.$e->getMessage());
@@ -95,13 +102,13 @@ class CalendarConnectionController extends Controller
     /**
      * Toggle a calendar connection active status.
      */
-    public function toggle(CalendarConnection $connection): RedirectResponse
+    public function toggle(CalendarConnection $calendarConnection): RedirectResponse
     {
-        $this->authorize('update', $connection);
+        $this->authorize('update', $calendarConnection);
 
-        $connection->update(['is_active' => ! $connection->is_active]);
+        $calendarConnection->update(['is_active' => ! $calendarConnection->is_active]);
 
-        $status = $connection->is_active ? 'enabled' : 'disabled';
+        $status = $calendarConnection->is_active ? 'enabled' : 'disabled';
 
         return redirect()->back()
             ->with('success', "Calendar connection {$status}");
@@ -110,11 +117,11 @@ class CalendarConnectionController extends Controller
     /**
      * Delete a calendar connection.
      */
-    public function destroy(CalendarConnection $connection): RedirectResponse
+    public function destroy(CalendarConnection $calendarConnection): RedirectResponse
     {
-        $this->authorize('delete', $connection);
+        $this->authorize('delete', $calendarConnection);
 
-        $connection->delete();
+        $calendarConnection->delete();
 
         return redirect()->back()
             ->with('success', 'Calendar connection removed');

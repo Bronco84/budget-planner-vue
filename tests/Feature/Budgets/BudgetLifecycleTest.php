@@ -147,3 +147,14 @@ test('user cannot open setup for another users budget', function () {
         ->get(route('budgets.setup', $otherBudget))
         ->assertForbidden();
 });
+
+test('storing a budget without a description field succeeds with a null description', function () {
+    $response = $this->actingAs($this->user)
+        ->post(route('budgets.store'), ['name' => 'No Description']);
+
+    $budget = $this->user->budgets()->sole();
+
+    expect($budget->description)->toBeNull();
+    $response->assertRedirect(route('budgets.setup', $budget))
+        ->assertSessionHasNoErrors();
+});

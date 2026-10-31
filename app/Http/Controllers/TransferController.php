@@ -22,30 +22,20 @@ class TransferController extends Controller
     }
 
     /**
-     * Display a listing of transfers for a budget.
+     * Transfers are listed in the budget dashboard ledger; there is no standalone list page.
      */
-    public function index(Request $request, Budget $budget): Response
+    public function index(Budget $budget): RedirectResponse
     {
-        $transfers = $this->transferService->getTransfersForBudget($budget);
-
-        return Inertia::render('Transfers/Index', [
-            'budget' => $budget,
-            'transfers' => $transfers,
-            'accounts' => $budget->accounts,
-        ]);
+        return redirect()->route('budgets.show', $budget);
     }
 
     /**
-     * Show the form for creating a new transfer.
+     * Transfers are created from the quick-add modal available on every page, so
+     * the standalone create URL sends the owner back to the budget dashboard.
      */
-    public function create(Budget $budget): Response
+    public function create(Budget $budget): RedirectResponse
     {
-        $accounts = $budget->accounts()->get();
-
-        return Inertia::render('Transfers/Create', [
-            'budget' => $budget,
-            'accounts' => $accounts,
-        ]);
+        return redirect()->route('budgets.show', $budget);
     }
 
     /**
@@ -80,16 +70,11 @@ class TransferController extends Controller
     }
 
     /**
-     * Display the specified transfer.
+     * There is no standalone transfer page; send the owner to the edit form.
      */
-    public function show(Budget $budget, Transfer $transfer): Response
+    public function show(Budget $budget, Transfer $transfer): RedirectResponse
     {
-        $transfer->load(['fromAccount', 'toAccount', 'transactions']);
-
-        return Inertia::render('Transfers/Show', [
-            'budget' => $budget,
-            'transfer' => $transfer,
-        ]);
+        return redirect()->route('budget.transfers.edit', [$budget, $transfer]);
     }
 
     /**
@@ -133,7 +118,7 @@ class TransferController extends Controller
             ]);
         }
 
-        return redirect()->route('budget.transfers.index', $budget)
+        return redirect()->route('budgets.show', $budget)
             ->with('message', 'Transfer updated successfully');
     }
 
@@ -152,7 +137,7 @@ class TransferController extends Controller
             ]);
         }
 
-        return redirect()->route('budget.transfers.index', $budget)
+        return redirect()->route('budgets.show', $budget)
             ->with('message', 'Transfer deleted successfully');
     }
 }

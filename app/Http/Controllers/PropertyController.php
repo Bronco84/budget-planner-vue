@@ -88,23 +88,18 @@ class PropertyController extends Controller
             }
         }
 
-        return redirect()->route('budgets.assets.index', $budget)
+        return redirect()->route('budgets.properties.index', $budget)
             ->with('message', 'Asset created successfully');
     }
 
     /**
-     * Display the specified asset.
+     * There is no standalone property page; send the owner to the edit form.
      */
-    public function show(Budget $budget, Property $property): Response
+    public function show(Budget $budget, Property $property): RedirectResponse
     {
         $this->authorize('view', $budget);
 
-        $property->load('linkedAccounts');
-
-        return Inertia::render('Properties/Show', [
-            'budget' => $budget,
-            'property' => $property,
-        ]);
+        return redirect()->route('budgets.properties.edit', [$budget, $property]);
     }
 
     /**
@@ -180,7 +175,7 @@ class PropertyController extends Controller
             }
         }
 
-        return redirect()->route('budgets.assets.index', $budget)
+        return redirect()->route('budgets.properties.index', $budget)
             ->with('message', 'Asset updated successfully');
     }
 
@@ -196,7 +191,7 @@ class PropertyController extends Controller
 
         $property->delete();
 
-        return redirect()->route('budgets.assets.index', $budget)
+        return redirect()->route('budgets.properties.index', $budget)
             ->with('message', 'Asset deleted successfully');
     }
 }

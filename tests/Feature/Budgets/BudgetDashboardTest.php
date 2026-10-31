@@ -116,3 +116,18 @@ test('per page is clamped to the allowed range', function (int $requested, int $
     'within range' => [50, 50],
     'above maximum' => [1000, 200],
 ]);
+
+test('an account id that is not in the budget falls back to the default account', function (string $case) {
+    $checking = Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+    $otherBudget = Budget::factory()->create(['user_id' => $this->user->id]);
+    $foreign = Account::factory()->checking()->create(['budget_id' => $otherBudget->id]);
+
+    $accountId = $case === 'other budget' ? $foreign->id : 999999;
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.show', [$this->budget, 'account_id' => $accountId]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Budgets/Show')
+            ->where('selectedAccountId', $checking->id));
+})->with(['other budget', 'nonexistent']);

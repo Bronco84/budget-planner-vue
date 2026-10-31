@@ -66,7 +66,7 @@ class BudgetController extends Controller
         /** @var Budget $budget */
         $budget = $user->budgets()->create([
             'name' => $validated['name'],
-            'description' => $validated['description'],
+            'description' => $validated['description'] ?? null,
             'color' => $validated['color'] ?? '#6366f1',
         ]);
 
@@ -147,7 +147,7 @@ class BudgetController extends Controller
             // Get the selected account based on request or user preferences
             $account = $budgetService->getSelectedAccount(
                 $budget,
-                $request->input('account_id'),
+                $request->integer('account_id') ?: null,
                 $user->getAccountTypeOrder()
             );
 
@@ -279,12 +279,12 @@ class BudgetController extends Controller
         $this->authorize('view', $budget);
 
         // Set default month and year if not provided
-        $month = $month ?? now()->month;
-        $year = $year ?? now()->year;
+        $month = (int) ($month ?? now()->month);
+        $year = (int) ($year ?? now()->year);
 
         $statistics = $budget->getMonthlyStatistics($month, $year);
 
-        return Inertia::render('Budgets/MonthlyStatistics', [
+        return Inertia::render('Budgets/Statistics/Monthly', [
             'budget' => $budget,
             'statistics' => $statistics,
             'year' => $year,
@@ -299,10 +299,10 @@ class BudgetController extends Controller
     {
         $this->authorize('view', $budget);
 
-        $year = $request->input('year', now()->year);
+        $year = $request->integer('year', now()->year);
         $statistics = $budget->getYearlyStatistics($year);
 
-        return Inertia::render('Budgets/YearlyStatistics', [
+        return Inertia::render('Budgets/Statistics/Yearly', [
             'budget' => $budget,
             'statistics' => $statistics,
             'year' => $year,

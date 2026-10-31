@@ -11,7 +11,7 @@ We detected a login to your Budget Planner account from a new device:
 
 This device will be remembered for 90 days. If this wasn't you, please secure your account immediately.
 
-<x-mail::button :url="route('trusted-devices.index')">
+<x-mail::button :url="route('profile.edit')">
 Manage Devices
 </x-mail::button>
 

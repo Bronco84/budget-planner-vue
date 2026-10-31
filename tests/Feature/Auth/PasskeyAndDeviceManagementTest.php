@@ -1,5 +1,6 @@
 <?php
 
+use App\Mail\NewDeviceLogin;
 use App\Models\Budget;
 use App\Models\TrustedDevice;
 use App\Models\User;
@@ -137,4 +138,13 @@ test('a user cannot activate another users budget', function () {
         ->assertJsonValidationErrors('budget_id');
 
     expect($user->fresh()->getActiveBudget()->id)->toBe($mine->id);
+});
+
+test('the new device login email links to the profile page to manage devices', function () {
+    $user = User::factory()->create();
+    $device = trustedDevice($user);
+
+    $html = (new NewDeviceLogin($user, $device))->render();
+
+    expect($html)->toContain(route('profile.edit'));
 });

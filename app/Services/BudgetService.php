@@ -41,9 +41,14 @@ class BudgetService
             return null;
         }
 
-        // If a specific account was requested, use that
+        // If a specific account was requested and it belongs to this budget, use that;
+        // otherwise fall back to the default account below.
         if ($requestedAccountId) {
-            return $budget->accounts()->where('id', $requestedAccountId)->first();
+            $requested = $budget->accounts()->where('id', $requestedAccountId)->first();
+
+            if ($requested) {
+                return $requested;
+            }
         }
 
         // Otherwise, get the first account according to user's preferred account type order

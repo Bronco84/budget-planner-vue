@@ -4,50 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\TrustedDevice;
 use App\Services\DeviceFingerprintService;
-use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class TrustedDeviceController extends Controller
 {
     public function __construct(
         private DeviceFingerprintService $fingerprintService
     ) {}
-
-    /**
-     * Display the user's trusted devices.
-     */
-    public function index(Request $request): Response
-    {
-        $user = $request->user();
-        $currentFingerprint = $this->fingerprintService->generate($request);
-
-        $devices = $user->trustedDevices()
-            ->valid()
-            ->orderBy('last_used_at', 'desc')
-            ->get()
-            ->map(function ($device) use ($currentFingerprint) {
-                return [
-                    'id' => $device->id,
-                    'device_name' => $device->device_name,
-                    'ip_address' => $device->ip_address,
-                    'last_used_at' => $device->last_used_at,
-                    'last_used_human' => $device->last_used_human,
-                    'expires_at' => $device->expires_at,
-                    'created_at' => $device->created_at,
-                    'is_current' => $device->isCurrentDevice($currentFingerprint),
-                    'auth_method' => $device->auth_method,
-                ];
-            });
-
-        return Inertia::render('Settings/TrustedDevices', [
-            'trustedDevices' => $devices,
-        ])->with('breadcrumbs', function () {
-            return Breadcrumbs::generate('trusted-devices.index');
-        });
-    }
 
     /**
      * Revoke a trusted device.

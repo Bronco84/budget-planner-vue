@@ -62,6 +62,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetDashboardTest.php::requested projection months are saved and reused on the next visit
+  - id: foreign_account_id_falls_back
+    kind: edge
+    description: An account_id belonging to another budget, or that does not exist, falls back to the budget's default account instead of erroring.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetDashboardTest.php::an account id that is not in the budget falls back to the default account
   - id: no_accounts_empty_state
     kind: empty_state
     description: A budget with no accounts renders with null selectedAccountId and no transactions.
@@ -87,9 +93,7 @@ scenarios:
     tests:
       - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access budgets
 known_issues:
-  - "Confirmed by test probe: GET /budgets/{budget}?account_id=<id of an account in another budget, or a non-existent id> returns 500 (BudgetController.php:155 throws 'No accounts found for this budget.') instead of falling back to the default account or returning 404. Left uncovered."
   - "BudgetService::getAccountTransactions only returns past-dated rows that have a plaid_transaction_id (Plaid is treated as source of truth), so manual transactions dated today or earlier never appear in the dashboard ledger, even for manual-only accounts. Ledger tests therefore use future-dated manual transactions."
-  - "BudgetController@show throws a generic Exception ('No accounts found for this budget.') if getSelectedAccount returns null while accounts exist, producing a 500 rather than a graceful fallback."
   - "Budgets/Show.vue loadBudgetAttachments() fetch()es GET /budgets/{id}/files expecting JSON, but that route is BudgetFilesController@index (an Inertia page). response.json() fails and the error is swallowed, so the dashboard's budget-attachment list never loads. FileController@getBudgetAttachments (the JSON variant) has no route."
   - "Shared budgets: User::hasBudget/accessibleBudgets include connected_users, but BudgetPolicy::view is owner-only, so a connected user who selects a shared budget gets 403 here."
 confidence: high

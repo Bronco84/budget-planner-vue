@@ -61,9 +61,10 @@ scenarios:
     coverage: uncovered
   - id: callback_without_code
     kind: validation
-    description: A callback with neither code nor error is handled gracefully.
-    coverage: uncovered
-    note: currently passes null to a string parameter, see known_issues.
+    description: A callback with neither code nor error redirects to connections with an error flash without calling Google.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback without a code or error redirects to connections with an error
   - id: token_exchange_failure
     kind: integration
     description: An invalid/expired code or Google API failure redirects to connections with "Failed to connect calendar".
@@ -75,7 +76,6 @@ scenarios:
     note: state is set but never verified, see known_issues.
 known_issues:
   - the OAuth state (json user_id) is never verified in the callback and is not a random nonce, so the flow is open to OAuth CSRF (an attacker's code could attach their calendar to the victim's account).
-  - GET /calendar/google/callback without code or error passes null to handleCallback(string $code), raising a TypeError (500) that the catch(\Exception) block does not catch.
   - the controller flashes under the 'success' key, which HandleInertiaRequests does not share, and Calendar/Connections.vue renders no flash at all, so success and error (including consent denial) are invisible to the user.
   - error flashes include raw exception messages from the Google client.
 confidence: high

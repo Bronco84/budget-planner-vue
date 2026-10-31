@@ -66,8 +66,13 @@ scenarios:
     kind: integration
     description: After revocation the old device cookie no longer authenticates.
     coverage: uncovered
+  - id: new_device_email_links_to_profile
+    kind: integration
+    description: The new-device login email's Manage Devices button links to the profile page (profile.edit), where devices are managed.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::the new device login email links to the profile page to manage devices
 known_issues:
-  - "TrustedDeviceController::index renders Settings/TrustedDevices (missing page), has no route, and references a non-existent trusted-devices.index breadcrumb."
   - ProfileController::edit lists expired devices too (no valid() scope) and does not flag the current device, so the UI cannot tell which device revoke-all keeps.
   - "Because the fingerprint includes the Accept header (see AUTH-005), revoke-all from a page request likely deletes the current browser's device as well."
 confidence: medium

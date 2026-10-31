@@ -66,12 +66,13 @@ scenarios:
     kind: authorization
     description: Posting to another user's budget returns 403.
     coverage: uncovered
-  - id: standalone_create_page_missing
+  - id: standalone_create_redirects
     kind: edge
-    description: GET /budget/{budget}/transfers/create renders Transfers/Create, which does not exist.
-    coverage: uncovered
-known_issues:
-  - "TransferController@create renders Inertia component Transfers/Create, which does not exist (resources/js/Pages/Transfers has only Edit.vue). Nothing links to it; creation works only through QuickAddTransferModal."
+    description: GET /budget/{budget}/transfers/create has no page (creation is via the quick-add modal) and redirects to budgets.show.
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferPagesTest.php::the standalone transfer create url redirects to the budget dashboard
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/TransferController.php create/store

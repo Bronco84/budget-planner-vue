@@ -4,39 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
 
 class PasskeyManagementController extends Controller
 {
-    /**
-     * Display the user's passkeys.
-     */
-    public function index(Request $request): Response
-    {
-        $user = $request->user();
-
-        // Get all WebAuthn credentials for the user
-        $passkeys = $user->webAuthnCredentials()
-            ->orderBy('updated_at', 'desc')
-            ->get()
-            ->map(function ($credential) {
-                return [
-                    'id' => $credential->id,
-                    'name' => $credential->alias ?? 'Unnamed Passkey',
-                    'created_at' => $credential->created_at,
-                    'updated_at' => $credential->updated_at,
-                    'last_used' => $credential->updated_at, // WebAuthn updates this on each use
-                    'can_delete' => true, // Always allow deletion
-                ];
-            });
-
-        return Inertia::render('Settings/Passkeys', [
-            'passkeys' => $passkeys,
-        ]);
-    }
-
     /**
      * Update a passkey's name/alias.
      */

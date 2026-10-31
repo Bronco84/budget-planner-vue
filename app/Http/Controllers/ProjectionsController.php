@@ -40,7 +40,10 @@ class ProjectionsController extends Controller
      */
     public function showBudgetProjections(Budget $budget, Request $request)
     {
-        $monthsAhead = $request->input('months', 3);
+        $validated = $request->validate([
+            'months' => 'nullable|integer|min:1|max:60',
+        ]);
+        $monthsAhead = (int) ($validated['months'] ?? 3);
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
 
@@ -108,7 +111,10 @@ class ProjectionsController extends Controller
      */
     public function showAccountProjections(Budget $budget, Account $account, Request $request)
     {
-        $monthsAhead = $request->input('months', 3);
+        $validated = $request->validate([
+            'months' => 'nullable|integer|min:1|max:60',
+        ]);
+        $monthsAhead = (int) ($validated['months'] ?? 3);
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
 
@@ -253,7 +259,10 @@ class ProjectionsController extends Controller
      */
     public function showBalanceProjection(Budget $budget, Account $account, Request $request)
     {
-        $monthsAhead = intval($request->input('months', 12));
+        $validated = $request->validate([
+            'months' => 'nullable|integer|min:1|max:60',
+        ]);
+        $monthsAhead = (int) ($validated['months'] ?? 12);
         $scenario = $request->input('scenario', 'default');
         $groupBy = $request->input('groupBy', 'day');
 

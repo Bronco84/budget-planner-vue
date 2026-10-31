@@ -433,11 +433,11 @@
             "cross_budget_account_not_found": "covered"
         },
         "PLAID-008": {
-            "api_lists_transactions": "uncovered",
-            "api_validation": "uncovered",
-            "show_not_found": "uncovered",
-            "index_page_renders": "uncovered",
-            "cross_user_denied": "uncovered"
+            "api_lists_transactions": "not_applicable",
+            "api_validation": "not_applicable",
+            "show_not_found": "not_applicable",
+            "index_page_renders": "not_applicable",
+            "cross_user_denied": "not_applicable"
         },
         "PLAID-009": {
             "page_lists_owned_cards": "covered",

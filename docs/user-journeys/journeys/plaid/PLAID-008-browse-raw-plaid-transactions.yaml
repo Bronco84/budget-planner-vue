@@ -32,24 +32,28 @@ scenarios:
   - id: api_lists_transactions
     kind: happy_path
     description: The JSON API returns the account's Plaid transactions with filters applied.
-    coverage: uncovered
+    coverage: not_applicable
+    note: 'journey deprecated; the plaid-transactions routes were removed as unreachable'
   - id: api_validation
     kind: validation
     description: Invalid per_page, dates or pending values fail validation.
-    coverage: uncovered
+    coverage: not_applicable
+    note: 'journey deprecated; the plaid-transactions routes were removed as unreachable'
   - id: show_not_found
     kind: edge
     description: Unknown or other-account Plaid transaction ids return JSON 404.
-    coverage: uncovered
+    coverage: not_applicable
+    note: 'journey deprecated; the plaid-transactions routes were removed as unreachable'
   - id: index_page_renders
     kind: happy_path
     description: The Inertia index page renders the paginated list.
-    coverage: uncovered
-    note: currently broken, the page component does not exist.
+    coverage: not_applicable
+    note: 'journey deprecated; the plaid-transactions routes were removed as unreachable'
   - id: cross_user_denied
     kind: authorization
     description: Another user's budget/account returns 403; a cross-budget account returns 404.
-    coverage: uncovered
+    coverage: not_applicable
+    note: 'journey deprecated; the plaid-transactions routes were removed as unreachable'
 known_issues:
   - "Removed as unreachable: the plaid-transactions.index/api/show routes and PlaidTransactionController were deleted. No frontend code linked to them and the index page component (PlaidTransactions/Index) never existed. Raw Plaid transactions remain stored but have no browsing UI."
 confidence: medium

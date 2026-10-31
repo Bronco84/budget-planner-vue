@@ -82,7 +82,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [PLAID-005](journeys/plaid/PLAID-005-reauthenticate-connection.yaml) | User re-authenticates a Plaid connection that needs a new login | high | yes | yes | yes | partial | partial | no | **partial** |
 | [PLAID-006](journeys/plaid/PLAID-006-unlink-account.yaml) | User disconnects an account from Plaid | medium | yes | yes | yes | yes | yes | no | **covered** |
 | [PLAID-007](journeys/plaid/PLAID-007-credit-card-statement-history.yaml) | User views credit card statement history for a Plaid-linked card | medium | yes | yes | yes | missing | missing | no | **covered** |
-| [PLAID-008](journeys/plaid/PLAID-008-browse-raw-plaid-transactions.yaml) | User browses raw Plaid transactions for an account | low | no | no | no | missing | missing | no | **deprecated** |
+| [PLAID-008](journeys/plaid/PLAID-008-browse-raw-plaid-transactions.yaml) | User browses raw Plaid transactions for an account | low | n/a | n/a | n/a | missing | missing | no | **deprecated** |
 | [PLAID-009](journeys/plaid/PLAID-009-refresh-credit-card-liabilities.yaml) | User refreshes credit card statement data from the Plaid liabilities page | medium | yes | yes | yes | missing | yes | no | **covered** |
 | [PLAID-010](journeys/plaid/PLAID-010-plaid-unavailable.yaml) | User attempts to connect or sync while Plaid is unavailable or misconfigured | high | yes | yes | n/a | missing | partial | no | **partial** |
 | [PREF-001](journeys/preferences/PREF-001-reorder-account-type-sections.yaml) | User reorders account type sections and the order persists | medium | yes | yes | yes | yes | no | no | **partial** |

@@ -118,6 +118,11 @@ final class Coverage
             }
             foreach ($scenarios as $scenario => $was) {
                 $now = $current[$id][$scenario] ?? 'missing';
+                // Declaring a scenario not applicable (which requires a note) is a
+                // deliberate decision, e.g. the behaviour was removed, not lost coverage.
+                if ($now === 'not_applicable') {
+                    continue;
+                }
                 if (($rank[$was] ?? 0) >= 2 && ($rank[$now] ?? 0) < ($rank[$was] ?? 0) && ! ($was === 'not_applicable' && $now === 'partial')) {
                     $out[] = "{$id}.{$scenario}: coverage regressed from {$was} to {$now}";
                 }

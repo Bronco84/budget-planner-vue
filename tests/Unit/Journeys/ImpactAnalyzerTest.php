@@ -243,3 +243,11 @@ test('model relations are followed one hop only', function () {
     // Order -> User is a relation edge: User is reached (one hop) from ORDER-001.
     expect(FixtureRepo::journeyIds($report))->toBe(['ORDER-001']);
 });
+
+test('declaring a covered scenario not applicable is not a coverage regression', function () {
+    $this->repo->replace('docs/user-journeys/journeys/invoices/INV-001-view-invoices.yaml', "coverage: covered\n    tests: ['tests/Feature/InvoiceTest.php::invoices are listed']", "coverage: not_applicable\n    note: listing removed");
+
+    $report = $this->repo->impact(ChangeSet::working($this->repo->git));
+
+    expect($report['coverage_regressions'])->toBe([]);
+});

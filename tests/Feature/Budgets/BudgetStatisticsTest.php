@@ -85,3 +85,27 @@ test('owner sees the yearly statistics page with twelve months and prior year co
             ->where('statistics.monthly.March.prev_year_income', 150000)
             ->where('statistics.yearly_totals.income', 300000));
 });
+
+test('monthly statistics return 404 for an out-of-range or non-numeric month or year', function (string $month, string $year) {
+    $this->actingAs($this->user)
+        ->get("/budget/{$this->budget->id}/statistics/monthly/{$month}/{$year}")
+        ->assertNotFound();
+})->with([
+    'month zero' => ['0', '2026'],
+    'month thirteen' => ['13', '2026'],
+    'month not a number' => ['may', '2026'],
+    'year too early' => ['5', '1899'],
+    'year too late' => ['5', '2101'],
+    'year not a number' => ['5', 'abcd'],
+]);
+
+test('yearly statistics reject an out-of-range or non-numeric year', function (mixed $year) {
+    $this->actingAs($this->user)
+        ->get(route('budget.statistics.yearly', [$this->budget, 'year' => $year]))
+        ->assertRedirect()
+        ->assertSessionHasErrors('year');
+})->with([
+    'too early' => [1899],
+    'too late' => [2101],
+    'not a number' => ['abc'],
+]);

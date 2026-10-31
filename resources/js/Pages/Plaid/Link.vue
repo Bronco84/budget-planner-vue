@@ -39,7 +39,34 @@
             <!-- Plaid Connection Status -->
             <div v-if="isLinked" class="mb-6 space-y-4">
               <h3 class="text-lg font-medium text-gray-900">Plaid Connection</h3>
-              
+
+              <!-- Re-authentication required (connection status 'error', e.g. ITEM_LOGIN_REQUIRED) -->
+              <div
+                v-if="needsReauth"
+                class="bg-amber-50 border border-amber-300 rounded-lg p-4"
+                role="alert"
+                data-testid="plaid-reauth-warning"
+              >
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div class="flex items-start">
+                    <svg class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    <div class="ml-3">
+                      <p class="text-sm font-semibold text-amber-800">Your bank needs you to sign in again</p>
+                      <p class="text-sm text-amber-700">Syncing is paused until you re-authenticate this connection.</p>
+                    </div>
+                  </div>
+                  <button
+                    @click="updateConnection"
+                    class="inline-flex items-center justify-center px-4 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                    :disabled="updateConnectionInProgress"
+                  >
+                    {{ updateConnectionInProgress ? 'Loading...' : 'Sign in again' }}
+                  </button>
+                </div>
+              </div>
+
               <!-- Quick Actions -->
               <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <div class="flex justify-between items-start mb-4">
@@ -340,6 +367,7 @@ const metadataInput = ref(null);
 // State
 const syncAllInProgress = ref(false);
 const updateConnectionInProgress = ref(false);
+const needsReauth = computed(() => props.connectionMetadata?.needs_reauth === true);
 const csrf = usePage().props.csrf || '';
 
 // Check if this is a credit card account

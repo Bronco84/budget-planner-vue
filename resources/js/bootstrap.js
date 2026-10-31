@@ -12,8 +12,8 @@ function getCsrfToken() {
 /**
  * Write a token everywhere the app reads it from.
  *
- * The meta tag is the single source of truth for the raw `fetch()` callers
- * scattered through the components, so it has to be updated too — not just the
+ * The meta tag is the single source of truth for apiFetch() (utils/http.js)
+ * and any remaining raw `fetch()` callers, so it has to be updated too — not just the
  * axios defaults. Laravel rotates the session token on login/logout, and since
  * navigation after that point is client-side (Inertia never re-renders <head>),
  * nothing would otherwise refresh it and the next write request 419s.
@@ -54,10 +54,10 @@ window.axios.interceptors.request.use(function (config) {
 
 // A single in-flight refresh shared by every request that 419s at once (the
 // dashboard fires several on load), so they don't stampede /csrf-token and
-// clobber each other's token.
+// clobber each other's token. Also used by apiFetch() in utils/http.js.
 let pendingTokenRefresh = null;
 
-function fetchFreshCsrfToken() {
+export function fetchFreshCsrfToken() {
     if (!pendingTokenRefresh) {
         pendingTokenRefresh = fetch('/csrf-token', {
             method: 'GET',

@@ -8,8 +8,6 @@ use App\Models\PlaidConnection;
 use App\Services\BudgetService;
 use App\Services\FileService;
 use App\Services\PlaidService;
-use App\Services\RecurringTransactionService;
-use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -64,6 +62,10 @@ class BudgetController extends Controller
 
         $user = Auth::user();
 
+        // A user with no budget yet gets the new one as their active budget. This must be
+        // checked before creating it: afterwards getActiveBudget() falls back to the new budget.
+        $hadNoActiveBudget = $user->getActiveBudget() === null;
+
         // Create the budget
         /** @var Budget $budget */
         $budget = $user->budgets()->create([
@@ -72,8 +74,7 @@ class BudgetController extends Controller
             'color' => $validated['color'] ?? '#6366f1',
         ]);
 
-        // Set as active budget if user has no active budget
-        if (! $user->getActiveBudget()) {
+        if ($hadNoActiveBudget) {
             $user->setActiveBudget($budget->id);
         }
 
@@ -287,6 +288,13 @@ class BudgetController extends Controller
     {
         $this->authorize('view', $budget);
 
+        // Reject months outside 1-12 and years outside 1900-2100 (including non-numeric values).
+        foreach ([[$month, 1, 12], [$year, 1900, 2100]] as [$value, $min, $max]) {
+            if ($value !== null && (! ctype_digit((string) $value) || (int) $value < $min || (int) $value > $max)) {
+                abort(404);
+            }
+        }
+
         // Set default month and year if not provided
         $month = (int) ($month ?? now()->month);
         $year = (int) ($year ?? now()->year);
@@ -308,55 +316,16 @@ class BudgetController extends Controller
     {
         $this->authorize('view', $budget);
 
-        $year = $request->integer('year', now()->year);
+        $validated = $request->validate([
+            'year' => 'nullable|integer|between:1900,2100',
+        ]);
+        $year = (int) ($validated['year'] ?? now()->year);
         $statistics = $budget->getYearlyStatistics($year);
 
         return Inertia::render('Budgets/Statistics/Yearly', [
             'budget' => $budget,
             'statistics' => $statistics,
             'year' => $year,
-        ]);
-    }
-
-    /**
-     * Get projected transactions for the budget
-     */
-    public function projections(Budget $budget, Request $request): Response
-    {
-        $this->authorize('view', $budget);
-
-        $validated = $request->validate([
-            'months' => 'integer|min:1|max:24',
-        ]);
-
-        $startDate = Carbon::today();
-        $months = $validated['months'] ?? 6;
-        $endDate = $startDate->copy()->addMonths($months);
-
-        // Get all accounts for this budget
-        $accounts = $budget->accounts;
-        $projections = collect();
-
-        // Get the RecurringTransactionService
-        $recurringTransactionService = app(RecurringTransactionService::class);
-
-        // Project transactions for each account
-        foreach ($accounts as $account) {
-            $accountProjections = $recurringTransactionService->projectTransactions(
-                $account,
-                $startDate,
-                $endDate
-            );
-
-            $projections = $projections->merge($accountProjections);
-        }
-
-        return Inertia::render('Budgets/Projections', [
-            'budget' => $budget,
-            'projections' => $projections,
-            'params' => [
-                'months' => $months,
-            ],
         ]);
     }
 }

@@ -16,6 +16,7 @@ actors:
 preconditions:
   - the account is linked to Plaid and its connection has an access token
 routes:
+  - plaid.link
   - plaid.upgrade-link-token
   - plaid.update-connection
 depends_on:
@@ -25,7 +26,9 @@ integrations:
   - Plaid Link update mode
   - Plaid API (/link/token/create with access_token, /item/public_token/exchange)
 steps:
-  - action: click Re-authenticate (axios POST plaid/upgrade-link-token)
+  - action: open the Bank Connection page for an account whose connection status is 'error'
+    expected: an amber warning "Your bank needs you to sign in again" with a "Sign in again" button is shown above the actions
+  - action: click Re-authenticate (or Sign in again) (axios POST plaid/upgrade-link-token)
     expected: JSON {link_token, institution_name}
   - action: complete Plaid Link in update mode
     expected: client posts public_token and metadata to plaid/update-connection
@@ -37,8 +40,17 @@ business_rules:
   - both endpoints are limited to 10 requests per minute
   - upgrade-link-token returns JSON 404 when the account is not linked and 400 when the connection has no access token
   - update-connection requires public_token and metadata
+  - showLinkForm exposes connectionMetadata.needs_reauth (status === 'error'); Plaid/Link.vue shows the sign-in-again warning only then, while the Re-authenticate button stays available on every linked account
   - ITEM_LOGIN_REQUIRED from a transaction sync or a balance, liabilities or investments refresh marks the PlaidConnection as 'error' (PlaidConnection::markAsError); covered in PLAID-003 login_required_flagged_on_refresh
 scenarios:
+  - id: reauth_prompt_on_error
+    kind: alternate
+    description: A connection in the 'error' state is flagged needs_reauth so the page shows the sign-in-again warning; an active connection is not.
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidReauthPromptTest.php::the bank connection page flags a connection in the error state as needing re-authentication
+      - tests/Feature/Plaid/PlaidReauthPromptTest.php::the bank connection page does not flag an active connection as needing re-authentication
+    note: the page prop is asserted; the rendered warning is frontend behaviour with no browser test.
   - id: upgrade_token_issued
     kind: happy_path
     description: A linked account receives an update-mode link token and the institution name as JSON.
@@ -85,7 +97,6 @@ scenarios:
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::plaid POST route rejects a cross-budget account with 404
 known_issues:
-  - the UI does not yet key a re-auth prompt off the connection's 'error' status; the Re-authenticate button is always shown on linked accounts.
   - Plaid documents that update mode does not require exchanging the public token; exchanging it and overwriting access_token should be verified against the Plaid sandbox.
 confidence: high
 evidence:

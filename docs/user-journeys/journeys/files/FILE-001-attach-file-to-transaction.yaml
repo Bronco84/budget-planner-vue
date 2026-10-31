@@ -81,12 +81,13 @@ scenarios:
   - id: invalid_file_rejected
     kind: validation
     description: Oversized, disallowed-type or extension-mismatched files are rejected.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/SecurityFileValidationTest.php::file upload rejects disallowed file types
       - tests/Feature/SecurityFileValidationTest.php::file extension must match mime type
       - tests/Feature/Files/TransactionFileAttachmentTest.php::a disallowed file type on a transaction upload still explains why it was rejected
-    note: the transaction upload route is tested for disallowed type only; oversized and extension-mismatch cases are exercised through budgets.files.upload.
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::an oversized file on a transaction upload is rejected without storing anything
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::a file whose extension does not match its content on a transaction upload is rejected without storing anything
   - id: s3_failure_returns_error
     kind: recovery
     description: An S3 failure returns 400 JSON with a generic error (raw exception only logged) and creates no records.

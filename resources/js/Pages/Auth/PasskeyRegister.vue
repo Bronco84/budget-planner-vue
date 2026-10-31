@@ -266,6 +266,7 @@ import { ref, computed } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import { apiFetch } from '@/utils/http.js';
 
 const props = defineProps({
   hasExistingPasskeys: Boolean,
@@ -293,12 +294,10 @@ const registerPasskey = async () => {
 
   try {
     // Get registration options from server
-    const optionsResponse = await fetch('/webauthn/register/options', {
+    const optionsResponse = await apiFetch('/webauthn/register/options', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-        'Accept': 'application/json',
       },
       body: JSON.stringify({
         name: passkeyName.value || 'My Passkey',
@@ -357,11 +356,10 @@ const registerPasskey = async () => {
     };
 
     // Send credential to server
-    const registerResponse = await fetch('/webauthn/register', {
+    const registerResponse = await apiFetch('/webauthn/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
       },
       body: JSON.stringify(credentialData),
     });

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Services\DeviceFingerprintService;
+use App\Services\DeviceTokenService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -109,7 +110,8 @@ class ProfileController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return Redirect::to('/');
+        // The trusted device rows are gone, so drop the now-useless device cookie too.
+        return Redirect::to('/')->withCookie(app(DeviceTokenService::class)->forgetCookie());
     }
 
     /**

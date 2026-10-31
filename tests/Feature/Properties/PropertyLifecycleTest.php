@@ -90,3 +90,40 @@ test('another users property show url is forbidden', function () {
         ->get(route('budgets.properties.show', [$this->budget, $property]))
         ->assertForbidden();
 });
+
+test('saving a property with an unchanged value keeps its value timestamp', function () {
+    $this->travelTo('2026-01-10 12:00:00');
+    $property = makeProperty($this->budget, ['current_value_cents' => 30000000]);
+    $this->travelTo('2026-02-20 12:00:00');
+
+    // Form submissions arrive as strings; the same number must not count as a change.
+    $this->actingAs($this->user)
+        ->put(route('budgets.properties.update', [$this->budget, $property]), [
+            'name' => 'Renamed house',
+            'type' => 'property',
+            'current_value_cents' => '30000000',
+        ])
+        ->assertRedirect();
+
+    $property->refresh();
+    expect($property->name)->toBe('Renamed house')
+        ->and($property->value_updated_at->toDateString())->toBe('2026-01-10');
+});
+
+test('saving a property with a changed value refreshes its value timestamp', function () {
+    $this->travelTo('2026-01-10 12:00:00');
+    $property = makeProperty($this->budget, ['current_value_cents' => 30000000]);
+    $this->travelTo('2026-02-20 12:00:00');
+
+    $this->actingAs($this->user)
+        ->put(route('budgets.properties.update', [$this->budget, $property]), [
+            'name' => 'Main house',
+            'type' => 'property',
+            'current_value_cents' => '31000000',
+        ])
+        ->assertRedirect();
+
+    $property->refresh();
+    expect($property->current_value_cents)->toBe(31000000)
+        ->and($property->value_updated_at->toDateString())->toBe('2026-02-20');
+});

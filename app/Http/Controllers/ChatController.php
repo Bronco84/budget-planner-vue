@@ -31,10 +31,24 @@ class ChatController extends Controller
         );
 
         if (! $response['success']) {
-            return response()->json($response, 500);
+            return response()->json($response, $this->failureStatus($response));
         }
 
         return response()->json($response);
+    }
+
+    /**
+     * Map a known moderation outcome to its 4xx status (matching the stream
+     * endpoint); anything else is a server/provider failure.
+     */
+    protected function failureStatus(array $response): int
+    {
+        return match (true) {
+            ! empty($response['banned']) => 403,
+            isset($response['rate_limit']) => 429,
+            ! empty($response['blocked']) => 400,
+            default => 500,
+        };
     }
 
     public function stream(Request $request)

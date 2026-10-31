@@ -97,6 +97,7 @@ import { ref, computed } from 'vue'
 import { router } from '@inertiajs/vue3'
 import InputLabel from '@/Components/InputLabel.vue'
 import TextInput from '@/Components/TextInput.vue'
+import { apiFetch } from '@/utils/http.js'
 
 const props = defineProps({
     uploadUrl: {
@@ -192,13 +193,9 @@ const uploadFile = async (file) => {
             throw new Error('CSRF token not found');
         }
         
-        const response = await fetch(props.uploadUrl, {
+        const response = await apiFetch(props.uploadUrl, {
             method: 'POST',
             body: formData,
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'Accept': 'application/json'
-            }
         })
         
         if (!response.ok) {

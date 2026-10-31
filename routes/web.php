@@ -130,7 +130,7 @@ Route::middleware('auth')->scopeBindings()->group(function () {
         ->name('budget.statistics.yearly');
     Route::get('budget/{budget}/statistics/monthly/{month?}/{year?}', [BudgetController::class, 'monthlyStatistics'])
         ->name('budget.statistics.monthly');
-    Route::get('budget/{budget}/projections', [BudgetController::class, 'projections'])
+    Route::get('budget/{budget}/projections', [ProjectionsController::class, 'showBudgetProjections'])
         ->name('budget.projections');
     Route::get('budget/{budget}/account/{account}/projections', [ProjectionsController::class, 'showAccountProjections'])
         ->name('budget.account.projections');

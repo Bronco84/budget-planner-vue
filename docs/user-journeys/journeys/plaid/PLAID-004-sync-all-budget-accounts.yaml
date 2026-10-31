@@ -24,7 +24,7 @@ steps:
   - action: click sync on Budgets/Show (POST budget/{budget}/plaid/sync-all)
     expected: redirect back with "Synced N new and updated M transactions."
   - action: page handles success
-    expected: toast shows the flash message and transactions/accounts props reload
+    expected: toast shows flash.message (success) and/or flash.error (error), and transactions/accounts props reload
 postconditions:
   - all linked accounts in the budget have fresh transactions and balances
 business_rules:
@@ -71,8 +71,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot sync all transactions on another users budget
-known_issues:
-  - Budgets/Show.vue only toasts flash.message on success; an error flash (e.g. "No Plaid-connected accounts found.") is not displayed by that handler.
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/PlaidController.php syncAllTransactions()

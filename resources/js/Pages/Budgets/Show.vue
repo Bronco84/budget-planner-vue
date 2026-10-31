@@ -1015,6 +1015,7 @@ import BudgetProjectionModal from '@/Components/BudgetProjectionModal.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable';
 import { useToast } from '@/composables/useToast';
+import { apiFetch } from '@/utils/http.js';
 
 // Define props
 const props = defineProps({
@@ -1304,12 +1305,10 @@ const rebuildDraggableArray = () => {
 
 // Save account type order to backend
 const saveAccountTypeOrder = async (order) => {
-  const response = await fetch('/api/preferences/account-type-order', {
+  const response = await apiFetch('/api/preferences/account-type-order', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
     },
     body: JSON.stringify({ order })
   });

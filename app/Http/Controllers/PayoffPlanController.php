@@ -231,18 +231,12 @@ class PayoffPlanController extends Controller
             'monthly_extra_payment' => 'required|integer|min:0',
         ]);
 
-        // compareStrategies persists temporary plan rows; always roll them back,
-        // including when the calculation throws.
-        DB::beginTransaction();
-        try {
-            $comparisons = $this->payoffPlanService->compareStrategies(
-                $budget,
-                $validated['debts'],
-                $validated['monthly_extra_payment']
-            );
-        } finally {
-            DB::rollBack();
-        }
+        // Computed in memory on unsaved models; nothing is written.
+        $comparisons = $this->payoffPlanService->compareStrategies(
+            $budget,
+            $validated['debts'],
+            $validated['monthly_extra_payment']
+        );
 
         return response()->json([
             'comparisons' => $comparisons,

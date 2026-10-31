@@ -37,6 +37,7 @@ business_rules:
   - dynamic-amount templates use a single computed amount for all future occurrences
   - autopay projections replace the template occurrence when shouldAutopayOverrideFor matches
   - the account is scoped to the budget (404 otherwise); budget view is required via can:view,budget middleware
+  - the series starts with a data point for today (today's items applied), then one point per week dated on the week's last day; the first week covers only tomorrow onwards
 scenarios:
   - id: balance_projection_renders
     kind: happy_path
@@ -47,6 +48,12 @@ scenarios:
       - tests/Feature/Projections/AccountProjectionTest.php::balance projection page defaults to twelve months and renders the detailed projection
       - tests/playwright/smoke.spec.js::account projections page loads for six months
     note: recurring and future manual items are asserted on both pages; credit-card autopay projections are not exercised.
+  - id: series_starts_today
+    kind: edge
+    description: The first data point is today and no bucket covers days before today; each amount is counted exactly once.
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/AccountProjectionTest.php::the projection series starts today and does not include days before today
   - id: liability_direction
     kind: edge
     description: For a credit card, purchases increase and payments decrease the projected balance.
@@ -93,9 +100,7 @@ scenarios:
       - tests/Feature/NestedRouteAuthorizationTest.php::account projections reject another users budget+account with 403
       - tests/Feature/Projections/AccountProjectionTest.php::balance projection rejects another users budget and account with 403
 known_issues:
-  - getFutureManualTransactions includes transactions dated today, which are usually already reflected in current_balance_cents, so today's posted transactions are double-counted.
-  - showBalanceProjection reads scenario and groupBy query parameters but never uses them.
-  - The first weekly bucket starts at the beginning of the current week, so its date range includes days before today; there is no data point for "today".
+  - "Unconfirmed: getFutureManualTransactions includes transactions dated today. Manual transaction create/update does not change current_balance_cents (only Plaid/manual balance edits do), so a manual entry dated today is not double-counted; a Plaid-imported transaction dated today may already be in the synced balance. Needs a product decision on how today's imported transactions should be treated."
   - budget.account.projections is only linked from its own page (Accounts/Projections.vue); no other page navigates to it.
 confidence: high
 evidence:

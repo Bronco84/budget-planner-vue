@@ -278,6 +278,19 @@ class RecurringTransactionService
     }
 
     /**
+     * The amount a template is projected at: the calculated dynamic amount for
+     * dynamic templates (falling back to the stored amount), otherwise the stored amount.
+     */
+    public function projectedAmount(RecurringTransactionTemplate $template): int
+    {
+        if (! $template->is_dynamic_amount) {
+            return (int) $template->amount_in_cents;
+        }
+
+        return (int) ($this->calculateDynamicAmount($template) ?? $template->amount_in_cents);
+    }
+
+    /**
      * Compute the dynamic amount without caching.
      *
      * Calculation priority:

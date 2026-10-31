@@ -3,6 +3,7 @@
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\User;
+use App\Models\UserPreference;
 use App\Services\PlaidService;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -76,6 +77,25 @@ test('a users first budget becomes their active budget', function () {
     $budget = $this->user->budgets()->sole();
 
     expect($this->user->fresh()->getActiveBudget()?->id)->toBe($budget->id);
+});
+
+test('a users first budget is stored as their active budget preference', function () {
+    $this->actingAs($this->user)
+        ->post(route('budgets.store'), ['name' => 'First', 'description' => null]);
+
+    $budget = $this->user->budgets()->sole();
+
+    expect(UserPreference::getActiveBudgetId($this->user->id))->toBe($budget->id);
+});
+
+test('creating another budget without a stored preference does not store the new budget as active', function () {
+    $existing = Budget::factory()->create(['user_id' => $this->user->id]);
+
+    $this->actingAs($this->user)
+        ->post(route('budgets.store'), ['name' => 'Second', 'description' => null]);
+
+    expect(UserPreference::getActiveBudgetId($this->user->id))->toBeNull()
+        ->and($this->user->fresh()->getActiveBudget()?->id)->toBe($existing->id);
 });
 
 test('creating another budget keeps the existing active budget', function () {

@@ -51,6 +51,7 @@ class DeviceTokenService
             'device_name' => $deviceName,
             'device_fingerprint' => $fingerprint,
             'device_token' => Crypt::encryptString($token),
+            'token_hash' => self::hashToken($token),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'last_used_at' => now(),
@@ -70,27 +71,57 @@ class DeviceTokenService
     public function verifyDeviceToken(string $token, Request $request): ?TrustedDevice
     {
         try {
-            // Find all devices and check each one
-            $devices = TrustedDevice::valid()->get();
+            $hash = self::hashToken($token);
 
-            foreach ($devices as $device) {
-                try {
-                    $decryptedToken = Crypt::decryptString($device->device_token);
+            // Indexed lookup by the token hash.
+            $candidates = TrustedDevice::valid()->where('token_hash', $hash)->get();
 
-                    if ($decryptedToken === $token) {
-                        // Verify fingerprint matches
-                        if ($this->fingerprintService->verify($request, $device->device_fingerprint)) {
-                            return $device;
-                        }
-                    }
-                } catch (\Exception $e) {
-                    continue;
+            foreach ($candidates as $device) {
+                if ($this->tokenMatches($device, $token)) {
+                    return $this->fingerprintService->verify($request, $device->device_fingerprint)
+                        ? $device
+                        : null;
+                }
+            }
+
+            // Legacy fallback: devices created before token_hash existed (or whose
+            // token could not be backfilled) are scanned and, on a match, given a
+            // hash so later requests use the indexed lookup.
+            $legacy = TrustedDevice::valid()->whereNull('token_hash')->get();
+
+            foreach ($legacy as $device) {
+                if ($this->tokenMatches($device, $token)) {
+                    $device->forceFill(['token_hash' => $hash])->saveQuietly();
+
+                    return $this->fingerprintService->verify($request, $device->device_fingerprint)
+                        ? $device
+                        : null;
                 }
             }
 
             return null;
         } catch (\Exception $e) {
             return null;
+        }
+    }
+
+    /**
+     * Deterministic lookup hash of a raw device token.
+     */
+    public static function hashToken(string $token): string
+    {
+        return hash('sha256', $token);
+    }
+
+    /**
+     * Constant-time comparison of the raw token against the device's encrypted token.
+     */
+    private function tokenMatches(TrustedDevice $device, string $token): bool
+    {
+        try {
+            return hash_equals(Crypt::decryptString($device->device_token), $token);
+        } catch (\Exception $e) {
+            return false;
         }
     }
 

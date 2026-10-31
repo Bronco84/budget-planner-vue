@@ -62,7 +62,11 @@ class PayoffPlanService
      */
     public function calculatePayoffProjection(PayoffPlan $plan): array
     {
-        $debts = $plan->debts()->with('account')->get();
+        // An unsaved plan (strategy preview) carries its unsaved debts, with
+        // their accounts, as a set relation; a saved plan is read from the DB.
+        $debts = $plan->exists
+            ? $plan->debts()->with('account')->get()
+            : $plan->getRelationValue('debts') ?? collect();
         $strategy = $plan->strategy;
         $monthlyExtraPayment = $plan->monthly_extra_payment_cents;
 
@@ -71,7 +75,7 @@ class PayoffPlanService
             return [
                 'id' => $debt->id,
                 'account_id' => $debt->account_id,
-                'name' => $debt->account->name,
+                'name' => $debt->account?->name,
                 'balance' => $debt->starting_balance_cents,
                 'interest_rate' => $debt->interest_rate,
                 'minimum_payment' => $debt->minimum_payment_cents,
@@ -218,39 +222,42 @@ class PayoffPlanService
 
     /**
      * Compare different payoff strategies for a budget.
+     *
+     * Runs entirely in memory: each strategy gets an unsaved PayoffPlan whose
+     * unsaved debts are passed to calculatePayoffProjection(), so a preview
+     * never writes rows.
      */
     public function compareStrategies(Budget $budget, array $debtData, int $monthlyExtraPayment): array
     {
-        $strategies = ['snowball', 'avalanche'];
+        $accounts = Account::where('budget_id', $budget->id)
+            ->whereIn('id', array_column($debtData, 'account_id'))
+            ->get()
+            ->keyBy('id');
+
         $comparisons = [];
 
-        foreach ($strategies as $strategy) {
-            // Create a temporary plan for calculation. The name is required
-            // (payoff_plans.name is NOT NULL); this row is deleted below.
-            $tempPlan = new PayoffPlan([
+        foreach (['snowball', 'avalanche'] as $strategy) {
+            $plan = new PayoffPlan([
                 'name' => "Strategy comparison ({$strategy})",
                 'strategy' => $strategy,
                 'monthly_extra_payment_cents' => $monthlyExtraPayment,
                 'start_date' => Carbon::now(),
             ]);
-            $tempPlan->budget_id = $budget->id;
+            $plan->budget_id = $budget->id;
 
-            // Temporarily save to allow relationship queries
-            $tempPlan->save();
-
-            // Create temporary debt entries
-            foreach ($debtData as $debt) {
-                PayoffPlanDebt::create([
-                    'payoff_plan_id' => $tempPlan->id,
+            $plan->setRelation('debts', collect($debtData)->map(function (array $debt) use ($accounts) {
+                $planDebt = new PayoffPlanDebt([
                     'account_id' => $debt['account_id'],
                     'starting_balance_cents' => $debt['balance'],
                     'interest_rate' => $debt['interest_rate'],
                     'minimum_payment_cents' => $debt['minimum_payment'],
                     'priority' => $debt['priority'] ?? 0,
                 ]);
-            }
 
-            $projection = $this->calculatePayoffProjection($tempPlan);
+                return $planDebt->setRelation('account', $accounts->get($debt['account_id']));
+            }));
+
+            $projection = $this->calculatePayoffProjection($plan);
 
             $comparisons[$strategy] = [
                 'strategy' => $strategy,
@@ -259,10 +266,6 @@ class PayoffPlanService
                 'never_paid_off' => $projection['never_paid_off'],
                 'total_interest_paid' => $projection['total_interest_paid'],
             ];
-
-            // Clean up temporary data
-            $tempPlan->debts()->delete();
-            $tempPlan->delete();
         }
 
         return $comparisons;

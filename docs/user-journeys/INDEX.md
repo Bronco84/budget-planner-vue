@@ -9,7 +9,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 | Journeys | At risk | Covered | Deprecated | Partial | Uncovered |
 |---|---|---|---|---|---|
-| 69 | 24 | 9 | 1 | 31 | 4 |
+| 69 | 24 | 11 | 1 | 30 | 3 |
 
 | Domain | Critical | High | Medium | Low |
 |---|---|---|---|---|
@@ -68,9 +68,9 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [CATEGORY-002](journeys/categories/CATEGORY-002-delete-category.yaml) | Owner deletes an unused category | medium | no | yes | no | missing | missing | no | **partial** |
 | [CATEGORY-003](journeys/categories/CATEGORY-003-reorder-categories.yaml) | Owner reorders categories | low | no | partial | yes | missing | missing | no | **partial** |
 | [CHAT-001](journeys/chat/CHAT-001-ask-assistant.yaml) | User asks the AI assistant a question about their finances | high | partial | partial | partial | yes | partial | no | **at risk** |
-| [CHAT-002](journeys/chat/CHAT-002-moderation-and-limits.yaml) | Chat message is blocked, throttled or refused by moderation | high | partial | partial | partial | missing | no | no | **at risk** |
+| [CHAT-002](journeys/chat/CHAT-002-moderation-and-limits.yaml) | Chat message is blocked, throttled or refused by moderation | high | partial | partial | yes | missing | no | no | **at risk** |
 | [CHAT-003](journeys/chat/CHAT-003-manage-conversation-history.yaml) | User browses, reopens and deletes chat conversations | medium | no | no | no | no | missing | no | **uncovered** |
-| [FILE-001](journeys/files/FILE-001-attach-file-to-transaction.yaml) | Owner attaches, downloads and removes receipts on a transaction | high | yes | partial | no | yes | yes | no | **at risk** |
+| [FILE-001](journeys/files/FILE-001-attach-file-to-transaction.yaml) | Owner attaches, downloads and removes receipts on a transaction | high | yes | yes | no | yes | yes | no | **at risk** |
 | [FILE-002](journeys/files/FILE-002-manage-budget-documents.yaml) | Owner uploads and manages budget-level documents | medium | partial | partial | partial | yes | missing | no | **partial** |
 | [PAYOFF-001](journeys/payoff/PAYOFF-001-create-payoff-plan.yaml) | User creates a debt payoff plan with the wizard | high | yes | partial | yes | yes | yes | yes | **partial** |
 | [PAYOFF-002](journeys/payoff/PAYOFF-002-view-payoff-projection.yaml) | User reviews a payoff plan's month-by-month projection | critical | yes | yes | yes | yes | missing | yes | **covered** |
@@ -79,18 +79,18 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [PLAID-002](journeys/plaid/PLAID-002-link-existing-account.yaml) | User links an existing budget account to Plaid | high | no | no | partial | partial | partial | no | **at risk** |
 | [PLAID-003](journeys/plaid/PLAID-003-sync-linked-account.yaml) | User refreshes transactions, balance, liabilities or holdings for a Plaid-linked account | critical | yes | yes | yes | missing | yes | no | **covered** |
 | [PLAID-004](journeys/plaid/PLAID-004-sync-all-budget-accounts.yaml) | User syncs all Plaid-linked accounts in a budget at once | high | yes | yes | yes | missing | yes | no | **covered** |
-| [PLAID-005](journeys/plaid/PLAID-005-reauthenticate-connection.yaml) | User re-authenticates a Plaid connection that needs a new login | high | no | no | yes | missing | partial | no | **at risk** |
+| [PLAID-005](journeys/plaid/PLAID-005-reauthenticate-connection.yaml) | User re-authenticates a Plaid connection that needs a new login | high | no | no | yes | partial | partial | no | **at risk** |
 | [PLAID-006](journeys/plaid/PLAID-006-unlink-account.yaml) | User disconnects an account from Plaid | medium | partial | no | partial | yes | yes | no | **partial** |
 | [PLAID-007](journeys/plaid/PLAID-007-credit-card-statement-history.yaml) | User views credit card statement history for a Plaid-linked card | medium | no | partial | yes | missing | missing | no | **partial** |
 | [PLAID-008](journeys/plaid/PLAID-008-browse-raw-plaid-transactions.yaml) | User browses raw Plaid transactions for an account | low | no | no | no | missing | missing | no | **deprecated** |
 | [PLAID-009](journeys/plaid/PLAID-009-refresh-credit-card-liabilities.yaml) | User refreshes credit card statement data from the Plaid liabilities page | medium | no | no | yes | missing | no | no | **partial** |
 | [PLAID-010](journeys/plaid/PLAID-010-plaid-unavailable.yaml) | User attempts to connect or sync while Plaid is unavailable or misconfigured | high | yes | yes | n/a | missing | partial | no | **partial** |
-| [PREF-001](journeys/preferences/PREF-001-reorder-account-type-sections.yaml) | User reorders account type sections and the order persists | medium | no | yes | no | yes | no | no | **partial** |
+| [PREF-001](journeys/preferences/PREF-001-reorder-account-type-sections.yaml) | User reorders account type sections and the order persists | medium | partial | yes | no | yes | no | no | **partial** |
 | [PREF-002](journeys/preferences/PREF-002-switch-active-budget.yaml) | User switches their active budget | high | yes | partial | yes | no | no | no | **partial** |
 | [PROFILE-001](journeys/profile/PROFILE-001-update-profile-information.yaml) | User updates their name and email | medium | yes | yes | no | yes | missing | no | **partial** |
 | [PROFILE-002](journeys/profile/PROFILE-002-delete-account.yaml) | User deletes their account | medium | yes | yes | yes | missing | partial | no | **partial** |
 | [PROJECT-001](journeys/projections/PROJECT-001-account-balance-projection.yaml) | User views an account's projected balance | critical | partial | yes | yes | missing | missing | yes | **at risk** |
-| [PROJECT-002](journeys/projections/PROJECT-002-budget-projected-transactions.yaml) | User views projected transactions for the whole budget | low | no | no | no | missing | missing | no | **uncovered** |
+| [PROJECT-002](journeys/projections/PROJECT-002-budget-projected-transactions.yaml) | User views projected transactions for the whole budget | low | yes | yes | yes | missing | missing | no | **covered** |
 | [PROPERTY-001](journeys/properties/PROPERTY-001-add-property.yaml) | Owner records a property or vehicle asset | medium | partial | partial | no | missing | missing | no | **partial** |
 | [PROPERTY-002](journeys/properties/PROPERTY-002-edit-or-delete-property.yaml) | Owner updates, re-links or deletes a property | medium | yes | yes | no | missing | missing | no | **partial** |
 | [RECUR-001](journeys/recurring/RECUR-001-create-recurring-template.yaml) | User creates a recurring transaction template | high | no | partial | partial | no | missing | no | **at risk** |
@@ -99,8 +99,8 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [RECUR-004](journeys/recurring/RECUR-004-inspect-and-correct-linked-transactions.yaml) | User inspects and corrects a template's linked transactions | medium | no | partial | partial | no | missing | no | **partial** |
 | [RECUR-005](journeys/recurring/RECUR-005-bulk-link-matching-transactions.yaml) | User reviews and bulk-links unlinked transactions to templates | medium | partial | no | partial | missing | missing | no | **partial** |
 | [RECUR-006](journeys/recurring/RECUR-006-discover-patterns-and-create-templates.yaml) | User discovers recurring patterns and creates templates from them | high | partial | partial | yes | yes | partial | no | **at risk** |
-| [REPORT-001](journeys/reports/REPORT-001-reports-dashboard.yaml) | User reviews the financial reports dashboard | high | no | partial | no | no | missing | no | **at risk** |
-| [REPORT-002](journeys/reports/REPORT-002-monthly-yearly-statistics.yaml) | User views monthly and yearly budget statistics | medium | yes | partial | yes | missing | missing | yes | **partial** |
+| [REPORT-001](journeys/reports/REPORT-001-reports-dashboard.yaml) | User reviews the financial reports dashboard | high | partial | partial | no | partial | missing | no | **at risk** |
+| [REPORT-002](journeys/reports/REPORT-002-monthly-yearly-statistics.yaml) | User views monthly and yearly budget statistics | medium | yes | yes | yes | missing | missing | yes | **covered** |
 | [SCENARIO-001](journeys/scenarios/SCENARIO-001-compare-multi-account-scenarios.yaml) | User compares multi-account projections with what-if scenarios | high | yes | partial | partial | yes | missing | no | **partial** |
 | [SCENARIO-002](journeys/scenarios/SCENARIO-002-manage-scenarios.yaml) | User creates, edits and deletes a what-if scenario | high | yes | partial | partial | partial | yes | no | **partial** |
 | [TRANSFER-001](journeys/transfers/TRANSFER-001-record-transfer.yaml) | Owner records a transfer between two accounts | high | partial | yes | partial | no | missing | no | **at risk** |
@@ -115,11 +115,11 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 - **AUTH-001** — successful_assertion_signs_in (happy_path) is uncovered: requires simulating a WebAuthn assertion signature; no test fixture exists yet.; invalid_assertion_rejected (validation) is uncovered; options_rate_limited (edge) is uncovered
 - **AUTH-002** — allowlisted_email_creates_account (happy_path) is uncovered; passkey_attestation_saved (happy_path) is uncovered: requires a WebAuthn attestation fixture; none exists yet.; non_allowlisted_email_rejected (validation) is uncovered; invalid_or_duplicate_email_rejected (validation) is uncovered; registration_throttled (edge) is uncovered; attestation_failure_surfaces_error (edge) is uncovered; register_options_require_auth (authentication) is uncovered; authenticated_user_redirected_from_register (authorization) is uncovered
 - **AUTH-003** — request_form_renders (happy_path) is uncovered; request_throttled (edge) is uncovered; no_trusted_device_created (edge) is uncovered; authenticated_user_redirected (authorization) is uncovered; email_delivery (integration) is uncovered
-- **AUTH-005** — auto_logged_in_user_skips_login_page (happy_path) is uncovered; expired_device_ignored (edge) is uncovered; unknown_or_tampered_cookie_ignored (authentication) is uncovered; revoked_device_no_longer_logs_in (authorization) is uncovered
+- **AUTH-005** — auto_logged_in_user_skips_login_page (happy_path) is uncovered; expired_device_ignored (edge) is uncovered; revoked_device_no_longer_logs_in (authorization) is uncovered
 - **AUTH-006** — logout_revokes_current_device (happy_path) is uncovered; guest_cannot_logout (authentication) is uncovered
 - **AUTH-007** — guest_not_affected (authentication) is uncovered
 - **AUTH-008** — json_request_gets_401 (edge) is uncovered; protected_page_redirects_guest (authentication) is partial: asserted for budgets.show only; dashboard and profile.edit guest redirects are not tested.; intended_url_restored_after_magic_link (alternate) is uncovered
-- **AUTH-009** — axios_419_retry (recovery) is uncovered: client-side behaviour; no JS unit tests exist and Playwright specs are stale.; inertia_419_reload (recovery) is uncovered: client-side behaviour; needs a browser test.
+- **AUTH-009** — axios_419_retry (recovery) is uncovered: client-side behaviour (axios interceptor, and apiFetch for fetch() writes); no JS unit tests exist and Playwright specs are stale.; inertia_419_reload (recovery) is uncovered: client-side behaviour; needs a browser test.
 - **AUTH-011** — profile_lists_passkeys (happy_path) is partial: only asserts 200; does not inspect the passkeys prop.; add_additional_passkey (happy_path) is uncovered: requires a WebAuthn attestation fixture.; add_passkey_returns_to_profile (alternate) is partial: asserts the redirectTo prop; the client-side redirect after the ceremony is not browser tested.
 - **AUTH-012** — no_devices_empty_state (empty_state) is uncovered; revoked_device_stops_auto_login (integration) is uncovered
 - **BUDGET-003** — index_redirects_to_active_budget (happy_path) is uncovered; transactions_redirects_to_active_budget (happy_path) is uncovered; no_budgets_redirects_to_create (empty_state) is uncovered; stale_active_budget_falls_back (edge) is uncovered; cannot_activate_other_users_budget (authorization) is uncovered; switch_active_budget (alternate) is uncovered
@@ -127,12 +127,12 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 - **CALENDAR-001** — connections_page_renders (happy_path) is uncovered; callback_creates_connection (happy_path) is partial: GoogleCalendarService is mocked, so the token exchange, calendar lookup and initial sync themselves are not exercised.; consent_denied (edge) is uncovered; reconnect_updates_existing (alternate) is uncovered
 - **CATEGORY-001** — index_shows_spending (happy_path) is uncovered; create_category (happy_path) is uncovered; edit_category (happy_path) is uncovered; no_categories_empty_state (empty_state) is uncovered; invalid_category_rejected (validation) is uncovered; other_users_categories_forbidden (authorization) is uncovered
 - **CHAT-001** — stream_returns_events (happy_path) is partial: asserts stream_end and the stored reply; the individual delta events are not asserted.; no_budget_no_tools (empty_state) is partial: asserts the factory returns no tools; the no-budget system prompt is not asserted.; transaction_limit_capped (edge) is partial: only 3 rows exist so the test cannot distinguish a cap from no cap.; message_validation (validation) is uncovered; other_users_budget_tools (authorization) is uncovered; provider_error_safe_message (integration) is partial: covers the rate-limit mapping only; overload, too-large and logging are not asserted.; stream_error_ui_recovery (recovery) is uncovered: client-side behaviour (ChatPanel.vue); needs a browser test.
-- **CHAT-002** — clean_message_allowed (happy_path) is partial: passes through moderation implicitly; no assertion on moderation outcome or flag absence.; injection_blocked (validation) is uncovered; abusive_logged_and_allowed (edge) is uncovered; hourly_limit_exceeded (edge) is partial: exercises ContentModerationService::checkRateLimit directly; the HTTP 429 (stream) / 500 (send) responses are not asserted.; route_throttle (edge) is uncovered; auto_ban_after_offenses (edge) is uncovered; banned_user_refused (authorization) is uncovered; stream_refusal_visible (recovery) is uncovered: EventSource cannot read non-SSE error bodies; the panel shows a generic connection error.
-- **FILE-001** — invalid_file_rejected (validation) is partial: the transaction upload route is tested for disallowed type only; oversized and extension-mismatch cases are exercised through budgets.files.upload.; other_users_transaction_files_forbidden (authorization) is uncovered
+- **CHAT-002** — clean_message_allowed (happy_path) is partial: passes through moderation implicitly; no assertion on moderation outcome or flag absence.; abusive_logged_and_allowed (edge) is uncovered; route_throttle (edge) is uncovered; auto_ban_after_offenses (edge) is uncovered; stream_refusal_visible (recovery) is uncovered: EventSource cannot read non-SSE error bodies; the panel shows a generic connection error.
+- **FILE-001** — other_users_transaction_files_forbidden (authorization) is uncovered
 - **PAYOFF-001** — negative_liability_balance_excluded (edge) is uncovered: getDebtAccounts filters current_balance_cents > 0, so cards stored as negative balances (a convention BudgetServiceTest accepts) are hidden.
 - **PLAID-001** — link_token_unavailable (integration) is partial: server side (linkToken null, 200) is covered; the disabled connect button is frontend behaviour with no test.
 - **PLAID-002** — link_page_renders (happy_path) is uncovered; store_creates_new_connection (happy_path) is uncovered; store_validation (validation) is uncovered; store_cross_user_denied (authorization) is uncovered: plaid.store is not part of the plaid_post_routes dataset in NestedRouteAuthorizationTest.; relink_orphaned_account (alternate) is partial: the new-connection branch is covered; re-linking onto an existing active connection is not asserted.; linked_page_shows_metadata (alternate) is uncovered; account_missing_from_plaid_response (recovery) is uncovered
-- **PLAID-005** — upgrade_token_issued (happy_path) is uncovered; connection_updated (happy_path) is uncovered; upgrade_token_not_linked (edge) is uncovered; upgrade_token_missing_access_token (edge) is uncovered; update_connection_validation (validation) is uncovered; upgrade_token_plaid_failure (integration) is partial: the JSON 500 and its safe message are covered; the UI toast is frontend behaviour with no test.
+- **PLAID-005** — upgrade_token_issued (happy_path) is uncovered; connection_updated (happy_path) is uncovered; upgrade_token_not_linked (edge) is uncovered; upgrade_token_missing_access_token (edge) is uncovered; update_connection_validation (validation) is uncovered; reauth_prompt_on_error (alternate) is partial: the page prop is asserted; the rendered warning is frontend behaviour with no browser test.; upgrade_token_plaid_failure (integration) is partial: the JSON 500 and its safe message are covered; the UI toast is frontend behaviour with no test.
 - **PLAID-010** — link_timeout (integration) is partial: server side covered (friendly log message, linkToken null, 5s/30s client timeouts); the disabled connect button is frontend behaviour with no test.
 - **PREF-002** — no_budgets_empty_state (empty_state) is uncovered; switch_to_shared_budget (alternate) is uncovered; stale_preference_falls_back (recovery) is uncovered
 - **PROJECT-001** — balance_projection_renders (happy_path) is partial: recurring and future manual items are asserted on both pages; credit-card autopay projections are not exercised.
@@ -140,8 +140,8 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 - **RECUR-002** — edit_page_renders (happy_path) is uncovered; update_template_and_sync_rules (happy_path) is partial: create and update of rules with priorities are asserted; deletion of omitted rules is not.; update_validation (validation) is uncovered; cross_user_budget_forbidden (authorization) is partial: only the edit (GET) route is asserted; update, duplicate and destroy are not tested for another user's budget.; duplicate_template (alternate) is partial: rule copying and the "Copy of" name are asserted; schedule and dynamic flag are not compared field by field.; delete_template (alternate) is uncovered
 - **RECUR-003** — add_rule_and_apply (happy_path) is partial: store and preview are asserted for a regex rule; apply (linking) is not exercised.; preview_without_active_rules (empty_state) is uncovered; cross_budget_template_not_found (authorization) is partial: only rules.index is asserted; store/update/destroy/test/preview/apply and cross-user 403 are untested.; test_draft_rule (alternate) is uncovered; update_rule_reevaluates_links (alternate) is partial: linking newly matching transactions is asserted; unlinking no-longer-matching ones is not.
 - **RECUR-006** — analysis_page_renders (happy_path) is uncovered; settings_validation (validation) is uncovered; refresh_fallback_redirects (recovery) is uncovered
-- **REPORT-001** — dashboard_renders (happy_path) is uncovered; foreign_account_filter_ignored (edge) is uncovered; active_templates_only (edge) is uncovered: the underlying RecurringTransactionTemplate::active() scope is unit-tested in tests/Feature/RecurringTransactionTemplateActiveScopeTest.php, but nothing asserts the report built on it.; monthly_normalisation (edge) is uncovered; dynamic_templates_in_income_vs_expenses (edge) is uncovered: dynamic templates store amount_in_cents 0 and are filtered out by the > 0 / < 0 conditions (see known_issues).; zero_starting_net_worth (edge) is uncovered; empty_budget (empty_state) is uncovered; cross_user_forbidden (authorization) is uncovered; account_filter (alternate) is uncovered
-- **SCENARIO-001** — scenario_changes_balance (edge) is uncovered; no_scenarios (empty_state) is uncovered; foreign_account_ids (validation) is uncovered; cross_user_scenario_toggle (authorization) is uncovered
+- **REPORT-001** — dashboard_renders (happy_path) is uncovered; foreign_account_filter_ignored (edge) is uncovered; active_templates_only (edge) is uncovered: the underlying RecurringTransactionTemplate::active() scope is unit-tested in tests/Feature/RecurringTransactionTemplateActiveScopeTest.php, but nothing asserts the report built on it.; monthly_normalisation (edge) is uncovered; zero_starting_net_worth (edge) is uncovered; empty_budget (empty_state) is uncovered; cross_user_forbidden (authorization) is uncovered; account_filter (alternate) is partial: only the net worth series is asserted for the filtered account.
+- **SCENARIO-001** — no_scenarios (empty_state) is uncovered; foreign_account_ids (validation) is uncovered; cross_user_scenario_toggle (authorization) is uncovered
 - **SCENARIO-002** — invalid_color_or_type (validation) is uncovered; cross_user_forbidden (authorization) is partial: asserted for show only; store, update and destroy on a foreign budget are not tested.; update_scenario (alternate) is partial: asserts the scenario fields only; replacement of adjustments is not asserted.
 - **TRANSFER-001** — store_transfer_via_modal (happy_path) is uncovered; other_users_budget_forbidden (authorization) is uncovered; json_response (alternate) is uncovered
 - **TRANSFER-002** — edit_page_renders (happy_path) is uncovered; other_users_transfer_forbidden (authorization) is uncovered; missing_leg_recreated (recovery) is uncovered
@@ -185,7 +185,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Auth/MagicLinkParameterValidationTest.php`, `tests/Feature/Auth/MagicLinkTest.php`
 - **AUTH-005** Returning user is signed in automatically on a trusted device _(implemented, critical)_
   - Routes: `login`, `dashboard`, `webauthn.login.options`
-  - Tests: `tests/Feature/Auth/TrustedDeviceAutoLoginTest.php`, `tests/Feature/Auth/TrustedDeviceFingerprintTest.php`, `tests/Feature/DeleteAccountTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`
+  - Tests: `tests/Feature/Auth/TrustedDeviceAutoLoginTest.php`, `tests/Feature/Auth/TrustedDeviceFingerprintTest.php`, `tests/Feature/Auth/TrustedDeviceTokenLookupTest.php`, `tests/Feature/DeleteAccountTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`
 - **AUTH-006** User signs out and the device is forgotten _(implemented, high)_
   - Routes: `logout`, `login`
   - Tests: `tests/Feature/Auth/AuthenticationTest.php`, `tests/Feature/CsrfTokenSyncTest.php`
@@ -295,8 +295,8 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Routes: `plaid.sync-all`
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidSyncAllTest.php`, `tests/Feature/SecurityRateLimitingTest.php`
 - **PLAID-005** User re-authenticates a Plaid connection that needs a new login _(implemented, high)_
-  - Routes: `plaid.upgrade-link-token`, `plaid.update-connection`
-  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php`
+  - Routes: `plaid.link`, `plaid.upgrade-link-token`, `plaid.update-connection`
+  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidReauthPromptTest.php`, `tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php`
 - **PLAID-006** User disconnects an account from Plaid _(implemented, medium)_
   - Routes: `plaid.destroy`
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidUnlinkTest.php`
@@ -336,6 +336,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Projections/AccountProjectionTest.php`, `tests/playwright/smoke.spec.js`
 - **PROJECT-002** User views projected transactions for the whole budget _(implemented, low)_
   - Routes: `budget.projections`
+  - Tests: `tests/Feature/Projections/BudgetProjectionTest.php`
 
 ### properties
 
@@ -371,16 +372,16 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **REPORT-001** User reviews the financial reports dashboard _(implemented, high)_
   - Routes: `reports.index`
-  - Tests: `tests/Feature/Reports/ReportsDateRangeTest.php`
+  - Tests: `tests/Feature/Reports/ReportsCalculationsTest.php`, `tests/Feature/Reports/ReportsDateRangeTest.php`, `tests/Feature/Reports/ReportsNetWorthQueryTest.php`
 - **REPORT-002** User views monthly and yearly budget statistics _(implemented, medium)_
   - Routes: `budget.statistics.monthly`, `budget.statistics.yearly`
-  - Tests: `tests/Feature/Budgets/BudgetStatisticsTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/playwright/smoke.spec.js`
+  - Tests: `tests/Feature/Budgets/BudgetStatisticsTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/YearlyStatisticsQueryTest.php`, `tests/playwright/smoke.spec.js`
 
 ### scenarios
 
 - **SCENARIO-001** User compares multi-account projections with what-if scenarios _(implemented, high)_
   - Routes: `budget.projections.multi-account`, `budgets.scenarios.index`, `budgets.scenarios.toggle`
-  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/ScenarioAdjustmentScheduleTest.php`, `tests/Feature/ScenarioTest.php`
+  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/ScenarioAdjustmentScheduleTest.php`, `tests/Feature/ScenarioProjectionQueryTest.php`, `tests/Feature/ScenarioTest.php`
 - **SCENARIO-002** User creates, edits and deletes a what-if scenario _(implemented, high)_
   - Routes: `budgets.scenarios.store`, `budgets.scenarios.show`, `budgets.scenarios.update`, `budgets.scenarios.destroy`
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/ScenarioAdjustmentScheduleTest.php`, `tests/Feature/ScenarioCrossBudgetTest.php`, `tests/Feature/ScenarioTest.php`

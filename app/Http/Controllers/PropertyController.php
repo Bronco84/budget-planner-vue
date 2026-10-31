@@ -155,8 +155,8 @@ class PropertyController extends Controller
             'linked_account_ids.*' => 'exists:accounts,id',
         ]);
 
-        // Update value timestamp if value changed
-        if ($validated['current_value_cents'] !== $property->current_value_cents) {
+        // Update value timestamp if value changed (form input arrives as a string, so compare as integers)
+        if ((int) $validated['current_value_cents'] !== (int) $property->current_value_cents) {
             $validated['value_updated_at'] = now();
         }
 

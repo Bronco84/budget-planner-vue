@@ -79,7 +79,15 @@ scenarios:
   - id: scenario_changes_balance
     kind: edge
     description: The scenario projection's balances differ from the base projection by exactly the adjustment amounts.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioProjectionQueryTest.php::multi account projection matches the pinned base and scenario values
+  - id: base_projection_reused_across_scenarios
+    kind: edge
+    description: Each account's base projected transactions (recurring, autopay, future manual) are built once and reused for every active scenario.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioProjectionQueryTest.php::the base projection is built once per account and reused across scenarios
   - id: month_end_adjustment_day
     kind: edge
     description: A monthly adjustment on day 29-31 lands on the last day of shorter months, including when the range starts after that day.
@@ -112,7 +120,6 @@ scenarios:
     coverage: uncovered
 known_issues:
   - "modify_existing adjustments are accepted by validation and offered in ScenarioAdjustmentRow.vue, but generateProjectedTransactions returns nothing for them and no other code handles them, so they have no effect on the projection."
-  - For every scenario the base projection (projectTransactions and manual transactions) is recomputed per account, so cost grows as scenarios x accounts.
 confidence: high
 evidence:
   - app/Http/Controllers/ProjectionsController.php showMultiAccountProjection/applyScenarioAdjustments

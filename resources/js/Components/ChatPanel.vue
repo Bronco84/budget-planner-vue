@@ -11,6 +11,7 @@ import {
     ArrowDownIcon
 } from '@heroicons/vue/24/outline';
 import axios from 'axios';
+import { apiFetch } from '@/utils/http.js';
 
 const props = defineProps({
     isOpen: {
@@ -209,7 +210,6 @@ const sendMessage = async () => {
 
         // Create EventSource
         const eventSource = new EventSource(url.toString());
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
         // Handle connection opened
         eventSource.addEventListener('open', (event) => {
@@ -249,11 +249,10 @@ const sendMessage = async () => {
             // Save the complete message to the database
             try {
                 console.log('💾 Saving message to database...');
-                const saveResponse = await fetch(route('chat.stream.complete'), {
+                const saveResponse = await apiFetch(route('chat.stream.complete'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
                     },
                     body: JSON.stringify({
                         message: lastMessage ? lastMessage.content : '',

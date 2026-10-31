@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Budget;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -64,7 +65,7 @@ class UserPreferencesController extends Controller
 
         $validated = $request->validate([
             'order' => 'required|array',
-            'order.*' => 'required|string|in:'.implode(',', User::ACCOUNT_TYPES),
+            'order.*' => ['required', 'string', Rule::in($this->allowedAccountTypes($user))],
         ]);
 
         $user->setAccountTypeOrder($validated['order']);
@@ -99,9 +100,28 @@ class UserPreferencesController extends Controller
         return [
             'account_type_order' => [
                 'value' => ['required', 'array'],
-                'value.*' => ['required', 'string', 'distinct', Rule::in(User::ACCOUNT_TYPES)],
+                'value.*' => ['required', 'string', 'distinct', Rule::in($this->allowedAccountTypes(Auth::user()))],
             ],
         ];
+    }
+
+    /**
+     * Account types that may appear in the saved order: the defaults plus any
+     * (free-text) type used by an account in a budget the user can access.
+     *
+     * @return array<int, string>
+     */
+    private function allowedAccountTypes(User $user): array
+    {
+        $budgetIds = $user->accessibleBudgets()->pluck('id');
+
+        $usedTypes = Account::whereIn('budget_id', $budgetIds)
+            ->whereNotNull('type')
+            ->distinct()
+            ->pluck('type')
+            ->all();
+
+        return array_values(array_unique(array_merge(User::ACCOUNT_TYPES, $usedTypes)));
     }
 
     /**

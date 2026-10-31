@@ -278,35 +278,17 @@ class Budget extends Model
         $year = $year ?: now()->year;
         $monthlyStats = [];
 
-        for ($month = 1; $month <= 12; $month++) {
-            $start = Carbon::create($year, $month, 1)->startOfMonth()->format('Y-m-d');
-            $end = Carbon::create($year, $month, 1)->endOfMonth()->format('Y-m-d');
+        $totals = $this->getMonthlyIncomeExpenseTotals($year - 1, $year);
 
-            // Get previous year's data for comparison
-            $prevStart = Carbon::create($year - 1, $month, 1)->startOfMonth()->format('Y-m-d');
-            $prevEnd = Carbon::create($year - 1, $month, 1)->endOfMonth()->format('Y-m-d');
+        for ($month = 1; $month <= 12; $month++) {
+            $key = sprintf('%04d-%02d', $year, $month);
+            $prevKey = sprintf('%04d-%02d', $year - 1, $month);
 
             $currentMonthStats = [
-                'total_income' => $this->transactions()
-                    ->where('amount_in_cents', '>', 0)
-                    ->whereDate('date', '>=', $start)
-                    ->whereDate('date', '<=', $end)
-                    ->sum('amount_in_cents'),
-                'total_expenses' => $this->transactions()
-                    ->where('amount_in_cents', '<', 0)
-                    ->whereDate('date', '>=', $start)
-                    ->whereDate('date', '<=', $end)
-                    ->sum('amount_in_cents'),
-                'prev_year_income' => $this->transactions()
-                    ->where('amount_in_cents', '>', 0)
-                    ->whereDate('date', '>=', $prevStart)
-                    ->whereDate('date', '<=', $prevEnd)
-                    ->sum('amount_in_cents'),
-                'prev_year_expenses' => $this->transactions()
-                    ->where('amount_in_cents', '<', 0)
-                    ->whereDate('date', '>=', $prevStart)
-                    ->whereDate('date', '<=', $prevEnd)
-                    ->sum('amount_in_cents'),
+                'total_income' => $totals[$key]['income'] ?? 0,
+                'total_expenses' => $totals[$key]['expenses'] ?? 0,
+                'prev_year_income' => $totals[$prevKey]['income'] ?? 0,
+                'prev_year_expenses' => $totals[$prevKey]['expenses'] ?? 0,
                 'month_number' => $month,
                 'year' => $year,
             ];
@@ -341,6 +323,35 @@ class Budget extends Model
             'monthly' => $monthlyStats,
             'yearly_totals' => $yearlyTotals,
         ];
+    }
+
+    /**
+     * Income (amount > 0) and expense (amount < 0) sums per calendar month for
+     * the given years, from one grouped query: ['YYYY-MM' => ['income' => int,
+     * 'expenses' => int]]. Months are bucketed by the date part of the stored
+     * value, matching the whereDate() month-range filters this replaced.
+     */
+    private function getMonthlyIncomeExpenseTotals(int $fromYear, int $toYear): array
+    {
+        $totals = [];
+
+        $this->transactions()
+            ->whereDate('date', '>=', Carbon::create($fromYear, 1, 1)->format('Y-m-d'))
+            ->whereDate('date', '<=', Carbon::create($toYear, 12, 31)->format('Y-m-d'))
+            ->where('amount_in_cents', '!=', 0)
+            ->groupBy('date')
+            ->selectRaw('date')
+            ->selectRaw('SUM(CASE WHEN amount_in_cents > 0 THEN amount_in_cents ELSE 0 END) as income')
+            ->selectRaw('SUM(CASE WHEN amount_in_cents < 0 THEN amount_in_cents ELSE 0 END) as expenses')
+            ->toBase()
+            ->get()
+            ->each(function ($row) use (&$totals) {
+                $month = substr((string) $row->date, 0, 7);
+                $totals[$month]['income'] = ($totals[$month]['income'] ?? 0) + (int) $row->income;
+                $totals[$month]['expenses'] = ($totals[$month]['expenses'] ?? 0) + (int) $row->expenses;
+            });
+
+        return $totals;
     }
 
     /**

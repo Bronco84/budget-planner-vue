@@ -66,7 +66,9 @@ scenarios:
   - id: source_from_other_budget_rejected
     kind: authorization
     description: A source account id from another budget is rejected ("must be in the same budget").
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AutopayValidationTest.php::autopay is rejected for a source account from another budget
   - id: other_users_account_forbidden
     kind: authorization
     description: Posting autopay for another user's budget returns 403 (can:view,budget); cross-budget account returns 404.

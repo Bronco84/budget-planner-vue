@@ -79,14 +79,19 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a passkey only user can delete their account by typing their email in a fresh session
+  - id: device_cookie_cleared
+    kind: integration
+    description: The device_token cookie is expired on the deletion response.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::deleting an account clears the trusted device cookie
   - id: guest_cannot_delete
     kind: authentication
     description: A guest DELETE /profile is redirected to login.
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a guest cannot delete an account
-known_issues:
-  - The device_token cookie is not cleared on deletion (it is inert because the trusted device rows are deleted).
+known_issues: []
 confidence: medium
 evidence:
   - app/Http/Controllers/ProfileController.php destroy()

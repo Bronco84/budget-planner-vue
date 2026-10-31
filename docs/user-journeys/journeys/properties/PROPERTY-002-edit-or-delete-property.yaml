@@ -33,6 +33,7 @@ postconditions:
   - property updated or removed; account.property_id links consistent
 business_rules:
   - when linked_account_ids is present, all existing links are cleared and the given in-budget accounts are linked
+  - value_updated_at is refreshed only when current_value_cents changes numerically (string form input is compared as an integer)
 scenarios:
   - id: update_property
     kind: happy_path
@@ -40,6 +41,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Properties/PropertyLifecycleTest.php::updating a property redirects to the properties list
+  - id: value_timestamp_only_on_change
+    kind: edge
+    description: Saving the same value keeps value_updated_at; a changed value refreshes it.
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyLifecycleTest.php::saving a property with an unchanged value keeps its value timestamp
+      - tests/Feature/Properties/PropertyLifecycleTest.php::saving a property with a changed value refreshes its value timestamp
   - id: delete_property_unlinks_accounts
     kind: happy_path
     description: Deleting a property clears property_id on its accounts.
@@ -63,8 +71,7 @@ scenarios:
     kind: authorization
     description: Edit/update/delete under another user's budget return 403; a property from another budget returns 404 via scopeBindings.
     coverage: uncovered
-known_issues:
-  - "value_updated_at comparison uses strict !== between the validated value and the model attribute; type differences could refresh the timestamp even when the value is unchanged."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/PropertyController.php show/edit/update/destroy

@@ -40,7 +40,7 @@ business_rules:
   - strategy is snowball, avalanche or custom; at least one debt is required
   - interest_rate 0-100; minimum_payment_cents and monthly_extra_payment_cents are non-negative integers
   - each debt account must belong to the budget (scoped exists validation on store and preview)
-  - store runs in a DB transaction, so a failure keeps the existing active plan; preview's temporary rows are always rolled back
+  - store runs in a DB transaction, so a failure keeps the existing active plan; preview computes each strategy in memory (unsaved PayoffPlan/PayoffPlanDebt models passed to PayoffPlanService::calculatePayoffProjection) and writes nothing
   - goal_type is savings, investment, purchase or other
   - index and preview need budget view; create and store need budget update
 scenarios:
@@ -65,6 +65,7 @@ scenarios:
     tests:
       - tests/Feature/Services/PayoffPlanServiceTest.php::avalanche pays no more interest than snowball
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::preview compares snowball and avalanche and leaves no temporary plans behind
+      - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::preview computes the comparison in memory without writing any plan rows
     note: the payoff-plans.preview endpoint is exercised over HTTP but is not called by the UI.
   - id: no_debt_accounts
     kind: empty_state
@@ -109,7 +110,6 @@ scenarios:
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot store a payoff plan in a budget they do not own
       - tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php::another user cannot preview payoff strategies in a budget they do not own
 known_issues:
-  - payoff-plans.preview still writes temporary PayoffPlan/PayoffPlanDebt rows on a view-only endpoint (rolled back by the controller, but it needs a writable DB connection).
   - payoff-plans.preview is not called anywhere in resources/js; the wizard has no live strategy comparison.
   - starting_balance_cents is copied from the account's current balance at creation time and never refreshed.
 confidence: high

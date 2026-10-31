@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Account;
 use App\Models\Budget;
 use App\Models\User;
 use App\Models\UserPreference;
@@ -24,6 +25,33 @@ test('saving an account type order with an unknown type or a non-array is reject
     'non-array' => ['checking', 'order'],
     'missing' => [null, 'order'],
 ]);
+
+test('saving an account type order accepts custom types used in the users budgets', function () {
+    $user = User::factory()->create();
+    $budget = Budget::factory()->create(['user_id' => $user->id]);
+    Account::factory()->create(['budget_id' => $budget->id, 'type' => 'crypto wallet']);
+
+    $this->actingAs($user)
+        ->postJson(route('preferences.account-type-order.update'), ['order' => ['crypto wallet', 'checking']])
+        ->assertOk()
+        ->assertJsonPath('order', ['crypto wallet', 'checking']);
+
+    $this->actingAs($user)
+        ->postJson(route('preferences.update', 'account_type_order'), ['value' => ['checking', 'crypto wallet']])
+        ->assertOk();
+
+    expect($user->fresh()->getAccountTypeOrder())->toBe(['checking', 'crypto wallet']);
+});
+
+test('saving an account type order rejects custom types that only exist in another users budget', function () {
+    $user = User::factory()->create();
+    Account::factory()->create(['type' => 'crypto wallet']);
+
+    $this->actingAs($user)
+        ->postJson(route('preferences.account-type-order.update'), ['order' => ['crypto wallet']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('order.0');
+});
 
 test('setting the active budget with a missing, non-integer or unknown id is rejected', function (array $payload) {
     $user = User::factory()->create();

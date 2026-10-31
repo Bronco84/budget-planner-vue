@@ -35,26 +35,35 @@ steps:
 postconditions:
   - account_type_order preference holds the new order
 business_rules:
-  - order must be an array of strings each in User::ACCOUNT_TYPES
+  - order must be an array of strings, each in User::ACCOUNT_TYPES or used as the type of an account in a budget the user can access (account types are free text)
   - default order is User::ACCOUNT_TYPES when nothing is saved
   - on a failed save the client rebuilds the previous order
-  - generic POST /api/preferences/{key} only accepts whitelisted keys (currently account_type_order, validated as a distinct array of known types); any other key is rejected with 422 on 'key'
+  - generic POST /api/preferences/{key} only accepts whitelisted keys (currently account_type_order, validated as a distinct array of allowed types); any other key is rejected with 422 on 'key'
   - Show.vue's save sends Accept application/json so validation failures come back as 422 JSON
 scenarios:
   - id: save_order
     kind: happy_path
     description: Posting a valid order stores it and returns it.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceValidationTest.php::saving an account type order accepts custom types used in the users budgets
   - id: saved_order_returned
     kind: happy_path
     description: GET account-type-order returns the saved order, or ACCOUNT_TYPES by default.
     coverage: uncovered
   - id: unknown_type_rejected
     kind: validation
-    description: An order containing a type outside ACCOUNT_TYPES, or a non-array, is rejected with 422.
+    description: An order containing a type outside the allowed types, or a non-array, is rejected with 422.
     coverage: covered
     tests:
       - tests/Feature/Preferences/PreferenceValidationTest.php::saving an account type order with an unknown type or a non-array is rejected
+  - id: custom_account_types_accepted
+    kind: alternate
+    description: An order containing a custom (non-default) type used by an account in the user's budgets is accepted; a type only used in another user's budget is rejected.
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceValidationTest.php::saving an account type order accepts custom types used in the users budgets
+      - tests/Feature/Preferences/PreferenceValidationTest.php::saving an account type order rejects custom types that only exist in another users budget
   - id: generic_preference_round_trip
     kind: alternate
     description: Writing a value via POST /api/preferences/{key} is returned by GET /api/preferences/{key}.
@@ -78,7 +87,6 @@ scenarios:
     description: Preferences are always read and written for the authenticated user; guests get 401/redirect.
     coverage: uncovered
 known_issues:
-  - "Suspected: account types are free text (AccountController validates string max 50) but the order validator only allows User::ACCOUNT_TYPES, so a budget with any other type (e.g. a Plaid-provided type) can never save its order."
   - GET /api/preferences/account-type-order and the generic show/update endpoints have no frontend caller.
 confidence: medium
 evidence:

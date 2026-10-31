@@ -125,6 +125,37 @@ test('a disallowed file type on a transaction upload still explains why it was r
         ->assertExactJson(['error' => 'File type not allowed']);
 });
 
+test('an oversized file on a transaction upload is rejected without storing anything', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson(route('transactions.files.upload', fileTestTransactionFor($user)), ['file' => UploadedFile::fake()->create('scan.pdf', 10241, 'application/pdf')])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('file');
+
+    expect(File::count())->toBe(0)
+        ->and(FileAttachment::count())->toBe(0)
+        ->and(Storage::disk('s3')->allFiles())->toBe([]);
+});
+
+test('a file whose extension does not match its content on a transaction upload is rejected without storing anything', function () {
+    $user = User::factory()->create();
+    // Plain text renamed to .pdf. A real (non-fake) UploadedFile so the MIME
+    // type is sniffed from the content (text/plain), not guessed from the name.
+    $path = tempnam(sys_get_temp_dir(), 'upload');
+    file_put_contents($path, "just some plain text pretending to be a receipt\n");
+    $renamed = new UploadedFile($path, 'receipt.pdf', 'application/pdf', null, true);
+
+    $this->actingAs($user)
+        ->post(route('transactions.files.upload', fileTestTransactionFor($user)), ['file' => $renamed])
+        ->assertStatus(400)
+        ->assertExactJson(['error' => 'File extension does not match file type. Expected: txt']);
+
+    expect(File::count())->toBe(0)
+        ->and(FileAttachment::count())->toBe(0)
+        ->and(Storage::disk('s3')->allFiles())->toBe([]);
+});
+
 test('a failure deleting an attachment returns a generic error', function () {
     $user = User::factory()->create();
     $attachmentId = $this->actingAs($user)

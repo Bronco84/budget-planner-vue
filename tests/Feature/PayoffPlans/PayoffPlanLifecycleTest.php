@@ -5,6 +5,7 @@ use App\Models\Budget;
 use App\Models\PayoffPlan;
 use App\Models\PayoffPlanDebt;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 
 /*
@@ -226,6 +227,30 @@ test('preview compares snowball and avalanche and leaves no temporary plans behi
         ->and($comparisons['snowball']['total_months'])->toBeGreaterThan(0)
         ->and(PayoffPlan::count())->toBe(0)
         ->and(PayoffPlanDebt::count())->toBe(0);
+});
+
+test('preview computes the comparison in memory without writing any plan rows', function () {
+    $writes = [];
+    DB::listen(function ($query) use (&$writes) {
+        if (preg_match('/^\s*(insert|update|delete)\b.*payoff_plan/i', $query->sql)) {
+            $writes[] = $query->sql;
+        }
+    });
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('payoff-plans.preview', $this->budget), [
+            'monthly_extra_payment' => 10000,
+            'debts' => [
+                ['account_id' => $this->card->id, 'balance' => 120000, 'interest_rate' => 12, 'minimum_payment' => 10000],
+            ],
+        ])
+        ->assertOk();
+
+    // 1,200.00 at 12% APR paid 200.00/month clears in 7 months either way.
+    expect($response->json('comparisons.snowball.total_months'))->toBe(7)
+        ->and($response->json('comparisons.avalanche.total_months'))->toBe(7)
+        ->and($response->json('comparisons.snowball.never_paid_off'))->toBeFalse()
+        ->and($writes)->toBe([]);
 });
 
 // --- PAYOFF-003: edit / update / destroy ---

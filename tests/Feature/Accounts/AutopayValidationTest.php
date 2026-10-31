@@ -140,3 +140,23 @@ test('autopay cannot be configured on another users account', function () {
 
     expect(autopayStateOf($this->card)['enabled'])->toBeFalse();
 });
+
+test('autopay is rejected for a source account from another budget', function (string $owner) {
+    $otherBudget = Budget::factory()->create([
+        'user_id' => $owner === 'same user' ? $this->user->id : User::factory()->create()->id,
+    ]);
+    $foreignChecking = Account::factory()->checking()->create(['budget_id' => $otherBudget->id]);
+    ($this->attachPlaid)($foreignChecking, 'depository', 'checking');
+    $before = autopayStateOf($this->card);
+
+    $this->actingAs($this->user)
+        ->from(route('budgets.show', $this->budget))
+        ->post(route('accounts.updateAutopay', [$this->budget, $this->card]), [
+            'autopay_enabled' => true,
+            'autopay_source_account_id' => $foreignChecking->id,
+        ])
+        ->assertRedirect(route('budgets.show', $this->budget))
+        ->assertSessionHas('error', 'Source account must be in the same budget.');
+
+    expect(autopayStateOf($this->card))->toBe($before);
+})->with(['same user', 'another user']);

@@ -53,6 +53,17 @@ test('a passkey only user can delete their account by typing their email in a fr
         ->and(MagicLinkToken::where('user_id', $user->id)->count())->toBe(0);
 });
 
+test('deleting an account clears the trusted device cookie', function () {
+    $user = passkeyOnlyUser();
+
+    $this->actingAs($user)
+        ->withSession(freshlyAuthenticated())
+        ->withUnencryptedCookie('device_token', Str::random(64))
+        ->delete(route('profile.destroy'), ['email' => $user->email])
+        ->assertRedirect('/')
+        ->assertCookieExpired('device_token');
+});
+
 test('account deletion is rejected when the typed email does not match', function () {
     $user = passkeyOnlyUser();
 

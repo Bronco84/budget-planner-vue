@@ -39,6 +39,7 @@ business_rules:
   - rejections past the hourly limit are logged but are not offenses
   - every content flag and more than 10 new conversations in 10 minutes ('rapid_conversation_creation') count as offenses; messages in an existing conversation are not tracked; 5 offenses in 24 hours trigger an automatic 24-hour ban
   - route throttles - 30 per minute for send/stream, 60 per minute for the chat group
+  - send and stream use the same status codes for moderation refusals - 403 banned, 429 hourly limit, 400 blocked; only provider/server failures return 500
 scenarios:
   - id: clean_message_allowed
     kind: happy_path
@@ -50,7 +51,9 @@ scenarios:
   - id: injection_blocked
     kind: validation
     description: A prompt-injection message is blocked with 400 and recorded as a FlaggedChatMessage.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Chat/ChatModerationLimitsTest.php::a prompt injection message is blocked with 400 and recorded as a flagged message
   - id: abusive_logged_and_allowed
     kind: edge
     description: Abusive content is flagged/logged but still answered.
@@ -58,10 +61,11 @@ scenarios:
   - id: hourly_limit_exceeded
     kind: edge
     description: The 31st message within the fixed hourly window is refused with rate limit details, and the window resets an hour after its first message.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Chat/ChatModerationLimitsTest.php::the hourly chat limit is a fixed window that resets an hour after the first message
-    note: exercises ContentModerationService::checkRateLimit directly; the HTTP 429 (stream) / 500 (send) responses are not asserted.
+      - tests/Feature/Chat/ChatModerationLimitsTest.php::sending past the hourly chat limit returns 429 with the safe message
+    note: the HTTP 429 is asserted on POST /chat/message; the stream endpoint shares the same moderation step.
   - id: limit_retries_not_offenses
     kind: edge
     description: Retrying after hitting the hourly limit does not add offenses or trigger a ban.
@@ -86,7 +90,9 @@ scenarios:
   - id: banned_user_refused
     kind: authorization
     description: A temporarily banned user receives 403 and no provider call is made.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Chat/ChatModerationLimitsTest.php::a banned user sending a chat message is refused with 403
   - id: stream_refusal_visible
     kind: recovery
     description: When the stream endpoint returns a JSON 400/403/429 the user is told why.

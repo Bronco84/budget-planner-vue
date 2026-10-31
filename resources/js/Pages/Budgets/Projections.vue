@@ -25,17 +25,6 @@
 
             <form @submit.prevent="updateProjections" class="flex flex-wrap gap-4 items-end">
               <div>
-                <InputLabel for="start_date" value="Start Date" />
-                <TextInput
-                  id="start_date"
-                  type="date"
-                  class="mt-1 block w-full"
-                  v-model="form.start_date"
-                  required
-                />
-              </div>
-
-              <div>
                 <InputLabel for="months" value="Months to Project" />
                 <select
                   id="months"
@@ -69,7 +58,7 @@
                 {{ formatCurrency(props.projections.starting_balance) }}
               </p>
               <p v-else class="text-3xl font-bold text-gray-400">$0.00</p>
-              <p class="text-sm text-gray-500 mt-1">As of {{ formatDate(form.start_date) }}</p>
+              <p class="text-sm text-gray-500 mt-1">As of {{ formatDate(props.params.start_date) }}</p>
             </div>
           </div>
 
@@ -85,8 +74,8 @@
                 </p>
               </div>
               <div class="flex justify-between text-sm text-gray-500 mt-2">
-                <p>Income: <span class="text-green-600">${{ formatCurrency(totalProjectedIncome) }}</span></p>
-                <p>Expenses: <span class="text-red-600">${{ formatCurrency(totalProjectedExpenses) }}</span></p>
+                <p>Income: <span class="text-green-600">{{ formatCurrency(totalProjectedIncome) }}</span></p>
+                <p>Expenses: <span class="text-red-600">{{ formatCurrency(totalProjectedExpenses) }}</span></p>
               </div>
               <p class="text-sm text-gray-500 mt-1">Over {{ form.months }} months</p>
             </div>
@@ -214,7 +203,7 @@
                   <div class="flex">
                     <div class="w-12 text-sm font-medium text-gray-700 pt-2">{{ day }}</div>
                     <div class="flex-1 border-l border-gray-200 pl-4">
-                      <div v-for="transaction in transactions" :key="transaction.id || transaction.date"
+                      <div v-for="(transaction, txIndex) in transactions" :key="`${transaction.recurring_transaction_template_id}-${transaction.account_id}-${txIndex}`"
                            class="flex justify-between items-start py-2 border-b border-gray-100 hover:bg-gray-50 transition-colors"
                            :class="[
                              {'opacity-70': transaction.is_projected},
@@ -265,8 +254,8 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import TextInput from '@/Components/TextInput.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import { formatCurrency } from '@/utils/format.js';
 
 // Define props
 const props = defineProps({
@@ -275,64 +264,39 @@ const props = defineProps({
   params: Object,
 });
 
-// Form state
+// Form state (projections always start today; only the window length is adjustable)
 const form = ref({
-  start_date: props.params.start_date,
   months: props.params.months,
 });
 const processing = ref(false);
 
-// Computed values
-const totalProjectedIncome = computed(() => {
-  if (!props.projections || !props.props.projections && props.projections.monthly_totals) {
-    return 0;
-  }
-  return Object.values(props.props.projections && props.projections.monthly_totals).reduce((sum, month) => {
-    return sum + month.income;
-  }, 0);
-});
+const monthlyTotals = computed(() => props.projections?.monthly_totals ?? {});
+const startingBalance = computed(() => props.projections?.starting_balance ?? 0);
 
-const totalProjectedExpenses = computed(() => {
-  if (!props.projections || !props.props.projections && props.projections.monthly_totals) {
-    return 0;
-  }
-  return Object.values(props.props.projections && props.projections.monthly_totals).reduce((sum, month) => {
-    return sum + Math.abs(month.expense);
-  }, 0);
-});
+// Computed values
+const totalProjectedIncome = computed(() =>
+  Object.values(monthlyTotals.value).reduce((sum, month) => sum + month.income, 0)
+);
+
+const totalProjectedExpenses = computed(() =>
+  Object.values(monthlyTotals.value).reduce((sum, month) => sum + Math.abs(month.expense), 0)
+);
 
 const netCashFlow = computed(() => {
   return totalProjectedIncome.value - totalProjectedExpenses.value;
 });
 
 const expectedEndingBalance = computed(() => {
-  if (!props.projections || !props.props.projections && props.projections.monthly_totals) {
-    return 0;
-  }
-  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
-  if (months.length === 0) return 0;
+  const months = Object.keys(monthlyTotals.value);
+  if (months.length === 0) return startingBalance.value;
 
-  const lastMonth = months[months.length - 1];
-  return props.props.projections && props.projections.monthly_totals[lastMonth].ending_balance;
+  return monthlyTotals.value[months[months.length - 1]].ending_balance;
 });
 
 const balanceChangePercent = computed(() => {
-  if (!props.projections || !props.props.projections && props.projections.monthly_totals || !props.props.projections && props.projections.starting_balance) {
-    return 0;
-  }
+  if (startingBalance.value === 0) return 0;
 
-  const startingBalance = props.props.projections && props.projections.starting_balance;
-  if (startingBalance === 0) return 0;
-
-  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
-  if (months.length === 0) return 0;
-
-  const lastMonth = months[months.length - 1];
-  const lastEndingBalance = props.props.projections && props.projections.monthly_totals[lastMonth].ending_balance;
-
-  const change = lastEndingBalance - startingBalance;
-
-  return (change / Math.abs(startingBalance)) * 100;
+  return ((expectedEndingBalance.value - startingBalance.value) / Math.abs(startingBalance.value)) * 100;
 });
 
 // Format helpers
@@ -341,7 +305,9 @@ const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
 
   try {
-    const date = new Date(dateString);
+    // Parse YYYY-MM-DD as a local date so it isn't shifted by the UTC offset.
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
@@ -353,40 +319,26 @@ const formatDate = (dateString) => {
 };
 
 const getEndDate = () => {
-  if (!props.projections || !props.props.projections && props.projections.monthly_totals || !props.params || !props.params.start_date) {
+  if (!props.params?.start_date) {
     return 'N/A';
   }
 
-  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
-  if (months.length === 0) return 'N/A';
-
-  try {
-    const date = new Date(props.params.start_date);
-    date.setMonth(date.getMonth() + parseInt(props.params.months || 0));
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  } catch (e) {
-    return 'N/A';
-  }
+  const [year, month, day] = props.params.start_date.split('-').map(Number);
+  const date = new Date(year, month - 1 + parseInt(props.params.months || 0), day);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 };
 
 // Get the previous month's net amount for comparison
 const getPreviousMonthNet = (currentMonth) => {
-  if (!props.projections || !props.props.projections && props.projections.monthly_totals || !currentMonth) {
-    return 0;
-  }
-
-  const months = Object.keys(props.props.projections && props.projections.monthly_totals);
+  const months = Object.keys(monthlyTotals.value);
   const currentIndex = months.indexOf(currentMonth);
   if (currentIndex <= 0) return 0;
 
-  const previousMonth = months[currentIndex - 1];
-  if (!props.props.projections && props.projections.monthly_totals[previousMonth]) return 0;
-
-  return props.props.projections && props.projections.monthly_totals[previousMonth].net;
+  return monthlyTotals.value[months[currentIndex - 1]]?.net ?? 0;
 };
 
 // Generate text for net change percentage
@@ -409,7 +361,6 @@ const getNetChangeText = (currentNet, previousNet) => {
 const updateProjections = () => {
   processing.value = true;
   router.get(route('budget.projections', props.budget.id), {
-    start_date: form.value.start_date,
     months: form.value.months,
   }, {
     onFinish: () => {

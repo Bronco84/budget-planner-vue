@@ -30,10 +30,11 @@ steps:
 postconditions:
   - nothing is persisted
 business_rules:
-  - historical balance at date = current balance minus the sum of the account's transactions after that date
+  - historical balance at date = current balance minus the sum of the account's transactions after that date for assets; plus that sum for liabilities (positive debt, negative purchases)
   - net worth = assets minus abs(liability balances); sampling interval is 1, 3, 7, 15 or 30 days depending on range length
   - savings rate = avg net cash flow / avg income x 100, 0 when there is no income
-  - income vs expenses uses only active templates (started, not ended) and normalises frequencies to monthly (weekly x4.33, biweekly x2.17, bimonthly x2, quarterly /3, yearly /12, daily x30.44)
+  - budget performance allocation = category monthly amount x months in the range, where each partial calendar month counts as days covered / days in that month
+  - income vs expenses values each template at its projected amount (RecurringTransactionService::projectedAmount, so dynamic templates use their calculated amount), uses only active templates (started, not ended) and normalises frequencies to monthly (weekly x4.33, biweekly x2.17, bimonthly x2, quarterly /3, yearly /12, daily x30.44)
   - requires budget view ability
 scenarios:
   - id: dashboard_renders
@@ -43,7 +44,30 @@ scenarios:
   - id: account_filter
     kind: alternate
     description: Selecting an account limits net worth, cash flow, performance and spending data to that account.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Reports/ReportsNetWorthQueryTest.php::net worth filtered to one account matches the pinned values
+    note: only the net worth series is asserted for the filtered account.
+  - id: net_worth_series
+    kind: happy_path
+    description: The net worth series (assets, liabilities, net worth per data point and summary) rolls each account's current balance back by later transactions, computed from one grouped per-account-per-day query rather than one SUM per account per data point.
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsNetWorthQueryTest.php::net worth series for all accounts matches the pinned values
+      - tests/Feature/Reports/ReportsNetWorthQueryTest.php::net worth balances are computed with one grouped query instead of one sum per account per data point
+  - id: liability_history_direction
+    kind: edge
+    description: Historical credit card balances roll back opposite to assets (a purchase after the date means the debt was lower then).
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsCalculationsTest.php::historical net worth rolls liability balances back in the opposite direction to assets
+  - id: budget_performance_prorated
+    kind: edge
+    description: Category allocations are prorated over the selected range (full and partial months) before comparing with spending.
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsCalculationsTest.php::budget performance prorates the monthly category allocation over the selected range
+      - tests/Feature/Reports/ReportsCalculationsTest.php::budget performance prorates partial months by the days covered
   - id: foreign_account_filter_ignored
     kind: edge
     description: An account_id from another budget is ignored and all accounts are shown.
@@ -59,9 +83,10 @@ scenarios:
     coverage: uncovered
   - id: dynamic_templates_in_income_vs_expenses
     kind: edge
-    description: Dynamic-amount templates should appear in income vs expenses.
-    coverage: uncovered
-    note: dynamic templates store amount_in_cents 0 and are filtered out by the > 0 / < 0 conditions (see known_issues).
+    description: Dynamic-amount templates appear in income vs expenses at the same calculated amount projections use.
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsCalculationsTest.php::income vs expenses includes dynamic-amount templates at their projected amount
   - id: zero_starting_net_worth
     kind: edge
     description: A starting net worth of 0 yields changePercent 0 instead of division by zero.
@@ -81,11 +106,7 @@ scenarios:
     kind: authorization
     description: Another user cannot open reports for a budget they do not own (403).
     coverage: uncovered
-known_issues:
-  - Dynamic-amount recurring templates (amount_in_cents 0) are excluded from income vs expenses totals.
-  - calculateBalanceAtDate subtracts later transaction sums the same way for liabilities and assets; with positive-debt liability balances and negative purchase amounts, historical credit card balances move in the wrong direction.
-  - Net worth issues one SUM query per account per data point (e.g. 'all' range over many years x accounts), which is slow.
-  - Budget performance compares category amount x 100 against all spending in the selected range regardless of range length (allocation is not prorated).
+known_issues: []
 confidence: medium
 evidence:
   - app/Http/Controllers/ReportsController.php

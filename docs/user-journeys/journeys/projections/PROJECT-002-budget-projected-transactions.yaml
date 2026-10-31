@@ -5,10 +5,10 @@ domain: projections
 status: implemented
 priority: low
 summary: >
-  The budget projections page is meant to list every projected recurring transaction
-  across all accounts for the next N months (default 6, max 24) with starting balance,
-  monthly totals and a per-month breakdown. In the current implementation the controller
-  and the page disagree on the data shape, so the page always renders its empty state.
+  The budget projections page lists every projected recurring transaction across the
+  budget's accounts for the next N months (default 6, max 24), with the starting net
+  worth, per-month income/expense/net/ending balance totals and a per-month, per-day
+  breakdown with running balances.
 actors:
   - authenticated budget owner
 preconditions:
@@ -21,42 +21,48 @@ depends_on:
 integrations: []
 steps:
   - action: open budget/{budget}/projections?months=N
-    expected: Budgets/Projections rendered with projections and params.months
+    expected: Budgets/Projections rendered by ProjectionsController::showBudgetProjections with projections {starting_balance, monthly_totals, transactions} and params {months, start_date}
   - action: change the months filter on the page
     expected: page reloads via router.get with the new months value
 postconditions:
   - nothing is persisted
 business_rules:
-  - months must be an integer 1-24 (default 6)
+  - months must be an integer 1-24 (default 6); projections always start today
   - only recurring template projections are included (no manual future transactions or autopay)
-  - requires budget view ability
+  - accounts with exclude_from_total_balance are left out entirely
+  - starting_balance is the net worth of the included accounts (liability balances count negative); every projected amount moves the running balance by its signed amount
+  - monthly_totals and transactions are keyed by "F Y" month labels; transactions are further keyed by a non-numeric "D j" day label so JSON keeps date order
+  - requires budget view ability (can:view,budget middleware)
 scenarios:
   - id: projections_listed
     kind: happy_path
     description: Owner sees projected transactions grouped by month with income, expense and ending balance totals.
-    coverage: uncovered
-    note: currently broken; see known_issues.
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/BudgetProjectionTest.php::owner sees projected transactions grouped by month with totals and running balances
+      - tests/Feature/Projections/BudgetProjectionTest.php::budget projections default to six months
   - id: months_validation
     kind: validation
     description: months outside 1-24 fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/BudgetProjectionTest.php::budget projections reject months outside 1-24
   - id: no_templates
     kind: empty_state
     description: A budget with no templates shows "no projections".
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/BudgetProjectionTest.php::a budget with no templates has no projected transactions
   - id: cross_user_forbidden
     kind: authorization
     description: Another user cannot view projections for a budget they do not own (403).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/BudgetProjectionTest.php::another user cannot view projections for a budget they do not own
 known_issues:
-  - BudgetController::projections passes a flat list of projected transactions, but Budgets/Projections.vue expects an object with starting_balance, monthly_totals and transactions keyed by month, so the page always shows the empty state.
-  - Budgets/Projections.vue computed totals reference props.props.projections (typo), which throws a TypeError whenever projections is truthy.
-  - The page reads params.start_date, which the controller never sends.
-  - ProjectionsController::showBudgetProjections builds the month-grouped shape but no route points to it; it appears to be the intended implementation.
   - No page outside Budgets/Projections.vue links to budget.projections, so the feature is effectively unreachable.
 confidence: high
 evidence:
-  - app/Http/Controllers/BudgetController.php projections
-  - app/Http/Controllers/ProjectionsController.php showBudgetProjections (unrouted)
+  - app/Http/Controllers/ProjectionsController.php showBudgetProjections
   - resources/js/Pages/Budgets/Projections.vue props and computed totals
 last_verified: null

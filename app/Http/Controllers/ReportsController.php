@@ -6,6 +6,8 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PayoffPlanDebt;
 use App\Models\RecurringTransactionTemplate;
+use App\Models\Transaction;
+use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -112,8 +114,10 @@ class ReportsController extends Controller
     {
         // If a specific account is selected, only use that account
         $accounts = $selectedAccount
-            ? collect([$selectedAccount->load('transactions')])
-            : $budget->accounts()->with('transactions')->get();
+            ? collect([$selectedAccount])
+            : $budget->accounts()->get();
+
+        $dailyTotals = $this->getDailyTransactionTotals($accounts->pluck('id')->all());
 
         // Calculate net worth at various points in time
         $dataPoints = [];
@@ -134,7 +138,11 @@ class ReportsController extends Controller
             $liabilities = 0;
 
             foreach ($accounts as $account) {
-                $balance = $this->calculateBalanceAtDate($account, $currentDate);
+                $balance = $this->calculateBalanceAtDate(
+                    $account,
+                    $currentDate,
+                    $this->sumDailyTotalsAfter($dailyTotals[$account->id] ?? [], $currentDate),
+                );
 
                 if ($account->isLiability()) {
                     $liabilities += abs($balance);
@@ -159,7 +167,11 @@ class ReportsController extends Controller
             $liabilities = 0;
 
             foreach ($accounts as $account) {
-                $balance = $this->calculateBalanceAtDate($account, $endDate);
+                $balance = $this->calculateBalanceAtDate(
+                    $account,
+                    $endDate,
+                    $this->sumDailyTotalsAfter($dailyTotals[$account->id] ?? [], $endDate),
+                );
 
                 if ($account->isLiability()) {
                     $liabilities += abs($balance);
@@ -192,20 +204,70 @@ class ReportsController extends Controller
     }
 
     /**
-     * Calculate account balance at a specific date
+     * Transaction totals per account per stored date, in one grouped query:
+     * [account_id => [raw date => sum of amount_in_cents]]. Used by the net
+     * worth series instead of one SUM query per account per data point.
      */
-    private function calculateBalanceAtDate($account, Carbon $date): int
+    private function getDailyTransactionTotals(array $accountIds): array
+    {
+        if ($accountIds === []) {
+            return [];
+        }
+
+        $totals = [];
+
+        Transaction::query()
+            ->whereIn('account_id', $accountIds)
+            ->whereNotNull('date')
+            ->groupBy('account_id', 'date')
+            ->selectRaw('account_id, date, SUM(amount_in_cents) as total')
+            ->toBase()
+            ->get()
+            ->each(function ($row) use (&$totals) {
+                $totals[$row->account_id][(string) $row->date] = (int) $row->total;
+            });
+
+        return $totals;
+    }
+
+    /**
+     * Sum of the daily totals strictly after $date. Compares the raw stored
+     * date string with 'Y-m-d' exactly as the SQL `date > ?` filter in
+     * calculateBalanceAtDate does.
+     */
+    private function sumDailyTotalsAfter(array $dailyTotals, Carbon $date): int
+    {
+        $target = $date->format('Y-m-d');
+        $sum = 0;
+
+        foreach ($dailyTotals as $day => $total) {
+            if (strcmp((string) $day, $target) > 0) {
+                $sum += $total;
+            }
+        }
+
+        return $sum;
+    }
+
+    /**
+     * Calculate account balance at a specific date. $transactionsAfterDate may
+     * be supplied precomputed (see getDailyTransactionTotals) to skip the query.
+     */
+    private function calculateBalanceAtDate($account, Carbon $date, ?int $transactionsAfterDate = null): int
     {
         // Get current balance
         $currentBalance = $account->current_balance_cents;
 
         // Get all transactions after the target date
-        $transactionsAfterDate = $account->transactions()
+        $transactionsAfterDate ??= (int) $account->transactions()
             ->where('date', '>', $date->format('Y-m-d'))
             ->sum('amount_in_cents');
 
-        // Subtract future transactions from current balance
-        return $currentBalance - $transactionsAfterDate;
+        // Undo later transactions. Liability balances are positive debt and purchases are
+        // negative amounts, so undoing them moves the balance the opposite way to assets.
+        return $account->isLiability()
+            ? $currentBalance + $transactionsAfterDate
+            : $currentBalance - $transactionsAfterDate;
     }
 
     /**
@@ -285,11 +347,13 @@ class ReportsController extends Controller
         $transactions = $transactionsQuery->get();
 
         $categoryPerformance = [];
+        $monthsInRange = $this->monthsInRange($startDate, $endDate);
 
         foreach ($categories as $category) {
             $categoryTransactions = $transactions->where('category', $category->name);
             $spent = abs($categoryTransactions->where('amount_in_cents', '<', 0)->sum('amount_in_cents'));
-            $allocated = $category->amount * 100; // Convert to cents
+            // Category amounts are monthly dollars; prorate them over the selected range.
+            $allocated = (int) round($category->amount * 100 * $monthsInRange);
 
             $categoryPerformance[] = [
                 'category' => $category->name,
@@ -314,6 +378,27 @@ class ReportsController extends Controller
                 'categoriesOverBudget' => collect($categoryPerformance)->where('isOverBudget', true)->count(),
             ],
         ];
+    }
+
+    /**
+     * Number of months covered by an inclusive date range, counting each partial
+     * calendar month as the fraction of its days that fall inside the range.
+     */
+    private function monthsInRange(Carbon $startDate, Carbon $endDate): float
+    {
+        $start = $startDate->copy()->startOfDay();
+        $end = $endDate->copy()->startOfDay();
+        $months = 0.0;
+        $cursor = $start->copy();
+
+        while ($cursor->lte($end)) {
+            $monthEnd = $cursor->copy()->endOfMonth()->startOfDay();
+            $segmentEnd = $monthEnd->lt($end) ? $monthEnd : $end;
+            $months += ((int) $cursor->diffInDays($segmentEnd) + 1) / $cursor->daysInMonth;
+            $cursor = $monthEnd->addDay();
+        }
+
+        return $months;
     }
 
     /**
@@ -453,43 +538,30 @@ class ReportsController extends Controller
         // Get all accounts for the filter dropdown
         $accounts = $budget->accounts()->select('id', 'name')->get();
 
-        // Get recurring income (positive amounts)
-        $incomeTemplates = $budget->recurringTransactionTemplates()
+        // Value each active template at the amount projections use, so dynamic-amount
+        // templates (stored as 0) are included at their calculated amount.
+        $recurringTransactionService = app(RecurringTransactionService::class);
+        $templates = $budget->recurringTransactionTemplates()
             ->active()
-            ->where('amount_in_cents', '>', 0)
-            ->with('account')
+            ->with(['account', 'transactions', 'linkedCreditCard.plaidAccount', 'rules'])
             ->get()
-            ->map(function ($template) {
+            ->map(function ($template) use ($recurringTransactionService) {
+                $amount = $recurringTransactionService->projectedAmount($template);
+
                 return [
                     'id' => $template->id,
                     'account_id' => $template->account_id,
                     'description' => $template->friendly_label ?: $template->description,
-                    'amount_in_cents' => $template->amount_in_cents,
+                    'amount_in_cents' => $amount,
                     'frequency' => $template->frequency,
-                    'monthly_amount' => $this->calculateMonthlyAmountForTemplate($template),
+                    'monthly_amount' => $this->calculateMonthlyAmountForTemplate($template, $amount),
                     'account_name' => $template->account?->name,
                     'category' => $template->category,
                 ];
             });
 
-        // Get recurring expenses (negative amounts)
-        $expenseTemplates = $budget->recurringTransactionTemplates()
-            ->active()
-            ->where('amount_in_cents', '<', 0)
-            ->with('account')
-            ->get()
-            ->map(function ($template) {
-                return [
-                    'id' => $template->id,
-                    'account_id' => $template->account_id,
-                    'description' => $template->friendly_label ?: $template->description,
-                    'amount_in_cents' => $template->amount_in_cents,
-                    'frequency' => $template->frequency,
-                    'monthly_amount' => $this->calculateMonthlyAmountForTemplate($template),
-                    'account_name' => $template->account?->name,
-                    'category' => $template->category,
-                ];
-            });
+        $incomeTemplates = $templates->filter(fn ($item) => $item['amount_in_cents'] > 0)->values();
+        $expenseTemplates = $templates->filter(fn ($item) => $item['amount_in_cents'] < 0)->values();
 
         // Get credit cards with autopay enabled
         $autopayAccounts = $budget->accounts()
@@ -532,9 +604,8 @@ class ReportsController extends Controller
     /**
      * Calculate monthly amount for a recurring transaction template
      */
-    private function calculateMonthlyAmountForTemplate(RecurringTransactionTemplate $template): int
+    private function calculateMonthlyAmountForTemplate(RecurringTransactionTemplate $template, int $amount): int
     {
-        $amount = $template->amount_in_cents;
 
         return match ($template->frequency) {
             RecurringTransactionTemplate::FREQUENCY_DAILY => (int) round($amount * 30.44),

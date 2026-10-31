@@ -31,7 +31,7 @@
             "disable_autopay": "covered",
             "ineligible_account_rejected": "covered",
             "invalid_source_rejected": "covered",
-            "source_from_other_budget_rejected": "uncovered",
+            "source_from_other_budget_rejected": "covered",
             "other_users_account_forbidden": "partial"
         },
         "ADMIN-001": {
@@ -99,7 +99,9 @@
             "fingerprint_mismatch_ignored": "covered",
             "json_login_device_matches_page_loads": "covered",
             "auto_login_records_authentication_time": "covered",
-            "unknown_or_tampered_cookie_ignored": "uncovered",
+            "unknown_or_tampered_cookie_ignored": "covered",
+            "device_found_by_indexed_token_hash": "covered",
+            "legacy_device_without_hash_still_verifies": "covered",
             "revoked_device_no_longer_logs_in": "uncovered",
             "login_options_stay_json_when_auto_logged_in": "covered"
         },
@@ -272,14 +274,14 @@
         },
         "CHAT-002": {
             "clean_message_allowed": "partial",
-            "injection_blocked": "uncovered",
+            "injection_blocked": "covered",
             "abusive_logged_and_allowed": "uncovered",
-            "hourly_limit_exceeded": "partial",
+            "hourly_limit_exceeded": "covered",
             "limit_retries_not_offenses": "covered",
             "rapid_conversation_creation": "covered",
             "route_throttle": "uncovered",
             "auto_ban_after_offenses": "uncovered",
-            "banned_user_refused": "uncovered",
+            "banned_user_refused": "covered",
             "stream_refusal_visible": "uncovered",
             "blocked_foreign_conversation": "covered"
         },
@@ -298,7 +300,7 @@
             "download_and_delete": "covered",
             "duplicate_content_reused": "covered",
             "cross_user_duplicate_content_isolated": "covered",
-            "invalid_file_rejected": "partial",
+            "invalid_file_rejected": "covered",
             "s3_failure_returns_error": "covered",
             "delete_failure_returns_generic_error": "covered",
             "other_users_transaction_files_forbidden": "uncovered"
@@ -399,6 +401,7 @@
             "cross_user_denied": "covered"
         },
         "PLAID-005": {
+            "reauth_prompt_on_error": "partial",
             "upgrade_token_issued": "uncovered",
             "connection_updated": "uncovered",
             "upgrade_token_not_linked": "uncovered",
@@ -451,9 +454,10 @@
             "authorization": "not_applicable"
         },
         "PREF-001": {
-            "save_order": "uncovered",
+            "save_order": "covered",
             "saved_order_returned": "uncovered",
             "unknown_type_rejected": "covered",
+            "custom_account_types_accepted": "covered",
             "generic_preference_round_trip": "covered",
             "generic_endpoint_whitelist": "covered",
             "failed_save_reverts_ui": "uncovered",
@@ -483,10 +487,12 @@
             "stale_session_rejected": "covered",
             "login_paths_record_authentication_time": "partial",
             "related_data_cleanup": "covered",
+            "device_cookie_cleared": "covered",
             "guest_cannot_delete": "covered"
         },
         "PROJECT-001": {
             "balance_projection_renders": "partial",
+            "series_starts_today": "covered",
             "liability_direction": "covered",
             "month_end_clamping": "covered",
             "no_templates_flat_line": "covered",
@@ -496,10 +502,10 @@
             "cross_user_forbidden": "covered"
         },
         "PROJECT-002": {
-            "projections_listed": "uncovered",
-            "months_validation": "uncovered",
-            "no_templates": "uncovered",
-            "cross_user_forbidden": "uncovered"
+            "projections_listed": "covered",
+            "months_validation": "covered",
+            "no_templates": "covered",
+            "cross_user_forbidden": "covered"
         },
         "PROPERTY-001": {
             "index_lists_properties": "uncovered",
@@ -511,6 +517,7 @@
         },
         "PROPERTY-002": {
             "update_property": "covered",
+            "value_timestamp_only_on_change": "covered",
             "delete_property_unlinks_accounts": "covered",
             "invalid_update_rejected": "covered",
             "show_redirects_to_edit": "covered",
@@ -593,11 +600,14 @@
         },
         "REPORT-001": {
             "dashboard_renders": "uncovered",
-            "account_filter": "uncovered",
+            "account_filter": "partial",
+            "net_worth_series": "covered",
+            "liability_history_direction": "covered",
+            "budget_performance_prorated": "covered",
             "foreign_account_filter_ignored": "uncovered",
             "active_templates_only": "uncovered",
             "monthly_normalisation": "uncovered",
-            "dynamic_templates_in_income_vs_expenses": "uncovered",
+            "dynamic_templates_in_income_vs_expenses": "covered",
             "zero_starting_net_worth": "uncovered",
             "empty_budget": "uncovered",
             "invalid_custom_range": "covered",
@@ -606,8 +616,9 @@
         "REPORT-002": {
             "monthly_page_renders": "covered",
             "yearly_page_renders": "covered",
+            "yearly_totals_by_month": "covered",
             "month_without_transactions": "covered",
-            "invalid_month_or_year": "uncovered",
+            "invalid_month_or_year": "covered",
             "cross_user_forbidden": "covered"
         },
         "SCENARIO-001": {
@@ -616,7 +627,8 @@
             "toggle_scenario": "covered",
             "one_time_adjustment_math": "covered",
             "recurring_adjustment_math": "covered",
-            "scenario_changes_balance": "uncovered",
+            "scenario_changes_balance": "covered",
+            "base_projection_reused_across_scenarios": "covered",
             "month_end_adjustment_day": "covered",
             "projection_page_does_not_log_autopay": "covered",
             "no_scenarios": "uncovered",

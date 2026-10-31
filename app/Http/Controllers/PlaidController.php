@@ -112,6 +112,8 @@ class PlaidController extends Controller
             $connection = $plaidAccount->plaidConnection;
             $connectionMetadata = [
                 'status' => $connection->status,
+                // 'error' is set when Plaid reports ITEM_LOGIN_REQUIRED (see PlaidService::flagLoginRequired)
+                'needs_reauth' => $connection->status === PlaidConnection::STATUS_ERROR,
                 'plaid_item_id' => $connection->plaid_item_id,
                 'institution_id' => $connection->institution_id,
                 'institution_name' => $connection->institution_name,

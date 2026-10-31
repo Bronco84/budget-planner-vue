@@ -140,6 +140,7 @@ import { router } from '@inertiajs/vue3'
 import Modal from '@/Components/Modal.vue'
 import SecondaryButton from '@/Components/SecondaryButton.vue'
 import DangerButton from '@/Components/DangerButton.vue'
+import { apiFetch } from '@/utils/http.js'
 
 const props = defineProps({
     attachments: {
@@ -209,12 +210,8 @@ const deleteFile = async () => {
     error.value = ''
     
     try {
-        const response = await fetch(`/files/${fileToDelete.value.id}`, {
+        const response = await apiFetch(`/files/${fileToDelete.value.id}`, {
             method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Accept': 'application/json'
-            }
         })
         
         if (!response.ok) {

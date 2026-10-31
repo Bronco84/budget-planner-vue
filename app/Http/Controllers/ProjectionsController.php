@@ -34,73 +34,72 @@ class ProjectionsController extends Controller
     }
 
     /**
-     * Show the budget projections page.
-     *
-     * @return Response
+     * Show the budget projections page: every projected recurring transaction across
+     * the budget's accounts (excluding accounts left out of the total balance) for the
+     * next N months, grouped by month and day with running net-worth balances.
      */
-    public function showBudgetProjections(Budget $budget, Request $request)
+    public function showBudgetProjections(Budget $budget, Request $request): Response
     {
         $validated = $request->validate([
-            'months' => 'nullable|integer|min:1|max:60',
+            'months' => 'nullable|integer|min:1|max:24',
         ]);
-        $monthsAhead = (int) ($validated['months'] ?? 3);
+        $monthsAhead = (int) ($validated['months'] ?? 6);
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
 
-        // Get all accounts for this budget
-        $accounts = $budget->accounts;
-        $projectedTransactions = collect();
+        $accounts = $budget->accounts->reject(fn (Account $account) => $account->exclude_from_total_balance);
 
-        // Project transactions for each account
-        foreach ($accounts as $account) {
-            $accountProjections = $this->recurringTransactionService->projectTransactions(
-                $account,
-                $startDate,
-                $endDate
-            );
+        // Net worth of the included accounts: liabilities (positive debt) count negative.
+        $startingBalance = (int) $accounts->sum(fn (Account $account) => $account->isLiability()
+            ? -abs($account->current_balance_cents)
+            : $account->current_balance_cents);
 
-            $projectedTransactions = $projectedTransactions->merge($accountProjections);
+        $projected = $accounts->flatMap(fn (Account $account) => $this->recurringTransactionService
+            ->projectTransactions($account, $startDate, $endDate)
+            ->map(fn (array $transaction) => array_merge($transaction, [
+                'account' => ['id' => $account->id, 'name' => $account->name],
+            ])))
+            ->sortBy(fn (array $transaction) => Carbon::parse($transaction['date'])->format('Y-m-d'))
+            ->values();
 
-            // Add future manual transactions for this account
-            $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
-            $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
-        }
+        // Every transaction amount moves net worth by its signed amount: deposits and
+        // card payments raise it, spending and card purchases lower it.
+        $runningBalance = $startingBalance;
+        $monthlyTotals = [];
+        $transactionsByMonth = [];
 
-        // Group by month
-        $projectionsByMonth = collect();
-        foreach ($projectedTransactions as $transaction) {
+        foreach ($projected as $transaction) {
             $date = Carbon::parse($transaction['date']);
-            $monthKey = $date->format('Y-m');
+            $monthKey = $date->format('F Y');
+            $amount = (int) $transaction['amount_in_cents'];
+            $runningBalance += $amount;
 
-            if (! $projectionsByMonth->has($monthKey)) {
-                $projectionsByMonth->put($monthKey, [
-                    'month' => $date->format('F Y'),
-                    'month_key' => $monthKey,
-                    'transactions' => collect(),
-                    'income' => 0,
-                    'expenses' => 0,
-                    'net' => 0,
-                ]);
-            }
-
-            $monthData = $projectionsByMonth->get($monthKey);
-            $monthData['transactions']->push($transaction);
-
-            // Update totals
-            if ($transaction['amount_in_cents'] > 0) {
-                $monthData['income'] += $transaction['amount_in_cents'];
+            $monthlyTotals[$monthKey] ??= ['income' => 0, 'expense' => 0, 'net' => 0, 'ending_balance' => 0];
+            if ($amount > 0) {
+                $monthlyTotals[$monthKey]['income'] += $amount;
             } else {
-                $monthData['expenses'] += abs($transaction['amount_in_cents']);
+                $monthlyTotals[$monthKey]['expense'] += abs($amount);
             }
-            $monthData['net'] += $transaction['amount_in_cents'];
+            $monthlyTotals[$monthKey]['net'] += $amount;
+            $monthlyTotals[$monthKey]['ending_balance'] = $runningBalance;
 
-            $projectionsByMonth->put($monthKey, $monthData);
+            $transactionsByMonth[$monthKey][$date->format('D j')][] = array_merge($transaction, [
+                'date' => $date->format('Y-m-d'),
+                'running_balance' => $runningBalance,
+            ]);
         }
 
         return Inertia::render('Budgets/Projections', [
             'budget' => $budget,
-            'projections' => $projectionsByMonth->values(),
-            'monthsAhead' => $monthsAhead,
+            'projections' => [
+                'starting_balance' => $startingBalance,
+                'monthly_totals' => $monthlyTotals,
+                'transactions' => $transactionsByMonth,
+            ],
+            'params' => [
+                'months' => $monthsAhead,
+                'start_date' => $startDate->format('Y-m-d'),
+            ],
         ]);
     }
 
@@ -187,7 +186,8 @@ class ProjectionsController extends Controller
      */
     protected function projectDailyBalance($projectedTransactions, $initialBalance, $startDate, $monthsAhead, bool $isLiability = false)
     {
-        $endDate = $startDate->copy()->addMonths($monthsAhead);
+        $today = $startDate->copy()->startOfDay();
+        $endDate = $today->copy()->addMonths($monthsAhead);
         $weeklyProjection = [];
         $runningBalance = $initialBalance;
 
@@ -196,56 +196,47 @@ class ProjectionsController extends Controller
             return Carbon::parse($transaction['date'])->format('Y-m-d');
         });
 
-        // Generate weekly data points
-        $currentDate = $startDate->copy()->startOfWeek(); // Start at beginning of week
+        // The series starts with a point for today, then one point per week ending on the
+        // week's last day (the first week covers only tomorrow onwards, never days before
+        // today). The final week may extend past $endDate but only applies transactions up to it.
+        $weekEndDay = $today->copy()->startOfWeek()->addDays(6)->dayOfWeek;
+        $lastDay = $endDate->copy();
+        while ($lastDay->dayOfWeek !== $weekEndDay) {
+            $lastDay->addDay();
+        }
 
-        while ($currentDate->lte($endDate)) {
-            $weekIncome = 0;
-            $weekExpense = 0;
+        $income = 0;
+        $expense = 0;
 
-            // Process all transactions for the next 7 days
-            $weekStart = $currentDate->copy();
-            $weekEnd = $currentDate->copy()->addDays(6);
+        for ($day = $today->copy(); $day->lte($lastDay); $day->addDay()) {
+            $dateKey = $day->format('Y-m-d');
 
-            $processDate = $weekStart->copy();
-            while ($processDate->lte($weekEnd) && $processDate->lte($endDate)) {
-                $dateKey = $processDate->format('Y-m-d');
+            if ($day->lte($endDate) && $transactionsByDate->has($dateKey)) {
+                foreach ($transactionsByDate->get($dateKey) as $transaction) {
+                    $amount = $transaction['amount_in_cents'];
 
-                // Apply any transactions for this date
-                if ($transactionsByDate->has($dateKey)) {
-                    foreach ($transactionsByDate->get($dateKey) as $transaction) {
-                        $amount = $transaction['amount_in_cents'];
+                    // For liabilities, subtract (spending increases debt, payments decrease debt)
+                    // For assets, add (spending decreases balance, deposits increase balance)
+                    $runningBalance += $isLiability ? -$amount : $amount;
 
-                        // For liabilities, subtract (spending increases debt, payments decrease debt)
-                        // For assets, add (spending decreases balance, deposits increase balance)
-                        if ($isLiability) {
-                            $runningBalance -= $amount;
-                        } else {
-                            $runningBalance += $amount;
-                        }
-
-                        // Track income and expenses separately
-                        if ($amount > 0) {
-                            $weekIncome += $amount;
-                        } else {
-                            $weekExpense += abs($amount);
-                        }
+                    if ($amount > 0) {
+                        $income += $amount;
+                    } else {
+                        $expense += abs($amount);
                     }
                 }
-
-                $processDate->addDay();
             }
 
-            // Add weekly data point (use end of week as the date)
-            $weeklyProjection[] = [
-                'date' => $weekEnd->format('Y-m-d'),
-                'balance' => $runningBalance,
-                'income' => $weekIncome,
-                'expense' => $weekExpense,
-            ];
-
-            // Move to next week
-            $currentDate->addWeek();
+            if ($day->equalTo($today) || $day->dayOfWeek === $weekEndDay) {
+                $weeklyProjection[] = [
+                    'date' => $dateKey,
+                    'balance' => $runningBalance,
+                    'income' => $income,
+                    'expense' => $expense,
+                ];
+                $income = 0;
+                $expense = 0;
+            }
         }
 
         // Wrap the weekly projection data in an object with a 'days' property to match frontend expectations
@@ -263,8 +254,6 @@ class ProjectionsController extends Controller
             'months' => 'nullable|integer|min:1|max:60',
         ]);
         $monthsAhead = (int) ($validated['months'] ?? 12);
-        $scenario = $request->input('scenario', 'default');
-        $groupBy = $request->input('groupBy', 'day');
 
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addMonths($monthsAhead)->endOfDay();
@@ -382,27 +371,13 @@ class ProjectionsController extends Controller
         // Group autopay projections by account
         $autopayByAccount = $autopayProjections->groupBy('account_id');
 
-        // Calculate base projections for each account
+        // Calculate base projections for each account. The base projected
+        // transactions are built once per account and reused for every scenario.
         $baseProjections = [];
+        $baseTransactionsByAccount = [];
         foreach ($accounts as $account) {
-            $projectedTransactions = $this->recurringTransactionService->projectTransactions(
-                $account,
-                $startDate,
-                $endDate
-            );
-
-            if (! $projectedTransactions instanceof Collection) {
-                $projectedTransactions = collect($projectedTransactions);
-            }
-
-            // Add autopay projections for this account
-            if ($autopayByAccount->has($account->id)) {
-                $projectedTransactions = $projectedTransactions->merge($autopayByAccount->get($account->id));
-            }
-
-            // Add future manual transactions for this account
-            $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
-            $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
+            $projectedTransactions = $this->buildBaseProjectedTransactions($account, $autopayByAccount, $startDate, $endDate);
+            $baseTransactionsByAccount[$account->id] = $projectedTransactions;
 
             $balanceProjection = $this->projectDailyBalance(
                 $projectedTransactions,
@@ -421,25 +396,8 @@ class ProjectionsController extends Controller
             $scenarioProjections[$scenario->id] = [];
 
             foreach ($accounts as $account) {
-                // Get base projected transactions
-                $projectedTransactions = $this->recurringTransactionService->projectTransactions(
-                    $account,
-                    $startDate,
-                    $endDate
-                );
-
-                if (! $projectedTransactions instanceof Collection) {
-                    $projectedTransactions = collect($projectedTransactions);
-                }
-
-                // Add autopay projections for this account
-                if ($autopayByAccount->has($account->id)) {
-                    $projectedTransactions = $projectedTransactions->merge($autopayByAccount->get($account->id));
-                }
-
-                // Add future manual transactions for this account
-                $futureManualTransactions = $this->getFutureManualTransactions($account, $startDate, $endDate);
-                $projectedTransactions = $projectedTransactions->merge($futureManualTransactions);
+                // Reuse the base projected transactions computed above
+                $projectedTransactions = $baseTransactionsByAccount[$account->id];
 
                 // Apply scenario adjustments
                 $adjustedTransactions = $this->applyScenarioAdjustments(
@@ -473,6 +431,31 @@ class ProjectionsController extends Controller
             'monthsAhead' => $monthsAhead,
             'breadcrumbs' => \Breadcrumbs::generate('budget.projections.multi-account', $budget),
         ]);
+    }
+
+    /**
+     * Base projected transactions for an account: recurring projections, plus
+     * the account's autopay projections, plus future manual transactions.
+     */
+    private function buildBaseProjectedTransactions(Account $account, Collection $autopayByAccount, Carbon $startDate, Carbon $endDate): Collection
+    {
+        $projectedTransactions = $this->recurringTransactionService->projectTransactions(
+            $account,
+            $startDate,
+            $endDate
+        );
+
+        if (! $projectedTransactions instanceof Collection) {
+            $projectedTransactions = collect($projectedTransactions);
+        }
+
+        // Add autopay projections for this account
+        if ($autopayByAccount->has($account->id)) {
+            $projectedTransactions = $projectedTransactions->merge($autopayByAccount->get($account->id));
+        }
+
+        // Add future manual transactions for this account
+        return $projectedTransactions->merge($this->getFutureManualTransactions($account, $startDate, $endDate));
     }
 
     /**

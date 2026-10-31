@@ -84,6 +84,8 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetLifecycleTest.php::a users first budget becomes their active budget
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::a users first budget is stored as their active budget preference
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::creating another budget without a stored preference does not store the new budget as active
       - tests/Feature/Budgets/BudgetLifecycleTest.php::creating another budget keeps the existing active budget
   - id: setup_other_users_budget_forbidden
     kind: authorization
@@ -97,8 +99,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetLifecycleTest.php::guest is redirected to login from the create budget form
-known_issues:
-  - "The 'set as active if user has no active budget' check runs after the budget is created; getActiveBudget() falls back to the first accessible budget, so it is never null at that point and setActiveBudget() is effectively dead code (the fallback still yields the right budget for a first-time user)."
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/BudgetController.php create/store/setup

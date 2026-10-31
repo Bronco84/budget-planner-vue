@@ -10,8 +10,9 @@ use Inertia\Testing\AssertableInertia;
 
 /*
  * PROJECT-001: account balance projection pages. Time is frozen on Wednesday
- * 2026-03-04, so the first weekly bucket runs Mon 03-02 .. Sun 03-08 and later
- * buckets end on Sundays (03-15, 03-22, ...).
+ * 2026-03-04, so the series starts with a point for today (03-04), the first
+ * weekly bucket covers Thu 03-05 .. Sun 03-08 and later buckets end on Sundays
+ * (03-15, 03-22, ...).
  */
 
 beforeEach(function () {
@@ -73,7 +74,8 @@ test('owner sees the weekly account projection rolled forward from the current b
             $props = $page->toArray()['props'];
             $balances = projectionBalancesByWeek($props['balanceProjection']['days']);
 
-            expect(array_key_first($balances))->toBe('2026-03-08')
+            expect(array_key_first($balances))->toBe('2026-03-04')
+                ->and($balances['2026-03-04'])->toBe(50000)    // today
                 ->and($balances['2026-03-08'])->toBe(50000)    // nothing before the 15th
                 ->and($balances['2026-03-15'])->toBe(150000)   // + paycheck
                 ->and($balances['2026-03-22'])->toBe(130000)   // - concert tickets
@@ -82,6 +84,32 @@ test('owner sees the weekly account projection rolled forward from the current b
 
             $descriptions = collect($props['projectedTransactions'])->pluck('description')->all();
             expect($descriptions)->toBe(['Paycheck', 'Concert tickets', 'Paycheck', 'Paycheck']);
+        });
+});
+
+test('the projection series starts today and does not include days before today', function () {
+    $checking = Account::factory()->checking()->create([
+        'budget_id' => $this->budget->id,
+        'current_balance_cents' => 50000,
+    ]);
+    // Due today (Wednesday 03-04) and on 03-07 later this week.
+    projectionTemplate($checking, ['description' => 'Allowance', 'amount_in_cents' => 1000, 'day_of_month' => 4]);
+    projectionTemplate($checking, ['description' => 'Coffee', 'amount_in_cents' => -300, 'day_of_month' => 7]);
+
+    $this->actingAs($this->user)
+        ->get(route('budget.account.balance-projection', [$this->budget, $checking, 'months' => 1]))
+        ->assertOk()
+        ->assertInertia(function (AssertableInertia $page) {
+            $days = $page->toArray()['props']['balanceProjection']['days'];
+
+            expect($days[0])->toBe(['date' => '2026-03-04', 'balance' => 51000, 'income' => 1000, 'expense' => 0])
+                // The rest of this week (03-05 .. 03-08) holds only the 03-07 coffee.
+                ->and($days[1])->toBe(['date' => '2026-03-08', 'balance' => 50700, 'income' => 0, 'expense' => 300])
+                ->and(collect($days)->pluck('date')->min())->toBe('2026-03-04')
+                // Every amount is counted exactly once: +1000 x2 (03-04, 04-04) and -300 once (03-07).
+                ->and(end($days)['balance'])->toBe(50000 + 2000 - 300)
+                ->and(collect($days)->sum('income'))->toBe(2000)
+                ->and(collect($days)->sum('expense'))->toBe(300);
         });
 });
 

@@ -17,5 +17,9 @@ abstract class TestCase extends BaseTestCase
         // untestable. Disable it by default; passkey-specific tests that need the
         // enforcement can opt back in with $this->withMiddleware(...).
         $this->withoutMiddleware(EnsureUserHasPasskey::class);
+
+        // Rendering the Inertia root view resolves Vite assets; CI's backend job
+        // never builds them, so don't require public/build/manifest.json.
+        $this->withoutVite();
     }
 }

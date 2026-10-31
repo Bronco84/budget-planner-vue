@@ -43,6 +43,7 @@ business_rules:
   - expiry configurable via auth.magic_link_expiry_minutes (default 15)
   - magic-link sign-in does not create a TrustedDevice
   - raw token and URL are never logged
+  - a mail transport failure is caught and logged (Log::error) and the same neutral status is returned
 scenarios:
   - id: request_form_renders
     kind: happy_path
@@ -72,6 +73,12 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/MagicLinkTest.php::an unknown email gets the same response as a known one and no mail is sent'
+  - id: mail_failure_neutral
+    kind: recovery
+    description: If the mail transport throws, the error is logged and the guest still gets the same neutral status message (no 500, no account enumeration).
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::a mail transport failure still returns the neutral status and is logged'
   - id: request_throttled
     kind: edge
     description: More than 6 link requests per minute are throttled.
@@ -89,7 +96,7 @@ scenarios:
     description: Magic link routes are guest-only; an authenticated user is redirected to the dashboard.
     coverage: uncovered
 known_issues:
-  - a mail transport exception in MagicLinkController::store is an uncaught 500, and the mail is sent synchronously only for existing accounts, so errors and response timing can still hint whether an email is registered.
+  - the mail is sent synchronously only for existing accounts, so response timing can still hint whether an email is registered.
 confidence: high
 evidence:
   - routes/auth.php guest group

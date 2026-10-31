@@ -86,7 +86,10 @@ scenarios:
   - id: invalid_operator_rejected
     kind: validation
     description: Unknown field/operator values or an empty value fail validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleValidationTest.php::storing a rule with an unknown field or operator or an empty value is rejected
+      - tests/Feature/Recurring/RecurringRuleValidationTest.php::updating a rule with an unknown field or operator or an empty value is rejected
   - id: invalid_regex_rule
     kind: edge
     description: A regex rule with an invalid pattern should be rejected or handled without a server error.

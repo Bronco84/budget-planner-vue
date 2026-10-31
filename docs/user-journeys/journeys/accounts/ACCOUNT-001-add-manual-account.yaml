@@ -82,7 +82,6 @@ scenarios:
       - tests/Feature/Accounts/ManualAccountTest.php::user cannot add an account to another users budget
 known_issues:
   - "AccountController@create calls PlaidService::createLinkToken($budget) with the Budget model where a user id is expected; (string)$budget serialises the whole budget JSON into Plaid's client_user_id. BudgetController@setup passes Auth::id() correctly."
-  - "resources/js/Pages/Accounts/Create.vue also posts to budgets.accounts.store but is never rendered by any controller (orphan page)."
 confidence: high
 evidence:
   - app/Http/Controllers/AccountController.php create/store

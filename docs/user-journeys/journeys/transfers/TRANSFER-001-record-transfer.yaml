@@ -57,11 +57,15 @@ scenarios:
   - id: same_account_or_zero_rejected
     kind: validation
     description: Identical from/to accounts or an amount below 0.01 return validation errors.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferValidationTest.php::storing a transfer with identical accounts or an amount below one cent is rejected
   - id: foreign_accounts_rejected
     kind: authorization
     description: Account ids from another budget fail the scoped exists rule.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferValidationTest.php::storing a transfer with accounts from another budget is rejected
   - id: other_users_budget_forbidden
     kind: authorization
     description: Posting to another user's budget returns 403.

@@ -8,7 +8,7 @@ summary: >
   An authenticated user opens /profile and edits their name and email. Saving
   validates the input; changing the email clears email_verified_at. The profile
   page also hosts passkey and trusted-device management (AUTH-011, AUTH-012) and
-  a legacy password form.
+  account deletion (PROFILE-002).
 actors:
   - authenticated user
 preconditions:
@@ -48,13 +48,14 @@ scenarios:
   - id: invalid_or_taken_email_rejected
     kind: validation
     description: Missing name, malformed, uppercase or another user's email fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Profile/ProfileValidationTest.php::updating the profile with a missing name or invalid email is rejected
   - id: guest_cannot_view_or_update_profile
     kind: authentication
     description: Guests are redirected to login for GET and PATCH /profile.
     coverage: uncovered
 known_issues:
-  - "UpdatePasswordForm.vue is rendered on the profile page but submits to route('password.update'), which does not exist; submitting it throws a Ziggy error. Passwords are not used by this app."
   - Changing email sends no new verification email.
 confidence: high
 evidence:

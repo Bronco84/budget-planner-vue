@@ -57,6 +57,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php::index lists the budgets plans with the active plan first
+      - tests/playwright/smoke.spec.js::payoff plans index page loads
   - id: compare_strategies_math
     kind: alternate
     description: Strategy comparison puts avalanche total interest at or below snowball when the higher-rate debt is larger.

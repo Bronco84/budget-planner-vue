@@ -71,8 +71,10 @@ scenarios:
   - id: stale_token_rejected
     kind: validation
     description: A POST with a stale CSRF token is rejected with 419.
-    coverage: uncovered
-    note: Laravel disables CSRF verification while running unit tests, so this needs an explicit middleware-enabled test.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/CsrfVerificationTest.php::a write with a stale csrf token is rejected with 419
+      - tests/Feature/Auth/CsrfVerificationTest.php::a write with the live csrf token passes verification
   - id: token_endpoint_public
     kind: authorization
     description: The token endpoint is intentionally public; it only reveals the caller's own session token.

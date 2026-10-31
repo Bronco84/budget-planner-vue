@@ -32,7 +32,9 @@ scenarios:
   - id: invalid_payload_rejected
     kind: validation
     description: Missing categories array or a negative order returns validation errors.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryValidationTest.php::reordering categories with a malformed payload is rejected
   - id: foreign_category_ids_ignored
     kind: edge
     description: A category id from another budget in the payload is left unchanged.

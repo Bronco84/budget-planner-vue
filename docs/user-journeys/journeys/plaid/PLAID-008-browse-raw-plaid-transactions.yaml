@@ -2,24 +2,20 @@ schema: 1
 id: PLAID-008
 name: User browses raw Plaid transactions for an account
 domain: plaid
-status: unverified
+status: deprecated
 priority: low
 summary: >
   Endpoints to list raw PlaidTransaction rows for an account: an Inertia page
   (paginated 20 per page), a JSON API with date/pending/search filters and pagination,
   and a JSON detail lookup by Plaid transaction id. No UI in resources/js links to
-  these routes.
+  these routes. DEPRECATED: the routes, controller and (never-built) page were
+  removed as unreachable; this file is kept so the id is not reused.
 actors:
   - budget owner
 preconditions:
   - the account has imported Plaid transactions
-routes:
-  - plaid-transactions.index
-  - plaid-transactions.api
-  - plaid-transactions.show
-depends_on:
-  - path: app/Policies/AccountPolicy.php
-    reason: each action calls authorize('view', $account) in addition to can:view,budget
+routes: []
+depends_on: []
 integrations: []
 steps:
   - action: GET budget/{budget}/account/{account}/plaid-transactions
@@ -55,10 +51,9 @@ scenarios:
     description: Another user's budget/account returns 403; a cross-budget account returns 404.
     coverage: uncovered
 known_issues:
-  - PlaidTransactionController::index renders PlaidTransactions/Index, which does not exist under resources/js/Pages, so the page fails to load (reported by `php bin/journeys validate`).
-  - no frontend code calls plaid-transactions.* routes; they may be dead code and candidates for removal.
+  - "Removed as unreachable: the plaid-transactions.index/api/show routes and PlaidTransactionController were deleted. No frontend code linked to them and the index page component (PlaidTransactions/Index) never existed. Raw Plaid transactions remain stored but have no browsing UI."
 confidence: medium
 evidence:
-  - app/Http/Controllers/PlaidTransactionController.php
-  - grep of resources/js finds no reference to plaid-transactions
+  - routes/web.php no longer defines plaid-transactions.* routes
+  - grep of resources/js found no reference to plaid-transactions before removal
 last_verified: null

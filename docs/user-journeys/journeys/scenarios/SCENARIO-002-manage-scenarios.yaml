@@ -90,9 +90,11 @@ scenarios:
     coverage: uncovered
   - id: clear_description
     kind: edge
-    description: Sending an empty description on update should clear it.
-    coverage: uncovered
-    note: update uses `?? $scenario->description`, so null keeps the old value (see known_issues).
+    description: Sending a null or empty description on update clears it; omitting the key keeps the existing value.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::user can clear a scenario description by sending null or an empty string
+      - tests/Feature/ScenarioTest.php::updating a scenario without a description key keeps the existing description
   - id: cross_user_forbidden
     kind: authorization
     description: Another user's scenario in their own budget returns 403.
@@ -107,7 +109,6 @@ scenarios:
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::scenario routes reject a cross-budget scenario with 404
 known_issues:
-  - Description cannot be cleared on update because null falls back to the existing value.
   - Scenario frequency options omit bimonthly, which recurring templates support.
   - budgets.scenarios.show is not called by the frontend.
 confidence: high

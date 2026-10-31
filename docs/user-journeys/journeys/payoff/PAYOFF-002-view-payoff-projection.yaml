@@ -44,6 +44,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php::owner sees the plan page with the month-by-month projection and goal estimates
+      - tests/playwright/smoke.spec.js::first payoff plan page loads
   - id: extra_payment_shortens
     kind: alternate
     description: A monthly extra payment shortens the payoff timeline.

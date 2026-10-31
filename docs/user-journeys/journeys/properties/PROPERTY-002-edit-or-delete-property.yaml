@@ -49,7 +49,9 @@ scenarios:
   - id: invalid_update_rejected
     kind: validation
     description: Invalid fields return validation errors and nothing changes.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyValidationTest.php::updating a property with invalid fields is rejected
   - id: show_redirects_to_edit
     kind: edge
     description: GET show (no standalone page) authorizes view and redirects to the property's edit form.

@@ -3,9 +3,11 @@
 use App\Mail\MagicLinkEmail;
 use App\Models\MagicLinkToken;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use Symfony\Component\Mailer\Exception\TransportException;
 
 function issueMagicLink(User $user, array $overrides = []): string
 {
@@ -149,4 +151,20 @@ test('the login page receives the invalid magic link error so it can be shown', 
             ->where('errors.magic_link', 'Invalid or expired magic link.'));
 
     $this->assertGuest();
+});
+
+test('a mail transport failure still returns the neutral status and is logged', function () {
+    Log::spy();
+    Mail::shouldReceive('to')->andThrow(new TransportException('SMTP unavailable'));
+    $user = User::factory()->create();
+
+    $this->from(route('magic-link.request'))
+        ->post(route('magic-link.store'), ['email' => $user->email])
+        ->assertRedirect(route('magic-link.request'))
+        ->assertSessionHas('status', 'If an account exists for that email, a sign-in link is on its way.')
+        ->assertSessionHasNoErrors();
+
+    Log::shouldHaveReceived('error')
+        ->withArgs(fn ($message, $context = []) => str_contains($message, 'Magic link') && ($context['user_id'] ?? null) === $user->id)
+        ->once();
 });

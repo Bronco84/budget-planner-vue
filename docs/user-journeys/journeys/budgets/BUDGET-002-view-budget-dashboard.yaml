@@ -43,6 +43,7 @@ scenarios:
       - tests/Feature/SecurityAuthorizationTest.php::user can access their own budget
       - tests/Feature/Budgets/BudgetDashboardTest.php::owner sees the dashboard with accounts, total balance and the selected account ledger
       - tests/Feature/Budgets/BudgetDashboardTest.php::dashboard ledger follows the requested account
+      - tests/playwright/smoke.spec.js::budgets index redirects to the active budget dashboard
   - id: total_balance_calculation
     kind: happy_path
     description: Total balance adds assets, subtracts liabilities and ignores excluded accounts.

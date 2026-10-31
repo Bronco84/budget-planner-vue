@@ -320,3 +320,39 @@ test('scenario adjustment generates correct recurring transactions', function ()
     expect($transactions)->toHaveCount(4);
     expect($transactions[0]['amount_in_cents'])->toBe(-100000);
 });
+
+test('user can clear a scenario description by sending null or an empty string', function (?string $cleared) {
+    $scenario = Scenario::factory()->create([
+        'budget_id' => $this->budget->id,
+        'user_id' => $this->user->id,
+        'description' => 'Something to remove',
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('budgets.scenarios.update', [
+            'budget' => $this->budget->id,
+            'scenario' => $scenario->id,
+        ]), ['description' => $cleared])
+        ->assertOk();
+
+    expect($scenario->fresh()->description)->toBeNull();
+})->with(['null' => [null], 'empty string' => ['']]);
+
+test('updating a scenario without a description key keeps the existing description', function () {
+    $scenario = Scenario::factory()->create([
+        'budget_id' => $this->budget->id,
+        'user_id' => $this->user->id,
+        'description' => 'Keep me',
+    ]);
+
+    $this->actingAs($this->user)
+        ->patchJson(route('budgets.scenarios.update', [
+            'budget' => $this->budget->id,
+            'scenario' => $scenario->id,
+        ]), ['name' => 'Renamed'])
+        ->assertOk();
+
+    expect($scenario->fresh())
+        ->name->toBe('Renamed')
+        ->description->toBe('Keep me');
+});

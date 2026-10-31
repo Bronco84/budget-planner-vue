@@ -169,7 +169,8 @@ class ScenarioController extends Controller
             // Update scenario
             $scenario->update([
                 'name' => $validated['name'] ?? $scenario->name,
-                'description' => $validated['description'] ?? $scenario->description,
+                // An explicitly sent null/empty description clears it; omitting the key keeps it.
+                'description' => array_key_exists('description', $validated) ? $validated['description'] : $scenario->description,
                 'color' => $validated['color'] ?? $scenario->color,
                 'is_active' => $validated['is_active'] ?? $scenario->is_active,
             ]);

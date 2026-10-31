@@ -9,8 +9,10 @@ use App\Services\MagicLinkService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class MagicLinkController extends Controller
 {
@@ -44,7 +46,16 @@ class MagicLinkController extends Controller
         $user = User::where('email', $validated['email'])->first();
 
         if ($user) {
-            $this->magicLinkService->sendMagicLink($user);
+            try {
+                $this->magicLinkService->sendMagicLink($user);
+            } catch (Throwable $e) {
+                // Respond exactly as on success so a mail outage cannot be used
+                // to tell registered addresses apart from unknown ones.
+                Log::error('Magic link email could not be sent', [
+                    'user_id' => $user->id,
+                    'exception' => $e,
+                ]);
+            }
         }
 
         return back()->with('status', 'If an account exists for that email, a sign-in link is on its way.');

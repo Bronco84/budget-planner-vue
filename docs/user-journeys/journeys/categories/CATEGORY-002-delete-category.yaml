@@ -33,7 +33,9 @@ scenarios:
   - id: delete_blocked_when_in_use
     kind: edge
     description: A category used by transactions is not deleted and an error flash is returned.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryValidationTest.php::deleting a category that transactions use is blocked with an error flash
   - id: other_users_category_forbidden
     kind: authorization
     description: Deleting under another user's budget returns 403; a cross-budget category returns 404.

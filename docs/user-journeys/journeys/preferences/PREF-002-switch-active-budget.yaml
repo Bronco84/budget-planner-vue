@@ -48,7 +48,9 @@ scenarios:
   - id: invalid_budget_rejected
     kind: validation
     description: A missing, non-integer or non-existent budget_id fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceValidationTest.php::setting the active budget with a missing, non-integer or unknown id is rejected
   - id: no_budgets_empty_state
     kind: empty_state
     description: GET active-budget returns null when the user has no budgets.
@@ -66,7 +68,9 @@ scenarios:
   - id: guest_rejected
     kind: authentication
     description: A guest JSON request to either endpoint gets 401.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Preferences/PreferenceValidationTest.php::guests cannot read or set the active budget
 confidence: medium
 evidence:
   - routes/web.php preferences routes

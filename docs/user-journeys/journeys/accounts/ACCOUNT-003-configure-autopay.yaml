@@ -48,11 +48,15 @@ scenarios:
   - id: ineligible_account_rejected
     kind: validation
     description: Non-credit-card or no-statement accounts get an error flash and no change.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AutopayValidationTest.php::autopay is rejected for accounts that are not credit cards with statement data
   - id: invalid_source_rejected
     kind: validation
     description: Missing source, a non-depository source, or the card itself is rejected with an error flash.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AutopayValidationTest.php::autopay is rejected for a missing, non-depository or self source account
   - id: source_from_other_budget_rejected
     kind: authorization
     description: A source account id from another budget is rejected ("must be in the same budget").

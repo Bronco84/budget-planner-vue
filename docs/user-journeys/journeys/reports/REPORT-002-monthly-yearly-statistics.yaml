@@ -42,6 +42,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetStatisticsTest.php::owner sees the monthly statistics page with totals for the requested month
+      - tests/playwright/smoke.spec.js::monthly statistics page loads
   - id: yearly_page_renders
     kind: happy_path
     description: Owner opens yearly statistics and the Yearly page renders twelve months with prior-year comparison.

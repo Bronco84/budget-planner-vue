@@ -13,7 +13,6 @@ use App\Http\Controllers\PayoffPlanController;
 use App\Http\Controllers\PlaidController;
 use App\Http\Controllers\PlaidLiabilitiesController;
 use App\Http\Controllers\PlaidStatementHistoryController;
-use App\Http\Controllers\PlaidTransactionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectionsController;
 use App\Http\Controllers\PropertyController;
@@ -320,14 +319,6 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::post('budget/{budget}/plaid/sync-all', [PlaidController::class, 'syncAllTransactions'])
         ->middleware('throttle:3,1')
         ->name('plaid.sync-all');
-
-    // Plaid transactions routes
-    Route::get('budget/{budget}/account/{account}/plaid-transactions', [PlaidTransactionController::class, 'index'])
-        ->name('plaid-transactions.index');
-    Route::get('budget/{budget}/account/{account}/plaid-transactions/api', [PlaidTransactionController::class, 'getTransactions'])
-        ->name('plaid-transactions.api');
-    Route::get('budget/{budget}/account/{account}/plaid-transactions/{plaidTransactionId}', [PlaidTransactionController::class, 'show'])
-        ->name('plaid-transactions.show');
 
     // File attachment routes
     Route::post('transactions/{transaction}/files', [FileController::class, 'uploadToTransaction'])

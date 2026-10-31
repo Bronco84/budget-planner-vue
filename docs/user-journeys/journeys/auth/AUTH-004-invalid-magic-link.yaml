@@ -52,7 +52,10 @@ scenarios:
   - id: missing_parameters_rejected
     kind: validation
     description: A request without token or email fails validation without authenticating.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/MagicLinkParameterValidationTest.php::a magic link without a token or email fails validation without authenticating
+      - tests/Feature/Auth/MagicLinkParameterValidationTest.php::a magic link with a malformed email fails validation without authenticating
   - id: email_mismatch_rejected
     kind: authentication
     description: A valid token presented with a different email does not sign anyone in.

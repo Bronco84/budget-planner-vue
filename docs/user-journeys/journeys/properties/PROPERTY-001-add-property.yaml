@@ -54,7 +54,9 @@ scenarios:
   - id: invalid_property_rejected
     kind: validation
     description: Bad type, negative value or out-of-range years return validation errors.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Properties/PropertyValidationTest.php::storing an invalid property is rejected
   - id: link_account_from_other_budget_ignored
     kind: edge
     description: A linked_account_id that exists but belongs to another budget passes validation but is not linked.

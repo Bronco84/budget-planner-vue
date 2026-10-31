@@ -69,7 +69,9 @@ scenarios:
   - id: invalid_update_rejected
     kind: validation
     description: Same from/to account or amount below 0.01 is rejected.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferValidationTest.php::updating a transfer with identical accounts or an amount below one cent is rejected
   - id: cross_budget_transfer_not_found
     kind: authorization
     description: A transfer from another budget under the user's own budget URL returns 404.

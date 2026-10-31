@@ -45,6 +45,7 @@ scenarios:
     tests:
       - tests/Feature/Projections/AccountProjectionTest.php::owner sees the weekly account projection rolled forward from the current balance
       - tests/Feature/Projections/AccountProjectionTest.php::balance projection page defaults to twelve months and renders the detailed projection
+      - tests/playwright/smoke.spec.js::account projections page loads for six months
     note: recurring and future manual items are asserted on both pages; credit-card autopay projections are not exercised.
   - id: liability_direction
     kind: edge

@@ -1,7 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DeleteUserForm from './Partials/DeleteUserForm.vue';
-import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
 import ManagePasskeysForm from './Partials/ManagePasskeysForm.vue';
 import ManageTrustedDevicesForm from './Partials/ManageTrustedDevicesForm.vue';
@@ -39,12 +38,6 @@ defineProps({
                         :status="status"
                         class="max-w-xl"
                     />
-                </div>
-
-                <div
-                    class="bg-white dark:bg-gray-800 p-4 shadow sm:rounded-lg sm:p-8"
-                >
-                    <UpdatePasswordForm class="max-w-xl" />
                 </div>
 
                 <div

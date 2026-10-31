@@ -36,7 +36,9 @@ scenarios:
   - id: invalid_update_rejected
     kind: validation
     description: Empty name or bad colour returns validation errors.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetUpdateValidationTest.php::updating a budget with an empty name or bad colour is rejected
   - id: other_users_budget_edit_forbidden
     kind: authorization
     description: Editing or updating another user's budget returns 403 (authorizeResource).

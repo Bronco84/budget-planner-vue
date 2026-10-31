@@ -1,5 +1,5 @@
 import '../css/app.css';
-import './bootstrap';
+import { setCsrfToken } from './bootstrap';
 
 import { createInertiaApp, router } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
@@ -7,6 +7,16 @@ import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+// Keep the page's CSRF token in step with the session. <head> is only rendered
+// on a full page load, so after Laravel rotates the token (passkey login,
+// magic link, logout) every client-side navigation carries a dead token and the
+// next POST 419s — Laravel prefers the X-CSRF-TOKEN header over the always-fresh
+// XSRF-TOKEN cookie, so the stale value wins. Every Inertia response ships the
+// live token (HandleInertiaRequests), so re-sync from it here.
+router.on('success', (event) => {
+    setCsrfToken(event.detail.page.props?.csrf_token);
+});
 
 // Gracefully recover from expired CSRF/session (419) on Inertia navigations.
 // Inertia's router uses its own axios instance, so the window.axios CSRF-retry

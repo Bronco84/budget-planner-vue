@@ -9,6 +9,28 @@ function getCsrfToken() {
     return token ? token.content : null;
 }
 
+/**
+ * Write a token everywhere the app reads it from.
+ *
+ * The meta tag is the single source of truth for the raw `fetch()` callers
+ * scattered through the components, so it has to be updated too — not just the
+ * axios defaults. Laravel rotates the session token on login/logout, and since
+ * navigation after that point is client-side (Inertia never re-renders <head>),
+ * nothing would otherwise refresh it and the next write request 419s.
+ */
+export function setCsrfToken(token) {
+    if (!token) {
+        return;
+    }
+
+    const metaTag = document.head.querySelector('meta[name="csrf-token"]');
+    if (metaTag) {
+        metaTag.content = token;
+    }
+
+    window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+}
+
 // Configure Axios to automatically send CSRF tokens
 // Laravel expects either X-CSRF-TOKEN (from meta tag) or X-XSRF-TOKEN (from cookie)
 let token = getCsrfToken();
@@ -30,58 +52,66 @@ window.axios.interceptors.request.use(function (config) {
     return Promise.reject(error);
 });
 
-// Gracefully handle CSRF token expiration (419 errors)
-// This interceptor will automatically retry the request with a fresh token
-// The user won't see any error - it happens transparently
+// A single in-flight refresh shared by every request that 419s at once (the
+// dashboard fires several on load), so they don't stampede /csrf-token and
+// clobber each other's token.
+let pendingTokenRefresh = null;
+
+function fetchFreshCsrfToken() {
+    if (!pendingTokenRefresh) {
+        pendingTokenRefresh = fetch('/csrf-token', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+            },
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch CSRF token');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data.csrf_token) {
+                    throw new Error('No CSRF token in response');
+                }
+                setCsrfToken(data.csrf_token);
+                return data.csrf_token;
+            })
+            .finally(() => {
+                pendingTokenRefresh = null;
+            });
+    }
+
+    return pendingTokenRefresh;
+}
+
+// Safety net for CSRF token expiration (419 errors): fetch a fresh token and
+// replay the request once. This should be rare — the token is kept in sync on
+// every Inertia navigation (see app.js) — so a hit here means the session
+// rotated out from under a page that never navigated.
 window.axios.interceptors.response.use(
     response => response,
     async error => {
         const originalRequest = error.config;
-        
+
         // Check if it's a 419 error and we haven't already retried this request
         if (error.response?.status === 419 && !originalRequest._retry) {
             originalRequest._retry = true; // Mark this request as retried to prevent infinite loops
-            
+
             try {
                 console.log('🔄 CSRF token expired, fetching fresh token...');
-                
-                // Get a fresh CSRF token from our custom endpoint
-                // We use fetch here instead of axios to avoid triggering another interceptor
-                const response = await fetch('/csrf-token', {
-                    method: 'GET',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Accept': 'application/json',
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to fetch CSRF token');
-                }
-                
-                const data = await response.json();
-                const newToken = data.csrf_token;
-                
-                if (newToken) {
-                    console.log('✅ Fresh CSRF token received, retrying request...');
-                    
-                    // Update the meta tag so other code can access the new token
-                    const metaTag = document.head.querySelector('meta[name="csrf-token"]');
-                    if (metaTag) {
-                        metaTag.content = newToken;
-                    }
-                    
-                    // Update axios defaults for future requests
-                    window.axios.defaults.headers.common['X-CSRF-TOKEN'] = newToken;
-                    
-                    // Update this specific request's header
-                    originalRequest.headers['X-CSRF-TOKEN'] = newToken;
-                    
-                    // Retry the original request with the fresh token
-                    return window.axios.request(originalRequest);
-                } else {
-                    throw new Error('No CSRF token in response');
-                }
+
+                const newToken = await fetchFreshCsrfToken();
+
+                console.log('✅ Fresh CSRF token received, retrying request...');
+
+                // Update this specific request's header
+                originalRequest.headers['X-CSRF-TOKEN'] = newToken;
+
+                // Retry the original request with the fresh token
+                return window.axios.request(originalRequest);
             } catch (refreshError) {
                 // If we can't refresh the token, let the error through
                 // This might happen if the session is completely dead
@@ -89,7 +119,7 @@ window.axios.interceptors.response.use(
                 return Promise.reject(error);
             }
         }
-        
+
         // For all other errors, just pass them through
         return Promise.reject(error);
     }

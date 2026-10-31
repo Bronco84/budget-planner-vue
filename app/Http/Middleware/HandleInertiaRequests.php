@@ -33,6 +33,12 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'environment' => app()->environment(),
+            // The <meta name="csrf-token"> tag is only written on a full page
+            // load, so it goes stale the moment the session token is
+            // regenerated (passkey login, magic link, logout) and the app keeps
+            // navigating client-side. Ship the live token on every Inertia
+            // response so the client can re-sync — see resources/js/app.js.
+            'csrf_token' => $request->session()->token(),
             'auth' => [
                 'user' => $request->user(),
             ],

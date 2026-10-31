@@ -169,7 +169,7 @@ class TransactionFilterTest extends TestCase
         Transaction::factory()->count(2)->create([
             'budget_id' => $this->budget->id,
             'account_id' => $this->account1->id,
-            'date' => Carbon::now()->subMonth(),
+            'date' => Carbon::now()->subMonthNoOverflow(),
         ]);
 
         // Filter by this month
@@ -193,7 +193,7 @@ class TransactionFilterTest extends TestCase
         Transaction::factory()->count(2)->create([
             'budget_id' => $this->budget->id,
             'account_id' => $this->account1->id,
-            'date' => Carbon::now()->subMonth()->startOfMonth(),
+            'date' => Carbon::now()->subMonthNoOverflow()->startOfMonth(),
         ]);
 
         Transaction::factory()->count(3)->create([
@@ -223,13 +223,13 @@ class TransactionFilterTest extends TestCase
         Transaction::factory()->count(5)->create([
             'budget_id' => $this->budget->id,
             'account_id' => $this->account1->id,
-            'date' => Carbon::now()->subMonths(2),
+            'date' => Carbon::now()->subMonthsNoOverflow(2),
         ]);
 
         Transaction::factory()->count(2)->create([
             'budget_id' => $this->budget->id,
             'account_id' => $this->account1->id,
-            'date' => Carbon::now()->subMonths(4),
+            'date' => Carbon::now()->subMonthsNoOverflow(4),
         ]);
 
         // Filter by last 3 months

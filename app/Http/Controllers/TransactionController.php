@@ -60,13 +60,13 @@ class TransactionController extends Controller
                     break;
 
                 case 'last_month':
-                    $lastMonth = now()->subMonth();
+                    $lastMonth = now()->subMonthNoOverflow();
                     $query->whereMonth('date', $lastMonth->month)
                         ->whereYear('date', $lastMonth->year);
                     break;
 
                 case 'last_3_months':
-                    $query->where('date', '>=', now()->subMonths(3)->startOfMonth());
+                    $query->whereDate('date', '>=', now()->subMonthsNoOverflow(3)->startOfMonth());
                     break;
 
                 case 'this_year':

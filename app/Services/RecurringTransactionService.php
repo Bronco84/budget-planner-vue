@@ -2100,7 +2100,7 @@ class RecurringTransactionService
     ): array {
         // Query transactions from the credit card account
         // Only include expenses (negative amounts) from the past N months
-        $startDate = Carbon::now()->subMonths($maxMonths)->startOfMonth();
+        $startDate = Carbon::now()->subMonthsNoOverflow($maxMonths)->startOfMonth();
 
         $transactions = Transaction::where('account_id', $creditCard->id)
             ->where('amount_in_cents', '<', 0) // Only expenses

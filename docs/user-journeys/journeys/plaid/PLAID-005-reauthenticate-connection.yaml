@@ -54,23 +54,33 @@ scenarios:
   - id: upgrade_token_issued
     kind: happy_path
     description: A linked account receives an update-mode link token and the institution name as JSON.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::a linked account receives an update mode link token and the institution name
   - id: connection_updated
     kind: happy_path
     description: Posting the update-mode public token replaces the access token on the existing connection and marks it active.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::posting the update mode public token replaces the access token and reactivates the connection
   - id: upgrade_token_not_linked
     kind: edge
     description: Requesting an upgrade token for an unlinked account returns JSON 404 "Account is not linked to Plaid."
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::requesting an upgrade token for an unlinked account returns a JSON 404
   - id: upgrade_token_missing_access_token
     kind: edge
     description: A connection without an access token returns JSON 400.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::requesting an upgrade token for a connection without an access token returns a JSON 400
   - id: update_connection_validation
     kind: validation
     description: Missing public_token or metadata fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidReauthenticateConnectionTest.php::updating a connection requires a public token and metadata and leaves it unchanged
   - id: upgrade_token_plaid_failure
     kind: integration
     description: When Plaid refuses to create the update-mode token the endpoint returns JSON 500 with a generic error (raw Plaid text only logged) and the UI toasts it.

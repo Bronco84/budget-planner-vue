@@ -48,7 +48,9 @@ scenarios:
   - id: request_form_renders
     kind: happy_path
     description: Guest can load the magic link request page.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkFlowTest.php::the magic link request page renders for a guest'
   - id: link_emailed
     kind: happy_path
     description: Submitting a known email stores a hashed token and sends MagicLinkEmail to that address.
@@ -82,19 +84,27 @@ scenarios:
   - id: request_throttled
     kind: edge
     description: More than 6 link requests per minute are throttled.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkFlowTest.php::magic link requests beyond six per minute are throttled'
   - id: no_trusted_device_created
     kind: edge
     description: Signing in by magic link does not create a TrustedDevice or set the device cookie.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkFlowTest.php::signing in by magic link creates no trusted device and sets no device cookie'
   - id: email_delivery
     kind: integration
     description: The emailed URL points at magic-link.authenticate with the raw token and email.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkFlowTest.php::the emailed magic link points at the authenticate route with the raw token and email'
   - id: authenticated_user_redirected
     kind: authorization
     description: Magic link routes are guest-only; an authenticated user is redirected to the dashboard.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkFlowTest.php::magic link routes redirect an authenticated user to the dashboard'
 known_issues:
   - the mail is sent synchronously only for existing accounts, so response timing can still hint whether an email is registered.
 confidence: high

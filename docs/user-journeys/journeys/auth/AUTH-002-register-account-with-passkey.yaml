@@ -57,28 +57,39 @@ scenarios:
   - id: allowlisted_email_creates_account
     kind: happy_path
     description: Submitting the allowlisted email creates a passwordless user, logs them in and redirects to passkey.register with new_user=1.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/RegistrationFlowTest.php::registering the allowlisted email creates a passwordless user and sends them to passkey registration'
   - id: passkey_attestation_saved
     kind: happy_path
     description: A valid attestation stores the credential, creates a trusted device, queues the cookie and returns 204.
     coverage: uncovered
-    note: requires a WebAuthn attestation fixture; none exists yet.
+    note: 'requires WebAuthn fixture'
   - id: non_allowlisted_email_rejected
     kind: validation
     description: Any email other than the allowlisted one is rejected with an email error and no user is created.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/RegistrationFlowTest.php::registering any other email is rejected and no user is created'
   - id: invalid_or_duplicate_email_rejected
     kind: validation
     description: Missing name, malformed email or an already-registered email fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/RegistrationFlowTest.php::registration requires a name and a valid unused email'
   - id: registration_throttled
     kind: edge
     description: More than 6 registration submissions per minute are throttled (429).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/RegistrationFlowTest.php::registration submissions beyond six per minute are throttled'
   - id: attestation_failure_surfaces_error
     kind: edge
     description: A failed attestation returns an error response and no credential or trusted device is stored.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/RegistrationFlowTest.php::a failed passkey attestation returns an error and stores no credential or trusted device'
+    note: 'uses a malformed attestation; a structurally valid but cryptographically bad attestation needs a WebAuthn fixture.'
   - id: registration_failure_message_is_generic
     kind: recovery
     description: An exception while saving the passkey returns JSON 500 "Failed to register passkey. Please try again."; the raw exception is only logged.
@@ -88,11 +99,15 @@ scenarios:
   - id: register_options_require_auth
     kind: authentication
     description: A guest calling webauthn/register/options or webauthn/register is rejected (401 JSON) rather than registering a passkey.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/RegistrationFlowTest.php::a guest cannot request passkey registration options or register a passkey'
   - id: authenticated_user_redirected_from_register
     kind: authorization
     description: An authenticated user visiting /register is redirected away by the guest middleware.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/RegistrationFlowTest.php::an authenticated user visiting the registration form is redirected away'
   - id: account_created_status_shown
     kind: happy_path
     description: After account creation, PasskeyRegister receives flash.status "Account created! Now register your passkey." and shows it in its success banner.

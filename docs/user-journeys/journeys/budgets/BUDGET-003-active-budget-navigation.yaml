@@ -43,27 +43,39 @@ scenarios:
   - id: index_redirects_to_active_budget
     kind: happy_path
     description: /budgets redirects to the active budget's dashboard.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::budgets index redirects to the active budget dashboard
   - id: transactions_redirects_to_active_budget
     kind: happy_path
     description: /transactions redirects to the active budget's transaction list.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::transactions shortcut redirects to the active budget transaction list
   - id: switch_active_budget
     kind: alternate
     description: Posting a new budget_id updates the preference and returns it.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::posting a new active budget updates the preference and returns it
   - id: no_budgets_redirects_to_create
     kind: empty_state
     description: A user with no budgets is redirected from /budgets and /transactions to budgets.create.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::a user with no budgets is redirected from budgets and transactions to the create form
   - id: stale_active_budget_falls_back
     kind: edge
     description: An active_budget_id for a deleted budget is cleared and the first remaining budget is used.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::a stale active budget id is cleared and the first remaining budget is used
   - id: cannot_activate_other_users_budget
     kind: authorization
     description: Setting another user's budget as active fails validation ("You do not have access to this budget.").
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::setting another users budget as active fails validation and leaves the preference unchanged
 known_issues:
   - "A connected (shared) user can set a shared budget as active (hasBudget allows it), but BudgetPolicy is owner-only, so the subsequent redirect to budgets.show is 403. Sharing is a deferred follow-up."
 confidence: high

@@ -51,34 +51,6 @@
                 </select>
               </div>
 
-              <div class="w-full md:w-auto">
-                <InputLabel for="scenario" value="Scenario" />
-                <select
-                  id="scenario"
-                  v-model="form.scenario"
-                  class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                  required
-                >
-                  <option value="default">Default</option>
-                  <option value="optimistic">Optimistic (+10%)</option>
-                  <option value="pessimistic">Pessimistic (-10%)</option>
-                </select>
-              </div>
-
-              <div class="w-full md:w-auto">
-                <InputLabel for="groupBy" value="Group By" />
-                <select
-                  id="groupBy"
-                  v-model="form.groupBy"
-                  class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                  required
-                >
-                  <option value="day">Daily</option>
-                  <option value="week">Weekly</option>
-                  <option value="month">Monthly</option>
-                </select>
-              </div>
-
               <div>
                 <PrimaryButton type="submit" :disabled="processing">
                   Update Projections
@@ -283,8 +255,6 @@ const props = defineProps({
 // Form state
 const form = ref({
   months: props.monthsAhead || 3,
-  scenario: 'default',
-  groupBy: 'day',
 });
 const processing = ref(false);
 
@@ -320,130 +290,11 @@ const balanceProjectionData = computed(() => {
     return [];
   }
 
-  let data = [...props.balanceProjection.days].map(day => ({
+  return props.balanceProjection.days.map(day => ({
     date: day.date,
     balance: parseInt(day.balance)
   }));
-
-  // Apply scenario adjustments
-  if (form.value.scenario === 'optimistic') {
-    // Optimistic: Increase income by 10%, decrease expenses by 10%
-    const startingBalance = props.account.current_balance_cents;
-    let runningBalance = startingBalance;
-
-    data = data.map((day, index) => {
-      if (index === 0) return day;
-
-      const prevDay = data[index - 1];
-      const dayChange = day.balance - prevDay.balance;
-
-      // For income (positive change), increase by 10%
-      // For expenses (negative change), decrease by 10%
-      const adjustedChange = dayChange * (dayChange >= 0 ? 1.1 : 0.9);
-      runningBalance += adjustedChange;
-
-      return {
-        date: day.date,
-        balance: Math.round(runningBalance)
-      };
-    });
-  } else if (form.value.scenario === 'pessimistic') {
-    // Pessimistic: Decrease income by 10%, increase expenses by 10%
-    const startingBalance = props.account.current_balance_cents;
-    let runningBalance = startingBalance;
-
-    data = data.map((day, index) => {
-      if (index === 0) return day;
-
-      const prevDay = data[index - 1];
-      const dayChange = day.balance - prevDay.balance;
-
-      // For income (positive change), decrease by 10%
-      // For expenses (negative change), increase by 10%
-      const adjustedChange = dayChange * (dayChange >= 0 ? 0.9 : 1.1);
-      runningBalance += adjustedChange;
-
-      return {
-        date: day.date,
-        balance: Math.round(runningBalance)
-      };
-    });
-  }
-
-  // Apply grouping if not daily
-  if (form.value.groupBy === 'week') {
-    // Group by week
-    const weeklyData = [];
-    let currentWeek = null;
-    let lastDate = null;
-
-    data.forEach(day => {
-      const date = new Date(day.date);
-      const weekNum = getWeekNumber(date);
-
-      if (currentWeek !== weekNum) {
-        if (currentWeek !== null) {
-          weeklyData.push({
-            date: lastDate,
-            balance: day.balance
-          });
-        }
-        currentWeek = weekNum;
-      }
-
-      lastDate = day.date;
-    });
-
-    // Add last week
-    if (data.length > 0) {
-      weeklyData.push({
-        date: data[data.length - 1].date,
-        balance: data[data.length - 1].balance
-      });
-    }
-
-    return weeklyData;
-  } else if (form.value.groupBy === 'month') {
-    // Group by month
-    const monthlyData = [];
-    let currentMonth = null;
-
-    data.forEach(day => {
-      const date = new Date(day.date);
-      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-
-      if (currentMonth !== monthKey) {
-        monthlyData.push({
-          date: day.date,
-          balance: day.balance
-        });
-        currentMonth = monthKey;
-      }
-    });
-
-    // Ensure we have the last day of the last month
-    if (data.length > 0) {
-      const lastDay = data[data.length - 1];
-      monthlyData.push({
-        date: lastDay.date,
-        balance: lastDay.balance
-      });
-    }
-
-    return monthlyData;
-  }
-
-  return data;
 });
-
-// Helper to get week number
-function getWeekNumber(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-}
 
 // Balance analysis
 const projectedEndingBalance = computed(() => {
@@ -690,9 +541,7 @@ const formatMonthYear = (dateObj) => {
 const updateProjections = () => {
   processing.value = true;
   router.get(route('budget.account.balance-projection', { budget: props.budget.id, account: props.account.id }), {
-    months: form.value.months,
-    scenario: form.value.scenario,
-    groupBy: form.value.groupBy
+    months: form.value.months
   }, {
     onFinish: () => {
       processing.value = false;

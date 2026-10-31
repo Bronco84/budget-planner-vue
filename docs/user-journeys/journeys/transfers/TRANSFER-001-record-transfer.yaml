@@ -37,7 +37,9 @@ scenarios:
   - id: store_transfer_via_modal
     kind: happy_path
     description: Valid POST creates the transfer and redirects back.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferLifecycleTest.php::posting a valid transfer from the modal creates the transfer and its legs and redirects back
   - id: balanced_pair_created
     kind: happy_path
     description: The service creates a balanced -X/+X pair categorised as Transfer.
@@ -53,7 +55,9 @@ scenarios:
   - id: json_response
     kind: alternate
     description: A JSON request receives {message, transfer} instead of a redirect.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferLifecycleTest.php::a json transfer request receives the message and the transfer
   - id: same_account_or_zero_rejected
     kind: validation
     description: Identical from/to accounts or an amount below 0.01 return validation errors.
@@ -69,7 +73,9 @@ scenarios:
   - id: other_users_budget_forbidden
     kind: authorization
     description: Posting to another user's budget returns 403.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferLifecycleTest.php::posting a transfer to another users budget is forbidden and nothing is created
   - id: standalone_create_redirects
     kind: edge
     description: GET /budget/{budget}/transfers/create has no page (creation is via the quick-add modal) and redirects to budgets.show.

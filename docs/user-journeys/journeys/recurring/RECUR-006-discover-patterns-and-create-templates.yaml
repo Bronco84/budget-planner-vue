@@ -56,7 +56,9 @@ scenarios:
   - id: analysis_page_renders
     kind: happy_path
     description: Owner opens the analysis page and runs an analysis through the controller.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisPageTest.php::an owner opens the analysis page and runs an analysis
   - id: create_templates_from_confirmation
     kind: happy_path
     description: Confirmed patterns become templates and the user lands on the recurring index with a success flash.
@@ -78,7 +80,9 @@ scenarios:
   - id: settings_validation
     kind: validation
     description: Out-of-range period, occurrence or confidence values fail validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisPageTest.php::analysis settings outside their allowed ranges are rejected
   - id: bimonthly_confirmation
     kind: edge
     description: A bimonthly pattern confirmed in the modal keeps both days of the month (bimonthly_first_day -> first_day_of_month, bimonthly_second_day -> day_of_month).
@@ -88,7 +92,9 @@ scenarios:
   - id: refresh_fallback_redirects
     kind: recovery
     description: GET on the analyze/create-templates URLs redirects to the analysis page.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringAnalysisPageTest.php::refreshing the analyze or create templates URL redirects to the analysis page
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot open the analysis page or analyse transactions in a budget they do not own.

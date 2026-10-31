@@ -40,14 +40,16 @@ scenarios:
   - id: dashboard_renders
     kind: happy_path
     description: Owner opens reports with default 6-month range and receives every report section.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDashboardTest.php::owner opens reports with the default six month range and receives every section
   - id: account_filter
     kind: alternate
     description: Selecting an account limits net worth, cash flow, performance and spending data to that account.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Reports/ReportsNetWorthQueryTest.php::net worth filtered to one account matches the pinned values
-    note: only the net worth series is asserted for the filtered account.
+      - tests/Feature/Reports/ReportsDashboardTest.php::selecting an account limits cash flow performance and spending to that account
   - id: net_worth_series
     kind: happy_path
     description: The net worth series (assets, liabilities, net worth per data point and summary) rolls each account's current balance back by later transactions, computed from one grouped per-account-per-day query rather than one SUM per account per data point.
@@ -71,16 +73,21 @@ scenarios:
   - id: foreign_account_filter_ignored
     kind: edge
     description: An account_id from another budget is ignored and all accounts are shown.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDashboardTest.php::an account id from another budget is ignored and all accounts are shown
   - id: active_templates_only
     kind: edge
     description: Income vs expenses excludes templates that have ended or not yet started, and includes those ending today.
-    coverage: uncovered
-    note: the underlying RecurringTransactionTemplate::active() scope is unit-tested in tests/Feature/RecurringTransactionTemplateActiveScopeTest.php, but nothing asserts the report built on it.
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDashboardTest.php::income vs expenses uses only active templates
   - id: monthly_normalisation
     kind: edge
     description: Weekly, biweekly, bimonthly, quarterly and yearly templates are normalised to correct monthly amounts.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDashboardTest.php::income vs expenses normalises each frequency to a monthly amount
   - id: dynamic_templates_in_income_vs_expenses
     kind: edge
     description: Dynamic-amount templates appear in income vs expenses at the same calculated amount projections use.
@@ -90,11 +97,15 @@ scenarios:
   - id: zero_starting_net_worth
     kind: edge
     description: A starting net worth of 0 yields changePercent 0 instead of division by zero.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDashboardTest.php::a starting net worth of zero yields a zero change percent
   - id: empty_budget
     kind: empty_state
     description: A budget with no accounts or transactions renders all tabs with zero values.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDashboardTest.php::a budget with no accounts or transactions renders every section with zero values
   - id: invalid_custom_range
     kind: validation
     description: An unparsable or inverted custom date range should be rejected.
@@ -105,7 +116,9 @@ scenarios:
   - id: cross_user_forbidden
     kind: authorization
     description: Another user cannot open reports for a budget they do not own (403).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDashboardTest.php::another user cannot open reports for a budget they do not own
 known_issues: []
 confidence: medium
 evidence:

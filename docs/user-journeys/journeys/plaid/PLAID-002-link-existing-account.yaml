@@ -44,11 +44,15 @@ scenarios:
   - id: link_page_renders
     kind: happy_path
     description: Owner opens the Bank Connection page for an unlinked account and receives a link token.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::the bank connection page renders a link token for an unlinked account
   - id: store_creates_new_connection
     kind: happy_path
     description: Linking with no matching connection creates a new PlaidConnection and PlaidAccount and redirects with "Account linked to Plaid successfully."
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::linking an account with no matching connection creates a new connection
   - id: store_reuses_existing_connection
     kind: alternate
     description: Linking an account from an item/institution already connected in the budget attaches it to the existing connection.
@@ -58,22 +62,28 @@ scenarios:
   - id: relink_orphaned_account
     kind: alternate
     description: An account with a stale PlaidAccount is updated to point at the active or newly created connection (created from the Link metadata's item and institution ids).
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidLinkTest.php::re-linking an account with a stale Plaid link creates a connection from the Link metadata
-    note: the new-connection branch is covered; re-linking onto an existing active connection is not asserted.
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::re-linking an account with a stale Plaid link onto an active connection reuses it
   - id: linked_page_shows_metadata
     kind: alternate
     description: For an already linked account the page shows status, institution, last sync and any error_message.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::the bank connection page shows connection metadata for a linked account
   - id: store_validation
     kind: validation
     description: Missing public_token, metadata.institution.name or metadata.account.id fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::linking requires a public token, institution name and account id
   - id: account_missing_from_plaid_response
     kind: recovery
     description: If the chosen account id is absent from Plaid's account list, the user is redirected back with "Failed to link account".
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::linking an account missing from the Plaid response redirects back with an error and links nothing
   - id: link_form_cross_budget_account
     kind: authorization
     description: Opening the link page with an account from another budget returns 404 via scoped bindings.
@@ -83,8 +93,9 @@ scenarios:
   - id: store_cross_user_denied
     kind: authorization
     description: Posting plaid.store against another user's budget/account is rejected (403/404).
-    coverage: uncovered
-    note: plaid.store is not part of the plaid_post_routes dataset in NestedRouteAuthorizationTest.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::linking an account in another users budget is forbidden and changes nothing
   - id: link_failure_message_is_user_safe
     kind: recovery
     description: A failure linking an account flashes "Failed to link account. Please try again." (or the could-not-reach message for a connect timeout); the raw exception is only logged.

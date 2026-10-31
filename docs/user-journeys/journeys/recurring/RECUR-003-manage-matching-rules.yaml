@@ -58,21 +58,23 @@ scenarios:
   - id: add_rule_and_apply
     kind: happy_path
     description: Owner adds a rule, previews matches and applies them, linking the matching transactions.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::storing a regex rule with a valid pattern succeeds and previews matches
-    note: store and preview are asserted for a regex rule; apply (linking) is not exercised.
+      - tests/Feature/Recurring/RecurringRuleManagementTest.php::an owner adds a rule, previews its matches and applies them to link the transactions
   - id: test_draft_rule
     kind: alternate
     description: Testing a draft rule shows matches without persisting the rule.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleManagementTest.php::testing a draft rule shows its matches without saving the rule
   - id: update_rule_reevaluates_links
     kind: alternate
     description: Editing a rule unlinks transactions that no longer match and links newly matching ones.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::updating a rule to a delimited regex links matching transactions
-    note: linking newly matching transactions is asserted; unlinking no-longer-matching ones is not.
+      - tests/Feature/Recurring/RecurringRuleManagementTest.php::editing a rule unlinks transactions that no longer match and links newly matching ones
   - id: reevaluation_uses_rule_matching
     kind: edge
     description: Re-evaluation matches exactly like test/preview/apply (delimited regex, absolute dollar amounts, case sensitivity); a stored regex that doesn't compile matches nothing instead of erroring.
@@ -84,7 +86,9 @@ scenarios:
   - id: preview_without_active_rules
     kind: empty_state
     description: Preview with no active rules renders hasActiveRules false; apply redirects with "No active rules to apply".
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleManagementTest.php::with no active rules preview reports none and apply links nothing
   - id: invalid_operator_rejected
     kind: validation
     description: Unknown field/operator values or an empty value fail validation.
@@ -110,10 +114,11 @@ scenarios:
   - id: cross_budget_template_not_found
     kind: authorization
     description: Rules routes for a template that belongs to another budget return 404.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction routes reject a cross-budget template with 404
-    note: only rules.index is asserted; store/update/destroy/test/preview/apply and cross-user 403 are untested.
+      - tests/Feature/Recurring/RecurringRuleManagementTest.php::rules routes for a template from another budget return 404 and change nothing
+      - tests/Feature/Recurring/RecurringRuleManagementTest.php::rules routes for another users budget return 403 and change nothing
   - id: rule_actions_redirect_to_rules_page
     kind: edge
     description: Store, update, apply and destroy all redirect to the rules index.

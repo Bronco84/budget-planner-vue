@@ -53,10 +53,10 @@ scenarios:
   - id: owner_updates_account
     kind: happy_path
     description: Valid update persists and redirects to the dashboard.
-    coverage: partial
+    coverage: covered
     tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::a valid update persists name type and budget inclusion and redirects to the dashboard
       - tests/Feature/Accounts/AccountEditTest.php::a valid custom logo is saved
-    note: only the custom_logo update is asserted; name/type/include_in_budget persistence is not.
   - id: custom_logo_validated
     kind: validation
     description: A custom_logo that is not an image data URL or https URL, or is larger than the column, is rejected and nothing is saved.
@@ -66,23 +66,34 @@ scenarios:
   - id: fetch_and_clear_logo
     kind: alternate
     description: Fetch-logo stores a favicon URL for a mapped institution; clear-logo removes both logo fields.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::fetch logo stores a favicon URL for a mapped institution and clears the custom logo
+      - tests/Feature/Accounts/AccountManagementTest.php::clear logo removes both logo fields
   - id: fetch_logo_unmapped_institution
     kind: edge
     description: An unmapped institution flashes an error and leaves the logo unchanged.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::fetch logo for an unmapped institution flashes an error and leaves the logo unchanged
   - id: invalid_update_rejected
     kind: validation
     description: Missing name/type or a non-URL logo_url returns validation errors.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::an update missing name and type or with a non URL logo is rejected and nothing changes
   - id: owner_deletes_unused_account
     kind: happy_path
     description: An account with no transactions is deleted.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::an account with no transactions is deleted and the owner returns to the dashboard
   - id: delete_blocked_with_transactions
     kind: edge
     description: Deleting an account that has transactions is refused with an error flash.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::deleting an account that has transactions is refused and the account remains
   - id: delete_blocked_with_transfers
     kind: edge
     description: Deleting an account that is part of a transfer is refused with a flash explaining its transfers must be deleted first.
@@ -107,7 +118,9 @@ scenarios:
   - id: logo_routes_cross_user
     kind: authorization
     description: fetch-logo and clear-logo on another user's account return 403.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::fetch logo and clear logo on another users account are forbidden and nothing changes
   - id: guest_redirected
     kind: authentication
     description: Guests opening the edit page are redirected to login.

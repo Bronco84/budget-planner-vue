@@ -225,11 +225,12 @@ class RecurringTransactionTemplate extends Model
     {
         $asOf = $asOf ? Carbon::parse($asOf) : Carbon::today();
 
+        // Compare calendar dates: a date-only value ('Y-m-d') must match the whole day.
         return $query
-            ->where('start_date', '<=', $asOf)
+            ->whereDate('start_date', '<=', $asOf)
             ->where(function ($q) use ($asOf) {
                 $q->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $asOf);
+                    ->orWhereDate('end_date', '>=', $asOf);
             });
     }
 

@@ -42,7 +42,9 @@ scenarios:
   - id: edit_page_renders
     kind: happy_path
     description: Owner can open the transfer edit page.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferLifecycleTest.php::the owner can open the transfer edit page
   - id: update_resyncs_legs
     kind: happy_path
     description: Updating amount/accounts/date updates both paired transactions.
@@ -64,7 +66,9 @@ scenarios:
   - id: missing_leg_recreated
     kind: recovery
     description: If a leg was deleted separately, update recreates it.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferLifecycleTest.php::updating a transfer recreates a leg that was deleted separately
   - id: post_action_redirect_to_dashboard
     kind: edge
     description: After a non-JSON update/delete the owner is redirected to budgets.show (the page Transfers/Edit's cancel link returns to).
@@ -87,7 +91,9 @@ scenarios:
   - id: other_users_transfer_forbidden
     kind: authorization
     description: Edit/update/delete under another user's budget return 403.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferLifecycleTest.php::edit update and delete of another users transfer are forbidden and nothing changes
   - id: index_and_show_redirect
     kind: edge
     description: GET index redirects to budgets.show and GET show redirects to the transfer's edit page; another user's budget returns 403.

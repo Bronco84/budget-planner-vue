@@ -43,7 +43,10 @@ scenarios:
   - id: connections_page_renders
     kind: happy_path
     description: The connections page lists the user's connections.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php::the connections page lists only the users calendar connections'
+      - 'tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php::the connections page renders an empty list when nothing is connected'
   - id: redirect_to_google
     kind: happy_path
     description: Connect redirects away to Google's authorization URL.
@@ -53,18 +56,23 @@ scenarios:
   - id: callback_creates_connection
     kind: happy_path
     description: A successful callback stores the connection and performs the initial sync.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback with a matching state stores the connection and flashes a visible message
-    note: GoogleCalendarService is mocked, so the token exchange, calendar lookup and initial sync themselves are not exercised.
+      - 'tests/Feature/Calendar/CalendarConnectionTest.php::a google callback with a matching state stores the connection and flashes a visible message'
+      - 'tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php::a google callback exchanges the code, stores the connection and runs the initial sync'
+    note: 'the real GoogleCalendarService runs against an in-memory Google client (token exchange, calendar lookup and initial sync); no HTTP to Google.'
   - id: reconnect_updates_existing
     kind: alternate
     description: Reconnecting the same calendar updates tokens on the existing connection instead of duplicating it.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php::reconnecting the same calendar updates the existing connection instead of duplicating it'
   - id: consent_denied
     kind: edge
     description: When Google returns ?error=access_denied the user is sent back to connections with an error flash.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php::a denied google consent returns to connections with an error and no token exchange'
   - id: callback_without_code
     kind: validation
     description: A callback with neither code nor error redirects to connections with an error flash without calling Google.
@@ -84,6 +92,12 @@ scenarios:
     tests:
       - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback with a mismatched state is rejected without a token exchange
       - tests/Feature/Calendar/CalendarConnectionTest.php::a google callback without a stored or returned state is rejected without a token exchange
+  - id: reconnect_keeps_refresh_token
+    kind: edge
+    description: A reconnect where Google omits the refresh token keeps the stored one instead of failing.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php::reconnecting when google omits the refresh token keeps the stored one'
 known_issues: []
 confidence: high
 evidence:

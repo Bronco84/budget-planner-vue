@@ -179,7 +179,7 @@ class ContentModerationService
 
         // Check for suspicious patterns (e.g., creating many conversations rapidly)
         $recentCount = collect($activity)
-            ->filter(fn ($a) => strtotime($a['timestamp']) > time() - 600) // Last 10 minutes
+            ->filter(fn ($a) => strtotime($a['timestamp']) > now()->getTimestamp() - 600) // Last 10 minutes
             ->count();
 
         if ($recentCount > 10) {
@@ -266,7 +266,7 @@ class ContentModerationService
 
         // Auto-ban after 5 offenses in 24 hours
         $recentOffenses = collect($offenses)
-            ->filter(fn ($o) => strtotime($o['timestamp']) > time() - 86400)
+            ->filter(fn ($o) => strtotime($o['timestamp']) > now()->getTimestamp() - 86400)
             ->count();
 
         if ($recentOffenses >= 5) {

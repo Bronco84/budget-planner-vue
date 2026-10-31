@@ -38,16 +38,15 @@ business_rules:
   - the per-user moderation counter allows 30 messages per fixed one-hour window starting at the first message (Laravel RateLimiter); reset_in_seconds is the time left in that window
   - rejections past the hourly limit are logged but are not offenses
   - every content flag and more than 10 new conversations in 10 minutes ('rapid_conversation_creation') count as offenses; messages in an existing conversation are not tracked; 5 offenses in 24 hours trigger an automatic 24-hour ban
-  - route throttles - 30 per minute for send/stream, 60 per minute for the chat group
+  - route throttles - 30 per minute each for send and stream (own rate-limit keys chat-send / chat-stream, so one request is not counted twice against the group key), 60 per minute for the chat group
   - send and stream use the same status codes for moderation refusals - 403 banned, 429 hourly limit, 400 blocked; only provider/server failures return 500
 scenarios:
   - id: clean_message_allowed
     kind: happy_path
     description: A normal message passes moderation and proceeds to the provider.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/ChatAssistantTest.php::chat assistant returns and persists a reply via the tool-loop flow
-    note: passes through moderation implicitly; no assertion on moderation outcome or flag absence.
+      - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::a clean message passes moderation without flags and reaches the provider'
   - id: injection_blocked
     kind: validation
     description: A prompt-injection message is blocked with 400 and recorded as a FlaggedChatMessage.
@@ -57,7 +56,9 @@ scenarios:
   - id: abusive_logged_and_allowed
     kind: edge
     description: Abusive content is flagged/logged but still answered.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::abusive content is flagged and logged but still answered'
   - id: hourly_limit_exceeded
     kind: edge
     description: The 31st message within the fixed hourly window is refused with rate limit details, and the window resets an hour after its first message.
@@ -82,11 +83,17 @@ scenarios:
   - id: route_throttle
     kind: edge
     description: More than 30 send/stream requests per minute return 429 from the throttle middleware.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::chat send and stream requests beyond thirty per minute are throttled by the route'
+      - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::the chat route throttle resets after a minute'
   - id: auto_ban_after_offenses
     kind: edge
     description: A fifth offense within 24 hours bans the user from chat for 24 hours.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::a fifth offense within 24 hours bans the user from chat for 24 hours'
+      - 'tests/Feature/Chat/ChatModerationOutcomesTest.php::offenses older than 24 hours do not count toward the automatic ban'
   - id: banned_user_refused
     kind: authorization
     description: A temporarily banned user receives 403 and no provider call is made.

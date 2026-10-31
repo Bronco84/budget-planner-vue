@@ -39,27 +39,40 @@ scenarios:
   - id: page_lists_owned_cards
     kind: happy_path
     description: The page lists only the user's own connections that have credit cards.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLiabilitiesAdminTest.php::the liabilities page lists only the users own connections with credit cards
   - id: update_one_connection
     kind: happy_path
     description: Refreshing one connection updates its cards and flashes success.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLiabilitiesAdminTest.php::refreshing one connection updates its cards and flashes success
   - id: update_all_partial_failure
     kind: integration
     description: When some institutions do not support liabilities, update-all reports how many succeeded and failed.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLiabilitiesAdminTest.php::refreshing all connections reports how many succeeded and failed
   - id: no_credit_cards
     kind: empty_state
     description: With no credit card connections the page is empty and update-all flashes "No credit card accounts found to update."
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLiabilitiesAdminTest.php::with no credit card connections the page is empty and update all reports nothing to update
   - id: connection_without_cards
     kind: edge
     description: Updating a connection with no credit cards flashes an error.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLiabilitiesAdminTest.php::refreshing a connection without credit cards flashes an error
   - id: update_rate_limited
     kind: edge
     description: Exceeding 10/min (connection) or 3/min (all) returns 429.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLiabilitiesAdminTest.php::refreshing one connection is rate limited to ten per minute
+      - tests/Feature/Plaid/PlaidLiabilitiesAdminTest.php::refreshing all liabilities is rate limited to three per minute
   - id: other_users_connection_refused
     kind: authorization
     description: Updating another user's connection returns 403 and makes no Plaid call.

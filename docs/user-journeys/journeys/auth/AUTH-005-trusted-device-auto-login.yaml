@@ -61,11 +61,15 @@ scenarios:
   - id: auto_logged_in_user_skips_login_page
     kind: happy_path
     description: An auto-logged-in visit to /login redirects through /dashboard to budgets.index.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/TrustedDeviceLifecycleTest.php::an auto logged in visit to the login page goes through the dashboard to the budgets index'
   - id: expired_device_ignored
     kind: edge
     description: A cookie whose device is past expires_at leaves the request as a guest.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/TrustedDeviceLifecycleTest.php::an expired trusted device leaves the request as a guest'
   - id: fingerprint_mismatch_ignored
     kind: edge
     description: A valid token presented with different browser headers is not accepted.
@@ -106,7 +110,10 @@ scenarios:
   - id: revoked_device_no_longer_logs_in
     kind: authorization
     description: After the device is revoked (AUTH-012) or the user logs out (AUTH-006) the cookie no longer signs the user in.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/TrustedDeviceLifecycleTest.php::a revoked trusted device no longer signs the user in'
+      - 'tests/Feature/Auth/TrustedDeviceLifecycleTest.php::after signing out the device cookie no longer signs the user in'
   - id: login_options_stay_json_when_auto_logged_in
     kind: integration
     description: The login-options endpoint still returns JSON when the request is authenticated (guards the auto-login regression).

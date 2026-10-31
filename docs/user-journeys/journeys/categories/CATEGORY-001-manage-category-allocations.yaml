@@ -40,27 +40,39 @@ scenarios:
   - id: index_shows_spending
     kind: happy_path
     description: Index renders categories with spent/remaining computed from matching expense transactions.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryManagementTest.php::index renders categories with spent and remaining computed from matching expenses
   - id: create_category
     kind: happy_path
     description: Valid create stores the category at the end of the order.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryManagementTest.php::a valid category is stored at the end of the order
   - id: edit_category
     kind: happy_path
     description: Valid update changes the category.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryManagementTest.php::a valid update changes the category
   - id: no_categories_empty_state
     kind: empty_state
     description: A budget with no categories renders zero totals.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryManagementTest.php::a budget with no categories renders zero totals
   - id: invalid_category_rejected
     kind: validation
     description: Missing name or negative amount returns validation errors.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryManagementTest.php::a category without a name or with a negative amount is rejected and nothing is saved
   - id: other_users_categories_forbidden
     kind: authorization
     description: Index/store/update on another user's budget return 403; a category from another budget returns 404 via scopeBindings.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryManagementTest.php::category routes on another users budget are forbidden and a cross budget category is not found
 known_issues:
   - "Transactions reference categories by name string, not id. Renaming a category in update silently detaches all existing transactions from it (their spend no longer counts and the delete guard in CATEGORY-002 no longer sees them)."
   - "Transaction forms take a free-text category, so spelling variants never match a category."

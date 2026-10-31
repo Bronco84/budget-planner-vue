@@ -50,7 +50,7 @@ Route::withoutMiddleware([HandleInertiaRequests::class])->group(function () {
     // (RememberDevice) can mark the request authenticated, and a `guest` guard
     // would then 302 it to the dashboard. axios follows that redirect to an HTML
     // page, which PasskeyLogin.vue surfaces as "Server configuration error".
-    Route::middleware('throttle:10,1')->group(function () {
+    Route::middleware('throttle:10,1,webauthn-login')->group(function () {
         Route::post('webauthn/login/options', [WebAuthnLoginController::class, 'options'])
             ->name('webauthn.login.options');
 
@@ -293,22 +293,22 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::post('budget/{budget}/account/{account}/plaid/store', [PlaidController::class, 'store'])
         ->name('plaid.store');
     Route::post('budget/{budget}/account/{account}/plaid/sync', [PlaidController::class, 'syncTransactions'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:5,1,plaid.sync')
         ->name('plaid.sync');
     Route::post('budget/{budget}/account/{account}/plaid/balance', [PlaidController::class, 'updateBalance'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,plaid.balance')
         ->name('plaid.balance');
     Route::post('budget/{budget}/account/{account}/plaid/liabilities', [PlaidController::class, 'updateLiabilities'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,plaid.liabilities')
         ->name('plaid.liabilities');
     Route::post('budget/{budget}/account/{account}/plaid/investments', [PlaidController::class, 'updateInvestments'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,plaid.investments')
         ->name('plaid.investments');
     Route::post('budget/{budget}/account/{account}/plaid/upgrade-link-token', [PlaidController::class, 'upgradeLinkToken'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,plaid.upgrade-link-token')
         ->name('plaid.upgrade-link-token');
     Route::post('budget/{budget}/account/{account}/plaid/update-connection', [PlaidController::class, 'updateConnection'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,plaid.update-connection')
         ->name('plaid.update-connection');
     Route::get('budget/{budget}/account/{account}/plaid/statement-history', [PlaidStatementHistoryController::class, 'index'])
         ->name('plaid.statement-history');
@@ -317,12 +317,12 @@ Route::middleware('auth')->scopeBindings()->group(function () {
 
     // New route for syncing all Plaid accounts in a budget
     Route::post('budget/{budget}/plaid/sync-all', [PlaidController::class, 'syncAllTransactions'])
-        ->middleware('throttle:3,1')
+        ->middleware('throttle:3,1,plaid.sync-all')
         ->name('plaid.sync-all');
 
     // File attachment routes
     Route::post('transactions/{transaction}/files', [FileController::class, 'uploadToTransaction'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,transactions.files.upload')
         ->name('transactions.files.upload');
     Route::get('transactions/{transaction}/files', [FileController::class, 'getTransactionAttachments'])
         ->name('transactions.files.index');
@@ -331,7 +331,7 @@ Route::middleware('auth')->scopeBindings()->group(function () {
     Route::get('budgets/{budget}/files', [BudgetFilesController::class, 'index'])
         ->name('budgets.files.index');
     Route::post('budgets/{budget}/files', [FileController::class, 'uploadToBudget'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,budgets.files.upload')
         ->name('budgets.files.upload');
     Route::get('budgets/{budget}/files/{fileAttachment}/download', [BudgetFilesController::class, 'download'])
         ->name('budgets.files.download');
@@ -359,9 +359,11 @@ Route::middleware('auth')->scopeBindings()->group(function () {
         ->name('preferences.update');
 
     // Chat routes with rate limiting
-    Route::prefix('chat')->name('chat.')->middleware('throttle:60,1')->group(function () {
-        Route::post('/message', [ChatController::class, 'send'])->middleware('throttle:30,1')->name('send');
-        Route::get('/stream', [ChatController::class, 'stream'])->middleware('throttle:30,1')->name('stream');
+    // Route throttles sharing the group's key would count each request twice;
+    // the third argument gives send/stream their own counters.
+    Route::prefix('chat')->name('chat.')->middleware('throttle:60,1,chat')->group(function () {
+        Route::post('/message', [ChatController::class, 'send'])->middleware('throttle:30,1,chat-send')->name('send');
+        Route::get('/stream', [ChatController::class, 'stream'])->middleware('throttle:30,1,chat-stream')->name('stream');
         Route::post('/stream/complete', [ChatController::class, 'streamComplete'])->name('stream.complete');
         Route::get('/conversations', [ChatController::class, 'conversations'])->name('conversations');
         Route::get('/conversations/{id}', [ChatController::class, 'show'])->name('conversations.show');
@@ -374,10 +376,10 @@ Route::middleware('auth')->scopeBindings()->group(function () {
         Route::get('/plaid-liabilities', [PlaidLiabilitiesController::class, 'index'])
             ->name('plaid-liabilities.index');
         Route::post('/plaid-liabilities/connections/{connection}/update', [PlaidLiabilitiesController::class, 'updateConnection'])
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:10,1,admin.plaid-liabilities.update-connection')
             ->name('plaid-liabilities.update-connection');
         Route::post('/plaid-liabilities/update-all', [PlaidLiabilitiesController::class, 'updateAll'])
-            ->middleware('throttle:3,1')
+            ->middleware('throttle:3,1,admin.plaid-liabilities.update-all')
             ->name('plaid-liabilities.update-all');
     });
 });

@@ -46,15 +46,14 @@ scenarios:
   - id: profile_lists_passkeys
     kind: happy_path
     description: The profile page includes the user's passkeys.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/ProfileTest.php::test_profile_page_is_displayed
-    note: only asserts 200; does not inspect the passkeys prop.
+      - 'tests/Feature/Auth/ProfilePasskeyListTest.php::the profile page lists the users passkeys and not other users passkeys'
   - id: add_additional_passkey
     kind: happy_path
     description: An existing user completes a second attestation and now has two credentials.
     coverage: uncovered
-    note: requires a WebAuthn attestation fixture.
+    note: 'requires WebAuthn fixture'
   - id: add_passkey_returns_to_profile
     kind: alternate
     description: Registration started from the profile (return=profile) sends the user back to the profile; first-passkey enrolment and unknown return values go to /budgets.

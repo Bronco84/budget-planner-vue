@@ -19,11 +19,11 @@ Route::middleware('guest')->group(function () {
         ->name('magic-link.request');
 
     Route::post('magic-link', [MagicLinkController::class, 'store'])
-        ->middleware('throttle:6,1')
+        ->middleware('throttle:6,1,magic-link.store')
         ->name('magic-link.store');
 
     Route::get('magic-link/authenticate', [MagicLinkController::class, 'authenticate'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:10,1,magic-link.authenticate')
         ->name('magic-link.authenticate');
 
     // Registration
@@ -31,7 +31,7 @@ Route::middleware('guest')->group(function () {
         ->name('register');
 
     Route::post('register', [PasskeyAuthController::class, 'registerStore'])
-        ->middleware('throttle:6,1');
+        ->middleware('throttle:6,1,register');
 });
 
 Route::middleware('auth')->group(function () {
@@ -57,11 +57,11 @@ Route::middleware('auth')->group(function () {
         ->name('verification.notice');
 
     Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
-        ->middleware(['signed', 'throttle:6,1'])
+        ->middleware(['signed', 'throttle:6,1,verification.verify'])
         ->name('verification.verify');
 
     Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
-        ->middleware('throttle:6,1')
+        ->middleware('throttle:6,1,verification.send')
         ->name('verification.send');
 
     // Logout

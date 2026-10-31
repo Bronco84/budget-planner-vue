@@ -50,31 +50,48 @@ scenarios:
   - id: create_fixed_template
     kind: happy_path
     description: Owner creates a fixed-amount monthly template and is redirected to the index.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::an owner creates a fixed amount monthly template and returns to the index
   - id: create_with_inline_rules_links_transactions
     kind: alternate
     description: Inline rules are saved in order and existing matching transactions are linked to the new template.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::inline rules are saved in order and existing matching transactions are linked
   - id: make_recurring_from_transaction
     kind: alternate
     description: Creating from an existing transaction prefills the form and links that transaction after save.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::making a transaction recurring prefills the form and links that transaction after save
   - id: redirect_without_active_budget
     kind: edge
     description: /recurring-transactions sends a user with no active budget to budgets.create.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::the recurring shortcut sends a user without a budget to create one
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::the recurring shortcut opens the active budgets recurring list
   - id: empty_list
     kind: empty_state
     description: A budget with no templates shows the "No recurring transactions have been set up yet" message.
-    coverage: uncovered
+    coverage: partial
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::a budget with no templates renders an empty recurring list
+    note: the empty recurringTransactions prop is asserted; the "No recurring transactions" message is rendered by Index.vue with no browser test.
   - id: schedule_validation
     kind: validation
     description: Missing day_of_week/day_of_month for the chosen frequency, or a bimonthly pair with identical days, is rejected.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::a schedule missing its day for the chosen frequency is rejected
   - id: amount_required_unless_dynamic
     kind: validation
     description: A non-dynamic template without an amount fails validation; a dynamic one is saved with amount_in_cents 0.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::a fixed amount template requires an amount
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::a dynamic amount template without an amount is saved with zero cents
   - id: cents_conversion_precision
     kind: edge
     description: Decimal amounts such as 19.99 (and min/max amounts) are converted to the exact cent value.
@@ -84,7 +101,9 @@ scenarios:
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot list, open the create form for, or store a template in a budget they do not own (403).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateCreateTest.php::another user cannot list, open the create form for or store templates in a budget
   - id: foreign_account_rejected
     kind: authorization
     description: account_id / linked_credit_card_account_id belonging to another budget is rejected with a validation error and no template is saved.

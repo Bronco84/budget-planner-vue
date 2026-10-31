@@ -51,19 +51,27 @@ scenarios:
   - id: view_linked_and_unlink
     kind: happy_path
     description: Owner views linked transactions and unlinks one.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkedTransactionsTest.php::an owner views the linked transactions and unlinks one
   - id: diagnostics_json
     kind: happy_path
     description: Diagnostics returns the matching method for the template.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkedTransactionsTest.php::diagnostics return the matching method, rules and linked transactions for the template
   - id: test_matching_reports_methods
     kind: alternate
     description: Test matching reports entity, rule and description matches with their method.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkedTransactionsTest.php::test matching reports entity, rule and description matches with their method
   - id: unlink_not_linked_transaction
     kind: validation
     description: Unlinking a transaction that is not linked to this template returns 400.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkedTransactionsTest.php::unlinking a transaction that is not linked to this template returns 400
   - id: linked_list_scoped_to_budget
     kind: authorization
     description: The linked list only shows transactions from the budget in the URL, even if another budget's transaction carries the template id.
@@ -85,15 +93,21 @@ scenarios:
   - id: no_linked_transactions
     kind: empty_state
     description: Linked list for a template with no links renders an empty page.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkedTransactionsTest.php::a template with no linked transactions renders an empty linked list
   - id: unlink_foreign_transaction
     kind: authorization
     description: Unlinking a transaction from another budget returns 403.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkedTransactionsTest.php::unlinking a transaction from another budget is forbidden and leaves it linked
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot read diagnostics, test matching or linked lists for a budget they do not own.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringLinkedTransactionsTest.php::another user cannot read diagnostics, test matching or the linked list
 known_issues: []
 confidence: medium
 evidence:

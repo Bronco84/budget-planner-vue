@@ -76,11 +76,16 @@ scenarios:
   - id: no_transactions_empty_state
     kind: empty_state
     description: A budget with no transactions renders an empty list.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/TransactionListTest.php::a budget with no transactions renders an empty list
   - id: shortcut_redirects_to_active_budget
     kind: happy_path
     description: /transactions redirects to the active budget's list (or budgets.create when none).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::transactions shortcut redirects to the active budget transaction list
+      - tests/Feature/Budgets/ActiveBudgetNavigationTest.php::a user with no budgets is redirected from budgets and transactions to the create form
   - id: other_users_transactions_forbidden
     kind: authorization
     description: Listing another user's budget transactions returns 403.

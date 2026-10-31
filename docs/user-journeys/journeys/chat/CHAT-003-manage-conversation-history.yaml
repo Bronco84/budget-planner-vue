@@ -39,31 +39,48 @@ scenarios:
   - id: list_conversations
     kind: happy_path
     description: The user sees their own recent conversations only.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::the conversation list shows only the users own conversations, most recent first'
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::the conversation list is limited to the 20 most recent conversations'
   - id: reopen_conversation
     kind: happy_path
     description: Reopening returns the conversation's messages in order.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::reopening a conversation returns its messages in order'
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::an untitled conversation is shown as a new conversation'
   - id: delete_conversation
     kind: happy_path
     description: Deleting removes the conversation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::deleting a conversation removes it and its messages'
   - id: bulk_delete
     kind: alternate
     description: Bulk delete removes the selected conversations and reports the count.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::bulk delete removes the selected conversations and reports the count'
   - id: bulk_delete_validation
     kind: validation
     description: An empty or non-existent id list fails validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::bulk delete rejects an empty or unknown id list'
   - id: no_conversations
     kind: empty_state
     description: A user with no conversations gets an empty list.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::a user with no conversations gets an empty list'
   - id: other_users_conversation_hidden
     kind: authorization
     description: Showing or deleting another user's conversation returns 404, and bulk delete does not remove it.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::another users conversation cannot be shown or deleted, and bulk delete skips it'
+      - 'tests/Feature/Chat/ChatConversationHistoryTest.php::guests cannot list, show or delete conversations'
 confidence: high
 evidence:
   - app/Http/Controllers/ChatController.php conversations(), show(), destroy(), bulkDestroy()

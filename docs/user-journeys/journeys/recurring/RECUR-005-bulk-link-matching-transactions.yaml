@@ -37,26 +37,34 @@ scenarios:
   - id: review_and_link
     kind: happy_path
     description: Owner reviews suggested matches and links a selection; flash reports the linked count.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::bulk linking links the selected transactions of the budget
-    note: asserts the link-transactions POST only; the find-matching review page is not tested.
+      - tests/Feature/Recurring/RecurringBulkLinkTest.php::an owner reviews suggested matches and links a selection
   - id: no_templates_or_matches
     kind: empty_state
     description: A budget with no templates or no matching transactions shows the empty state.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringBulkLinkTest.php::find matching shows the empty state with no templates or no matching transactions
   - id: already_linked_skipped
     kind: edge
     description: A selected transaction that is already linked is not re-linked and the "No transactions were linked." message is shown.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringBulkLinkTest.php::an already linked transaction is not re-linked and nothing is reported as linked
   - id: selections_required
     kind: validation
     description: Missing selections or non-existent template/transaction ids fail validation.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringBulkLinkTest.php::bulk linking requires selections with existing template and transaction ids
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot open find-matching or post link-transactions for a budget they do not own (403).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringBulkLinkTest.php::another user cannot open find matching or bulk link in a budget they do not own
   - id: foreign_ids_rejected
     kind: authorization
     description: Template or transaction ids from another budget in the selections payload are rejected with a validation error and nothing is linked.

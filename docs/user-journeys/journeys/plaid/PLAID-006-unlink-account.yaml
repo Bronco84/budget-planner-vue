@@ -29,10 +29,10 @@ scenarios:
   - id: unlink_account
     kind: happy_path
     description: Unlinking deletes the PlaidAccount and keeps the account and transactions.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidUnlinkTest.php::unlinking one of several accounts keeps the connection and its Plaid item
-    note: asserts the account stays and is unlinked; keeping its transactions is not asserted.
+      - tests/Feature/Plaid/PlaidUnlinkEdgeCasesTest.php::unlinking an account keeps the account and its transactions
   - id: last_account_removes_connection
     kind: alternate
     description: Unlinking the last account on a connection also deletes the connection, removes its item at Plaid, and mentions the institution in the flash.
@@ -48,7 +48,9 @@ scenarios:
   - id: not_linked
     kind: edge
     description: Disconnecting an unlinked account redirects back with "Account is not linked to Plaid."
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidUnlinkEdgeCasesTest.php::disconnecting an account that is not linked redirects back with an error
   - id: cross_budget_account_not_found
     kind: authorization
     description: Disconnecting an account from another budget via one's own budget URL returns 404.
@@ -58,8 +60,9 @@ scenarios:
   - id: cross_user_denied
     kind: authorization
     description: Disconnecting another user's account via their budget URL returns 403.
-    coverage: uncovered
-    note: plaid.destroy is not in the 403 dataset in NestedRouteAuthorizationTest.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidUnlinkEdgeCasesTest.php::disconnecting another users account is forbidden and leaves the link in place
 known_issues: []
 confidence: high
 evidence:

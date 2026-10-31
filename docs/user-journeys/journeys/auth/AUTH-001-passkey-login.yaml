@@ -58,15 +58,21 @@ scenarios:
     kind: happy_path
     description: A valid assertion authenticates the user and issues a trusted-device cookie.
     coverage: uncovered
-    note: requires simulating a WebAuthn assertion signature; no test fixture exists yet.
+    note: 'requires WebAuthn fixture'
   - id: invalid_assertion_rejected
     kind: validation
     description: An invalid or unknown assertion returns 422 and no session is created.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLoginEndpointTest.php::an invalid passkey assertion is rejected with 422 and no session or device is created'
+      - 'tests/Feature/Auth/PasskeyLoginEndpointTest.php::a malformed passkey assertion payload is rejected with 422'
   - id: options_rate_limited
     kind: edge
     description: Login option requests beyond 10 per minute are throttled.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLoginEndpointTest.php::passkey login option requests beyond ten per minute are throttled'
+      - 'tests/Feature/Auth/PasskeyLoginEndpointTest.php::passkey login options are available again after the throttle window'
   - id: authorization
     kind: authorization
     description: Endpoints are intentionally public; there is no resource ownership to enforce.

@@ -71,6 +71,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::user cannot sync all transactions on another users budget
+  - id: throttles_isolated_per_route
+    kind: edge
+    description: Each throttled route has its own counter, so requests to one route never use up another route's limit.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Security/RouteThrottleIsolationTest.php::requests to one throttled route do not use up another routes limit'
+      - 'tests/Feature/Security/RouteThrottleIsolationTest.php::each throttled route still enforces its own limit'
 known_issues: []
 confidence: high
 evidence:

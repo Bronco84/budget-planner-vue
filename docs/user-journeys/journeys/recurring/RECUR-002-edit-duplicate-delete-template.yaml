@@ -44,25 +44,29 @@ scenarios:
   - id: edit_page_renders
     kind: happy_path
     description: Owner opens the detail page and sees the template, rules and linked transactions.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateEditTest.php::the detail page shows the template with its rules and linked transactions
   - id: update_template_and_sync_rules
     kind: happy_path
     description: Updating with a changed rule list updates, creates and deletes rules accordingly; every submitted rule gets priority = its position + 1, as on create.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateLifecycleTest.php::rules saved through the update form get priorities in submitted order
-    note: create and update of rules with priorities are asserted; deletion of omitted rules is not.
+      - tests/Feature/Recurring/RecurringTemplateEditTest.php::updating with a changed rule list updates kept rules, creates new ones and deletes omitted ones
   - id: duplicate_template
     kind: alternate
     description: Duplicate creates "Copy of ..." with the same schedule and dynamic flag, and copies the template's matching rules (field, operator, value, case sensitivity, priority, active flag).
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateLifecycleTest.php::duplicating a template copies its matching rules
-    note: rule copying and the "Copy of" name are asserted; schedule and dynamic flag are not compared field by field.
+      - tests/Feature/Recurring/RecurringTemplateEditTest.php::duplicating a template copies its schedule, amounts and dynamic flag
   - id: delete_template
     kind: alternate
     description: Delete removes the template and returns to the index.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateEditTest.php::deleting a template removes it and returns to the index
   - id: update_cents_conversion_precision
     kind: edge
     description: Updating with decimal amounts such as 19.99 stores the exact cent value.
@@ -72,7 +76,9 @@ scenarios:
   - id: update_validation
     kind: validation
     description: Invalid frequency/day combinations or end_date before start_date are rejected on update.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTemplateEditTest.php::updating with an invalid schedule or an end date before the start date is rejected
   - id: cross_budget_template_not_found
     kind: authorization
     description: A template from another budget addressed through the user's own budget returns 404 for edit and destroy.
@@ -82,10 +88,10 @@ scenarios:
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot edit, update, duplicate or delete templates in a budget they do not own (403).
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction template routes reject another users budget with 403
-    note: only the edit (GET) route is asserted; update, duplicate and destroy are not tested for another user's budget.
+      - tests/Feature/Recurring/RecurringTemplateEditTest.php::another user cannot update, duplicate or delete a template in a budget they do not own
   - id: foreign_account_rejected
     kind: authorization
     description: Updating account_id / linked_credit_card_account_id to an account from another budget is rejected with a validation error and the template is unchanged.

@@ -42,12 +42,12 @@ scenarios:
   - id: balance_projection_renders
     kind: happy_path
     description: Owner sees a weekly balance line that starts from the current balance and applies recurring, manual and autopay items.
-    coverage: partial
+    coverage: covered
     tests:
       - tests/Feature/Projections/AccountProjectionTest.php::owner sees the weekly account projection rolled forward from the current balance
       - tests/Feature/Projections/AccountProjectionTest.php::balance projection page defaults to twelve months and renders the detailed projection
+      - tests/Feature/Projections/AccountAutopayProjectionTest.php::credit card autopay is projected on the source account and replaces the linked template payment
       - tests/playwright/smoke.spec.js::account projections page loads for six months
-    note: recurring and future manual items are asserted on both pages; credit-card autopay projections are not exercised.
   - id: series_starts_today
     kind: edge
     description: The first data point is today and no bucket covers days before today; each amount is counted exactly once.

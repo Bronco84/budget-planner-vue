@@ -46,7 +46,9 @@ scenarios:
   - id: logout_revokes_current_device
     kind: happy_path
     description: The TrustedDevice for the current cookie is deleted and the cookie is forgotten; other devices remain.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/TrustedDeviceLifecycleTest.php::signing out revokes the current trusted device, forgets its cookie and keeps other devices'
   - id: logout_without_device_cookie
     kind: edge
     description: Logging out without a device cookie still ends the session cleanly.
@@ -56,7 +58,9 @@ scenarios:
   - id: guest_cannot_logout
     kind: authentication
     description: A guest posting to /logout is redirected to login by the auth middleware.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/TrustedDeviceLifecycleTest.php::a guest posting to logout is redirected to the login page'
 confidence: high
 evidence:
   - routes/auth.php auth group

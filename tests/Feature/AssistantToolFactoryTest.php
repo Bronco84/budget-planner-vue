@@ -59,7 +59,7 @@ test('transaction query caps the requested limit', function () {
     $budget = Budget::factory()->create(['user_id' => $user->id]);
     $account = Account::factory()->create(['budget_id' => $budget->id]);
 
-    Transaction::factory()->count(3)->create([
+    Transaction::factory()->count(105)->create([
         'budget_id' => $budget->id,
         'account_id' => $account->id,
         'date' => now()->subDays(5),
@@ -67,6 +67,6 @@ test('transaction query caps the requested limit', function () {
 
     $result = (new TransactionQueryContextBuilder)->build($user, $budget, ['limit' => 999]);
 
-    // Limit is capped well under 999 and never returns more than exists.
-    expect($result['summary']['returned'])->toBe(3);
+    // More rows exist than the cap, so the 100-row maximum is what limits the result.
+    expect($result['summary']['returned'])->toBe(100);
 });

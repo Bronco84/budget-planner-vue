@@ -30,7 +30,9 @@ scenarios:
   - id: history_returned
     kind: happy_path
     description: A linked credit card returns its statement history and credit limit.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidStatementHistoryTest.php::a linked credit card returns its statement history and credit limit
   - id: not_linked_returns_404
     kind: edge
     description: An owner's unlinked account returns 404 "Account is not linked to Plaid."
@@ -40,11 +42,15 @@ scenarios:
   - id: non_credit_card_returns_400
     kind: validation
     description: A linked non-credit-card account returns 400.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidStatementHistoryTest.php::a linked account that is not a credit card returns 400
   - id: empty_history
     kind: empty_state
     description: A card with no statements in the last 12 months returns an empty history array.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidStatementHistoryTest.php::a credit card with no statements in the last 12 months returns an empty history
   - id: cross_user_denied
     kind: authorization
     description: Another user's budget returns 403.

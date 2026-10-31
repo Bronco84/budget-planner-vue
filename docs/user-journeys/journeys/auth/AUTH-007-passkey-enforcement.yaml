@@ -76,7 +76,9 @@ scenarios:
   - id: guest_not_affected
     kind: authentication
     description: Guests pass through the middleware untouched and are handled by auth/guest guards instead.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementGuestTest.php::guests are not redirected to passkey registration by the enforcement middleware'
   - id: enforcement_error_shown
     kind: recovery
     description: After the redirect, PasskeyRegister receives flash.error "You must register a passkey to continue." and shows it in its error banner.

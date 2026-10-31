@@ -63,10 +63,10 @@ scenarios:
   - id: stream_returns_events
     kind: happy_path
     description: GET /chat/stream emits conversation_id, text_delta and stream_end events.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/ChatAssistantTest.php::the stream persists the assistant reply the server generated
-    note: asserts stream_end and the stored reply; the individual delta events are not asserted.
+      - 'tests/Feature/ChatAssistantTest.php::the stream persists the assistant reply the server generated'
+      - 'tests/Feature/Chat/ChatAssistantRequestTest.php::the stream emits the conversation id, a text delta per word and a stream end event'
   - id: stream_complete_saves_reply
     kind: happy_path
     description: The stream stores the server-generated reply as the assistant message and titles a new conversation.
@@ -94,10 +94,10 @@ scenarios:
   - id: no_budget_no_tools
     kind: empty_state
     description: A user without a budget gets no tools and a prompt explaining how to get started.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/AssistantToolFactoryTest.php::factory returns no tools when there is no budget
-    note: asserts the factory returns no tools; the no-budget system prompt is not asserted.
+      - 'tests/Feature/AssistantToolFactoryTest.php::factory returns no tools when there is no budget'
+      - 'tests/Feature/Chat/ChatAssistantRequestTest.php::a user without a budget gets no tools and a getting started prompt'
   - id: transaction_window_clamped
     kind: edge
     description: The transaction query tool clamps start dates to the last 12 months.
@@ -107,22 +107,24 @@ scenarios:
   - id: transaction_limit_capped
     kind: edge
     description: The transaction query tool caps the requested limit.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/AssistantToolFactoryTest.php::transaction query caps the requested limit
-    note: only 3 rows exist so the test cannot distinguish a cap from no cap.
+      - 'tests/Feature/AssistantToolFactoryTest.php::transaction query caps the requested limit'
   - id: message_validation
     kind: validation
     description: Empty, over-2000-char messages or unknown conversation/budget ids fail validation (422).
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatAssistantRequestTest.php::chat messages are validated before anything is stored or sent to the provider'
   - id: provider_error_safe_message
     kind: integration
     description: Provider rate limit, overload or request-too-large failures return the specific safe message (JSON 500 on send, in-band SSE error event on stream) and log the real cause.
-    coverage: partial
+    coverage: covered
     tests:
-      - tests/Feature/ChatAssistantTest.php::a provider failure on send returns the safe message and leaves no orphan user message
-      - tests/Feature/ChatAssistantTest.php::a provider failure while streaming sends the safe message in-band and leaves no orphan user message
-    note: covers the rate-limit mapping only; overload, too-large and logging are not asserted.
+      - 'tests/Feature/ChatAssistantTest.php::a provider failure on send returns the safe message and leaves no orphan user message'
+      - 'tests/Feature/ChatAssistantTest.php::a provider failure while streaming sends the safe message in-band and leaves no orphan user message'
+      - 'tests/Feature/Chat/ChatAssistantRequestTest.php::provider failures on send return the specific safe message and log the real cause'
+      - 'tests/Feature/Chat/ChatAssistantRequestTest.php::provider failures while streaming send the specific safe message in band and log the real cause'
   - id: failed_turn_not_persisted
     kind: recovery
     description: A provider failure leaves no orphan user message, and no empty conversation when the conversation was new.
@@ -147,7 +149,9 @@ scenarios:
   - id: other_users_budget_tools
     kind: authorization
     description: Passing another user's budget_id does not expose that budget's data to the tools.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - 'tests/Feature/Chat/ChatAssistantRequestTest.php::passing another users budget id does not expose that budget to the assistant'
 known_issues:
   - ChatPanel does not send budget_id, so tools always use the active budget; the question text travels in the GET query string (logged by web servers).
 confidence: high

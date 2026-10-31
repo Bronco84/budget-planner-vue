@@ -103,7 +103,9 @@ scenarios:
   - id: other_users_transaction_files_forbidden
     kind: authorization
     description: Upload, list, download and delete on another user's transaction or attachment return 403.
-    coverage: uncovered
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAuthorizationTest.php::upload list download and delete on another users transaction files are forbidden and nothing changes
 known_issues:
   - "Access check allows connected users, while TransactionPolicy and BudgetPolicy are owner-only; file routes are not nested under {budget} so scopeBindings does not apply."
 confidence: high

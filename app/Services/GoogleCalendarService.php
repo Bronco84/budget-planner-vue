@@ -53,22 +53,28 @@ class GoogleCalendarService
         $calendar = new GoogleCalendar($this->client);
         $calendarInfo = $calendar->calendars->get($calendarId);
 
+        // Google only returns a refresh token on first consent; on a reconnect
+        // keep the stored one rather than overwriting it with null.
+        $attributes = [
+            'provider' => 'google',
+            'calendar_name' => $calendarInfo->getSummary(),
+            'access_token' => $token['access_token'],
+            'token_expires_at' => isset($token['expires_in'])
+                ? now()->addSeconds($token['expires_in'])
+                : null,
+            'is_active' => true,
+        ];
+        if (! empty($token['refresh_token'])) {
+            $attributes['refresh_token'] = $token['refresh_token'];
+        }
+
         // Create or update calendar connection
         $connection = CalendarConnection::updateOrCreate(
             [
                 'user_id' => $user->id,
                 'calendar_id' => $calendarId,
             ],
-            [
-                'provider' => 'google',
-                'calendar_name' => $calendarInfo->getSummary(),
-                'access_token' => $token['access_token'],
-                'refresh_token' => $token['refresh_token'] ?? null,
-                'token_expires_at' => isset($token['expires_in'])
-                    ? now()->addSeconds($token['expires_in'])
-                    : null,
-                'is_active' => true,
-            ]
+            $attributes
         );
 
         // Perform initial sync

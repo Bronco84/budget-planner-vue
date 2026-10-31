@@ -1,0 +1,44 @@
+schema: 1
+id: CATEGORY-002
+name: Owner deletes an unused category
+domain: categories
+status: implemented
+priority: medium
+summary: >
+  From the categories page the owner confirms deletion of a category. The delete
+  is refused with an error flash when any of the budget's transactions use the
+  category's name.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.categories.destroy
+depends_on:
+  - path: resources/js/Pages/Categories/Partials/DeleteConfirmationModal.vue
+    reason: confirmation modal issuing the delete
+integrations: []
+steps:
+  - action: confirm delete (DELETE /budgets/{budget}/categories/{category})
+    expected: category removed and back with success flash, or back with an error naming the transaction count
+postconditions:
+  - category deleted only when no transaction references its name
+business_rules:
+  - categories in use by transactions (matched by name) cannot be deleted
+scenarios:
+  - id: delete_unused_category
+    kind: happy_path
+    description: A category with no transactions is deleted.
+    coverage: uncovered
+  - id: delete_blocked_when_in_use
+    kind: edge
+    description: A category used by transactions is not deleted and an error flash is returned.
+    coverage: uncovered
+  - id: other_users_category_forbidden
+    kind: authorization
+    description: Deleting under another user's budget returns 403; a cross-budget category returns 404.
+    coverage: uncovered
+confidence: high
+evidence:
+  - app/Http/Controllers/CategoryController.php destroy
+last_verified: null

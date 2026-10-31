@@ -1,0 +1,64 @@
+schema: 1
+id: PLAID-007
+name: User views credit card statement history for a Plaid-linked card
+domain: plaid
+status: implemented
+priority: medium
+summary: >
+  The StatementHistoryChart component fetches the last 12 months of stored Plaid
+  statement snapshots (statement balance, minimum payment, due date, APR, utilisation)
+  plus the credit limit for a linked credit card and charts them.
+actors:
+  - budget owner
+preconditions:
+  - the account is linked to Plaid as a credit card and liabilities have been synced
+routes:
+  - plaid.statement-history
+depends_on:
+  - path: resources/js/Components/StatementHistoryChart.vue
+    reason: fetches the JSON endpoint by URL and renders the chart
+integrations: []
+steps:
+  - action: chart component GETs budget/{budget}/account/{account}/plaid/statement-history
+    expected: JSON {account_id, account_name, credit_limit, history[]} ordered by statement date
+postconditions:
+  - none (read-only)
+business_rules:
+  - only statements issued within the last 12 months are returned
+  - unlinked accounts return 404; non-credit-card accounts return 400
+scenarios:
+  - id: history_returned
+    kind: happy_path
+    description: A linked credit card returns its statement history and credit limit.
+    coverage: uncovered
+  - id: not_linked_returns_404
+    kind: edge
+    description: An owner's unlinked account returns 404 "Account is not linked to Plaid."
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::owner passes authorization on their own nested route
+  - id: non_credit_card_returns_400
+    kind: validation
+    description: A linked non-credit-card account returns 400.
+    coverage: uncovered
+  - id: empty_history
+    kind: empty_state
+    description: A card with no statements in the last 12 months returns an empty history array.
+    coverage: uncovered
+  - id: cross_user_denied
+    kind: authorization
+    description: Another user's budget returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot read another users plaid statement history
+  - id: cross_budget_account_not_found
+    kind: authorization
+    description: Another budget's account under one's own budget returns 404.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::statement history rejects an account that does not belong to the budget
+confidence: high
+evidence:
+  - app/Http/Controllers/PlaidStatementHistoryController.php
+  - resources/js/Components/StatementHistoryChart.vue
+last_verified: null

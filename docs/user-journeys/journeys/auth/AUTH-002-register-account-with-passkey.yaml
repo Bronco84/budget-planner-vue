@@ -1,0 +1,101 @@
+schema: 1
+id: AUTH-002
+name: Guest registers an account and enrols a first passkey
+domain: auth
+status: implemented
+priority: critical
+summary: >
+  A guest fills in name and email on the registration form. If the email is the
+  single allowlisted owner address an account is created without a password, the
+  user is logged in and sent to the passkey registration page, where a WebAuthn
+  attestation ceremony stores the first passkey and issues a trusted-device cookie
+  before redirecting to /budgets.
+actors:
+  - guest
+preconditions:
+  - no account exists for the email
+  - browser supports WebAuthn
+routes:
+  - register
+  - POST /register
+  - passkey.register
+  - webauthn.register.options
+  - webauthn.register
+depends_on:
+  - path: app/Services/DeviceTokenService.php
+    reason: creates the TrustedDevice and cookie after a passkey is saved
+  - path: app/Services/DeviceFingerprintService.php
+    reason: fingerprints the browser for the trusted device
+integrations:
+  - WebAuthn (laragear/webauthn), browser credential API
+  - Mail (NewDeviceLogin notification queued on first trust of a device)
+steps:
+  - action: visit /register
+    expected: Auth/Register page rendered with name + email fields
+  - action: submit name and email (POST /register)
+    expected: user created with null password, logged in, redirect to /passkey/register?new_user=1
+  - action: request attestation options (POST webauthn/register/options)
+    expected: JSON creation challenge for the authenticated user
+  - action: submit attestation (POST webauthn/register)
+    expected: 204, credential saved, trusted-device cookie queued; page navigates to /budgets
+postconditions:
+  - user exists and has one WebAuthn credential
+  - a TrustedDevice record exists for this browser (auth_method passkey)
+business_rules:
+  - registration is restricted to one hardcoded email in PasskeyAuthController::registerStore; any other valid email gets an "is currently restricted" error
+  - name required max 255; email required, valid, unique (uniqueness is checked before the allowlist)
+  - POST /register is throttled to 6 requests per minute
+  - webauthn register routes require auth and are excluded from HandleInertiaRequests so they return JSON
+  - PasskeyRegister renders in GuestLayout when isNewUser, otherwise AuthenticatedLayout
+scenarios:
+  - id: registration_form_renders
+    kind: happy_path
+    description: Guest can load the registration form.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/RegistrationTest.php::test_registration_screen_can_be_rendered
+  - id: allowlisted_email_creates_account
+    kind: happy_path
+    description: Submitting the allowlisted email creates a passwordless user, logs them in and redirects to passkey.register with new_user=1.
+    coverage: uncovered
+  - id: passkey_attestation_saved
+    kind: happy_path
+    description: A valid attestation stores the credential, creates a trusted device, queues the cookie and returns 204.
+    coverage: uncovered
+    note: requires a WebAuthn attestation fixture; none exists yet.
+  - id: non_allowlisted_email_rejected
+    kind: validation
+    description: Any email other than the allowlisted one is rejected with an email error and no user is created.
+    coverage: uncovered
+  - id: invalid_or_duplicate_email_rejected
+    kind: validation
+    description: Missing name, malformed email or an already-registered email fails validation.
+    coverage: uncovered
+  - id: registration_throttled
+    kind: edge
+    description: More than 6 registration submissions per minute are throttled (429).
+    coverage: uncovered
+  - id: attestation_failure_surfaces_error
+    kind: edge
+    description: A failed attestation returns an error response and no credential or trusted device is stored.
+    coverage: uncovered
+  - id: register_options_require_auth
+    kind: authentication
+    description: A guest calling webauthn/register/options or webauthn/register is rejected (401 JSON) rather than registering a passkey.
+    coverage: uncovered
+  - id: authenticated_user_redirected_from_register
+    kind: authorization
+    description: An authenticated user visiting /register is redirected away by the guest middleware.
+    coverage: uncovered
+known_issues:
+  - "WebAuthnRegisterController::register catches every exception and returns 500 with the raw exception message appended to 'Failed to register passkey' in the JSON body."
+  - PasskeyRegister.vue does not render the flashed status ("Account created! Now register your passkey.") from registerStore.
+  - Registration allowlist is a hardcoded email literal in the controller rather than configuration.
+confidence: high
+evidence:
+  - routes/auth.php guest group (register) and auth group (passkey.register)
+  - routes/web.php webauthn register group
+  - app/Http/Controllers/PasskeyAuthController.php
+  - app/Http/Controllers/WebAuthn/WebAuthnRegisterController.php
+  - resources/js/Pages/Auth/Register.vue, resources/js/Pages/Auth/PasskeyRegister.vue
+last_verified: null

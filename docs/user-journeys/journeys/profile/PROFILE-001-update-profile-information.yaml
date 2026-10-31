@@ -1,0 +1,65 @@
+schema: 1
+id: PROFILE-001
+name: User updates their name and email
+domain: profile
+status: implemented
+priority: medium
+summary: >
+  An authenticated user opens /profile and edits their name and email. Saving
+  validates the input; changing the email clears email_verified_at. The profile
+  page also hosts passkey and trusted-device management (AUTH-011, AUTH-012) and
+  a legacy password form.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated and has a passkey
+routes:
+  - profile.edit
+  - profile.update
+steps:
+  - action: open /profile
+    expected: Profile/Edit rendered with mustVerifyEmail, status, passkeys and trustedDevices props
+  - action: submit name and email (PATCH /profile)
+    expected: user saved, redirect to profile.edit
+postconditions:
+  - user's name/email updated; email_verified_at null if the email changed
+business_rules:
+  - name required max 255; email required, lowercase, valid, max 255, unique except self (ProfileUpdateRequest)
+  - an unchanged email keeps email_verified_at
+scenarios:
+  - id: profile_page_renders
+    kind: happy_path
+    description: An authenticated user can open the profile page.
+    coverage: covered
+    tests:
+      - tests/Feature/ProfileTest.php::test_profile_page_is_displayed
+  - id: profile_updated
+    kind: happy_path
+    description: Submitting a new name and email saves them and clears email_verified_at.
+    coverage: covered
+    tests:
+      - tests/Feature/ProfileTest.php::test_profile_information_can_be_updated
+  - id: unchanged_email_keeps_verification
+    kind: edge
+    description: Re-submitting the same email leaves email_verified_at intact.
+    coverage: covered
+    tests:
+      - tests/Feature/ProfileTest.php::test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged
+  - id: invalid_or_taken_email_rejected
+    kind: validation
+    description: Missing name, malformed, uppercase or another user's email fails validation.
+    coverage: uncovered
+  - id: guest_cannot_view_or_update_profile
+    kind: authentication
+    description: Guests are redirected to login for GET and PATCH /profile.
+    coverage: uncovered
+known_issues:
+  - "UpdatePasswordForm.vue is rendered on the profile page but submits to route('password.update'), which does not exist; submitting it throws a Ziggy error. Passwords are not used by this app."
+  - Changing email sends no new verification email.
+confidence: high
+evidence:
+  - routes/web.php profile routes
+  - app/Http/Controllers/ProfileController.php
+  - app/Http/Requests/ProfileUpdateRequest.php
+  - resources/js/Pages/Profile/Edit.vue
+last_verified: null

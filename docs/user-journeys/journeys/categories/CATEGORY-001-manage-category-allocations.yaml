@@ -1,0 +1,71 @@
+schema: 1
+id: CATEGORY-001
+name: Owner reviews spending by category and creates or edits categories
+domain: categories
+status: implemented
+priority: high
+summary: >
+  The owner opens the categories page to see each category's allocated amount,
+  spent, remaining and percent used, plus budget-wide totals. New categories are
+  added and existing ones edited through modals on the same page; spending is
+  matched to transactions by category name.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.categories.index
+  - budgets.categories.store
+  - budgets.categories.update
+depends_on:
+  - path: resources/js/Pages/Categories/Partials/CreateCategoryModal.vue
+    reason: create modal posting to budgets.categories.store
+  - path: resources/js/Pages/Categories/Partials/EditCategoryModal.vue
+    reason: edit modal patching budgets.categories.update
+integrations: []
+steps:
+  - action: visit /budgets/{budget}/categories
+    expected: Categories/Index rendered with categories (spent_cents, remaining_cents, percent_used) and a summary
+  - action: create a category in the modal (POST /budgets/{budget}/categories)
+    expected: category stored with order = max(order)+1; back with flash message
+  - action: edit a category in the modal (PATCH /budgets/{budget}/categories/{category})
+    expected: category updated; back with flash message
+postconditions:
+  - category list reflects the change
+business_rules:
+  - name required (max 255), amount required numeric >= 0 (stored in dollars), colour max 7 chars, description max 1000
+  - spent = sum of |amount_in_cents| of the budget's negative transactions whose category string equals the category name
+  - percent_used is 0 when the allocation is 0
+scenarios:
+  - id: index_shows_spending
+    kind: happy_path
+    description: Index renders categories with spent/remaining computed from matching expense transactions.
+    coverage: uncovered
+  - id: create_category
+    kind: happy_path
+    description: Valid create stores the category at the end of the order.
+    coverage: uncovered
+  - id: edit_category
+    kind: happy_path
+    description: Valid update changes the category.
+    coverage: uncovered
+  - id: no_categories_empty_state
+    kind: empty_state
+    description: A budget with no categories renders zero totals.
+    coverage: uncovered
+  - id: invalid_category_rejected
+    kind: validation
+    description: Missing name or negative amount returns validation errors.
+    coverage: uncovered
+  - id: other_users_categories_forbidden
+    kind: authorization
+    description: Index/store/update on another user's budget return 403; a category from another budget returns 404 via scopeBindings.
+    coverage: uncovered
+known_issues:
+  - "Transactions reference categories by name string, not id. Renaming a category in update silently detaches all existing transactions from it (their spend no longer counts and the delete guard in CATEGORY-002 no longer sees them)."
+  - "Transaction forms take a free-text category, so spelling variants never match a category."
+confidence: high
+evidence:
+  - app/Http/Controllers/CategoryController.php index/store/update
+  - resources/js/Pages/Categories/Index.vue
+last_verified: null

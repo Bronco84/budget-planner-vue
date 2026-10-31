@@ -1,0 +1,102 @@
+schema: 1
+id: FILE-002
+name: Owner uploads and manages budget-level documents
+domain: files
+status: implemented
+priority: medium
+summary: >
+  From the sidebar Files page (or the dashboard's upload modal) the owner uploads
+  documents attached to the budget itself, lists them newest first, downloads and
+  deletes them. Invalid uploads (too large, disallowed type, extension/MIME
+  mismatch) are rejected and uploads are rate limited.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.files.index
+  - budgets.files.upload
+  - budgets.files.download
+  - budgets.files.destroy
+  - files.download
+  - files.delete
+depends_on:
+  - path: resources/js/Pages/Budgets/Files/Index.vue
+    reason: files page with upload, download and delete
+  - path: app/Services/FileService.php
+    reason: upload validation and S3 storage
+integrations:
+  - AWS S3 (file storage)
+steps:
+  - action: visit /budgets/{budget}/files
+    expected: Budgets/Files/Index rendered with the budget's attachments and breadcrumbs
+  - action: upload (POST /budgets/{budget}/files)
+    expected: 201 JSON with the attachment
+  - action: download (GET /budgets/{budget}/files/{fileAttachment}/download)
+    expected: file download with original name
+  - action: delete (DELETE /budgets/{budget}/files/{fileAttachment})
+    expected: attachment removed (file row removed when unused); back with success flash
+postconditions:
+  - budget attachments reflect the change
+business_rules:
+  - same file rules as FILE-001 (10MB, MIME allow-list, extension must match)
+  - upload throttled to 10 per minute
+  - download/destroy 404 when the attachment does not belong to this budget
+scenarios:
+  - id: files_page_renders
+    kind: happy_path
+    description: Owner sees the budget's files.
+    coverage: uncovered
+  - id: upload_valid_file
+    kind: happy_path
+    description: A PDF or image upload is accepted.
+    coverage: partial
+    tests:
+      - tests/Feature/SecurityFileValidationTest.php::file upload accepts PDF files
+      - tests/Feature/SecurityFileValidationTest.php::file upload accepts image files
+    note: tests only assert the status is not 400; neither checks 201 nor that an attachment exists.
+  - id: download_and_delete
+    kind: happy_path
+    description: Download returns the file and delete removes it.
+    coverage: uncovered
+  - id: oversized_file_rejected
+    kind: validation
+    description: Files over 10MB fail validation.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityFileValidationTest.php::file upload rejects files over 10MB
+  - id: disallowed_type_rejected
+    kind: validation
+    description: Disallowed types and extension/MIME mismatches return 400.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityFileValidationTest.php::file upload rejects disallowed file types
+      - tests/Feature/SecurityFileValidationTest.php::file extension must match mime type
+  - id: upload_rate_limited
+    kind: edge
+    description: The 11th upload within a minute returns 429.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityRateLimitingTest.php::file upload endpoint has rate limiting
+  - id: no_files_empty_state
+    kind: empty_state
+    description: A budget with no files shows an empty list.
+    coverage: uncovered
+  - id: attachment_from_other_budget_not_found
+    kind: authorization
+    description: Downloading or deleting an attachment of another budget under the user's own budget URL returns 404.
+    coverage: uncovered
+  - id: other_users_files_forbidden
+    kind: authorization
+    description: Index/download (view) and destroy (update) on another user's budget return 403; upload returns 403 JSON.
+    coverage: uncovered
+known_issues:
+  - "BudgetFilesController download/destroy use the default disk with path 'files/{hash}', but FileService stores objects on the s3 disk at key '{hash}'. Download from the Files page therefore fails to find the file, and destroy deletes the File row without removing the S3 object (orphaned storage). FileController@download (files.download, used by the dashboard list) uses the correct disk."
+  - "Budgets/Show.vue loads budget attachments with fetch('/budgets/{id}/files') expecting JSON, but that route returns the Inertia Files page; the dashboard attachment list silently stays empty. FileController@getBudgetAttachments exists but has no route."
+  - "BudgetFilesController@destroy flashes 'success' while the rest of the app uses 'message'."
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetFilesController.php
+  - app/Http/Controllers/FileController.php uploadToBudget/download/delete
+  - app/Services/FileService.php uploadAndAttach
+last_verified: null

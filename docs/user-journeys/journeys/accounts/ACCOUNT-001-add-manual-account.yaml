@@ -1,0 +1,85 @@
+schema: 1
+id: ACCOUNT-001
+name: Owner adds a manual account to a budget
+domain: accounts
+status: implemented
+priority: critical
+summary: >
+  From budget setup ("add manually") or the dashboard's add-account action, the
+  owner opens the create-or-import page, chooses manual mode, enters a name, type,
+  current balance and active/inactive status, and is returned to the dashboard
+  with the new account. The same page also offers Plaid import (covered by the
+  Plaid journeys).
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.setup.manual
+  - budgets.accounts.create
+  - budgets.accounts.store
+depends_on:
+  - path: resources/js/Pages/Accounts/CreateOrImport.vue
+    reason: page rendered by AccountController@create; manual mode posts to budgets.accounts.store
+  - path: app/Services/PlaidService.php
+    reason: create() always requests a Plaid link token for the import option
+integrations:
+  - Plaid (link token requested even for manual entry)
+steps:
+  - action: visit /budgets/{budget}/setup/manual or /budgets/{budget}/accounts/create
+    expected: Accounts/CreateOrImport rendered with existing active Plaid connections and a link token (or null)
+  - action: choose manual mode and submit (POST /budgets/{budget}/accounts)
+    expected: account created with current_balance_cents = balance*100, redirect to budgets.show
+postconditions:
+  - new Account belongs to the budget
+business_rules:
+  - name required (max 255), type required (max 50), current_balance required numeric
+  - include_in_budget defaults to true; exclude_from_total_balance is set to its inverse
+scenarios:
+  - id: create_page_renders
+    kind: happy_path
+    description: Owner can open the create-or-import page from setup or the dashboard.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::owner can open the create or import account page
+  - id: manual_account_stored
+    kind: happy_path
+    description: Valid manual submission creates the account and redirects to the dashboard.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::storing a manual account persists it and redirects to the dashboard
+      - tests/Feature/Accounts/ManualAccountTest.php::a manual account is included in the budget by default
+  - id: inactive_account_excluded
+    kind: alternate
+    description: include_in_budget=false also sets exclude_from_total_balance=true.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::an inactive manual account is also excluded from the total balance
+  - id: missing_fields_rejected
+    kind: validation
+    description: Missing name/type/balance or non-numeric balance returns validation errors.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::storing a manual account rejects invalid input and creates nothing
+  - id: plaid_link_token_failure
+    kind: recovery
+    description: If link-token creation fails the page still renders with linkToken null.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::create account page still renders with a null link token when plaid fails
+  - id: other_users_budget_forbidden
+    kind: authorization
+    description: Opening create or posting an account to another user's budget returns 403 (can:view,budget middleware).
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/ManualAccountTest.php::user cannot open the create account page for another users budget
+      - tests/Feature/Accounts/ManualAccountTest.php::user cannot add an account to another users budget
+known_issues:
+  - "AccountController@create calls PlaidService::createLinkToken($budget) with the Budget model where a user id is expected; (string)$budget serialises the whole budget JSON into Plaid's client_user_id. BudgetController@setup passes Auth::id() correctly."
+  - "current_balance is multiplied by 100 without rounding before storage in an integer column (float precision, e.g. 19.99*100)."
+  - "resources/js/Pages/Accounts/Create.vue also posts to budgets.accounts.store but is never rendered by any controller (orphan page)."
+confidence: high
+evidence:
+  - app/Http/Controllers/AccountController.php create/store
+  - routes/web.php budgets.setup.manual
+last_verified: null

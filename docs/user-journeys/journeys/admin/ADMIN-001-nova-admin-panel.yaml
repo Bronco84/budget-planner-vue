@@ -1,0 +1,84 @@
+schema: 1
+id: ADMIN-001
+name: Administrator manages application data in the Nova panel
+domain: admin
+status: implemented
+priority: medium
+summary: >
+  An administrator opens /nova to browse and edit application records (users, budgets,
+  accounts, transactions, Plaid connections/accounts/transactions/holdings, payoff plans,
+  recurring templates, chat conversations and messages, files, preferences) through
+  Laravel Nova resources and the Main dashboard. Access is controlled by the viewNova
+  gate. Nova registers its own routes, so none appear in the route files.
+actors:
+  - administrator
+preconditions:
+  - user has is_admin true (or is the hard-coded allowlisted email)
+routes: []
+depends_on:
+  - path: app/Nova/**
+    reason: Nova resources and the Main dashboard
+  - path: app/Providers/NovaServiceProvider.php
+    reason: viewNova gate, Nova routes (with auth and password-reset routes) and Fortify features
+  - path: config/nova.php
+    reason: path (/nova), guard and middleware stack
+integrations:
+  - Laravel Nova
+steps:
+  - action: visit /nova as an admin
+    expected: Nova dashboard loads
+  - action: open a resource (e.g. Users, Plaid Connections) and view or edit a record
+    expected: resource index/detail/edit pages work
+postconditions:
+  - edits are persisted via Nova
+business_rules:
+  - viewNova passes when is_admin === true or the email is in the hard-coded allowlist
+  - is_admin is not mass-assignable
+scenarios:
+  - id: admin_gate_allows
+    kind: happy_path
+    description: A user with is_admin true passes the viewNova gate.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityNovaAccessTest.php::admin users can access nova
+  - id: admin_loads_dashboard
+    kind: happy_path
+    description: An admin can load /nova over HTTP.
+    coverage: uncovered
+    note: tests check the gate only, not Nova HTTP responses.
+  - id: is_admin_must_be_true
+    kind: edge
+    description: Revoking is_admin removes access.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityNovaAccessTest.php::is_admin must be explicitly true to access nova
+      - tests/Feature/SecurityNovaAccessTest.php::users without is_admin flag cannot access nova
+  - id: is_admin_not_mass_assignable
+    kind: validation
+    description: is_admin cannot be set via fill().
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityNovaAccessTest.php::is_admin cannot be mass-assigned via fill
+  - id: non_admin_denied
+    kind: authorization
+    description: A non-admin user fails the viewNova gate.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityNovaAccessTest.php::non-admin users cannot access nova
+  - id: non_admin_http_denied
+    kind: authorization
+    description: A non-admin requesting /nova over HTTP receives 403.
+    coverage: uncovered
+  - id: guest_redirected
+    kind: authentication
+    description: A guest requesting /nova is sent to a login page.
+    coverage: uncovered
+known_issues:
+  - the viewNova gate hard-codes an allowlisted email address, granting access independent of is_admin; it should rely on is_admin alone.
+  - Nova is registered withAuthenticationRoutes() and withPasswordResetRoutes() and the Nova User resource has a Password field, although the app removed password login in favour of passkeys; this keeps a password-based login surface at /nova.
+confidence: medium
+evidence:
+  - app/Providers/NovaServiceProvider.php gate(), routes()
+  - app/Nova/User.php
+  - tests/Feature/SecurityNovaAccessTest.php
+last_verified: null

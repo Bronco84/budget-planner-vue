@@ -1,0 +1,75 @@
+schema: 1
+id: REPORT-002
+name: User views monthly and yearly budget statistics
+domain: reports
+status: implemented
+priority: medium
+summary: >
+  The statistics pages summarise a budget's transactions for a month (income, expenses,
+  totals by category and comparison with the previous month) or for a year (per-month
+  income and expenses with prior-year comparison). Both pages link to each other. In the
+  current implementation the controller renders Inertia component names that do not
+  exist, so neither page can load in the browser.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with transactions
+routes:
+  - budget.statistics.monthly
+  - budget.statistics.yearly
+depends_on:
+  - path: resources/js/Pages/Budgets/Statistics/Monthly.vue
+    reason: intended monthly page (controller renders Budgets/MonthlyStatistics instead)
+  - path: resources/js/Pages/Budgets/Statistics/Yearly.vue
+    reason: intended yearly page (controller renders Budgets/YearlyStatistics instead)
+  - path: app/Models/Budget.php
+    reason: getMonthlyStatistics and getYearlyStatistics
+integrations: []
+steps:
+  - action: open budget/{budget}/statistics/monthly/{month?}/{year?}
+    expected: monthly statistics for the given (default current) month
+  - action: open budget/{budget}/statistics/yearly?year=YYYY
+    expected: per-month statistics for the given (default current) year with prior-year comparison
+postconditions:
+  - nothing is persisted
+business_rules:
+  - income = sum of positive amounts, expenses = sum of negative amounts within the period
+  - month and year default to the current date; requires budget view ability
+scenarios:
+  - id: monthly_page_renders
+    kind: happy_path
+    description: Owner opens monthly statistics and the Monthly page renders with totals and category breakdown.
+    coverage: uncovered
+    note: currently broken; Inertia component Budgets/MonthlyStatistics does not exist (see known_issues).
+  - id: yearly_page_renders
+    kind: happy_path
+    description: Owner opens yearly statistics and the Yearly page renders twelve months with prior-year comparison.
+    coverage: uncovered
+    note: currently broken; Inertia component Budgets/YearlyStatistics does not exist (see known_issues).
+  - id: month_without_transactions
+    kind: empty_state
+    description: A month with no transactions shows zero totals and no categories.
+    coverage: uncovered
+  - id: invalid_month_or_year
+    kind: validation
+    description: month outside 1-12 or a non-numeric year should be rejected.
+    coverage: uncovered
+    note: parameters are not validated; Carbon::create rolls month 13 into the next year and a non-numeric year throws.
+  - id: cross_user_forbidden
+    kind: authorization
+    description: Another user cannot view monthly or yearly statistics for a budget they do not own (403).
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users monthly statistics
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users yearly statistics
+known_issues:
+  - BudgetController::monthlyStatistics renders Budgets/MonthlyStatistics and yearlyStatistics renders Budgets/YearlyStatistics, but the pages live at resources/js/Pages/Budgets/Statistics/Monthly.vue and Yearly.vue (component names Budgets/Statistics/Monthly and Budgets/Statistics/Yearly); the client cannot resolve the page, so both routes are broken for the owner. Confirmed by `php bin/journeys validate` (unresolved_dependency).
+  - The only links to these routes are on the Monthly/Yearly pages themselves, so they are also unreachable from navigation.
+  - getYearlyStatistics runs four SUM queries per month (48 per page load).
+  - Month/year route and query parameters are unvalidated.
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetController.php monthlyStatistics/yearlyStatistics
+  - app/Models/Budget.php getMonthlyStatistics/getYearlyStatistics
+  - ls resources/js/Pages/Budgets/Statistics (Monthly.vue, Yearly.vue only)
+last_verified: null

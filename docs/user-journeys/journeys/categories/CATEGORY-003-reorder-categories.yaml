@@ -1,0 +1,51 @@
+schema: 1
+id: CATEGORY-003
+name: Owner reorders categories
+domain: categories
+status: implemented
+priority: low
+summary: >
+  A client posts a list of category ids with new order values; categories that
+  belong to the budget get the new order, others are silently skipped. No Vue page
+  currently calls this endpoint, so it is reachable only as an API.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.categories.reorder
+integrations: []
+steps:
+  - action: POST /budgets/{budget}/categories/reorder with categories[{id, order}]
+    expected: matching categories updated; back with flash message
+postconditions:
+  - category order values updated
+business_rules:
+  - categories.*.id must exist; order is an integer >= 0
+  - ids belonging to other budgets are ignored rather than rejected
+  - Category has a global scope ordering by order, so lists reflect the new order
+scenarios:
+  - id: reorder_own_categories
+    kind: happy_path
+    description: Posting new orders for the budget's categories persists them.
+    coverage: uncovered
+  - id: invalid_payload_rejected
+    kind: validation
+    description: Missing categories array or a negative order returns validation errors.
+    coverage: uncovered
+  - id: foreign_category_ids_ignored
+    kind: edge
+    description: A category id from another budget in the payload is left unchanged.
+    coverage: uncovered
+  - id: other_users_budget_forbidden
+    kind: authorization
+    description: Reordering another user's categories returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot reorder another users categories
+known_issues:
+  - "No frontend caller: nothing in resources/js references the reorder route, so the drag-and-drop ordering this endpoint implies is not exposed in the UI."
+confidence: medium
+evidence:
+  - app/Http/Controllers/CategoryController.php reorder
+last_verified: null

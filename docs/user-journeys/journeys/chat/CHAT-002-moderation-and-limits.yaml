@@ -1,0 +1,89 @@
+schema: 1
+id: CHAT-002
+name: Chat message is blocked, throttled or refused by moderation
+domain: chat
+status: implemented
+priority: high
+summary: >
+  Exceptional journey. Before a chat message reaches the AI provider, ContentModerationService
+  checks for a temporary ban, enforces a 30-messages-per-hour per-user limit, sanitises
+  the text and scans it for prompt-injection, harmful-instruction, abusive, over-long and
+  repeated-character patterns. Flagged messages are recorded as FlaggedChatMessage rows;
+  injection/harmful content is blocked, other flags are logged and allowed. Route
+  throttles (60/min group, 30/min on send/stream) apply first.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated
+routes:
+  - chat.send
+  - chat.stream
+depends_on:
+  - path: app/Services/ContentModerationService.php
+    reason: isUserBanned, checkRateLimit, sanitizeContent, checkContent, determineAction
+  - path: app/Models/FlaggedChatMessage.php
+    reason: stores flagged content for admin review (ADMIN-002)
+integrations: []
+steps:
+  - action: send a message containing a prompt-injection pattern
+    expected: FlaggedChatMessage stored; JSON 400 {blocked true, error "...violates our usage policies..."}
+  - action: send a 31st message within an hour
+    expected: JSON 429 {rate_limit {...}}
+  - action: send while banned
+    expected: JSON 403 {banned true}
+postconditions:
+  - blocked messages are not sent to the provider and not stored as chat messages
+business_rules:
+  - prompt_injection or harmful_instructions => block; excessive_length or repeated_characters => warn (allowed); abusive_content => log (allowed)
+  - the per-user moderation counter allows 30 messages per hour (cache based)
+  - every suspicious-activity event (any flag, moderation rate-limit hit, more than 10 tracked messages in 10 minutes) counts as an offense; 5 offenses in 24 hours trigger an automatic 24-hour ban
+  - route throttles - 30 per minute for send/stream, 60 per minute for the chat group
+scenarios:
+  - id: clean_message_allowed
+    kind: happy_path
+    description: A normal message passes moderation and proceeds to the provider.
+    coverage: partial
+    tests:
+      - tests/Feature/ChatAssistantTest.php::chat assistant returns and persists a reply via the tool-loop flow
+    note: passes through moderation implicitly; no assertion on moderation outcome or flag absence.
+  - id: injection_blocked
+    kind: validation
+    description: A prompt-injection message is blocked with 400 and recorded as a FlaggedChatMessage.
+    coverage: uncovered
+  - id: abusive_logged_and_allowed
+    kind: edge
+    description: Abusive content is flagged/logged but still answered.
+    coverage: uncovered
+  - id: hourly_limit_exceeded
+    kind: edge
+    description: The 31st message within an hour returns 429 with rate limit details.
+    coverage: uncovered
+  - id: route_throttle
+    kind: edge
+    description: More than 30 send/stream requests per minute return 429 from the throttle middleware.
+    coverage: uncovered
+  - id: auto_ban_after_offenses
+    kind: edge
+    description: A fifth offense within 24 hours bans the user from chat for 24 hours.
+    coverage: uncovered
+  - id: banned_user_refused
+    kind: authorization
+    description: A temporarily banned user receives 403 and no provider call is made.
+    coverage: uncovered
+  - id: stream_refusal_visible
+    kind: recovery
+    description: When the stream endpoint returns a JSON 400/403/429 the user is told why.
+    coverage: uncovered
+    note: EventSource cannot read non-SSE error bodies; the panel shows a generic connection error.
+known_issues:
+  - trackConversationActivity records every message (not just new conversations) and logs 'rapid_conversation_creation' as an offense once more than 10 messages are sent in 10 minutes, so an ordinary user sending about 15 messages in 10 minutes is auto-banned from chat for 24 hours.
+  - each rejected attempt after hitting the hourly limit is itself an offense, so a user who retries a few times past the limit escalates to a 24-hour ban.
+  - the moderation rate counter re-puts the cache key with a fresh one-hour TTL on every message, so it is a rolling window that never resets while the user keeps chatting, and reset_in_seconds is always 3600.
+  - a blocked message with a foreign conversation_id hits findOrFail before blocking and returns a generic 500.
+  - over-length detection (>5000 chars) is unreachable because validation caps messages at 2000.
+confidence: high
+evidence:
+  - app/Services/ChatService.php steps 1-4 of processMessage/processMessageStream, flagMessage()
+  - app/Services/ContentModerationService.php
+  - routes/web.php chat group throttles
+last_verified: null

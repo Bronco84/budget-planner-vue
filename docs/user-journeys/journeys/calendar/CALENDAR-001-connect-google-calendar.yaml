@@ -1,0 +1,86 @@
+schema: 1
+id: CALENDAR-001
+name: User connects a Google Calendar via OAuth
+domain: calendar
+status: implemented
+priority: high
+summary: >
+  On the calendar connections settings page the user clicks "Connect Google Calendar"
+  and is redirected to Google's consent screen (read-only calendar scope, offline
+  access). Google redirects back to the callback, which exchanges the code for tokens,
+  stores or updates a CalendarConnection for the user's primary calendar, runs an
+  initial event sync (1 month back to 6 months ahead) and returns to the connections page.
+actors:
+  - authenticated user
+preconditions:
+  - Google OAuth client id/secret/redirect URI are configured
+routes:
+  - calendar.connections.index
+  - calendar.connect.google
+  - calendar.google.callback
+depends_on:
+  - path: app/Services/GoogleCalendarService.php
+    reason: authorization URL, code exchange, calendar lookup, initial syncEvents
+integrations:
+  - Google OAuth 2.0
+  - Google Calendar API (calendars.get, events.list)
+steps:
+  - action: open /calendar/connections
+    expected: Calendar/Connections rendered with the user's connections and event counts
+  - action: click Connect Google Calendar (GET /calendar/connect/google)
+    expected: 302 to Google with state containing the user id
+  - action: approve consent; Google calls /calendar/google/callback?code=...
+    expected: connection created/updated for calendar 'primary', events synced, redirect to connections index
+postconditions:
+  - an active CalendarConnection with access and refresh tokens exists for the user
+  - CalendarEvents for the sync window are stored
+business_rules:
+  - one connection per (user, calendar_id); reconnecting updates tokens in place
+  - the callback is behind auth, so the user must still be logged in when Google redirects back
+scenarios:
+  - id: connections_page_renders
+    kind: happy_path
+    description: The connections page lists the user's connections.
+    coverage: uncovered
+  - id: redirect_to_google
+    kind: happy_path
+    description: Connect redirects away to Google's authorization URL.
+    coverage: uncovered
+  - id: callback_creates_connection
+    kind: happy_path
+    description: A successful callback stores the connection and performs the initial sync.
+    coverage: uncovered
+    note: requires faking the Google client; GoogleCalendarService constructs it internally.
+  - id: reconnect_updates_existing
+    kind: alternate
+    description: Reconnecting the same calendar updates tokens on the existing connection instead of duplicating it.
+    coverage: uncovered
+  - id: consent_denied
+    kind: edge
+    description: When Google returns ?error=access_denied the user is sent back to connections with an error flash.
+    coverage: uncovered
+  - id: callback_without_code
+    kind: validation
+    description: A callback with neither code nor error is handled gracefully.
+    coverage: uncovered
+    note: currently passes null to a string parameter, see known_issues.
+  - id: token_exchange_failure
+    kind: integration
+    description: An invalid/expired code or Google API failure redirects to connections with "Failed to connect calendar".
+    coverage: uncovered
+  - id: state_not_verified
+    kind: authorization
+    description: The callback should bind the OAuth response to the user who started it (state check).
+    coverage: uncovered
+    note: state is set but never verified, see known_issues.
+known_issues:
+  - the OAuth state (json user_id) is never verified in the callback and is not a random nonce, so the flow is open to OAuth CSRF (an attacker's code could attach their calendar to the victim's account).
+  - GET /calendar/google/callback without code or error passes null to handleCallback(string $code), raising a TypeError (500) that the catch(\Exception) block does not catch.
+  - the controller flashes under the 'success' key, which HandleInertiaRequests does not share, and Calendar/Connections.vue renders no flash at all, so success and error (including consent denial) are invisible to the user.
+  - error flashes include raw exception messages from the Google client.
+confidence: high
+evidence:
+  - app/Http/Controllers/CalendarConnectionController.php index(), connect(), callback()
+  - app/Services/GoogleCalendarService.php
+  - app/Http/Middleware/HandleInertiaRequests.php flash keys
+last_verified: null

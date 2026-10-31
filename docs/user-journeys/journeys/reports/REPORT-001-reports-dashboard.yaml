@@ -1,0 +1,92 @@
+schema: 1
+id: REPORT-001
+name: User reviews the financial reports dashboard
+domain: reports
+status: implemented
+priority: high
+summary: >
+  "Reports" in the sidebar opens a tabbed dashboard for the budget: overview stats, net
+  worth over time, monthly cash flow and savings rate, category budget performance,
+  spending by category and merchant, debt payoff progress and recurring income vs
+  expenses (including autopay). The user can filter by a single account and by a date
+  preset (30 days, 3/6 months, YTD, year, all) or a custom range.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with accounts and transactions
+routes:
+  - reports.index
+depends_on:
+  - path: resources/js/Pages/Reports/Tabs/**
+    reason: per-report tab components
+  - path: resources/js/Components/Sidebar.vue
+    reason: Reports navigation entry in the sidebar
+integrations: []
+steps:
+  - action: open budget/{budget}/reports
+    expected: Reports/Index with accounts, dateRange (default 6months), overview, netWorth, cashFlow, budgetPerformance, spendingPatterns, debtPayoff and incomeVsExpenses
+  - action: choose an account and/or date preset or custom start/end
+    expected: page reloads with the filtered data; an account id not in the budget silently falls back to all accounts
+postconditions:
+  - nothing is persisted
+business_rules:
+  - historical balance at date = current balance minus the sum of the account's transactions after that date
+  - net worth = assets minus abs(liability balances); sampling interval is 1, 3, 7, 15 or 30 days depending on range length
+  - savings rate = avg net cash flow / avg income x 100, 0 when there is no income
+  - income vs expenses uses only active templates (started, not ended) and normalises frequencies to monthly (weekly x4.33, biweekly x2.17, bimonthly x2, quarterly /3, yearly /12, daily x30.44)
+  - requires budget view ability
+scenarios:
+  - id: dashboard_renders
+    kind: happy_path
+    description: Owner opens reports with default 6-month range and receives every report section.
+    coverage: uncovered
+  - id: account_filter
+    kind: alternate
+    description: Selecting an account limits net worth, cash flow, performance and spending data to that account.
+    coverage: uncovered
+  - id: foreign_account_filter_ignored
+    kind: edge
+    description: An account_id from another budget is ignored and all accounts are shown.
+    coverage: uncovered
+  - id: active_templates_only
+    kind: edge
+    description: Income vs expenses excludes templates that have ended or not yet started, and includes those ending today.
+    coverage: uncovered
+    note: the underlying RecurringTransactionTemplate::active() scope is unit-tested in tests/Feature/RecurringTransactionTemplateActiveScopeTest.php, but nothing asserts the report built on it.
+  - id: monthly_normalisation
+    kind: edge
+    description: Weekly, biweekly, bimonthly, quarterly and yearly templates are normalised to correct monthly amounts.
+    coverage: uncovered
+  - id: dynamic_templates_in_income_vs_expenses
+    kind: edge
+    description: Dynamic-amount templates should appear in income vs expenses.
+    coverage: uncovered
+    note: dynamic templates store amount_in_cents 0 and are filtered out by the > 0 / < 0 conditions (see known_issues).
+  - id: zero_starting_net_worth
+    kind: edge
+    description: A starting net worth of 0 yields changePercent 0 instead of division by zero.
+    coverage: uncovered
+  - id: empty_budget
+    kind: empty_state
+    description: A budget with no accounts or transactions renders all tabs with zero values.
+    coverage: uncovered
+  - id: invalid_custom_range
+    kind: validation
+    description: An unparsable or inverted custom date range should be rejected.
+    coverage: uncovered
+    note: dates are not validated; Carbon::parse throws on garbage and a start after end leaves netWorth dataPoints empty (see known_issues).
+  - id: cross_user_forbidden
+    kind: authorization
+    description: Another user cannot open reports for a budget they do not own (403).
+    coverage: uncovered
+known_issues:
+  - start_date/end_date are not validated; an unparsable value throws (500) and a start after end leaves dataPoints empty, so end($dataPoints)['date'] and $dataPoints[0] fail.
+  - Dynamic-amount recurring templates (amount_in_cents 0) are excluded from income vs expenses totals.
+  - calculateBalanceAtDate subtracts later transaction sums the same way for liabilities and assets; with positive-debt liability balances and negative purchase amounts, historical credit card balances move in the wrong direction.
+  - Net worth issues one SUM query per account per data point (e.g. 'all' range over many years x accounts), which is slow.
+  - Budget performance compares category amount x 100 against all spending in the selected range regardless of range length (allocation is not prorated).
+confidence: medium
+evidence:
+  - app/Http/Controllers/ReportsController.php
+  - resources/js/Pages/Reports/Index.vue
+last_verified: null

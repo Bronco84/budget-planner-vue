@@ -1,0 +1,124 @@
+schema: 1
+id: CHAT-001
+name: User asks the AI assistant a question about their finances
+domain: chat
+status: implemented
+priority: high
+summary: >
+  From the chat panel in the authenticated layout the user types a question. The panel
+  opens an EventSource to GET /chat/stream; the server moderates and stores the user
+  message, builds budget-scoped data tools (accounts, transactions, categories,
+  projections, ...), runs a Prism tool loop (openai gpt-4o-mini) and streams the final
+  text word-by-word as SSE (conversation_id, text_delta, stream_end). On stream_end the
+  panel posts the full text to /chat/stream/complete, which validates and stores it as
+  the assistant message and titles new conversations. A non-streaming POST /chat/message
+  returns the reply as JSON.
+actors:
+  - authenticated user
+preconditions:
+  - an AI provider key is configured for Prism
+routes:
+  - chat.stream
+  - chat.stream.complete
+  - chat.send
+depends_on:
+  - path: app/Services/ChatService.php
+    reason: processMessageStream, processMessage, saveStreamedMessage, provider error translation
+  - path: app/Services/Chat/**
+    reason: AssistantToolFactory and context builders that back the model's tools
+  - path: app/Services/ContentModerationService.php
+    reason: sanitise input, safe system prompt, response validation
+  - path: resources/js/Components/ChatPanel.vue
+    reason: chat UI (EventSource streaming, save on stream_end)
+  - path: resources/js/Layouts/AuthenticatedLayout.vue
+    reason: mounts the chat panel
+integrations:
+  - Prism (prism-php) with OpenAI gpt-4o-mini
+steps:
+  - action: type a question in the chat panel
+    expected: GET /chat/stream?message=...&conversation_id=... opens an SSE stream
+  - action: receive events
+    expected: conversation_id event, then text_delta events, then stream_end
+  - action: panel posts the streamed text to /chat/stream/complete
+    expected: JSON {success true, conversation_id}; assistant message stored and conversation titled
+postconditions:
+  - the conversation contains the user message and the assistant reply
+business_rules:
+  - message is required, max 2000 chars; conversation_id and budget_id must exist
+  - tools are scoped to the requested budget only if the user owns it, else to the user's active budget; with no budget no tools are offered
+  - transaction queries are clamped to the last 12 months and the result count is capped
+  - provider rate-limit/overload/too-large errors map to specific safe messages; anything else to a generic message; raw provider text is never returned
+scenarios:
+  - id: send_returns_reply
+    kind: happy_path
+    description: POST /chat/message returns success with the model reply and persists user and assistant messages.
+    coverage: covered
+    tests:
+      - tests/Feature/ChatAssistantTest.php::chat assistant returns and persists a reply via the tool-loop flow
+  - id: stream_returns_events
+    kind: happy_path
+    description: GET /chat/stream emits conversation_id, text_delta and stream_end events.
+    coverage: uncovered
+  - id: stream_complete_saves_reply
+    kind: happy_path
+    description: Posting the streamed text stores the assistant message and titles a new conversation.
+    coverage: uncovered
+  - id: tools_built_for_budget
+    kind: alternate
+    description: A budget-owning user gets the full tool set (13 tools including get_accounts, query_transactions).
+    coverage: covered
+    tests:
+      - tests/Feature/AssistantToolFactoryTest.php::factory builds the full tool set for a budget-owning user
+  - id: no_budget_no_tools
+    kind: empty_state
+    description: A user without a budget gets no tools and a prompt explaining how to get started.
+    coverage: partial
+    tests:
+      - tests/Feature/AssistantToolFactoryTest.php::factory returns no tools when there is no budget
+    note: asserts the factory returns no tools; the no-budget system prompt is not asserted.
+  - id: transaction_window_clamped
+    kind: edge
+    description: The transaction query tool clamps start dates to the last 12 months.
+    coverage: covered
+    tests:
+      - tests/Feature/AssistantToolFactoryTest.php::transaction query clamps the start date to the last 12 months
+  - id: transaction_limit_capped
+    kind: edge
+    description: The transaction query tool caps the requested limit.
+    coverage: partial
+    tests:
+      - tests/Feature/AssistantToolFactoryTest.php::transaction query caps the requested limit
+    note: only 3 rows exist so the test cannot distinguish a cap from no cap.
+  - id: message_validation
+    kind: validation
+    description: Empty, over-2000-char messages or unknown conversation/budget ids fail validation (422).
+    coverage: uncovered
+  - id: provider_error_safe_message
+    kind: integration
+    description: Provider rate limit, overload or request-too-large failures return the specific safe message (JSON 500 on send, in-band SSE error event on stream) and log the real cause.
+    coverage: uncovered
+  - id: stream_error_ui_recovery
+    kind: recovery
+    description: On a stream error the panel removes the pending messages and restores the input text.
+    coverage: uncovered
+  - id: other_users_conversation
+    kind: authorization
+    description: Sending into another user's conversation_id is refused and does not append to it.
+    coverage: uncovered
+  - id: other_users_budget_tools
+    kind: authorization
+    description: Passing another user's budget_id does not expose that budget's data to the tools.
+    coverage: uncovered
+known_issues:
+  - chat.stream.complete stores whatever text the client posts as the assistant message, so a user can forge assistant turns in their own history (which are replayed to the model as context); the server never retains the text it streamed.
+  - the stream path never runs validateResponse on the generated text before sending it; validation only happens on the client-supplied copy at stream/complete.
+  - ChatPanel.vue's 'error' listener ignores event.data, so the safe provider message sent in-band is never shown; the user sees "Connection error. Check console for details."
+  - the user message is persisted before the provider call, but on error the panel pops it from the UI, so reloaded history shows a user message with no reply.
+  - a foreign conversation_id passes the exists rule, then findOrFail throws inside the service try/catch, so the user gets a generic 500 ("Something went wrong...") instead of 404.
+  - ChatPanel does not send budget_id, so tools always use the active budget; the question text travels in the GET query string (logged by web servers).
+confidence: high
+evidence:
+  - app/Http/Controllers/ChatController.php
+  - app/Services/ChatService.php processMessageStream(), processMessage(), saveStreamedMessage(), resolveBudget(), userFacingProviderError()
+  - resources/js/Components/ChatPanel.vue sendMessage()
+last_verified: null

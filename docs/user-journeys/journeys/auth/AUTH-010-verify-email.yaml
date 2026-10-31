@@ -1,0 +1,73 @@
+schema: 1
+id: AUTH-010
+name: User verifies their email address
+domain: auth
+status: implemented
+priority: low
+summary: >
+  User implements MustVerifyEmail. An unverified user can open the verify-email
+  prompt, request a new verification link, and follow the signed link to mark the
+  address verified, after which they are sent to the dashboard with ?verified=1.
+  Profile shows a resend link when the email is unverified.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated and email_verified_at is null
+routes:
+  - verification.notice
+  - verification.send
+  - verification.verify
+integrations:
+  - Mail (framework VerifyEmail notification)
+steps:
+  - action: open /verify-email
+    expected: Auth/VerifyEmail rendered (already-verified users are redirected to dashboard)
+  - action: request a link (POST /email/verification-notification)
+    expected: notification sent, back with status verification-link-sent
+  - action: open the signed link (GET /verify-email/{id}/{hash})
+    expected: email_verified_at set, Verified event fired, redirect to /dashboard?verified=1
+postconditions:
+  - email_verified_at is set
+business_rules:
+  - verify link requires a valid signature and the sha1 hash of the user's email; throttled 6/min
+  - resend is throttled 6/min and is a no-op redirect for verified users
+  - no route uses the verified middleware, so verification does not gate any feature
+scenarios:
+  - id: prompt_renders
+    kind: happy_path
+    description: An unverified user can load the verification prompt.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/EmailVerificationTest.php::test_email_verification_screen_can_be_rendered
+  - id: signed_link_verifies
+    kind: happy_path
+    description: A valid signed link verifies the email, dispatches Verified and redirects to dashboard?verified=1.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/EmailVerificationTest.php::test_email_can_be_verified
+  - id: invalid_hash_rejected
+    kind: validation
+    description: A link whose hash does not match the user's email does not verify it.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/EmailVerificationTest.php::test_email_is_not_verified_with_invalid_hash
+  - id: resend_notification
+    kind: alternate
+    description: Requesting a new link sends the notification and flashes verification-link-sent.
+    coverage: uncovered
+  - id: already_verified_redirected
+    kind: edge
+    description: A verified user hitting the prompt or resend is redirected to the dashboard.
+    coverage: uncovered
+  - id: link_requires_auth_and_signature
+    kind: authentication
+    description: Unsigned/expired links or guests cannot verify an address.
+    coverage: uncovered
+known_issues:
+  - Changing email on the profile clears email_verified_at but sends no new verification email.
+  - With passkey enforcement active, a passkeyless user is redirected away from the verify-email routes.
+confidence: high
+evidence:
+  - routes/auth.php auth group
+  - app/Http/Controllers/Auth/EmailVerificationPromptController.php, VerifyEmailController.php, EmailVerificationNotificationController.php
+last_verified: null

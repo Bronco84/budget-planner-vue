@@ -1,0 +1,102 @@
+schema: 1
+id: RECUR-003
+name: User manages a template's transaction matching rules
+domain: recurring
+status: implemented
+priority: high
+summary: >
+  On a template's Rules page (or the Rules tab of the detail page) the user adds, edits
+  and deletes field/operator/value rules, tests a draft rule against the account's last
+  100 transactions, previews which unlinked transactions from the last 90 days match all
+  active rules, and applies the rules to link those transactions. Editing or deleting a
+  rule re-evaluates every link for the template.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with a recurring template attached to an account
+routes:
+  - recurring-transactions.rules.index
+  - recurring-transactions.rules.store
+  - recurring-transactions.rules.update
+  - recurring-transactions.rules.destroy
+  - recurring-transactions.rules.test
+  - recurring-transactions.rules.preview
+  - recurring-transactions.rules.apply
+depends_on:
+  - path: app/Models/RecurringTransactionRule.php
+    reason: matchesTransaction implements each operator (contains, equals, starts_with, ends_with, regex, greater_than, less_than)
+  - path: app/Services/RecurringTransactionService.php
+    reason: reevaluateTransactionLinks re-links/unlinks after rule update or delete
+  - path: resources/js/Pages/RecurringTransactions/Partials/RecurringTransactionRules.vue
+    reason: rules tab on the template detail page uses the same endpoints
+integrations: []
+steps:
+  - action: open budget/{budget}/recurring-transactions/{recurring_transaction}/rules
+    expected: RecurringTransactions/Rules/Index with rules ordered by priority plus field/operator options
+  - action: add a rule (POST .../rules)
+    expected: rule created active, case-insensitive by default, priority max+1 when omitted; redirect to rules index
+  - action: test a draft rule (POST .../rules/test)
+    expected: RecurringTransactions/Rules/Test rendered with matches among the account's latest 100 transactions
+  - action: preview active rules (GET .../rules/preview)
+    expected: RecurringTransactions/Rules/Preview lists unlinked last-90-day transactions matching ALL active rules; hasActiveRules false when none
+  - action: apply rules (POST .../rules/apply)
+    expected: matching unlinked transactions linked; flash "Successfully linked N transactions..." or "No matching transactions found."
+  - action: edit or delete a rule (PATCH/DELETE .../rules/{rule})
+    expected: links re-evaluated; redirect to the template detail page with linked/unlinked counts
+postconditions:
+  - rule set and transaction links reflect the user's changes
+business_rules:
+  - rules combine with AND logic; a transaction must match every active rule
+  - preview and apply only consider unlinked transactions on the template's account dated within the last 90 days
+  - field must be description, amount or category; operator must be one of the seven supported operators
+  - "{rule} is scoped to the template and the template to the budget, so foreign ids return 404"
+  - index, test and preview need budget view; store, update, destroy and apply need budget update
+scenarios:
+  - id: add_rule_and_apply
+    kind: happy_path
+    description: Owner adds a rule, previews matches and applies them, linking the matching transactions.
+    coverage: uncovered
+  - id: test_draft_rule
+    kind: alternate
+    description: Testing a draft rule shows matches without persisting the rule.
+    coverage: uncovered
+  - id: update_rule_reevaluates_links
+    kind: alternate
+    description: Editing a rule unlinks transactions that no longer match and links newly matching ones.
+    coverage: uncovered
+  - id: preview_without_active_rules
+    kind: empty_state
+    description: Preview with no active rules renders hasActiveRules false; apply redirects with "No active rules to apply".
+    coverage: uncovered
+  - id: invalid_operator_rejected
+    kind: validation
+    description: Unknown field/operator values or an empty value fail validation.
+    coverage: uncovered
+  - id: invalid_regex_rule
+    kind: edge
+    description: A regex rule with an invalid pattern should be rejected or handled without a server error.
+    coverage: uncovered
+    note: no pattern validation exists; preg_match on a malformed pattern raises a warning that Laravel turns into a 500 during test/preview/apply (see known_issues).
+  - id: delete_last_rule_unlinks_everything
+    kind: edge
+    description: Deleting the only active rule triggers reevaluateTransactionLinks with no rules.
+    coverage: uncovered
+    note: current behaviour unlinks every transaction of the template, including entity- or manually-linked ones (see known_issues).
+  - id: cross_budget_template_not_found
+    kind: authorization
+    description: Rules routes for a template that belongs to another budget return 404.
+    coverage: partial
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction routes reject a cross-budget template with 404
+    note: only rules.index is asserted; store/update/destroy/test/preview/apply and cross-user 403 are untested.
+known_issues:
+  - Regex rule values are stored without validating the pattern; a malformed pattern makes preg_match emit a warning, which surfaces as a 500 on test, preview, apply and any reevaluation.
+  - reevaluateTransactionLinks unlinks ALL linked transactions when the template has no active rules left, so deleting the last rule wipes links created by Plaid entity matching, description matching or manual linking.
+  - update and destroy redirect to recurring-transactions.edit while store and apply redirect to rules.index, so the Rules page and detail tab land on different pages after similar actions.
+  - test and preview dereference $recurring_transaction->account without a null check; a template whose account was deleted errors.
+confidence: high
+evidence:
+  - app/Http/Controllers/RecurringTransactionRuleController.php
+  - app/Services/RecurringTransactionService.php reevaluateTransactionLinks
+  - resources/js/Pages/RecurringTransactions/Rules/*.vue
+last_verified: null

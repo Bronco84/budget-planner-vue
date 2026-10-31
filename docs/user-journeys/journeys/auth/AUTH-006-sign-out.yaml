@@ -1,0 +1,64 @@
+schema: 1
+id: AUTH-006
+name: User signs out and the device is forgotten
+domain: auth
+status: implemented
+priority: high
+summary: >
+  An authenticated user posts to /logout. The TrustedDevice matching the current
+  device_token cookie is deleted, the session is invalidated and its CSRF token
+  regenerated, the device cookie is cleared and the browser is redirected to
+  /login, so the next visit requires a passkey or magic link again.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated
+routes:
+  - logout
+  - login
+depends_on:
+  - path: app/Services/DeviceTokenService.php
+    reason: resolves the current device from the cookie so it can be deleted
+steps:
+  - action: choose Log Out (POST /logout)
+    expected: current TrustedDevice deleted, session invalidated, token regenerated, device_token cookie forgotten
+  - action: follow redirect
+    expected: /login rendered for a guest
+postconditions:
+  - user is a guest
+  - the current browser's TrustedDevice no longer exists
+business_rules:
+  - RememberDevice skips the logout route so the cookie cannot re-authenticate during logout
+  - only the current device is revoked; other trusted devices remain
+scenarios:
+  - id: logout_ends_session
+    kind: happy_path
+    description: Posting to /logout leaves the user a guest and redirects to /login.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/AuthenticationTest.php::test_users_can_logout
+  - id: logout_rotates_csrf_token
+    kind: edge
+    description: The session CSRF token changes on logout and the next Inertia page shares the new token.
+    coverage: covered
+    tests:
+      - tests/Feature/CsrfTokenSyncTest.php::the shared token follows a session token rotation
+  - id: logout_revokes_current_device
+    kind: happy_path
+    description: The TrustedDevice for the current cookie is deleted and the cookie is forgotten; other devices remain.
+    coverage: uncovered
+  - id: logout_without_device_cookie
+    kind: edge
+    description: Logging out without a device cookie still ends the session cleanly.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/AuthenticationTest.php::test_users_can_logout
+  - id: guest_cannot_logout
+    kind: authentication
+    description: A guest posting to /logout is redirected to login by the auth middleware.
+    coverage: uncovered
+confidence: high
+evidence:
+  - routes/auth.php auth group
+  - app/Http/Controllers/PasskeyAuthController.php destroy()
+last_verified: null

@@ -1,0 +1,96 @@
+schema: 1
+id: AUTH-011
+name: User adds, renames and removes passkeys
+domain: auth
+status: implemented
+priority: high
+summary: >
+  From the Passkeys section of the profile page a user can add another passkey
+  (PasskeyRegister in AuthenticatedLayout plus the WebAuthn attestation
+  ceremony), rename a passkey's alias, or delete one. Deleting the last remaining
+  passkey is refused so the account cannot be locked out.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated and has at least one passkey
+routes:
+  - profile.edit
+  - passkey.register
+  - webauthn.register.options
+  - webauthn.register
+  - passkeys.update
+  - passkeys.destroy
+depends_on:
+  - path: resources/js/Pages/Profile/Partials/ManagePasskeysForm.vue
+    reason: list, rename and delete UI
+integrations:
+  - WebAuthn (laragear/webauthn), browser credential API
+steps:
+  - action: open /profile
+    expected: passkeys listed (alias or "Passkey", created_at, last_used)
+  - action: add a passkey (link to /passkey/register, then webauthn/register/options + webauthn/register)
+    expected: new credential saved, trusted device refreshed, redirect to /budgets
+  - action: rename (PATCH /settings/passkeys/{credential} with name)
+    expected: alias updated, back with status
+  - action: delete (DELETE /settings/passkeys/{credential})
+    expected: credential removed, back with status reminding to remove it from the device
+postconditions:
+  - the user's credential set reflects the change and at least one passkey remains
+business_rules:
+  - name required, string, max 255; stored with forceFill on alias
+  - a user may not delete their last passkey (errors.passkey)
+  - both mutations abort 403 when the credential's authenticatable_id is not the current user
+  - deleting a passkey does not revoke trusted devices
+scenarios:
+  - id: profile_lists_passkeys
+    kind: happy_path
+    description: The profile page includes the user's passkeys.
+    coverage: partial
+    tests:
+      - tests/Feature/ProfileTest.php::test_profile_page_is_displayed
+    note: only asserts 200; does not inspect the passkeys prop.
+  - id: add_additional_passkey
+    kind: happy_path
+    description: An existing user completes a second attestation and now has two credentials.
+    coverage: uncovered
+    note: requires a WebAuthn attestation fixture.
+  - id: rename_passkey
+    kind: happy_path
+    description: Renaming updates the alias and flashes a status.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can rename their passkey'
+  - id: delete_passkey
+    kind: happy_path
+    description: Deleting one of several passkeys removes it.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can delete a passkey when another remains'
+  - id: rename_requires_name
+    kind: validation
+    description: An empty or over-long name is rejected.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::renaming a passkey requires a name'
+  - id: last_passkey_protected
+    kind: edge
+    description: Deleting the only passkey is refused with errors.passkey and the credential is kept.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot delete their last passkey'
+  - id: cannot_modify_other_users_passkey
+    kind: authorization
+    description: Renaming or deleting another user's credential returns 403.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot rename another users passkey'
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot delete another users passkey'
+known_issues:
+  - "PasskeyManagementController::index renders Settings/Passkeys, which does not exist, and has no route; management only works via the profile page."
+  - After adding a passkey PasskeyRegister always hard-redirects to /budgets rather than back to the profile.
+confidence: high
+evidence:
+  - routes/auth.php auth group
+  - app/Http/Controllers/PasskeyManagementController.php
+  - app/Http/Controllers/ProfileController.php edit()
+last_verified: null

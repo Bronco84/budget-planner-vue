@@ -1,0 +1,130 @@
+schema: 1
+id: PLAID-001
+name: User connects bank accounts via Plaid and imports them into a budget
+domain: plaid
+status: implemented
+priority: critical
+summary: >
+  From the budget setup screen (or the "Connect Bank Account" discovery page) the user
+  opens Plaid Link, picks an institution, selects which discovered accounts to import,
+  and submits. The server exchanges the public token, creates one local Account per
+  selected Plaid account, links them all under a single PlaidConnection (with
+  institution logo/URL looked up from Plaid), runs an initial transaction sync and
+  redirects to the budget.
+actors:
+  - budget owner
+preconditions:
+  - user is authenticated and can view the budget (BudgetPolicy view)
+  - Plaid credentials are configured so a link token can be created
+routes:
+  - budgets.setup
+  - budgets.setup.connect
+  - budgets.setup.import
+  - plaid.discover
+  - plaid.import
+depends_on:
+  - path: app/Services/PlaidService.php
+    reason: link token creation, public token exchange, account fetch, linkMultipleAccounts, initial sync
+  - path: resources/js/Pages/Accounts/CreateOrImport.vue
+    reason: alternate entry point that also posts to plaid.import
+integrations:
+  - Plaid Link (cdn.plaid.com link-initialize.js)
+  - Plaid API (/link/token/create, /item/public_token/exchange, /accounts/get, /institutions/get_by_id, /institutions/search, /transactions/get)
+steps:
+  - action: open budgets/{budget}/setup on a budget with no accounts
+    expected: Budgets/Setup rendered with a linkToken (null if Plaid fails); budgets with accounts redirect to budgets.show
+  - action: choose "connect bank" (GET budgets/{budget}/setup/connect or budget/{budget}/plaid/discover)
+    expected: Plaid/Discover rendered with a fresh linkToken and the budget's active connections
+  - action: complete Plaid Link and tick the accounts to import
+    expected: discovered accounts listed client-side from Link metadata
+  - action: submit selection (POST budget/{budget}/plaid/import)
+    expected: selected accounts created, linked under one PlaidConnection, transactions synced, redirect to budgets.show with "Successfully imported N accounts"
+postconditions:
+  - one Account and one PlaidAccount per selected Plaid account
+  - a single active PlaidConnection holding the access token and institution metadata
+business_rules:
+  - only accounts whose Plaid id is in selected_accounts are imported
+  - initial balance is Plaid current balance in cents, or 0 when missing
+  - institution details are looked up by institution_id, falling back to a name search; missing details are tolerated
+  - link token failures are logged and render the page with linkToken null (connect button disabled)
+scenarios:
+  - id: setup_page_renders
+    kind: happy_path
+    description: An owner of an empty budget sees the setup page with a link token.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::setup page renders for an empty budget with a Plaid link token
+  - id: setup_redirects_when_accounts_exist
+    kind: edge
+    description: A budget that already has accounts redirects from setup to budgets.show with a message.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::setup redirects to the budget when it already has accounts
+  - id: discover_lists_existing_connections
+    kind: happy_path
+    description: The discovery page renders a link token and the budget's active connections with their accounts.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::discover page lists the budgets active connections with their accounts
+  - id: import_selected_accounts
+    kind: happy_path
+    description: Importing creates local accounts for only the selected Plaid accounts under one connection and redirects with a success message.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::importing creates local accounts for only the selected Plaid accounts under one connection
+      - tests/Feature/Plaid/PlaidImportTest.php::the setup import route imports accounts the same way
+  - id: import_validation
+    kind: validation
+    description: Missing public_token, metadata.institution.name or selected_accounts fails validation.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::import requires a public token, institution name and selected accounts
+  - id: import_with_no_matching_selection
+    kind: edge
+    description: selected_accounts that match nothing in the Plaid response still redirect with "imported 0 accounts" and create an empty connection.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::import with a selection matching no Plaid account reports zero imported
+  - id: institution_lookup_fallback
+    kind: alternate
+    description: When institution_id is missing or lookup fails, the institution is searched by name; absent details leave logo/url null.
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::import falls back to an institution name search when no institution id is given
+      - tests/Feature/Plaid/PlaidImportTest.php::import still succeeds with no logo or url when the institution cannot be found
+    note: the missing-id and not-found paths are covered; the 'lookup by institution_id' path is unreachable from import because validation drops metadata.institution.institution_id (see known_issues), so it is not asserted.
+  - id: link_token_unavailable
+    kind: integration
+    description: When Plaid link token creation fails (misconfig, DNS, timeout) the setup/discover page still renders with linkToken null and the connect button disabled.
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidOutageTest.php::connect pages render without a link token when Plaid returns an error
+    note: server side (linkToken null, 200) is covered; the disabled connect button is frontend behaviour with no test.
+  - id: import_failure_redirects_back
+    kind: recovery
+    description: Token exchange or account fetch failure redirects back with an error flash and no connection is created.
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::a failed public token exchange redirects back with an error and creates nothing
+      - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange on import redirects back with an error and no connection
+    note: token exchange failure is covered; account fetch failure is not, because it currently reports success (see known_issues).
+  - id: cross_user_budget_denied
+    kind: authorization
+    description: A user cannot open discovery or import into another user's budget (403 from can:view,budget).
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::another users budget cannot be discovered, set up or imported into
+known_issues:
+  - 'import is not wrapped in a transaction (PlaidController.php:214-253): local Accounts are created before linkMultipleAccounts/syncTransactions, so a later failure leaves orphan unlinked accounts in the budget. Confirmed by a throwaway test (linkMultipleAccounts throwing left 2 Accounts, 0 PlaidAccounts); not committed.'
+  - 'validation (PlaidController.php:181-188) only declares metadata.institution.name, so $validated drops metadata.institution.institution_id and metadata.item.id. As a result import always falls back to the institution name search (line 236) and every import gets a random plaid-item-<uniqid> item id (line 208-210), so re-importing the same Plaid item creates a second PlaidConnection instead of reusing it. Confirmed by a throwaway test sending institution_id ins_109508 and item.id: the connection stored institution_id null and plaid_item_id plaid-item-...; not committed.'
+  - 'an account fetch failure during import is reported as success: PlaidService::getAccounts (PlaidService.php:477-484) returns [] on any RequestException, so import redirects to budgets.show with "Successfully imported 0 accounts from Plaid." and leaves an empty PlaidConnection. Confirmed by a throwaway test (/accounts/get returning ITEM_LOGIN_REQUIRED); not committed, so import_failure_redirects_back is only partial.'
+  - 'error flashes interpolate raw exception messages ("Failed to import accounts ..."), which can expose Plaid/Guzzle internals (e.g. cURL errors) to the user.'
+  - budgets.setup.import (POST budgets/{budget}/setup/connect) is not used by the UI; Discover.vue always posts to plaid.import.
+  - the post-import transaction sync swallows Plaid errors inside PlaidService::syncTransactions, so import reports success even when the initial sync failed (see PLAID-003).
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetController.php setup()
+  - app/Http/Controllers/PlaidController.php discover(), import(), fetchInstitutionDetails()
+  - resources/js/Pages/Budgets/Setup.vue, resources/js/Pages/Plaid/Discover.vue
+  - routes/web.php budgets.setup.* and plaid.discover/import
+last_verified: null

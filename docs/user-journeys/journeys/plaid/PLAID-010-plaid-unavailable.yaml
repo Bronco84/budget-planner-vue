@@ -1,0 +1,85 @@
+schema: 1
+id: PLAID-010
+name: User attempts to connect or sync while Plaid is unavailable or misconfigured
+domain: plaid
+status: implemented
+priority: high
+summary: >
+  Exceptional journey. When Plaid credentials are missing, DNS fails, the API times out
+  (5s connect / 30s request) or returns an error, the app must degrade without a 500:
+  connect pages render with no link token (connect button disabled), token exchange
+  failures redirect back with an error flash, and sync failures should be reported.
+actors:
+  - budget owner
+preconditions:
+  - Plaid is unreachable, misconfigured, or returns API errors
+routes:
+  - budgets.setup
+  - plaid.discover
+  - plaid.link
+  - plaid.import
+  - plaid.store
+  - plaid.sync
+depends_on:
+  - path: app/Services/PlaidService.php
+    reason: isConfigured guard, Guzzle timeouts, ConnectException/RequestException translation into user messages
+integrations:
+  - Plaid API
+steps:
+  - action: open setup, discover or link page while createLinkToken throws
+    expected: page renders with linkToken null; error is logged; connect button disabled
+  - action: submit import/store while token exchange fails
+    expected: redirect back with "Failed to import accounts" / "Failed to link account" error flash
+  - action: sync while Plaid errors
+    expected: user is told the sync failed (not currently the case, see known_issues)
+postconditions:
+  - no partial PlaidConnection is created when exchange fails
+business_rules:
+  - createLinkToken maps ConnectException to "Unable to connect to Plaid..." (DNS / timeout variants) and RequestException to Plaid's error_message
+  - unconfigured Plaid throws "Plaid service is not properly configured" before any HTTP call
+scenarios:
+  - id: pages_render_without_link_token
+    kind: happy_path
+    description: Setup, discover and link pages render (200) with linkToken null when Plaid is down.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidOutageTest.php::connect pages render without a link token when Plaid returns an error
+  - id: unconfigured_plaid
+    kind: edge
+    description: With no client id/secret, link token creation is refused without an HTTP call and pages still render.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidOutageTest.php::unconfigured Plaid refuses link token creation without calling the API
+  - id: link_timeout
+    kind: integration
+    description: A connect timeout to Plaid produces the friendly "Connection timed out" message in logs and a disabled connect button rather than a hung request.
+    coverage: partial
+    tests:
+      - tests/Feature/Plaid/PlaidOutageTest.php::a connect timeout while creating a link token is logged with a friendly message
+      - tests/Feature/Plaid/PlaidOutageTest.php::Plaid requests are bounded by connect and request timeouts
+    note: server side covered (friendly log message, linkToken null, 5s/30s client timeouts); the disabled connect button is frontend behaviour with no test.
+  - id: exchange_failure_redirects
+    kind: recovery
+    description: A failed /item/public_token/exchange on import or store redirects back with an error flash and no connection.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange on import redirects back with an error and no connection
+      - tests/Feature/Plaid/PlaidOutageTest.php::a failed token exchange when linking one account redirects back with an error and no connection
+  - id: sync_failure_reported
+    kind: recovery
+    description: A Plaid error during sync is surfaced to the user as a failure.
+    coverage: uncovered
+    note: confirmed broken, errors are swallowed and reported as a "Synced 0 ..." success (see PLAID-003 known_issues); no test committed.
+  - id: authorization
+    kind: authorization
+    description: Ownership enforcement for these routes is catalogued in PLAID-001/002/003.
+    coverage: not_applicable
+    note: this journey is about external failure handling; authorization is covered by the owning journeys.
+known_issues:
+  - 'exchangePublicToken (PlaidService.php:287) only catches RequestException; a ConnectException (timeout/DNS) propagates and the controller flashes the raw cURL message to the user. Confirmed: with a faked connect timeout, import flashes "Failed to import accounts: cURL error 28: Connection timed out after 5001 milliseconds" (the redirect and no-connection behaviour is tested; the message text is deliberately not asserted).'
+  - the Link/Discover/Setup pages give no visible explanation when linkToken is null; the connect button is simply disabled.
+confidence: medium
+evidence:
+  - app/Services/PlaidService.php createLinkToken(), getConnectionErrorMessage(), exchangePublicToken(), initializeClient() timeouts
+  - app/Http/Controllers/PlaidController.php try/catch around createLinkToken
+last_verified: null

@@ -1,0 +1,94 @@
+schema: 1
+id: TXN-002
+name: Owner records a manual transaction
+domain: transactions
+status: implemented
+priority: critical
+summary: >
+  The owner opens the create-transaction form (optionally pre-filled from query
+  parameters, e.g. from a recurring projection) or the QuickAddTransactionModal,
+  chooses an account in the budget, enters description, signed amount, date,
+  category and notes, optionally links a recurring template, and is redirected to
+  the transaction's edit page to attach files.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget and it has at least one account
+routes:
+  - budget.transaction.create
+  - budget.transaction.store
+  - budget.transaction.edit
+depends_on:
+  - path: resources/js/Pages/Transactions/Create.vue
+    reason: full-page create form
+  - path: resources/js/Components/Modals/QuickAddTransactionModal.vue
+    reason: quick-add modal posting to the active budget
+integrations: []
+steps:
+  - action: visit /budget/{budget}/transactions/create (optionally with description/account_id/category/date/amount/recurring_transaction_template_id query)
+    expected: Transactions/Create rendered with accounts, recurring templates and prefillData
+  - action: submit (POST /budget/{budget}/transactions)
+    expected: transaction stored with amount_in_cents = amount*100; redirect to budget.transaction.edit with a prompt to add attachments
+postconditions:
+  - Transaction exists in the budget and an activity-log entry is recorded by model events
+business_rules:
+  - account_id must exist in this budget; recurring_transaction_template_id, if given, must belong to this budget
+  - description and category required (max 255); amount numeric (negative = expense); date required
+scenarios:
+  - id: create_form_renders
+    kind: happy_path
+    description: Create page renders with accounts and prefill data.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::owner can open the create transaction form with budget accounts and templates
+  - id: store_transaction
+    kind: happy_path
+    description: Valid submission stores the transaction and redirects to its edit page.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::storing a manual transaction persists it and redirects to its edit page
+  - id: quick_add_modal
+    kind: alternate
+    description: QuickAddTransactionModal posts to the active budget's store endpoint.
+    coverage: partial
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::quick add payload without notes or template stores the transaction
+    note: 'server side only: asserts the modal''s field set is accepted by the store endpoint; the modal posting to the active budget is not exercised (needs a browser test).'
+  - id: prefill_from_query
+    kind: alternate
+    description: Query parameters populate prefillData.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::create transaction form is prefilled from query parameters
+  - id: missing_fields_rejected
+    kind: validation
+    description: Missing description/amount/date/category returns validation errors.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::storing a transaction rejects invalid input and creates nothing
+  - id: foreign_account_rejected
+    kind: authorization
+    description: Referencing another budget's account fails account_id validation.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::cannot store a transaction referencing another budgets account
+  - id: foreign_template_rejected
+    kind: authorization
+    description: Referencing another budget's recurring template fails validation.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::storing a transaction rejects another budgets recurring template
+  - id: other_users_budget_forbidden
+    kind: authorization
+    description: Create/store on another user's budget returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/ManualTransactionTest.php::user cannot open the create transaction form for another users budget
+      - tests/Feature/Transactions/ManualTransactionTest.php::user cannot store a transaction on another users budget
+known_issues:
+  - "amount*100 is stored without rounding (float to integer cents; e.g. 0.29*100 = 28.999...). TransferController rounds; TransactionController does not."
+  - "Breadcrumb is defined as 'budgets.transactions.create' in routes/breadcrumbs.php while the route is 'budget.transaction.create', so the create page gets no breadcrumb."
+confidence: high
+evidence:
+  - app/Http/Controllers/TransactionController.php create/store
+last_verified: null

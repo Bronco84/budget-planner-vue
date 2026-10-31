@@ -1,0 +1,79 @@
+schema: 1
+id: PREF-001
+name: User reorders account type sections and the order persists
+domain: preferences
+status: implemented
+priority: medium
+summary: >
+  On the budget page the user drags account type sections (checking, savings,
+  credit card...) into a new order. The page posts the full order to the
+  preferences API, which stores it in user_preferences.other_preferences; the
+  page then partially reloads userAccountTypeOrder. The saved order is used by
+  BudgetController for section ordering and default account selection. A generic
+  key/value preference endpoint can also read and write arbitrary keys.
+actors:
+  - authenticated user
+preconditions:
+  - user has a budget with accounts of more than one type
+routes:
+  - preferences.account-type-order.get
+  - preferences.account-type-order.update
+  - preferences.show
+  - preferences.update
+depends_on:
+  - path: resources/js/Pages/Budgets/Show.vue
+    reason: draggable sections and saveAccountTypeOrder fetch call
+  - path: app/Models/UserPreference.php
+    reason: storage in built-in columns or the other_preferences JSON column
+steps:
+  - action: drag an account type section to a new position on the budget page
+    expected: POST /api/preferences/account-type-order with the full order
+  - action: server validates and stores
+    expected: JSON {order, message}; page reloads only userAccountTypeOrder
+  - action: revisit the budget
+    expected: sections render in the saved order
+postconditions:
+  - account_type_order preference holds the new order
+business_rules:
+  - order must be an array of strings each in User::ACCOUNT_TYPES
+  - default order is User::ACCOUNT_TYPES when nothing is saved
+  - on a failed save the client rebuilds the previous order
+  - generic POST /api/preferences/{key} accepts any key with a nullable value, except account_type_order which must be an array of known types; theme, notifications_enabled and show_balance_projection map to dedicated columns
+scenarios:
+  - id: save_order
+    kind: happy_path
+    description: Posting a valid order stores it and returns it.
+    coverage: uncovered
+  - id: saved_order_returned
+    kind: happy_path
+    description: GET account-type-order returns the saved order, or ACCOUNT_TYPES by default.
+    coverage: uncovered
+  - id: unknown_type_rejected
+    kind: validation
+    description: An order containing a type outside ACCOUNT_TYPES, or a non-array, is rejected with 422.
+    coverage: uncovered
+  - id: generic_preference_round_trip
+    kind: alternate
+    description: Writing a value via POST /api/preferences/{key} is returned by GET /api/preferences/{key}.
+    coverage: uncovered
+  - id: failed_save_reverts_ui
+    kind: recovery
+    description: When the save fails the dragged sections snap back to the previous order.
+    coverage: uncovered
+    note: client-side behaviour; needs a browser test.
+  - id: preferences_scoped_to_user
+    kind: authorization
+    description: Preferences are always read and written for the authenticated user; guests get 401/redirect.
+    coverage: uncovered
+known_issues:
+  - "Suspected: account types are free text (AccountController validates string max 50) but the order validator only allows User::ACCOUNT_TYPES, so a budget with any other type (e.g. a Plaid-provided type) can never save its order."
+  - "Show.vue's fetch omits Accept: application/json, so a validation failure becomes a 302 back to the page rather than a 422 JSON error."
+  - "Generic POST /api/preferences/{key} accepts arbitrary keys and unvalidated values (e.g. active_budget_id, budget_*_projection_months), bypassing the dedicated endpoints' validation."
+  - GET /api/preferences/account-type-order and the generic show/update endpoints have no frontend caller.
+confidence: medium
+evidence:
+  - routes/web.php preferences routes inside the auth group
+  - app/Http/Controllers/Api/UserPreferencesController.php
+  - app/Models/User.php, app/Models/UserPreference.php
+  - app/Http/Controllers/BudgetController.php userAccountTypeOrder prop
+last_verified: null

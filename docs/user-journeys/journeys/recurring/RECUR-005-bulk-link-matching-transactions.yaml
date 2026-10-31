@@ -1,0 +1,70 @@
+schema: 1
+id: RECUR-005
+name: User reviews and bulk-links unlinked transactions to templates
+domain: recurring
+status: implemented
+priority: medium
+summary: >
+  From the recurring list the user opens "Find matching transactions", which scans every
+  unlinked Plaid-imported transaction in the budget against every template (Plaid entity
+  id first, then description matching). The user ticks the suggestions to accept and
+  submits; the selected transactions are linked to their templates.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with recurring templates and unlinked Plaid transactions
+routes:
+  - recurring-transactions.find-matching
+  - recurring-transactions.link-transactions
+depends_on:
+  - path: app/Services/RecurringTransactionService.php
+    reason: findMatchingTransactionsForTemplates and linkSelectedTransactions
+integrations:
+  - Plaid transaction counterparties and merchant_entity_id (read-only)
+steps:
+  - action: open budget/{budget}/recurring-transactions/find-matching
+    expected: RecurringTransactions/FindMatchingTransactions lists templates with matching unlinked transactions plus totals
+  - action: select transactions and submit (POST .../link-transactions)
+    expected: selected, still-unlinked transactions linked; redirect to index with "Successfully linked N transaction(s)..." or info "No transactions were linked."
+postconditions:
+  - chosen transactions carry the template id
+business_rules:
+  - only transactions with a plaid_transaction_id and no existing template link are suggested
+  - entity match checks counterparties[].entity_id and merchant_entity_id; fallback is description exact / contains (5+ chars) / fuzzy 70%
+  - already-linked transactions are skipped, never re-linked
+  - find-matching needs budget view; link-transactions needs budget update
+scenarios:
+  - id: review_and_link
+    kind: happy_path
+    description: Owner reviews suggested matches and links a selection; flash reports the linked count.
+    coverage: uncovered
+  - id: no_templates_or_matches
+    kind: empty_state
+    description: A budget with no templates or no matching transactions shows the empty state.
+    coverage: uncovered
+  - id: already_linked_skipped
+    kind: edge
+    description: A selected transaction that is already linked is not re-linked and the "No transactions were linked." message is shown.
+    coverage: uncovered
+  - id: selections_required
+    kind: validation
+    description: Missing selections or non-existent template/transaction ids fail validation.
+    coverage: uncovered
+  - id: cross_user_budget_forbidden
+    kind: authorization
+    description: Another user cannot open find-matching or post link-transactions for a budget they do not own (403).
+    coverage: uncovered
+  - id: foreign_ids_rejected
+    kind: authorization
+    description: Template or transaction ids from another budget in the selections payload must be rejected.
+    coverage: uncovered
+    note: currently not enforced (see known_issues).
+known_issues:
+  - linkSelectedTransactions loads templates and transactions with find() and never checks they belong to the budget in the URL; validation is only exists:..., so an owner of any budget can link another user's unlinked transactions to their own template (IDOR that modifies foreign rows), and then read them via rules.linked.
+  - Matching description fuzzy threshold (70% similar_text) runs every template against every unlinked transaction in PHP (O(templates x transactions)), which can be slow on large budgets.
+confidence: high
+evidence:
+  - app/Http/Controllers/RecurringTransactionController.php findMatchingTransactions/linkSelectedTransactions
+  - app/Services/RecurringTransactionService.php findMatchingTransactionsForTemplates/linkSelectedTransactions/matchesDescription
+  - resources/js/Pages/RecurringTransactions/FindMatchingTransactions.vue
+last_verified: null

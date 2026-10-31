@@ -1,0 +1,63 @@
+schema: 1
+id: PROPERTY-002
+name: Owner updates, re-links or deletes a property
+domain: properties
+status: implemented
+priority: medium
+summary: >
+  From the properties list or the dashboard the owner edits a property's value and
+  details, changes which liability accounts are linked to it, or deletes it
+  (unlinking its accounts first). A show route exists but its page does not.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget and the property belongs to it
+routes:
+  - budgets.properties.edit
+  - budgets.properties.update
+  - budgets.properties.destroy
+  - budgets.properties.show
+depends_on:
+  - path: resources/js/Pages/Properties/Edit.vue
+    reason: edit form sending linked_account_ids
+integrations: []
+steps:
+  - action: open /budgets/{budget}/properties/{property}/edit
+    expected: Properties/Edit rendered with liability accounts that are unlinked or linked to this property
+  - action: save (PUT /budgets/{budget}/properties/{property})
+    expected: property updated; value_updated_at refreshed when the value changed; linked accounts replaced
+  - action: delete from the list (DELETE /budgets/{budget}/properties/{property})
+    expected: accounts unlinked and property deleted
+postconditions:
+  - property updated or removed; account.property_id links consistent
+business_rules:
+  - when linked_account_ids is present, all existing links are cleared and the given in-budget accounts are linked
+scenarios:
+  - id: update_property
+    kind: happy_path
+    description: Valid update persists changes and links.
+    coverage: uncovered
+  - id: delete_property_unlinks_accounts
+    kind: happy_path
+    description: Deleting a property clears property_id on its accounts.
+    coverage: uncovered
+  - id: invalid_update_rejected
+    kind: validation
+    description: Invalid fields return validation errors and nothing changes.
+    coverage: uncovered
+  - id: show_page_missing
+    kind: edge
+    description: GET show renders Properties/Show, which has no Vue page.
+    coverage: uncovered
+  - id: other_users_property_forbidden
+    kind: authorization
+    description: Edit/update/delete under another user's budget return 403; a property from another budget returns 404 via scopeBindings.
+    coverage: uncovered
+known_issues:
+  - "update and destroy redirect to the undefined route budgets.assets.index, so both return 500 after the database change has been committed."
+  - "show renders Inertia component Properties/Show, which does not exist (resources/js/Pages/Properties has only Index/Create/Edit); a breadcrumb for budgets.properties.show exists but nothing links to the page."
+  - "value_updated_at comparison uses strict !== between the validated value and the model attribute; type differences could refresh the timestamp even when the value is unchanged."
+confidence: high
+evidence:
+  - app/Http/Controllers/PropertyController.php show/edit/update/destroy
+last_verified: null

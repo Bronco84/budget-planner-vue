@@ -1,0 +1,140 @@
+# Journey analysis configuration. See README.md in this directory.
+schema: 1
+
+# Only these paths are read when building the dependency graph.
+analysis_roots:
+  - app/
+  - bootstrap/
+  - config/
+  - routes/
+  - resources/js/
+  - resources/views/
+  - database/
+  - tests/
+  - docs/user-journeys/
+
+app_namespaces: ['App\', 'Database\', 'Tests\']
+page_root: resources/js/Pages
+js_aliases:
+  '@/': resources/js/
+
+# Route files and the group attributes the framework applies when loading them.
+route_files:
+  - routes/web.php
+  - routes/auth.php
+  - { path: routes/api.php, prefix: api }
+
+# URIs registered outside route files; skipped by `validate --with-app`.
+route_check_ignore:
+  - 'nova/**'
+
+test_roots:
+  - tests/
+
+commands:
+  php_tests: php artisan test
+  e2e_tests: npx playwright test
+
+# Changes here can affect many or all journeys. scope: all | backend | frontend.
+# all/backend changes make impact analysis recommend the full PHP suite.
+shared_infrastructure:
+  - pattern: bootstrap/**
+    scope: all
+    reason: application bootstrap and global middleware stack
+  - pattern: app/Http/Middleware/**
+    scope: all
+    reason: web middleware (Inertia shared props, passkey enforcement, trusted devices, security headers, CSRF)
+  - pattern: app/Providers/**
+    scope: all
+    reason: service providers (gates, observers, route registration, Nova/Telescope)
+  - pattern: app/Http/Controllers/Controller.php
+    scope: backend
+    reason: base controller for every action
+  - pattern: config/**
+    scope: backend
+    reason: framework and integration configuration
+  - pattern: routes/breadcrumbs.php
+    scope: backend
+    reason: breadcrumb definitions resolved for every page by HandleInertiaRequests
+  - pattern: resources/views/app.blade.php
+    scope: all
+    reason: Inertia root template
+  - pattern: resources/js/app.js
+    scope: frontend
+    reason: Vue/Inertia bootstrap and page resolution
+  - pattern: resources/js/bootstrap.js
+    scope: frontend
+    reason: axios defaults and CSRF handling for every request
+  - pattern: resources/css/**
+    scope: frontend
+    reason: global styles
+  - pattern: lang/**
+    scope: backend
+    reason: validation and UI translations
+  - pattern: composer.lock
+    scope: all
+    reason: PHP dependency versions
+  - pattern: composer.json
+    scope: all
+    reason: PHP dependencies and autoloading
+  - pattern: package-lock.json
+    scope: frontend
+    reason: JS dependency versions
+  - pattern: package.json
+    scope: frontend
+    reason: JS dependencies and scripts
+  - pattern: postcss.config.js
+    scope: frontend
+    reason: build configuration
+  - pattern: vite.config.js
+    scope: frontend
+    reason: build configuration
+  - pattern: tailwind.config.js
+    scope: frontend
+    reason: build configuration
+  - pattern: phpunit.xml
+    scope: all
+    reason: test environment configuration
+  - pattern: tests/TestCase.php
+    scope: all
+    reason: base test case used by every feature test
+  - pattern: tests/Pest.php
+    scope: all
+    reason: Pest bootstrap used by every test
+
+# Code that is intentionally not part of an end-user journey. Changes are
+# reported, and tests that reach the file still run, but no journey is flagged.
+non_journey:
+  - pattern: app/Console/Commands/**
+    reason: operator CLI commands (backfills, diagnostics), not reachable from the UI
+  - pattern: routes/console.php
+    reason: artisan command registration
+  - pattern: database/factories/**
+    reason: test fixtures; tests that use them are selected through the graph
+  - pattern: database/seeders/**
+    reason: local seed data
+  - pattern: app/Providers/TelescopeServiceProvider.php
+    reason: developer tooling
+
+# Never affect user journeys.
+ignore:
+  - '**/*.md'
+  - '**/*.png'
+  - tests/playwright/screenshots/**
+  - playwright-report/**
+  - test-results/**
+  - .github/**
+  - '*.neon'
+  - .gitignore
+  - .editorconfig
+  - herd.yml
+  - public/vendor/**
+
+# Routes deliberately not mapped to any journey, with the reason.
+excluded_routes:
+  'GET /api/user': Sanctum scaffold; nothing in the frontend calls it (returns the full User model, see AUTH known issues)
+  budgets.accounts.index: registered by Route::resource but AccountController has no index(); unreachable from the UI (should be removed with ->except())
+  budgets.accounts.show: registered by Route::resource but AccountController has no show(); unreachable from the UI (should be removed with ->except())
+  budgets.categories.create: registered by Route::resource but CategoryController has no create(); unreachable from the UI (should be removed with ->except())
+  budgets.categories.show: registered by Route::resource but CategoryController has no show(); unreachable from the UI (should be removed with ->except())
+  budgets.categories.edit: registered by Route::resource but CategoryController has no edit(); unreachable from the UI (should be removed with ->except())

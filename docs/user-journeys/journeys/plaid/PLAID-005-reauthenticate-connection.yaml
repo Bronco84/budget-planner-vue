@@ -1,0 +1,90 @@
+schema: 1
+id: PLAID-005
+name: User re-authenticates a Plaid connection that needs a new login
+domain: plaid
+status: implemented
+priority: high
+summary: >
+  When a bank requires the user to log in again (Plaid ITEM_LOGIN_REQUIRED), the user
+  clicks "Re-authenticate" on the Bank Connection page. The browser requests an
+  update-mode link token, opens Plaid Link in update mode, and on success posts the
+  resulting public token. The server exchanges it and writes the new access token onto
+  the existing connection, marking it active and clearing its error message, which
+  repairs every account under that connection.
+actors:
+  - budget owner
+preconditions:
+  - the account is linked to Plaid and its connection has an access token
+routes:
+  - plaid.upgrade-link-token
+  - plaid.update-connection
+depends_on:
+  - path: app/Services/PlaidService.php
+    reason: createLinkToken in update mode (existing access token), exchangePublicToken
+integrations:
+  - Plaid Link update mode
+  - Plaid API (/link/token/create with access_token, /item/public_token/exchange)
+steps:
+  - action: click Re-authenticate (axios POST plaid/upgrade-link-token)
+    expected: JSON {link_token, institution_name}
+  - action: complete Plaid Link in update mode
+    expected: client posts public_token and metadata to plaid/update-connection
+  - action: server updates the connection
+    expected: connection access_token replaced, status active, error_message null; redirect back with success flash and the page reloads
+postconditions:
+  - the existing PlaidConnection (not a new one) holds a working access token
+business_rules:
+  - both endpoints are limited to 10 requests per minute
+  - upgrade-link-token returns JSON 404 when the account is not linked and 400 when the connection has no access token
+  - update-connection requires public_token and metadata
+scenarios:
+  - id: upgrade_token_issued
+    kind: happy_path
+    description: A linked account receives an update-mode link token and the institution name as JSON.
+    coverage: uncovered
+  - id: connection_updated
+    kind: happy_path
+    description: Posting the update-mode public token replaces the access token on the existing connection and marks it active.
+    coverage: uncovered
+  - id: upgrade_token_not_linked
+    kind: edge
+    description: Requesting an upgrade token for an unlinked account returns JSON 404 "Account is not linked to Plaid."
+    coverage: uncovered
+  - id: upgrade_token_missing_access_token
+    kind: edge
+    description: A connection without an access token returns JSON 400.
+    coverage: uncovered
+  - id: update_connection_validation
+    kind: validation
+    description: Missing public_token or metadata fails validation.
+    coverage: uncovered
+  - id: upgrade_token_plaid_failure
+    kind: integration
+    description: When Plaid refuses to create the update-mode token the endpoint returns JSON 500 and the UI toasts the error.
+    coverage: uncovered
+  - id: exchange_failure_on_update
+    kind: recovery
+    description: If the public token exchange fails the connection is left unchanged and the user is redirected back with an error.
+    coverage: uncovered
+  - id: cross_user_denied
+    kind: authorization
+    description: Both endpoints return 403 for another user's budget/account.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::plaid POST route rejects another users budget+account with 403
+  - id: cross_budget_account_not_found
+    kind: authorization
+    description: Both endpoints return 404 for an account from a different budget.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::plaid POST route rejects a cross-budget account with 404
+known_issues:
+  - nothing in the app ever detects ITEM_LOGIN_REQUIRED or calls PlaidConnection::markAsError, so connections never enter the 'error' status and users are never prompted to re-authenticate; the button is always shown on linked accounts and re-auth is purely user-initiated.
+  - Plaid documents that update mode does not require exchanging the public token; exchanging it and overwriting access_token should be verified against the Plaid sandbox.
+  - 'JSON 500 and error flashes include raw exception text ("Failed to create re-authentication link ...", "Failed to re-authenticate ...").'
+confidence: high
+evidence:
+  - app/Http/Controllers/PlaidController.php upgradeLinkToken(), updateConnection()
+  - resources/js/Pages/Plaid/Link.vue updateConnection()
+  - app/Models/PlaidConnection.php markAsError() has no callers
+last_verified: null

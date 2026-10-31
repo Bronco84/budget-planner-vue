@@ -1,0 +1,18 @@
+#!/bin/sh
+# User journey checks (docs/user-journeys/README.md).
+# Installed by `composer install` via core.hooksPath. Bypass: --no-verify or JOURNEYS_SKIP=1.
+
+# Keep any hook that existed in .git/hooks before core.hooksPath was set.
+legacy="$(git rev-parse --git-common-dir)/hooks/pre-commit"
+if [ -x "$legacy" ]; then
+    "$legacy" "$@" || exit $?
+fi
+
+[ "$JOURNEYS_SKIP" = "1" ] && exit 0
+
+if ! command -v php >/dev/null 2>&1; then
+    echo "journeys: php not found; skipping pre-commit checks" >&2
+    exit 0
+fi
+
+exec php bin/journeys hook pre-commit "$@"

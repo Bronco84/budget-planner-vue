@@ -1,0 +1,108 @@
+schema: 1
+id: ACCOUNT-002
+name: Owner edits account details, logo, or removes the account
+domain: accounts
+status: implemented
+priority: high
+summary: >
+  From the dashboard the owner opens an account's edit page to rename it, change
+  its type, include/exclude it from the budget, set a custom or URL logo, fetch a
+  logo from the institution's favicon, clear the logo, or delete the account.
+  Deletion is refused when the account has transactions.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget and the account belongs to it
+routes:
+  - budgets.accounts.edit
+  - budgets.accounts.update
+  - accounts.fetchLogo
+  - accounts.clearLogo
+  - budgets.accounts.destroy
+depends_on:
+  - path: resources/js/Pages/Accounts/Edit.vue
+    reason: edit form with logo and delete actions
+  - path: app/Traits/InstitutionDomainMapping.php
+    reason: maps institution names to domains for the favicon logo
+integrations:
+  - Google S2 favicon service (logo URL only; not fetched server-side)
+steps:
+  - action: visit /budgets/{budget}/accounts/{account}/edit
+    expected: Accounts/Edit rendered with the account and its Plaid connection
+  - action: save changes (PUT /budgets/{budget}/accounts/{account})
+    expected: account updated, redirect to budgets.show
+  - action: fetch logo (POST .../fetch-logo) or clear logo (DELETE .../logo)
+    expected: logo_url set from the institution mapping (custom_logo cleared) or both cleared; back with flash message
+  - action: delete account (DELETE /budgets/{budget}/accounts/{account})
+    expected: account deleted and redirect to dashboard, or back with error when it has transactions
+postconditions:
+  - account updated, logo changed, or account removed
+business_rules:
+  - include_in_budget toggles exclude_from_total_balance to its inverse
+  - logo_url must be a URL (max 500)
+  - accounts with any transactions cannot be deleted
+  - fetch-logo falls back to the account name when there is no Plaid institution, and flashes an error when no domain mapping exists
+scenarios:
+  - id: edit_form_renders
+    kind: happy_path
+    description: Owner can open the account edit page.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::user can edit their own account
+  - id: owner_updates_account
+    kind: happy_path
+    description: Valid update persists and redirects to the dashboard.
+    coverage: uncovered
+  - id: fetch_and_clear_logo
+    kind: alternate
+    description: Fetch-logo stores a favicon URL for a mapped institution; clear-logo removes both logo fields.
+    coverage: uncovered
+  - id: fetch_logo_unmapped_institution
+    kind: edge
+    description: An unmapped institution flashes an error and leaves the logo unchanged.
+    coverage: uncovered
+  - id: invalid_update_rejected
+    kind: validation
+    description: Missing name/type or a non-URL logo_url returns validation errors.
+    coverage: uncovered
+  - id: owner_deletes_unused_account
+    kind: happy_path
+    description: An account with no transactions is deleted.
+    coverage: uncovered
+  - id: delete_blocked_with_transactions
+    kind: edge
+    description: Deleting an account that has transactions is refused with an error flash.
+    coverage: uncovered
+  - id: other_users_account_forbidden
+    kind: authorization
+    description: Edit, update and delete on another user's budget/account return 403 and nothing changes.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot edit another users account
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot update another users account
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot delete another users account
+  - id: cross_budget_account_not_found
+    kind: authorization
+    description: An account from another budget under the user's own budget URL returns 404 (scopeBindings).
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::account must belong to budget in route
+      - tests/Feature/NestedRouteAuthorizationTest.php::account resource routes reject a cross-budget account with 404
+  - id: logo_routes_cross_user
+    kind: authorization
+    description: fetch-logo and clear-logo on another user's account return 403.
+    coverage: uncovered
+  - id: guest_redirected
+    kind: authentication
+    description: Guests opening the edit page are redirected to login.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access accounts
+known_issues:
+  - "custom_logo accepts an arbitrary unbounded string (base64 image) with no size or content validation."
+  - "Since transfers create transactions on both accounts, any account that was ever part of a transfer can only be deleted after its transfers are deleted; the error message does not explain this."
+confidence: high
+evidence:
+  - app/Http/Controllers/AccountController.php edit/update/fetchLogo/clearLogo/destroy
+  - app/Policies/AccountPolicy.php
+last_verified: null

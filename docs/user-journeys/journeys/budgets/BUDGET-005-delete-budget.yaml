@@ -1,0 +1,54 @@
+schema: 1
+id: BUDGET-005
+name: Owner deletes a budget
+domain: budgets
+status: implemented
+priority: high
+summary: >
+  From the edit page the owner deletes the budget. If it was the active budget the
+  preference is cleared; the user is redirected to /budgets, which forwards to the
+  next accessible budget or to the create form when none remain. Child rows
+  (accounts, transactions, categories, transfers, properties, Plaid connections)
+  are removed by database cascades.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.destroy
+  - budgets.index
+integrations: []
+steps:
+  - action: confirm delete on Budgets/Edit (DELETE /budgets/{budget})
+    expected: budget deleted, active preference cleared if it pointed at it, redirect to budgets.index
+  - action: follow redirect
+    expected: next accessible budget's dashboard, or budgets.create when none remain
+postconditions:
+  - the budget and its cascaded children no longer exist
+business_rules:
+  - deletion is a hard delete (no SoftDeletes on Budget)
+scenarios:
+  - id: owner_deletes_budget
+    kind: happy_path
+    description: Owner deletes a budget and is redirected to budgets.index.
+    coverage: uncovered
+  - id: deleting_last_budget_leads_to_create
+    kind: empty_state
+    description: Deleting the only budget ends on the create-budget form.
+    coverage: uncovered
+  - id: deleting_active_budget_clears_preference
+    kind: edge
+    description: Deleting the active budget clears active_budget_id so another budget becomes active.
+    coverage: uncovered
+  - id: other_users_budget_delete_forbidden
+    kind: authorization
+    description: Deleting another user's budget returns 403 and the budget remains.
+    coverage: uncovered
+known_issues:
+  - "File attachments are polymorphic (no FK), so budget/transaction FileAttachment rows and their S3 objects are left orphaned when a budget is deleted."
+  - "Plaid items for the budget's connections are not removed at Plaid; only local rows cascade."
+confidence: medium
+evidence:
+  - app/Http/Controllers/BudgetController.php destroy
+  - database/migrations/* (budget_id foreign keys onDelete cascade)
+last_verified: null

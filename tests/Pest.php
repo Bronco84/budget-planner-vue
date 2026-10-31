@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Laragear\WebAuthn\Models\WebAuthnCredential;
 use Tests\TestCase;
 
 /*
@@ -42,7 +45,19 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Persist a WebAuthn credential for the user without running a real ceremony.
+ */
+function createPasskey(User $user, ?string $id = null): WebAuthnCredential
 {
-    // ..
+    return $user->webAuthnCredentials()->forceCreate([
+        'id' => $id ?? Str::random(32),
+        'user_id' => (string) Str::uuid(),
+        'alias' => 'Test key',
+        'counter' => 0,
+        'rp_id' => 'localhost',
+        'origin' => 'http://localhost',
+        'public_key' => 'test-public-key',
+        'attestation_format' => 'none',
+    ]);
 }

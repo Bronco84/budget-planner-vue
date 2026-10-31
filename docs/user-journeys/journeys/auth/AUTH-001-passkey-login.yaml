@@ -1,0 +1,79 @@
+schema: 1
+id: AUTH-001
+name: Guest signs in with a passkey
+domain: auth
+status: implemented
+priority: critical
+summary: >
+  A guest opens the login page, requests a WebAuthn assertion challenge, completes
+  the passkey ceremony in the browser and is signed in. A trusted-device cookie is
+  issued so later visits can auto-login. Passwords are not supported.
+actors:
+  - guest
+preconditions:
+  - user account exists with at least one registered passkey
+routes:
+  - login
+  - GET /
+  - webauthn.login.options
+  - webauthn.login
+depends_on:
+  - path: resources/js/vendor/webauthn/**
+    reason: browser-side WebAuthn helper loaded by the login page
+integrations:
+  - WebAuthn (laragear/webauthn), browser credential API
+steps:
+  - action: visit / or /login
+    expected: PasskeyLogin page rendered (/ redirects to login)
+  - action: request assertion options (POST webauthn/login/options)
+    expected: JSON challenge returned, credentials with empty ids filtered out
+  - action: submit signed assertion (POST webauthn/login)
+    expected: 204, session authenticated, trusted-device cookie queued
+postconditions:
+  - user is authenticated
+  - a TrustedDevice record exists for this browser
+business_rules:
+  - login options are rate limited to 10/min and are not guest-only, so an auto-logged-in request still receives JSON
+  - a failed assertion returns 422 without creating a session
+scenarios:
+  - id: login_page_renders
+    kind: happy_path
+    description: Guest can load the login page.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/AuthenticationTest.php::test_login_screen_can_be_rendered
+  - id: options_return_challenge
+    kind: happy_path
+    description: Guest receives a JSON assertion challenge.
+    coverage: covered
+    tests:
+      - tests/Feature/WebAuthnLoginOptionsTest.php::guest can fetch webauthn login options as json
+  - id: authenticated_options_stay_json
+    kind: edge
+    description: An already-authenticated (trusted device) request still gets JSON, not an HTML redirect.
+    coverage: covered
+    tests:
+      - tests/Feature/WebAuthnLoginOptionsTest.php::an authenticated request to login options returns json, not an html redirect
+  - id: successful_assertion_signs_in
+    kind: happy_path
+    description: A valid assertion authenticates the user and issues a trusted-device cookie.
+    coverage: uncovered
+    note: requires simulating a WebAuthn assertion signature; no test fixture exists yet.
+  - id: invalid_assertion_rejected
+    kind: validation
+    description: An invalid or unknown assertion returns 422 and no session is created.
+    coverage: uncovered
+  - id: options_rate_limited
+    kind: edge
+    description: Login option requests beyond 10 per minute are throttled.
+    coverage: uncovered
+  - id: authorization
+    kind: authorization
+    description: Endpoints are intentionally public; there is no resource ownership to enforce.
+    coverage: not_applicable
+    note: guest-facing entry point; abuse is limited by throttling instead.
+confidence: high
+evidence:
+  - routes/web.php webauthn group and routes/auth.php guest group
+  - app/Http/Controllers/WebAuthn/WebAuthnLoginController.php
+last_verified: null

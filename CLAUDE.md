@@ -9,7 +9,7 @@ long-lived feature branches unless explicitly requested.
 - Feature branches may be used for isolation, but folding finished work back into
   `main` and developing on `main` directly is fine.
 - Prefer keeping the local checkout aligned with `main` so the running site
-  (`http://budget_planner_vue.test`) always reflects the latest work.
+  (`https://budget-planner-vue.test`) always reflects the latest work.
 - When a branch is simply `main` plus new commits (a fast-forward), merge it into
   `main` rather than treating it as a divergent line of development.
 
@@ -48,7 +48,7 @@ This is a budget planning application built with:
 ## Development Environment
 
 This project uses **Laravel Herd** for local development:
-- **Local URL**: `http://budget_planner_vue.test`
+- **Local URL**: `https://budget-planner-vue.test`
 - **NEVER run `php artisan serve`** - This will interfere with Herd processes that are already running
 - **Herd and Vite are assumed to be running** - They provide the web server and hot module replacement for instant page updates
 - **Always use the .test domain** for all local development and testing
@@ -145,7 +145,7 @@ When using Playwright for testing this application:
 
 1. **Always verify the page loads correctly**:
    ```javascript
-o   await page.goto('http://budget_planner_vue.test');
+o   await page.goto('https://budget-planner-vue.test');
    await page.waitForLoadState('networkidle');
    ```
 
@@ -369,3 +369,41 @@ Before adding any package:
 - **Overcomplicated packages**: Heavy solutions for simple problems
 - **Duplicate functionality**: When framework already provides the feature
 - **Security concerns**: Packages with known vulnerabilities or poor security practices
+
+## User Journey Catalog (mandatory workflow)
+
+`docs/user-journeys/` maps every user-facing journey to its routes, derived code
+dependencies and the tests that verify each scenario. Use it as the behavioural
+and architectural map of the app instead of rediscovering it. Full guide:
+`docs/user-journeys/README.md`.
+
+**The catalog describes observed implementation; product requirements and tests
+define intended behaviour.** Never treat something as correct just because a
+journey describes it. Entries under `known_issues` are bugs, not specs.
+
+### Before modifying code
+1. Find the related journeys: `php bin/journeys find <term>`, `php bin/journeys show <file|route|Class>`.
+2. Read them: `php bin/journeys show <ID>` (routes, derived files, scenarios, gaps, unresolved deps).
+3. Review existing coverage and the cited tests (`php bin/journeys coverage --gaps`).
+4. Note the alternate, failure, authorization and empty-state scenarios that must keep working.
+
+### During implementation
+1. Follow existing conventions.
+2. Update affected journey YAML (steps, business rules, scenarios, known_issues) to match the new behaviour.
+3. Add a journey for new user-visible functionality, and list every new route in a journey (or in
+   `excluded_routes` in `config.yaml` with a reason).
+4. Add `depends_on` entries for dependencies static analysis can't see (container bindings, events, dynamic pages).
+5. Update or add tests for changed behaviour, and cite them in the scenarios (`path::exact test name`).
+6. Check downstream impact on shared services, middleware and policies: `php bin/journeys impacted -v`.
+
+### Before considering the task complete
+1. `php bin/journeys validate` (no errors).
+2. `php bin/journeys impacted` (review affected journeys, uncertain files and coverage warnings).
+3. Run the relevant tests: `php bin/journeys impacted --run --full-on-uncertain`, or `php artisan test`.
+4. Review uncovered scenarios for the journeys you touched.
+5. `php bin/journeys index` (and `--update-baseline` only if coverage intentionally changed) so `INDEX.md` is in sync.
+6. Report remaining gaps honestly: uncovered scenarios, uncertain impact, unrun E2E specs.
+
+Git hooks (`.githooks/`, installed by `composer install`) enforce validation and run affected
+tests; CI repeats this in strict mode. Hooks are a convenience, not a guarantee: impact
+analysis narrows which tests to run first, it doesn't prove the rest is unaffected.

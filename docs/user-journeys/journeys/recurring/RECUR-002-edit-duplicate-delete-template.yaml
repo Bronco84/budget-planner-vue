@@ -1,0 +1,84 @@
+schema: 1
+id: RECUR-002
+name: User edits, duplicates or deletes a recurring template
+domain: recurring
+status: implemented
+priority: high
+summary: >
+  The user opens a template's detail page (overview, rules, linked transactions,
+  diagnostics tabs), edits its schedule, amount and inline rules and saves, or uses the
+  list actions to duplicate or delete it. Saving the edit form syncs the rule set:
+  submitted rules with ids are updated, new ones created and omitted ones deleted.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with at least one recurring template
+routes:
+  - recurring-transactions.edit
+  - recurring-transactions.update
+  - recurring-transactions.duplicate
+  - recurring-transactions.destroy
+depends_on:
+  - path: resources/js/Pages/RecurringTransactions/Partials/**
+    reason: overview, rules and linked-transaction tabs on the detail page
+integrations: []
+steps:
+  - action: open budget/{budget}/recurring-transactions/{recurring_transaction}
+    expected: RecurringTransactions/Show rendered with the template, ordered rules, linked transactions and field/operator options
+  - action: submit the edit form (PATCH)
+    expected: template updated, rule set synced, redirect to index with "Recurring transaction updated successfully"
+  - action: click Duplicate on the index (POST .../duplicate)
+    expected: a copy named "Copy of <description>" is created; redirect to index
+  - action: click Delete (DELETE)
+    expected: template removed; redirect to index with "Recurring transaction deleted successfully"
+postconditions:
+  - template reflects the submitted values, or a duplicate exists, or the template is gone
+business_rules:
+  - update uses the same validation as store (frequency/day rules, bimonthly distinct days, amount required unless dynamic)
+  - rules omitted from the update payload are deleted; rule ids not belonging to the template are ignored
+  - the template is resolved through the budget (scoped binding), so a template from another budget returns 404
+  - all four actions require the budget update ability
+scenarios:
+  - id: edit_page_renders
+    kind: happy_path
+    description: Owner opens the detail page and sees the template, rules and linked transactions.
+    coverage: uncovered
+  - id: update_template_and_sync_rules
+    kind: happy_path
+    description: Updating with a changed rule list updates, creates and deletes rules accordingly.
+    coverage: uncovered
+  - id: duplicate_template
+    kind: alternate
+    description: Duplicate creates "Copy of ..." with the same schedule and dynamic flag.
+    coverage: uncovered
+  - id: delete_template
+    kind: alternate
+    description: Delete removes the template and returns to the index.
+    coverage: uncovered
+  - id: update_validation
+    kind: validation
+    description: Invalid frequency/day combinations or end_date before start_date are rejected on update.
+    coverage: uncovered
+  - id: cross_budget_template_not_found
+    kind: authorization
+    description: A template from another budget addressed through the user's own budget returns 404 for edit and destroy.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction routes reject a cross-budget template with 404
+  - id: cross_user_budget_forbidden
+    kind: authorization
+    description: Another user cannot edit, update, duplicate or delete templates in a budget they do not own (403).
+    coverage: partial
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::recurring transaction template routes reject another users budget with 403
+    note: only the edit (GET) route is asserted; update, duplicate and destroy are not tested for another user's budget.
+known_issues:
+  - duplicate uses replicate() on the template only; matching rules are not copied, so the copy silently stops matching transactions that the original matched by rules.
+  - update has the same unscoped exists:accounts,id validation and float cents truncation as store (see RECUR-001).
+  - rules created through the update form get no priority value (store assigns index+1, update does not).
+  - Delete relies on the transactions FK to unlink linked transactions; there is no confirmation of how many transactions lose their link.
+confidence: high
+evidence:
+  - app/Http/Controllers/RecurringTransactionController.php edit/update/duplicate/destroy
+  - resources/js/Pages/RecurringTransactions/Show.vue, Index.vue
+last_verified: null

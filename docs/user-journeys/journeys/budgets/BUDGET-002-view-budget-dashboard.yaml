@@ -1,0 +1,100 @@
+schema: 1
+id: BUDGET-002
+name: Owner views the budget dashboard and account ledger
+domain: budgets
+status: implemented
+priority: critical
+summary: >
+  The owner opens a budget and sees the total balance across accounts, the
+  accounts grouped by type, properties, and a paginated ledger for the selected
+  account combining actual, pending and projected transactions with running
+  balances. Query parameters select the account, date range, projection horizon
+  (persisted as a per-budget preference) and page size.
+actors:
+  - budget owner
+preconditions:
+  - user is authenticated and owns the budget
+routes:
+  - budgets.show
+depends_on:
+  - path: app/Services/BudgetService.php
+    reason: selected account, date range parsing, ledger assembly, running balances, totals
+  - path: resources/js/Pages/Budgets/Show.vue
+    reason: dashboard page
+integrations: []
+steps:
+  - action: visit /budgets/{budget}
+    expected: Budgets/Show rendered with budget, totalBalance, accounts, properties, transactions and projection params
+  - action: pick another account or change projection_months / date_range / per_page
+    expected: ledger reloads for that account; projection_months is saved as a user preference for this budget
+postconditions:
+  - preference budget_{id}_projection_months updated when a new value is requested
+business_rules:
+  - per_page is clamped to 10..200 (default 100)
+  - default date range is 90 days; default projection horizon is the saved preference or 1 month
+  - accounts excluded from total balance are ignored by the total; liabilities are subtracted
+  - with no accounts the page renders an empty "No Accounts Yet" state and no ledger
+scenarios:
+  - id: owner_views_dashboard
+    kind: happy_path
+    description: Owner with an account gets a 200 dashboard.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::user can access their own budget
+      - tests/Feature/Budgets/BudgetDashboardTest.php::owner sees the dashboard with accounts, total balance and the selected account ledger
+      - tests/Feature/Budgets/BudgetDashboardTest.php::dashboard ledger follows the requested account
+  - id: total_balance_calculation
+    kind: happy_path
+    description: Total balance adds assets, subtracts liabilities and ignores excluded accounts.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/BudgetServiceTest.php::calculateTotalBalance adds assets, subtracts liabilities, ignores excluded accounts
+      - tests/Feature/Services/BudgetServiceTest.php::calculateTotalBalance subtracts liabilities stored as negative balances
+  - id: date_range_parsing
+    kind: alternate
+    description: Relative date_range values map to the expected ledger start dates.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/BudgetServiceTest.php::parseDateRange returns the expected relative start dates
+  - id: projection_months_persisted
+    kind: alternate
+    description: Passing projection_months saves it as the per-budget preference and it is reused on the next visit.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetDashboardTest.php::requested projection months are saved and reused on the next visit
+  - id: no_accounts_empty_state
+    kind: empty_state
+    description: A budget with no accounts renders with null selectedAccountId and no transactions.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetDashboardTest.php::budget without accounts renders the empty state
+  - id: per_page_clamped
+    kind: edge
+    description: Out-of-range per_page values are clamped to 10..200.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetDashboardTest.php::per page is clamped to the allowed range
+  - id: other_users_budget_forbidden
+    kind: authorization
+    description: Viewing another user's budget returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot access another users budget
+  - id: guest_redirected_to_login
+    kind: authentication
+    description: Guests are redirected to login.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access budgets
+known_issues:
+  - "Confirmed by test probe: GET /budgets/{budget}?account_id=<id of an account in another budget, or a non-existent id> returns 500 (BudgetController.php:155 throws 'No accounts found for this budget.') instead of falling back to the default account or returning 404. Left uncovered."
+  - "BudgetService::getAccountTransactions only returns past-dated rows that have a plaid_transaction_id (Plaid is treated as source of truth), so manual transactions dated today or earlier never appear in the dashboard ledger, even for manual-only accounts. Ledger tests therefore use future-dated manual transactions."
+  - "BudgetController@show throws a generic Exception ('No accounts found for this budget.') if getSelectedAccount returns null while accounts exist, producing a 500 rather than a graceful fallback."
+  - "Budgets/Show.vue loadBudgetAttachments() fetch()es GET /budgets/{id}/files expecting JSON, but that route is BudgetFilesController@index (an Inertia page). response.json() fails and the error is swallowed, so the dashboard's budget-attachment list never loads. FileController@getBudgetAttachments (the JSON variant) has no route."
+  - "Shared budgets: User::hasBudget/accessibleBudgets include connected_users, but BudgetPolicy::view is owner-only, so a connected user who selects a shared budget gets 403 here."
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetController.php show
+  - app/Services/BudgetService.php
+  - resources/js/Pages/Budgets/Show.vue
+last_verified: null

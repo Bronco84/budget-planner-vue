@@ -1,0 +1,57 @@
+schema: 1
+id: PLAID-006
+name: User disconnects an account from Plaid
+domain: plaid
+status: implemented
+priority: medium
+summary: >
+  On the Bank Connection page the user confirms "Disconnect from Plaid". The account's
+  PlaidAccount is deleted (imported transactions are kept); if that leaves the
+  PlaidConnection with no accounts, the connection is deleted too and the flash says so.
+actors:
+  - budget owner
+preconditions:
+  - the account is linked to Plaid
+routes:
+  - plaid.destroy
+depends_on: []
+integrations: []
+steps:
+  - action: confirm disconnect on Plaid/Link (DELETE budget/{budget}/account/{account}/plaid)
+    expected: redirect back with "Account unlinked from Plaid."
+postconditions:
+  - the local account and its transactions remain but are no longer linked
+  - an empty PlaidConnection is removed
+business_rules:
+  - the Plaid item is not removed at Plaid (/item/remove is not called); only local records are deleted
+scenarios:
+  - id: unlink_account
+    kind: happy_path
+    description: Unlinking deletes the PlaidAccount and keeps the account and transactions.
+    coverage: uncovered
+  - id: last_account_removes_connection
+    kind: alternate
+    description: Unlinking the last account on a connection also deletes the connection and mentions the institution in the flash.
+    coverage: uncovered
+  - id: not_linked
+    kind: edge
+    description: Disconnecting an unlinked account redirects back with "Account is not linked to Plaid."
+    coverage: uncovered
+  - id: cross_budget_account_not_found
+    kind: authorization
+    description: Disconnecting an account from another budget via one's own budget URL returns 404.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::plaid destroy rejects a cross-budget account with 404
+  - id: cross_user_denied
+    kind: authorization
+    description: Disconnecting another user's account via their budget URL returns 403.
+    coverage: uncovered
+    note: plaid.destroy is not in the 403 dataset in NestedRouteAuthorizationTest.
+known_issues:
+  - the Plaid item is never removed at Plaid when the last account is unlinked, so the access token stays valid at Plaid (and billable) after local deletion.
+confidence: high
+evidence:
+  - app/Http/Controllers/PlaidController.php destroy()
+  - resources/js/Pages/Plaid/Link.vue confirmDisconnect()
+last_verified: null

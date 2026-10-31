@@ -1,0 +1,79 @@
+schema: 1
+id: TRANSFER-001
+name: Owner records a transfer between two accounts
+domain: transfers
+status: implemented
+priority: high
+summary: >
+  From the quick-add transfer modal (available on every authenticated page for the
+  active budget) the owner chooses a source and destination account, amount, date
+  and optional description/notes. The transfer is stored as the source of truth and
+  a balanced pair of "Transfer" transactions (outgoing on the source, incoming on
+  the destination) is created atomically.
+actors:
+  - budget owner
+preconditions:
+  - the active budget has at least two accounts
+routes:
+  - budget.transfers.store
+  - budget.transfers.create
+depends_on:
+  - path: resources/js/Components/Modals/QuickAddTransferModal.vue
+    reason: the only UI that creates transfers (mounted in AuthenticatedLayout)
+  - path: app/Services/TransferService.php
+    reason: creates the transfer and its paired transactions in a DB transaction
+integrations: []
+steps:
+  - action: open the quick-add transfer modal and submit (POST /budget/{budget}/transfers)
+    expected: transfer and two paired transactions created; redirect back (or JSON when wantsJson)
+postconditions:
+  - Transfer exists with a positive amount_in_cents
+  - two transactions with transfer_id, category Transfer, amounts -X (source) and +X (destination)
+business_rules:
+  - from and to accounts must differ and both belong to the budget
+  - amount >= 0.01, rounded to integer cents; stored as absolute value
+  - the modal defaults the date to tomorrow
+scenarios:
+  - id: store_transfer_via_modal
+    kind: happy_path
+    description: Valid POST creates the transfer and redirects back.
+    coverage: uncovered
+  - id: balanced_pair_created
+    kind: happy_path
+    description: The service creates a balanced -X/+X pair categorised as Transfer.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/TransferServiceTest.php::create produces a balanced pair of transactions
+  - id: negative_amount_normalised
+    kind: edge
+    description: A negative amount is stored as a positive transfer with correctly signed legs.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/TransferServiceTest.php::create normalizes a negative amount to a positive transfer
+  - id: json_response
+    kind: alternate
+    description: A JSON request receives {message, transfer} instead of a redirect.
+    coverage: uncovered
+  - id: same_account_or_zero_rejected
+    kind: validation
+    description: Identical from/to accounts or an amount below 0.01 return validation errors.
+    coverage: uncovered
+  - id: foreign_accounts_rejected
+    kind: authorization
+    description: Account ids from another budget fail the scoped exists rule.
+    coverage: uncovered
+  - id: other_users_budget_forbidden
+    kind: authorization
+    description: Posting to another user's budget returns 403.
+    coverage: uncovered
+  - id: standalone_create_page_missing
+    kind: edge
+    description: GET /budget/{budget}/transfers/create renders Transfers/Create, which does not exist.
+    coverage: uncovered
+known_issues:
+  - "TransferController@create renders Inertia component Transfers/Create, which does not exist (resources/js/Pages/Transfers has only Edit.vue). Nothing links to it; creation works only through QuickAddTransferModal."
+confidence: high
+evidence:
+  - app/Http/Controllers/TransferController.php create/store
+  - app/Services/TransferService.php create
+last_verified: null

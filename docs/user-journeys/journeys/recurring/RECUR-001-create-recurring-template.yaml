@@ -1,0 +1,101 @@
+schema: 1
+id: RECUR-001
+name: User creates a recurring transaction template
+domain: recurring
+status: implemented
+priority: high
+summary: >
+  From the sidebar (or the "Make Recurring" action on a budget transaction) the user
+  opens the recurring transactions list, fills in the create form (amount or dynamic
+  amount, frequency and schedule, optional matching rules, optional autopay credit card
+  link) and saves. The template drives every future projection for its account; any
+  inline rules are saved and existing transactions matching them are linked immediately.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with at least one account
+routes:
+  - recurring-transactions.redirect
+  - recurring-transactions.index
+  - recurring-transactions.create
+  - recurring-transactions.store
+depends_on:
+  - path: resources/js/Components/Sidebar.vue
+    reason: sidebar entry links to recurring-transactions.redirect
+  - path: app/Services/RecurringTransactionService.php
+    reason: linkMatchingTransactionsByRules links existing transactions after inline rules are saved
+integrations: []
+steps:
+  - action: open /recurring-transactions from the sidebar
+    expected: redirected to the active budget's recurring list, or to budgets.create when there is no active budget
+  - action: view budget/{budget}/recurring-transactions
+    expected: RecurringTransactions/Index lists templates ordered by description with their account; empty state text when none exist
+  - action: open the create form (optionally with ?from_transaction=<id>)
+    expected: RecurringTransactions/Create rendered with budget accounts, autopay-eligible credit cards and the source transaction prefilled when it belongs to the budget
+  - action: submit the form (POST budget/{budget}/recurring-transactions)
+    expected: template stored with amount converted to cents; redirect to index with "Recurring transaction created successfully"
+postconditions:
+  - a RecurringTransactionTemplate exists for the budget
+  - inline rules are stored with priority by array order and matching transactions are linked
+  - when from_transaction_id was supplied and still unlinked, that transaction is linked to the new template
+business_rules:
+  - frequency is one of daily, weekly, biweekly, monthly, bimonthly, quarterly, yearly
+  - day_of_week is required for weekly/biweekly; day_of_month for monthly, quarterly and bimonthly
+  - bimonthly requires first_day_of_month and it must differ from day_of_month
+  - amount is required unless is_dynamic_amount is true; dynamic templates store amount_in_cents 0
+  - min_amount/max_amount are stored in cents with the sign of the main amount
+  - end_date must be on or after start_date
+  - create and store require the budget update ability; index requires view
+scenarios:
+  - id: create_fixed_template
+    kind: happy_path
+    description: Owner creates a fixed-amount monthly template and is redirected to the index.
+    coverage: uncovered
+  - id: create_with_inline_rules_links_transactions
+    kind: alternate
+    description: Inline rules are saved in order and existing matching transactions are linked to the new template.
+    coverage: uncovered
+  - id: make_recurring_from_transaction
+    kind: alternate
+    description: Creating from an existing transaction prefills the form and links that transaction after save.
+    coverage: uncovered
+  - id: redirect_without_active_budget
+    kind: edge
+    description: /recurring-transactions sends a user with no active budget to budgets.create.
+    coverage: uncovered
+  - id: empty_list
+    kind: empty_state
+    description: A budget with no templates shows the "No recurring transactions have been set up yet" message.
+    coverage: uncovered
+  - id: schedule_validation
+    kind: validation
+    description: Missing day_of_week/day_of_month for the chosen frequency, or a bimonthly pair with identical days, is rejected.
+    coverage: uncovered
+  - id: amount_required_unless_dynamic
+    kind: validation
+    description: A non-dynamic template without an amount fails validation; a dynamic one is saved with amount_in_cents 0.
+    coverage: uncovered
+  - id: cents_conversion_precision
+    kind: edge
+    description: Decimal amounts such as 19.99 are converted to the exact cent value.
+    coverage: uncovered
+    note: getArr uses (int) ($amount * 100), which truncates float error (see known_issues).
+  - id: cross_user_budget_forbidden
+    kind: authorization
+    description: Another user cannot list, open the create form for, or store a template in a budget they do not own (403).
+    coverage: uncovered
+  - id: foreign_account_rejected
+    kind: authorization
+    description: account_id / linked_credit_card_account_id belonging to another budget must be rejected.
+    coverage: uncovered
+    note: currently not enforced; validation is only exists:accounts,id (see known_issues).
+known_issues:
+  - store validates account_id and linked_credit_card_account_id with an unscoped exists:accounts,id rule, so a template can reference another user's account; RecurringTransactionService::projectTransactions selects templates by account_id only, so such a template would inject projected transactions into the other user's account projections.
+  - getArr converts dollars with (int) ($amount * 100), which truncates floating-point error (e.g. 19.99 becomes 1998 cents, 0.29 becomes 28).
+  - index logs the full first account record to the info log on every request (leftover debug logging).
+confidence: high
+evidence:
+  - routes/web.php recurring-transactions.redirect closure and recurring-transactions routes
+  - app/Http/Controllers/RecurringTransactionController.php index/create/store/getArr
+  - resources/js/Pages/RecurringTransactions/Index.vue, Create.vue
+last_verified: null

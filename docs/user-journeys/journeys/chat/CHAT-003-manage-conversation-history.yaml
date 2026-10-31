@@ -1,0 +1,71 @@
+schema: 1
+id: CHAT-003
+name: User browses, reopens and deletes chat conversations
+domain: chat
+status: implemented
+priority: medium
+summary: >
+  The chat panel lists the user's 20 most recent conversations, reopens one to show its
+  messages, and deletes a single conversation or a selected batch. All lookups are
+  scoped to the authenticated user.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated
+routes:
+  - chat.conversations
+  - chat.conversations.show
+  - chat.conversations.destroy
+  - chat.conversations.bulk-destroy
+depends_on:
+  - path: app/Services/ChatService.php
+    reason: getConversations, deleteConversation, bulkDeleteConversations
+  - path: resources/js/Components/ChatPanel.vue
+    reason: conversation list, reopen, delete and bulk delete UI
+integrations: []
+steps:
+  - action: open the history list (GET /chat/conversations)
+    expected: JSON {conversations} limited to 20
+  - action: open a conversation (GET /chat/conversations/{id})
+    expected: JSON {conversation {id, title, messages}}
+  - action: delete one (DELETE /chat/conversations/{id}) or several (POST /chat/conversations/bulk-delete)
+    expected: JSON confirmation; bulk returns deleted_count
+postconditions:
+  - deleted conversations no longer appear in the list
+business_rules:
+  - group throttle 60 requests per minute
+  - bulk-delete requires a non-empty array of existing conversation ids; ids belonging to other users are silently skipped
+scenarios:
+  - id: list_conversations
+    kind: happy_path
+    description: The user sees their own recent conversations only.
+    coverage: uncovered
+  - id: reopen_conversation
+    kind: happy_path
+    description: Reopening returns the conversation's messages in order.
+    coverage: uncovered
+  - id: delete_conversation
+    kind: happy_path
+    description: Deleting removes the conversation.
+    coverage: uncovered
+  - id: bulk_delete
+    kind: alternate
+    description: Bulk delete removes the selected conversations and reports the count.
+    coverage: uncovered
+  - id: bulk_delete_validation
+    kind: validation
+    description: An empty or non-existent id list fails validation.
+    coverage: uncovered
+  - id: no_conversations
+    kind: empty_state
+    description: A user with no conversations gets an empty list.
+    coverage: uncovered
+  - id: other_users_conversation_hidden
+    kind: authorization
+    description: Showing or deleting another user's conversation returns 404, and bulk delete does not remove it.
+    coverage: uncovered
+confidence: high
+evidence:
+  - app/Http/Controllers/ChatController.php conversations(), show(), destroy(), bulkDestroy()
+  - app/Services/ChatService.php
+last_verified: null

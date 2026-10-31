@@ -1,0 +1,62 @@
+schema: 1
+id: PROJECT-002
+name: User views projected transactions for the whole budget
+domain: projections
+status: implemented
+priority: low
+summary: >
+  The budget projections page is meant to list every projected recurring transaction
+  across all accounts for the next N months (default 6, max 24) with starting balance,
+  monthly totals and a per-month breakdown. In the current implementation the controller
+  and the page disagree on the data shape, so the page always renders its empty state.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with recurring templates
+routes:
+  - budget.projections
+depends_on:
+  - path: app/Services/RecurringTransactionService.php
+    reason: projectTransactions per account
+integrations: []
+steps:
+  - action: open budget/{budget}/projections?months=N
+    expected: Budgets/Projections rendered with projections and params.months
+  - action: change the months filter on the page
+    expected: page reloads via router.get with the new months value
+postconditions:
+  - nothing is persisted
+business_rules:
+  - months must be an integer 1-24 (default 6)
+  - only recurring template projections are included (no manual future transactions or autopay)
+  - requires budget view ability
+scenarios:
+  - id: projections_listed
+    kind: happy_path
+    description: Owner sees projected transactions grouped by month with income, expense and ending balance totals.
+    coverage: uncovered
+    note: currently broken; see known_issues.
+  - id: months_validation
+    kind: validation
+    description: months outside 1-24 fails validation.
+    coverage: uncovered
+  - id: no_templates
+    kind: empty_state
+    description: A budget with no templates shows "no projections".
+    coverage: uncovered
+  - id: cross_user_forbidden
+    kind: authorization
+    description: Another user cannot view projections for a budget they do not own (403).
+    coverage: uncovered
+known_issues:
+  - BudgetController::projections passes a flat list of projected transactions, but Budgets/Projections.vue expects an object with starting_balance, monthly_totals and transactions keyed by month, so the page always shows the empty state.
+  - Budgets/Projections.vue computed totals reference props.props.projections (typo), which throws a TypeError whenever projections is truthy.
+  - The page reads params.start_date, which the controller never sends.
+  - ProjectionsController::showBudgetProjections builds the month-grouped shape but no route points to it; it appears to be the intended implementation.
+  - No page outside Budgets/Projections.vue links to budget.projections, so the feature is effectively unreachable.
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetController.php projections
+  - app/Http/Controllers/ProjectionsController.php showBudgetProjections (unrouted)
+  - resources/js/Pages/Budgets/Projections.vue props and computed totals
+last_verified: null

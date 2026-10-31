@@ -1,0 +1,74 @@
+schema: 1
+id: BUDGET-003
+name: User lands on, or switches, their active budget
+domain: budgets
+status: implemented
+priority: high
+summary: >
+  Entry points (/budgets, /transactions) resolve the user's active budget from the
+  active_budget_id preference, falling back to the first accessible budget, and
+  redirect into it. The BudgetSwitcher posts a new active budget and re-visits the
+  current route for that budget. Users with no budgets are sent to the create form.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated
+routes:
+  - budgets.index
+  - transactions.index
+  - preferences.active-budget.set
+depends_on:
+  - path: app/Models/User.php
+    reason: getActiveBudget/setActiveBudget/hasBudget/accessibleBudgets
+  - path: app/Models/UserPreference.php
+    reason: stores active_budget_id
+  - path: resources/js/Components/BudgetSwitcher.vue
+    reason: switcher UI that sets the active budget and re-navigates
+  - path: app/Http/Middleware/HandleInertiaRequests.php
+    reason: shares activeBudget and userBudgets with every page
+integrations: []
+steps:
+  - action: visit /budgets
+    expected: redirect to budgets.show for the active budget, or budgets.create when the user has none
+  - action: visit /transactions
+    expected: redirect to budget.transaction.index for the active budget, or budgets.create when none
+  - action: choose another budget in the BudgetSwitcher (POST /api/preferences/active-budget)
+    expected: JSON with the new active budget; UI re-visits the same route with the new budget id
+postconditions:
+  - active_budget_id preference points to an accessible budget (stale ids are cleared)
+business_rules:
+  - a stale active_budget_id (deleted budget or lost access) is cleared and the first accessible budget is used
+  - setting the active budget requires an existing budget the user hasBudget() (owned or connected)
+scenarios:
+  - id: index_redirects_to_active_budget
+    kind: happy_path
+    description: /budgets redirects to the active budget's dashboard.
+    coverage: uncovered
+  - id: transactions_redirects_to_active_budget
+    kind: happy_path
+    description: /transactions redirects to the active budget's transaction list.
+    coverage: uncovered
+  - id: switch_active_budget
+    kind: alternate
+    description: Posting a new budget_id updates the preference and returns it.
+    coverage: uncovered
+  - id: no_budgets_redirects_to_create
+    kind: empty_state
+    description: A user with no budgets is redirected from /budgets and /transactions to budgets.create.
+    coverage: uncovered
+  - id: stale_active_budget_falls_back
+    kind: edge
+    description: An active_budget_id for a deleted budget is cleared and the first remaining budget is used.
+    coverage: uncovered
+  - id: cannot_activate_other_users_budget
+    kind: authorization
+    description: Setting another user's budget as active fails validation ("You do not have access to this budget.").
+    coverage: uncovered
+known_issues:
+  - "A connected (shared) user can set a shared budget as active (hasBudget allows it), but BudgetPolicy is owner-only, so the subsequent redirect to budgets.show is 403. Sharing is a deferred follow-up."
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetController.php index
+  - routes/web.php transactions.index closure
+  - app/Http/Controllers/Api/UserPreferencesController.php setActiveBudget
+last_verified: null

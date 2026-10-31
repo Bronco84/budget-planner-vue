@@ -1,0 +1,108 @@
+schema: 1
+id: BUDGET-001
+name: User creates a budget and is routed into connection-first setup
+domain: budgets
+status: implemented
+priority: critical
+summary: >
+  An authenticated user opens the create-budget form (full page or the sidebar
+  CreateBudgetModal), submits a name, optional description and hex colour, and is
+  redirected to the setup page, which offers "connect your bank" (Plaid) or
+  "add manually" before the budget dashboard is usable. If the budget already
+  has accounts, setup redirects straight to the budget dashboard.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated
+routes:
+  - budgets.create
+  - budgets.store
+  - budgets.setup
+depends_on:
+  - path: resources/js/Components/Modals/CreateBudgetModal.vue
+    reason: alternate entry point that posts to budgets.store from the sidebar
+  - path: app/Services/PlaidService.php
+    reason: setup creates a Plaid link token for the connect option
+integrations:
+  - Plaid (link token creation on the setup page)
+steps:
+  - action: visit /budgets/create (or open the CreateBudgetModal)
+    expected: Budgets/Create page rendered with name, description and colour fields
+  - action: submit the form (POST /budgets)
+    expected: budget created for the user (colour defaults to #6366f1), redirect to budgets.setup with a flash message
+  - action: land on /budgets/{budget}/setup
+    expected: Budgets/Setup rendered with a Plaid link token (null if Plaid fails); options lead to budgets.setup.connect or budgets.setup.manual
+postconditions:
+  - a Budget owned by the user exists
+  - the user still has an active budget (new budget becomes active only when the user had none)
+business_rules:
+  - name is required (max 255); colour must match ^#[0-9A-Fa-f]{6}$ when provided
+  - setup redirects to budgets.show when the budget already has any account
+  - a Plaid link-token failure is logged and setup still renders with linkToken null
+scenarios:
+  - id: create_form_renders
+    kind: happy_path
+    description: Authenticated user can load the create-budget page.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::authenticated user can open the create budget form
+  - id: store_redirects_to_setup
+    kind: happy_path
+    description: Valid submission creates a budget and redirects to the setup page.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::storing a budget persists it for the user and redirects to setup
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::storing a budget without a colour applies the default colour
+  - id: setup_renders_choices
+    kind: happy_path
+    description: Setup page renders for a budget without accounts, with a link token.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::setup page renders for a budget without accounts with a plaid link token
+  - id: invalid_name_or_colour_rejected
+    kind: validation
+    description: Missing name or a malformed colour returns validation errors and creates nothing.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::storing a budget rejects invalid input and creates nothing
+  - id: setup_with_existing_accounts_redirects
+    kind: edge
+    description: Visiting setup for a budget that already has accounts redirects to the dashboard.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::setup redirects to the dashboard when the budget already has accounts
+  - id: setup_survives_plaid_failure
+    kind: recovery
+    description: When Plaid link-token creation throws, setup still renders with linkToken null.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::setup page still renders with a null link token when plaid fails
+  - id: first_budget_becomes_active
+    kind: alternate
+    description: A user with no budgets who creates one gets it as the active budget.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::a users first budget becomes their active budget
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::creating another budget keeps the existing active budget
+  - id: setup_other_users_budget_forbidden
+    kind: authorization
+    description: Opening setup for another user's budget returns 403 (BudgetPolicy view).
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::user cannot open setup for another users budget
+  - id: unauthenticated_redirected
+    kind: authentication
+    description: Guests hitting the create form are redirected to login.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetLifecycleTest.php::guest is redirected to login from the create budget form
+known_issues:
+  - "BudgetController@store reads $validated['description'] directly; a request that omits description (rather than sending null/empty) triggers an undefined array key error. The Vue forms always send it, so only API/other clients are affected."
+  - "The 'set as active if user has no active budget' check runs after the budget is created; getActiveBudget() falls back to the first accessible budget, so it is never null at that point and setActiveBudget() is effectively dead code (the fallback still yields the right budget for a first-time user)."
+  - "Setup passes Auth::id() to PlaidService::createLinkToken, whereas AccountController@create passes the Budget model (see ACCOUNT-001)."
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetController.php create/store/setup
+  - resources/js/Pages/Budgets/Create.vue, resources/js/Pages/Budgets/Setup.vue
+  - CLAUDE.md "connection-first budget creation workflow"
+last_verified: null

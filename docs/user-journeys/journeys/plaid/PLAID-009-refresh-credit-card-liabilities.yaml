@@ -1,0 +1,74 @@
+schema: 1
+id: PLAID-009
+name: User refreshes credit card statement data from the Plaid liabilities page
+domain: plaid
+status: implemented
+priority: medium
+summary: >
+  The /admin/plaid-liabilities page lists every Plaid connection on the user's own
+  budgets that has credit card accounts, with each card's statement balance, due date,
+  minimum payment, limit and APR. The user can refresh liability data for one
+  connection or for all connections at once.
+actors:
+  - authenticated user
+preconditions:
+  - the user owns budgets with Plaid-linked credit cards
+routes:
+  - admin.plaid-liabilities.index
+  - admin.plaid-liabilities.update-connection
+  - admin.plaid-liabilities.update-all
+depends_on:
+  - path: app/Services/PlaidService.php
+    reason: updateLiabilityData (one /liabilities/get call refreshes all cards on a connection)
+integrations:
+  - Plaid API (/liabilities/get)
+steps:
+  - action: open /admin/plaid-liabilities
+    expected: Admin/PlaidLiabilities rendered with connections that have credit cards
+  - action: click update on a connection (POST admin/plaid-liabilities/connections/{connection}/update)
+    expected: redirect back with "Successfully updated liability data for <institution>."
+  - action: click update all (POST admin/plaid-liabilities/update-all)
+    expected: redirect back with a success, partial-success or failure message
+postconditions:
+  - PlaidAccount liability fields and statement history are refreshed
+business_rules:
+  - despite the /admin prefix these routes are not admin-gated; any authenticated user sees only connections on budgets they own (budget.user_id match)
+  - update-connection is limited to 10/minute, update-all to 3/minute
+  - only accounts with account_type credit and subtype "credit card" are included
+scenarios:
+  - id: page_lists_owned_cards
+    kind: happy_path
+    description: The page lists only the user's own connections that have credit cards.
+    coverage: uncovered
+  - id: update_one_connection
+    kind: happy_path
+    description: Refreshing one connection updates its cards and flashes success.
+    coverage: uncovered
+  - id: update_all_partial_failure
+    kind: integration
+    description: When some institutions do not support liabilities, update-all reports how many succeeded and failed.
+    coverage: uncovered
+  - id: no_credit_cards
+    kind: empty_state
+    description: With no credit card connections the page is empty and update-all flashes "No credit card accounts found to update."
+    coverage: uncovered
+  - id: connection_without_cards
+    kind: edge
+    description: Updating a connection with no credit cards flashes an error.
+    coverage: uncovered
+  - id: update_rate_limited
+    kind: edge
+    description: Exceeding 10/min (connection) or 3/min (all) returns 429.
+    coverage: uncovered
+  - id: other_users_connection_refused
+    kind: authorization
+    description: Updating another user's connection redirects back with "Unauthorized access to this connection." and makes no Plaid call.
+    coverage: uncovered
+known_issues:
+  - the cross-user refusal is a redirect with an error flash (HTTP 302) rather than a 403, and the route path/name suggests admin-only access that is not enforced.
+confidence: high
+evidence:
+  - app/Http/Controllers/PlaidLiabilitiesController.php
+  - resources/js/Pages/Admin/PlaidLiabilities.vue
+  - routes/web.php admin.* group (auth only)
+last_verified: null

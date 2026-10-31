@@ -1,0 +1,47 @@
+schema: 1
+id: BUDGET-004
+name: Owner edits budget name, description and colour
+domain: budgets
+status: implemented
+priority: medium
+summary: >
+  The owner opens the edit page from the dashboard, changes the budget's name,
+  description or colour and is redirected back to the dashboard with a flash
+  message.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.edit
+  - budgets.update
+depends_on:
+  - path: resources/js/Pages/Budgets/Edit.vue
+    reason: edit form (also hosts the delete action, see BUDGET-005)
+integrations: []
+steps:
+  - action: visit /budgets/{budget}/edit
+    expected: Budgets/Edit rendered with the budget
+  - action: submit changes (PATCH /budgets/{budget})
+    expected: budget updated, redirect to budgets.show with "Budget updated successfully"
+postconditions:
+  - budget attributes updated
+business_rules:
+  - same validation as create (name required, max 255; colour #RRGGBB)
+scenarios:
+  - id: owner_updates_budget
+    kind: happy_path
+    description: Valid update persists and redirects to the dashboard.
+    coverage: uncovered
+  - id: invalid_update_rejected
+    kind: validation
+    description: Empty name or bad colour returns validation errors.
+    coverage: uncovered
+  - id: other_users_budget_edit_forbidden
+    kind: authorization
+    description: Editing or updating another user's budget returns 403 (authorizeResource).
+    coverage: uncovered
+confidence: high
+evidence:
+  - app/Http/Controllers/BudgetController.php edit/update
+last_verified: null

@@ -1,0 +1,94 @@
+schema: 1
+id: TXN-003
+name: Owner edits, reviews history of, or deletes a transaction
+domain: transactions
+status: implemented
+priority: high
+summary: >
+  The owner opens a transaction's edit page (showing its recurring template and
+  rules when linked, file attachments and an activity log fetched as JSON),
+  updates its fields or deletes it, and returns to the transactions list.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget and the transaction belongs to it
+routes:
+  - budget.transaction.edit
+  - budget.transaction.update
+  - budget.transaction.destroy
+  - budget.transaction.activity-log
+depends_on:
+  - path: resources/js/Pages/Transactions/Edit.vue
+    reason: edit page; loads activity log and attachments via fetch
+integrations: []
+steps:
+  - action: visit /budget/{budget}/transactions/{transaction}/edit
+    expected: Transactions/Edit rendered with accounts, templates, recurringTemplate and rules
+  - action: page fetches /activity-log
+    expected: JSON {activities}
+  - action: save (PATCH) or delete (DELETE)
+    expected: redirect to budget.transaction.index with a flash message
+postconditions:
+  - transaction updated or deleted; activity recorded
+business_rules:
+  - same validation as create, scoped to the budget
+scenarios:
+  - id: edit_page_renders
+    kind: happy_path
+    description: Owner can open the edit page.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::owner can open the edit page for their transaction
+      - tests/Feature/Transactions/EditTransactionTest.php::edit page includes the linked recurring template
+  - id: update_transaction
+    kind: happy_path
+    description: Valid update persists and redirects to the list.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::owner can update their transaction and is redirected to the list
+  - id: delete_transaction
+    kind: happy_path
+    description: Delete removes the transaction and redirects to the list.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::owner can delete their transaction and is redirected to the list
+  - id: activity_log_json
+    kind: alternate
+    description: Activity log endpoint returns formatted activities.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::activity log returns the transaction history as json
+  - id: invalid_update_rejected
+    kind: validation
+    description: Invalid fields or a foreign account id return validation errors.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::updating a transaction rejects invalid input and leaves it unchanged
+      - tests/Feature/Transactions/EditTransactionTest.php::updating a transaction rejects an account from another budget
+  - id: other_users_transaction_forbidden
+    kind: authorization
+    description: Edit, update and delete of another user's transaction return 403 and it remains.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot edit another users transaction
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot update another users transaction
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot delete another users transaction
+  - id: cross_budget_transaction_not_found
+    kind: authorization
+    description: A transaction from another budget under the user's own budget URL returns 404.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::transaction must belong to budget in route
+      - tests/Feature/NestedRouteAuthorizationTest.php::transaction routes reject a cross-budget transaction with 404
+  - id: activity_log_cross_user
+    kind: authorization
+    description: Activity log for another user's transaction returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::user cannot read the activity log of another users transaction
+known_issues:
+  - "Transfer legs (transactions with transfer_id) can be edited or deleted here independently; nothing blocks it, leaving the Transfer and its pair out of sync (TransferService only re-syncs on transfer update)."
+confidence: high
+evidence:
+  - app/Http/Controllers/TransactionController.php edit/update/destroy/getActivityLog
+last_verified: null

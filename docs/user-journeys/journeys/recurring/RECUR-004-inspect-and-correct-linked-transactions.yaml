@@ -1,0 +1,86 @@
+schema: 1
+id: RECUR-004
+name: User inspects and corrects a template's linked transactions
+domain: recurring
+status: implemented
+priority: medium
+summary: >
+  On a template's detail page the user reviews which transactions are linked, opens the
+  Diagnostics tab to see how matching works (Plaid entity id, rules or description), runs
+  "test matching" to see which recent unlinked transactions would match with current
+  settings, and unlinks transactions that were matched incorrectly. A paginated linked
+  list is also available from the Rules page.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with a recurring template that has linked transactions
+routes:
+  - recurring-transactions.rules.linked
+  - recurring-transactions.rules.unlink
+  - recurring-transactions.diagnostics
+  - recurring-transactions.test-matching
+depends_on:
+  - path: resources/js/Pages/RecurringTransactions/Show.vue
+    reason: Diagnostics tab fetches recurring-transactions.diagnostics as JSON
+  - path: resources/js/Pages/RecurringTransactions/Partials/RecurringTransactionOverview.vue
+    reason: the Test matching button fetches recurring-transactions.test-matching as JSON
+  - path: resources/js/Pages/RecurringTransactions/Partials/RecurringTransactionLinked.vue
+    reason: unlink action on the detail page
+  - path: app/Services/RecurringTransactionService.php
+    reason: getMatchingDiagnostics
+integrations:
+  - Plaid transaction counterparties / entity ids (read-only)
+steps:
+  - action: open the Diagnostics tab (GET .../diagnostics)
+    expected: JSON describing the matching method and supporting data for the template
+  - action: run test matching (GET .../test-matching)
+    expected: JSON with total_tested, matches_found and per-transaction match_method (entity_id, rules, description_exact/contains/fuzzy) for unlinked transactions from the last 90 days
+  - action: open the linked list (GET .../linked)
+    expected: RecurringTransactions/Rules/Linked with linked transactions, 50 per page, newest first
+  - action: unlink a transaction (POST .../rules/unlink)
+    expected: transaction's recurring_transaction_template_id cleared; back with "Transaction unlinked successfully"
+postconditions:
+  - incorrectly matched transactions are no longer linked to the template
+business_rules:
+  - test-matching precedence is Plaid entity id, then all active rules, then description (exact, contains when template description is 5+ chars, fuzzy at 70% similarity)
+  - unlink returns 403 if the transaction belongs to another budget and 400 if it is not linked to this template
+  - diagnostics, test-matching and linked need budget view; unlink needs budget update
+scenarios:
+  - id: view_linked_and_unlink
+    kind: happy_path
+    description: Owner views linked transactions and unlinks one.
+    coverage: uncovered
+  - id: diagnostics_json
+    kind: happy_path
+    description: Diagnostics returns the matching method for the template.
+    coverage: uncovered
+  - id: test_matching_reports_methods
+    kind: alternate
+    description: Test matching reports entity, rule and description matches with their method.
+    coverage: uncovered
+  - id: unlink_not_linked_transaction
+    kind: validation
+    description: Unlinking a transaction that is not linked to this template returns 400.
+    coverage: uncovered
+  - id: no_linked_transactions
+    kind: empty_state
+    description: Linked list for a template with no links renders an empty page.
+    coverage: uncovered
+  - id: unlink_foreign_transaction
+    kind: authorization
+    description: Unlinking a transaction from another budget returns 403.
+    coverage: uncovered
+  - id: cross_user_budget_forbidden
+    kind: authorization
+    description: Another user cannot read diagnostics, test matching or linked lists for a budget they do not own.
+    coverage: uncovered
+known_issues:
+  - rules.linked lists Transaction::where('recurring_transaction_template_id', ...) without a budget filter; combined with the unscoped linking in RECUR-005/RECUR-006 a user can link another budget's transaction to their own template and then read it here.
+  - test-matching only checks the Plaid entity id when counterparties is_string, but PlaidTransaction casts counterparties to an array, so entity_id matches are never reported (and merchant_entity_id is not checked) even though findMatchingTransactionsForTemplates would match them; test results disagree with real matching.
+  - test-matching dereferences $recurring_transaction->account without a null check.
+confidence: medium
+evidence:
+  - app/Http/Controllers/RecurringTransactionController.php diagnostics/testMatching
+  - app/Http/Controllers/RecurringTransactionRuleController.php linked/unlink
+  - grep of resources/js for recurring-transactions.diagnostics and test-matching (both user-facing)
+last_verified: null

@@ -1,0 +1,117 @@
+schema: 1
+id: SCENARIO-001
+name: User compares multi-account projections with what-if scenarios
+domain: scenarios
+status: implemented
+priority: high
+summary: >
+  "Scenarios" in the sidebar opens the multi-account projection page. The user picks
+  accounts and a horizon (1-60 months, default 12) and sees a base weekly balance
+  projection per account plus one projection per active scenario, where each scenario's
+  adjustments (one-time or recurring expenses, debt paydown, savings contributions) are
+  layered on top. Scenarios can be toggled on and off from the side panel.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with accounts; scenarios optional
+routes:
+  - budget.projections.multi-account
+  - budgets.scenarios.index
+  - budgets.scenarios.toggle
+depends_on:
+  - path: resources/js/composables/useMultiAccountProjection.js
+    reason: reloads the projection with selected account_ids/scenario_ids/months
+  - path: resources/js/composables/useScenarios.js
+    reason: axios calls to scenarios index and toggle
+  - path: resources/js/Components/ScenarioManager.vue
+    reason: scenario side panel
+  - path: app/Models/ScenarioAdjustment.php
+    reason: generateProjectedTransactions for each adjustment
+  - path: app/Services/RecurringTransactionService.php
+    reason: base projectTransactions and autopay projections
+integrations: []
+steps:
+  - action: open budget/{budget}/projections/multi-account (optionally ?account_ids[]=..&scenario_ids[]=..&months=N)
+    expected: Budgets/MultiAccountProjection with accounts, baseProjections, scenarioProjections, scenarios, activeScenarios, monthsAhead and breadcrumbs
+  - action: list scenarios (GET budgets/{budget}/scenarios, JSON)
+    expected: scenarios with adjustments and accounts, newest first
+  - action: toggle a scenario (POST budgets/{budget}/scenarios/{scenario}/toggle)
+    expected: JSON with the new is_active value; projection reloaded
+postconditions:
+  - only scenario is_active changes are persisted
+business_rules:
+  - with no account_ids all budget accounts are used; any account not in the budget aborts 422
+  - with no scenario_ids the scenarios flagged is_active are applied; scenario_ids are filtered to the budget's scenarios
+  - each scenario projection = base projection + that scenario's adjustments for the account
+  - months 1-60; page needs budget view (middleware); toggle needs budget update
+scenarios:
+  - id: projection_structure
+    kind: happy_path
+    description: Owner requests two accounts over 3 months with an active scenario and receives base and scenario projections.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::multi account projection returns correct structure
+  - id: list_scenarios
+    kind: happy_path
+    description: Owner lists the budget's scenarios as JSON.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::user can list scenarios for a budget
+  - id: toggle_scenario
+    kind: alternate
+    description: Toggling flips is_active and returns the new state; toggling again restores it.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::user can toggle scenario active state
+  - id: one_time_adjustment_math
+    kind: edge
+    description: A one-time expense inside the window produces exactly one projected transaction of the given amount.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::scenario adjustment generates correct one time transactions
+  - id: recurring_adjustment_math
+    kind: edge
+    description: A monthly adjustment from the first of the month over 3 months yields 4 occurrences.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::scenario adjustment generates correct recurring transactions
+  - id: scenario_changes_balance
+    kind: edge
+    description: The scenario projection's balances differ from the base projection by exactly the adjustment amounts.
+    coverage: uncovered
+  - id: month_end_adjustment_day
+    kind: edge
+    description: A monthly adjustment on day 29-31 lands on the last day of shorter months.
+    coverage: uncovered
+    note: generateRecurringTransactions uses Carbon day()/addMonth() which can overflow into the next month (see known_issues).
+  - id: no_scenarios
+    kind: empty_state
+    description: A budget with no scenarios shows the empty scenario panel and only base projections.
+    coverage: uncovered
+  - id: foreign_account_ids
+    kind: validation
+    description: account_ids including an account from another budget abort with 422.
+    coverage: uncovered
+  - id: cross_user_forbidden
+    kind: authorization
+    description: Another user cannot open the multi-account projection for a budget they do not own.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users multi-account projection
+  - id: cross_user_scenario_toggle
+    kind: authorization
+    description: Another user cannot list or toggle scenarios on a budget they do not own.
+    coverage: uncovered
+known_issues:
+  - "modify_existing adjustments are accepted by validation and offered in ScenarioAdjustmentRow.vue, but generateProjectedTransactions returns nothing for them and no other code handles them, so they have no effect on the projection."
+  - Monthly adjustments with day_of_month 29-31 use Carbon day()/addMonth() without clamping; the start date can overflow into the following month and later dates can drift.
+  - For every scenario the base projection (projectTransactions and manual transactions) is recomputed per account, so cost grows as scenarios x accounts.
+  - The full autopay projection list is written to the info log on every page load.
+  - Toggle errors return the raw exception message in JSON.
+confidence: high
+evidence:
+  - app/Http/Controllers/ProjectionsController.php showMultiAccountProjection/applyScenarioAdjustments
+  - app/Http/Controllers/ScenarioController.php index/toggle
+  - app/Models/ScenarioAdjustment.php
+  - resources/js/Pages/Budgets/MultiAccountProjection.vue
+last_verified: null

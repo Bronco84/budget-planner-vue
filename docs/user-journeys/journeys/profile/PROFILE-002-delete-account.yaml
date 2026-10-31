@@ -1,0 +1,65 @@
+schema: 1
+id: PROFILE-002
+name: User deletes their account
+domain: profile
+status: implemented
+priority: medium
+summary: >
+  From the profile page the user confirms account deletion in a modal by
+  entering their password. On success they are logged out, the user row is
+  deleted, the session invalidated and they are redirected to /.
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated
+routes:
+  - profile.edit
+  - profile.destroy
+depends_on:
+  - path: resources/js/Pages/Profile/Partials/DeleteUserForm.vue
+    reason: confirmation modal with password field
+steps:
+  - action: click Delete Account and enter password
+    expected: modal submits DELETE /profile
+  - action: server validates current_password
+    expected: user logged out and deleted, session invalidated, redirect to /
+postconditions:
+  - the user record no longer exists
+business_rules:
+  - password is required and must match (current_password rule)
+scenarios:
+  - id: account_deleted
+    kind: happy_path
+    description: A user with a password who supplies it is logged out and deleted.
+    coverage: partial
+    tests:
+      - tests/Feature/ProfileTest.php::test_user_can_delete_their_account
+    note: the factory user has a password; real accounts are passwordless (passkey-only), for whom this flow cannot succeed.
+  - id: wrong_password_rejected
+    kind: validation
+    description: An incorrect password returns an error and keeps the account.
+    coverage: covered
+    tests:
+      - tests/Feature/ProfileTest.php::test_correct_password_must_be_provided_to_delete_account
+  - id: passkey_only_user_can_delete
+    kind: edge
+    description: A user created via passkey registration (null password) can delete their account.
+    coverage: uncovered
+    note: currently impossible - current_password always fails for a null password (suspected bug).
+  - id: related_data_cleanup
+    kind: integration
+    description: Deleting the user removes or detaches owned budgets, passkeys, trusted devices and preferences.
+    coverage: uncovered
+  - id: guest_cannot_delete
+    kind: authentication
+    description: A guest DELETE /profile is redirected to login.
+    coverage: uncovered
+known_issues:
+  - Account deletion requires current_password but registerStore creates users without a password, so passkey-only users can never delete their account. Deletion should re-verify with a passkey instead.
+  - WebAuthn credentials are a polymorphic relation with no foreign key, so they are orphaned when the user is deleted (budgets, preferences, trusted devices and magic-link tokens cascade). The device_token cookie is also not cleared.
+confidence: medium
+evidence:
+  - app/Http/Controllers/ProfileController.php destroy()
+  - database/migrations/2026_01_05_210006_make_password_nullable_in_users_table.php
+  - app/Http/Controllers/PasskeyAuthController.php registerStore() creates users without a password
+last_verified: null

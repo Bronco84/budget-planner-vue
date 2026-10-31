@@ -1,0 +1,76 @@
+schema: 1
+id: AUTH-007
+name: Signed-in user without a passkey is forced to enrol one
+domain: auth
+status: implemented
+priority: critical
+summary: >
+  Every web request from an authenticated user who has no WebAuthn credential is
+  redirected to /passkey/register (flash error "You must register a passkey to
+  continue."), except the registration page itself, webauthn/* and logout. This
+  catches users who signed in by magic link or registered but abandoned the
+  passkey ceremony, and users who somehow lost all credentials.
+actors:
+  - authenticated user without a passkey
+preconditions:
+  - user is authenticated (magic link, fresh registration or trusted device)
+  - user has zero WebAuthn credentials
+routes:
+  - passkey.register
+  - webauthn.register.options
+  - webauthn.register
+  - dashboard
+depends_on:
+  - path: app/Http/Middleware/EnsureUserHasPasskey.php
+    reason: global web middleware performing the redirect
+steps:
+  - action: request any page (e.g. /dashboard)
+    expected: 302 to /passkey/register with flash error
+  - action: complete passkey registration (see AUTH-002 / AUTH-011)
+    expected: subsequent requests pass through normally
+postconditions:
+  - user cannot reach the app until a passkey exists
+business_rules:
+  - allowed without a passkey - passkey/register, webauthn/*, logout
+  - the user model is refreshed from the database on every authenticated web request before checking credentials
+  - guests are unaffected
+  - tests disable this middleware globally in tests/TestCase.php; enforcement tests must opt back in
+scenarios:
+  - id: passkeyless_user_redirected
+    kind: happy_path
+    description: An authenticated user with no passkey requesting an app page is redirected to passkey.register.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a signed-in user without a passkey is redirected to passkey registration'
+    note: tests/TestCase.php disables EnsureUserHasPasskey by default, so no existing test exercises it.
+  - id: registration_routes_allowed
+    kind: edge
+    description: passkey/register, webauthn/* and logout are reachable without a passkey (no redirect loop).
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::the passkey registration page stays reachable without a passkey'
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::passkey registration options stay reachable without a passkey'
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a user without a passkey can still sign out'
+  - id: user_with_passkey_passes
+    kind: edge
+    description: A user with at least one credential is not redirected.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyEnforcementTest.php::a user with a passkey is not redirected'
+  - id: json_endpoints_redirected
+    kind: edge
+    description: JSON endpoints (e.g. /api/preferences/*, /csrf-token) also receive a 302 rather than a JSON error for passkeyless users.
+    coverage: uncovered
+  - id: guest_not_affected
+    kind: authentication
+    description: Guests pass through the middleware untouched and are handled by auth/guest guards instead.
+    coverage: uncovered
+known_issues:
+  - PasskeyRegister.vue does not display the flashed error, so the user is redirected without being told why.
+  - The middleware returns an HTML redirect for JSON/XHR requests instead of a 403/409 JSON response.
+confidence: high
+evidence:
+  - bootstrap/app.php web middleware append list
+  - app/Http/Middleware/EnsureUserHasPasskey.php
+  - tests/TestCase.php
+last_verified: null

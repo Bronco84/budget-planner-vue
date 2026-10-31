@@ -1,0 +1,106 @@
+schema: 1
+id: SCENARIO-002
+name: User creates, edits and deletes a what-if scenario
+domain: scenarios
+status: implemented
+priority: high
+summary: >
+  From the scenario panel on the multi-account projection page the user creates a named,
+  coloured scenario with one or more adjustments (one-time expense, recurring expense,
+  debt paydown, savings contribution, modify existing) tied to budget accounts, edits it
+  later (adjustments are replaced wholesale) or deletes it. All endpoints are JSON and
+  called via axios.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with at least one account
+routes:
+  - budgets.scenarios.store
+  - budgets.scenarios.show
+  - budgets.scenarios.update
+  - budgets.scenarios.destroy
+depends_on:
+  - path: resources/js/composables/useScenarios.js
+    reason: axios create/update/delete calls
+  - path: resources/js/Components/ScenarioForm.vue
+    reason: scenario editor form
+  - path: resources/js/Components/ScenarioAdjustmentRow.vue
+    reason: adjustment rows and type options
+integrations: []
+steps:
+  - action: create a scenario (POST budgets/{budget}/scenarios)
+    expected: 201 JSON with the scenario and its adjustments
+  - action: fetch one scenario (GET budgets/{budget}/scenarios/{scenario})
+    expected: JSON scenario with adjustments (not currently called by the UI)
+  - action: edit the scenario (PATCH)
+    expected: 200 JSON; when adjustments are sent, existing adjustments are deleted and recreated
+  - action: delete the scenario (DELETE)
+    expected: 200 JSON; scenario and its adjustments removed
+postconditions:
+  - scenario and adjustments are stored, replaced or removed
+business_rules:
+  - name required; color must be a #RRGGBB hex; at least one adjustment on create
+  - adjustment_type in one_time_expense, recurring_expense, debt_paydown, savings_contribution, modify_existing
+  - every adjustment account must belong to the budget, else 422 with "One or more accounts do not belong to this budget."
+  - create and update run in a DB transaction; scenario is scoped to the budget
+  - store/update/destroy need budget update; show needs budget view
+scenarios:
+  - id: create_with_adjustments
+    kind: happy_path
+    description: Owner creates a scenario with a one-time and a recurring adjustment; both are persisted.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::user can create a scenario with adjustments
+  - id: update_scenario
+    kind: alternate
+    description: Updating name, description, colour and adjustments persists the new values.
+    coverage: partial
+    tests:
+      - tests/Feature/ScenarioTest.php::user can update a scenario
+    note: asserts the scenario fields only; replacement of adjustments is not asserted.
+  - id: delete_scenario
+    kind: alternate
+    description: Deleting removes the scenario and cascades to its adjustments.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::user can delete a scenario
+  - id: foreign_account_rejected
+    kind: validation
+    description: An adjustment referencing an account from a different budget is rejected with 422.
+    coverage: covered
+    tests:
+      - tests/Feature/ScenarioTest.php::scenario adjustments must have valid account from budget
+  - id: invalid_color_or_type
+    kind: validation
+    description: A non-hex colour or unknown adjustment type fails validation.
+    coverage: uncovered
+  - id: clear_description
+    kind: edge
+    description: Sending an empty description on update should clear it.
+    coverage: uncovered
+    note: update uses `?? $scenario->description`, so null keeps the old value (see known_issues).
+  - id: cross_user_forbidden
+    kind: authorization
+    description: Another user's scenario in their own budget returns 403.
+    coverage: partial
+    tests:
+      - tests/Feature/ScenarioTest.php::user cannot access scenarios from another users budget
+    note: asserted for show only; store, update and destroy on a foreign budget are not tested.
+  - id: cross_budget_not_found
+    kind: authorization
+    description: A scenario from another budget addressed through the user's own budget returns 404.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::scenario routes reject a cross-budget scenario with 404
+known_issues:
+  - adjustments.*.target_recurring_template_id is validated with an unscoped exists rule, so it can reference another budget's template (currently unused by projections).
+  - Description cannot be cleared on update because null falls back to the existing value.
+  - Scenario frequency options omit bimonthly, which recurring templates support.
+  - 500 responses include the raw exception message (error key) in JSON.
+  - budgets.scenarios.show is not called by the frontend.
+confidence: high
+evidence:
+  - app/Http/Controllers/ScenarioController.php
+  - resources/js/composables/useScenarios.js
+  - tests/Feature/ScenarioTest.php
+last_verified: null

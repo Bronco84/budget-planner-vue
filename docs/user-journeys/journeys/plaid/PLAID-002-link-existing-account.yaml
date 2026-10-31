@@ -1,0 +1,89 @@
+schema: 1
+id: PLAID-002
+name: User links an existing budget account to Plaid
+domain: plaid
+status: implemented
+priority: high
+summary: >
+  From an account (budget page or account edit page) the user opens the Bank Connection
+  page, launches Plaid Link and picks the matching bank account. The server exchanges the
+  public token and either reuses an active connection for the same item/institution,
+  re-links a previously linked (orphaned) PlaidAccount, or creates a new connection, then
+  runs a transaction sync. The same page shows connection metadata for linked accounts.
+actors:
+  - budget owner
+preconditions:
+  - user is authenticated and owns (or can view) the budget
+  - the account belongs to the budget in the URL (scoped bindings)
+routes:
+  - plaid.link
+  - plaid.store
+depends_on:
+  - path: app/Services/PlaidService.php
+    reason: createLinkToken, exchangePublicToken, getAccounts, linkAccount, linkAccountToConnection, createOrFindConnection, syncTransactions
+integrations:
+  - Plaid Link
+  - Plaid API (/link/token/create, /item/public_token/exchange, /accounts/get, /institutions/*)
+steps:
+  - action: open budget/{budget}/account/{account}/plaid/link
+    expected: Plaid/Link rendered with linkToken, isLinked flag and connection metadata when already linked
+  - action: complete Plaid Link and select one account
+    expected: client posts public_token and metadata (item id synthesised client-side when absent) to plaid.store
+  - action: server links the account
+    expected: redirect to budgets.show with a success message naming the reused or new connection
+postconditions:
+  - a PlaidAccount points the local account at an active PlaidConnection
+  - transactions for the account have been synced (best effort)
+business_rules:
+  - an existing active connection is matched by plaid_item_id first, then institution_id (when not null), scoped to the budget
+  - an account that already has a PlaidAccount is re-linked in place instead of duplicated
+  - the selected metadata.account.id must exist in Plaid's /accounts/get response or linking fails
+scenarios:
+  - id: link_page_renders
+    kind: happy_path
+    description: Owner opens the Bank Connection page for an unlinked account and receives a link token.
+    coverage: uncovered
+  - id: store_creates_new_connection
+    kind: happy_path
+    description: Linking with no matching connection creates a new PlaidConnection and PlaidAccount and redirects with "Account linked to Plaid successfully."
+    coverage: uncovered
+  - id: store_reuses_existing_connection
+    kind: alternate
+    description: Linking an account from an item/institution already connected in the budget attaches it to the existing connection.
+    coverage: uncovered
+  - id: relink_orphaned_account
+    kind: alternate
+    description: An account with a stale PlaidAccount is updated to point at the active or newly created connection.
+    coverage: uncovered
+  - id: linked_page_shows_metadata
+    kind: alternate
+    description: For an already linked account the page shows status, institution, last sync and any error_message.
+    coverage: uncovered
+  - id: store_validation
+    kind: validation
+    description: Missing public_token, metadata.institution.name or metadata.account.id fails validation.
+    coverage: uncovered
+  - id: account_missing_from_plaid_response
+    kind: recovery
+    description: If the chosen account id is absent from Plaid's account list, the user is redirected back with "Failed to link account".
+    coverage: uncovered
+  - id: link_form_cross_budget_account
+    kind: authorization
+    description: Opening the link page with an account from another budget returns 404 via scoped bindings.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::plaid link form rejects a cross-budget account with 404
+  - id: store_cross_user_denied
+    kind: authorization
+    description: Posting plaid.store against another user's budget/account is rejected (403/404).
+    coverage: uncovered
+    note: plaid.store is not part of the plaid_post_routes dataset in NestedRouteAuthorizationTest.
+known_issues:
+  - 'error flashes include raw exception messages ("Failed to link account ..."), leaking provider details.'
+  - the client fabricates an item id (plaid-item-<timestamp>) when Link metadata has none, which defeats item-based connection reuse and stores a fake plaid_item_id.
+confidence: high
+evidence:
+  - app/Http/Controllers/PlaidController.php showLinkForm(), store(), relinkExistingAccount()
+  - resources/js/Pages/Plaid/Link.vue
+  - links from resources/js/Pages/Budgets/Show.vue and resources/js/Pages/Accounts/Edit.vue
+last_verified: null

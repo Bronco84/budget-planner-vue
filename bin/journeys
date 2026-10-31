@@ -1,0 +1,18 @@
+#!/usr/bin/env php
+<?php
+
+/*
+ * User journey catalog, dependency graph and change-impact analysis.
+ * See docs/user-journeys/README.md. Run `php bin/journeys list` for commands.
+ */
+
+$root = dirname(__DIR__);
+require $root.'/vendor/autoload.php';
+
+if (! class_exists(Tooling\Journeys\Console\Application::class)) {
+    fwrite(STDERR, "journeys: dev dependencies are not installed (run `composer install`).\n");
+    exit(1);
+}
+
+$git = new Tooling\Journeys\Git\Git($root);
+exit((new Tooling\Journeys\Console\Application($git))->run());

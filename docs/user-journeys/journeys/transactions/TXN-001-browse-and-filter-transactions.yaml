@@ -1,0 +1,100 @@
+schema: 1
+id: TXN-001
+name: Owner browses and filters a budget's transactions
+domain: transactions
+status: implemented
+priority: high
+summary: >
+  The owner opens the transactions list (directly or via the /transactions
+  shortcut that resolves the active budget) and narrows it by free-text search,
+  account, category and timeframe. Results are paginated 20 per page, newest first,
+  and the active filters are echoed back to the page.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budget.transaction.index
+  - transactions.index
+depends_on:
+  - path: resources/js/Pages/Transactions/Index.vue
+    reason: list page with filter controls
+integrations: []
+steps:
+  - action: visit /transactions or /budget/{budget}/transactions
+    expected: Transactions/Index rendered with transactions (paginated), accounts, distinct categories and filters
+  - action: apply search/account_id/category/timeframe query parameters
+    expected: list filtered accordingly; filters echoed in props
+postconditions:
+  - none (read only)
+business_rules:
+  - search matches description or notes (LIKE)
+  - timeframe is one of this_month, last_month, last_3_months, this_year; unknown values are ignored
+  - 20 per page ordered by date desc
+scenarios:
+  - id: list_loads
+    kind: happy_path
+    description: The list renders without filters.
+    coverage: covered
+    tests:
+      - tests/Feature/TransactionFilterTest.php::test_transactions_page_loads_without_filters
+  - id: filter_by_search
+    kind: alternate
+    description: Search term filters on description/notes.
+    coverage: covered
+    tests:
+      - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_search_term
+  - id: filter_by_account_and_category
+    kind: alternate
+    description: Account and category filters restrict results.
+    coverage: covered
+    tests:
+      - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_account
+      - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_category
+  - id: filter_by_timeframe
+    kind: alternate
+    description: Each timeframe option restricts by date.
+    coverage: covered
+    tests:
+      - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_this_month
+      - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_last_month
+      - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_last_3_months
+      - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_this_year
+  - id: combined_filters_and_echo
+    kind: alternate
+    description: Filters combine and are passed back to the view.
+    coverage: covered
+    tests:
+      - tests/Feature/TransactionFilterTest.php::test_can_combine_multiple_filters
+      - tests/Feature/TransactionFilterTest.php::test_filters_are_passed_back_to_view
+  - id: pagination_with_filters
+    kind: edge
+    description: Pagination returns 20 per page and preserves filters.
+    coverage: covered
+    tests:
+      - tests/Feature/TransactionFilterTest.php::test_pagination_works_with_filters
+  - id: no_transactions_empty_state
+    kind: empty_state
+    description: A budget with no transactions renders an empty list.
+    coverage: uncovered
+  - id: shortcut_redirects_to_active_budget
+    kind: happy_path
+    description: /transactions redirects to the active budget's list (or budgets.create when none).
+    coverage: uncovered
+  - id: other_users_transactions_forbidden
+    kind: authorization
+    description: Listing another user's budget transactions returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::user cannot access another users transactions
+  - id: guest_redirected
+    kind: authentication
+    description: Guests are redirected to login.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access transactions
+confidence: high
+evidence:
+  - app/Http/Controllers/TransactionController.php index
+  - tests/Feature/TransactionFilterTest.php
+last_verified: null

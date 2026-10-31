@@ -1,0 +1,104 @@
+schema: 1
+id: PROJECT-001
+name: User views an account's projected balance
+domain: projections
+status: implemented
+priority: critical
+summary: >
+  From the budget dashboard the user opens an account's balance projection. Future
+  occurrences of the account's recurring templates, future-dated manual transactions and
+  credit-card autopay projections are merged and rolled forward from the current balance
+  in weekly buckets (12 months by default on the detailed page, 3 months on the simpler
+  projections page). Liability accounts move in the opposite direction to assets.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with an account
+routes:
+  - budget.account.balance-projection
+  - budget.account.projections
+depends_on:
+  - path: app/Services/RecurringTransactionService.php
+    reason: projectTransactions (occurrence generation, dynamic amounts) and generateAutopayProjections
+  - path: app/Models/RecurringTransactionTemplate.php
+    reason: shouldAutopayOverrideFor and hasTransactionForDate used during projection
+integrations: []
+steps:
+  - action: open budget/{budget}/account/{account}/balance-projection (link on Budgets/Show)
+    expected: Accounts/BalanceProjection with projectedTransactions, balanceProjection.days (weekly date/balance/income/expense) and monthsAhead (default 12)
+  - action: open budget/{budget}/account/{account}/projections?months=N
+    expected: Accounts/Projections with the same data shape, default 3 months
+postconditions:
+  - nothing is persisted
+business_rules:
+  - start balance is the account's current_balance_cents; assets add amounts, liabilities subtract them
+  - templates whose end_date is before today are skipped; dates already covered by a linked transaction are not projected again
+  - monthly/quarterly/yearly days beyond month length clamp to the last day of the month
+  - dynamic-amount templates use a single computed amount for all future occurrences
+  - autopay projections replace the template occurrence when shouldAutopayOverrideFor matches
+  - the account is scoped to the budget (404 otherwise); budget view is required via can:view,budget middleware
+scenarios:
+  - id: balance_projection_renders
+    kind: happy_path
+    description: Owner sees a weekly balance line that starts from the current balance and applies recurring, manual and autopay items.
+    coverage: partial
+    tests:
+      - tests/Feature/Projections/AccountProjectionTest.php::owner sees the weekly account projection rolled forward from the current balance
+      - tests/Feature/Projections/AccountProjectionTest.php::balance projection page defaults to twelve months and renders the detailed projection
+    note: recurring and future manual items are asserted on both pages; credit-card autopay projections are not exercised.
+  - id: liability_direction
+    kind: edge
+    description: For a credit card, purchases increase and payments decrease the projected balance.
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/AccountProjectionTest.php::credit card projection increases with purchases and decreases with payments
+  - id: month_end_clamping
+    kind: edge
+    description: A monthly template on day 31 occurs on the last day of shorter months, including February.
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/AccountProjectionTest.php::a monthly template on day 31 lands on the last day of shorter months
+  - id: no_templates_flat_line
+    kind: empty_state
+    description: An account with no templates or future transactions projects a flat line at the current balance.
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/AccountProjectionTest.php::an account with nothing scheduled projects a flat line at the current balance
+  - id: zero_balance_start
+    kind: edge
+    description: An account with a zero balance projects from zero and can go negative.
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/AccountProjectionTest.php::a zero balance account projects from zero and can go negative
+  - id: months_parameter_bounds
+    kind: validation
+    description: Invalid or extreme months values should be rejected or clamped.
+    coverage: uncovered
+    note: months is not validated on either page, and on budget.account.projections any explicit ?months=N currently 500s (see known_issues).
+  - id: cross_budget_account_not_found
+    kind: authorization
+    description: An account from another budget addressed through the user's own budget returns 404.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::account projections reject a cross-budget account with 404
+      - tests/Feature/Projections/AccountProjectionTest.php::balance projection rejects an account from another budget with 404
+  - id: cross_user_forbidden
+    kind: authorization
+    description: Another user's budget and account return 403.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::account projections reject another users budget+account with 403
+      - tests/Feature/Projections/AccountProjectionTest.php::balance projection rejects another users budget and account with 403
+known_issues:
+  - "budget.account.projections returns a 500 for any explicit ?months=N (e.g. ?months=6 from the page's own Months to Project selector): ProjectionsController.php:111 passes the raw query string to Carbon::addMonths(), which throws a TypeError (string given). showBudgetProjections (line 43) has the same pattern; showBalanceProjection wraps it in intval()."
+  - months is read straight from the query string with no validation on both routes; a very large value triggers an unbounded projection loop and a negative value returns an empty series.
+  - getFutureManualTransactions includes transactions dated today, which are usually already reflected in current_balance_cents, so today's posted transactions are double-counted.
+  - showBalanceProjection reads scenario and groupBy query parameters but never uses them.
+  - The first weekly bucket starts at the beginning of the current week, so its date range includes days before today; there is no data point for "today".
+  - budget.account.projections is only linked from its own page (Accounts/Projections.vue); no other page navigates to it.
+confidence: high
+evidence:
+  - app/Http/Controllers/ProjectionsController.php showAccountProjections/showBalanceProjection/projectDailyBalance/getFutureManualTransactions
+  - app/Services/RecurringTransactionService.php projectTransactions/generateOccurrenceDates
+  - resources/js/Pages/Accounts/BalanceProjection.vue, Projections.vue; resources/js/Pages/Budgets/Show.vue
+last_verified: null

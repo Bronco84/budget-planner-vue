@@ -1,0 +1,64 @@
+schema: 1
+id: PLAID-008
+name: User browses raw Plaid transactions for an account
+domain: plaid
+status: unverified
+priority: low
+summary: >
+  Endpoints to list raw PlaidTransaction rows for an account: an Inertia page
+  (paginated 20 per page), a JSON API with date/pending/search filters and pagination,
+  and a JSON detail lookup by Plaid transaction id. No UI in resources/js links to
+  these routes.
+actors:
+  - budget owner
+preconditions:
+  - the account has imported Plaid transactions
+routes:
+  - plaid-transactions.index
+  - plaid-transactions.api
+  - plaid-transactions.show
+depends_on:
+  - path: app/Policies/AccountPolicy.php
+    reason: each action calls authorize('view', $account) in addition to can:view,budget
+integrations: []
+steps:
+  - action: GET budget/{budget}/account/{account}/plaid-transactions
+    expected: Inertia page PlaidTransactions/Index with paginated transactions (page component missing, see known_issues)
+  - action: GET .../plaid-transactions/api?start_date=&end_date=&pending=&search=&per_page=
+    expected: JSON paginator of matching transactions ordered by date desc
+  - action: GET .../plaid-transactions/{plaidTransactionId}
+    expected: JSON transaction, or 404 {error} when not found for this account
+postconditions:
+  - none (read-only)
+business_rules:
+  - per_page is 1..100 (default 20); search matches name, merchant_name or category
+scenarios:
+  - id: api_lists_transactions
+    kind: happy_path
+    description: The JSON API returns the account's Plaid transactions with filters applied.
+    coverage: uncovered
+  - id: api_validation
+    kind: validation
+    description: Invalid per_page, dates or pending values fail validation.
+    coverage: uncovered
+  - id: show_not_found
+    kind: edge
+    description: Unknown or other-account Plaid transaction ids return JSON 404.
+    coverage: uncovered
+  - id: index_page_renders
+    kind: happy_path
+    description: The Inertia index page renders the paginated list.
+    coverage: uncovered
+    note: currently broken, the page component does not exist.
+  - id: cross_user_denied
+    kind: authorization
+    description: Another user's budget/account returns 403; a cross-budget account returns 404.
+    coverage: uncovered
+known_issues:
+  - PlaidTransactionController::index renders PlaidTransactions/Index, which does not exist under resources/js/Pages, so the page fails to load (reported by `php bin/journeys validate`).
+  - no frontend code calls plaid-transactions.* routes; they may be dead code and candidates for removal.
+confidence: medium
+evidence:
+  - app/Http/Controllers/PlaidTransactionController.php
+  - grep of resources/js finds no reference to plaid-transactions
+last_verified: null

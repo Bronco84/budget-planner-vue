@@ -1,0 +1,98 @@
+schema: 1
+id: AUTH-003
+name: Guest signs in with an emailed magic link
+domain: auth
+status: implemented
+priority: high
+summary: >
+  Fallback sign-in when no passkey is available on the device. The guest enters
+  their email, receives a single-use link valid for 15 minutes, and clicking it
+  logs them in for this session only (no trusted device). Users without a passkey
+  are sent to passkey registration; others land on the budgets index with a
+  prompt to add a passkey for this device.
+actors:
+  - guest
+preconditions:
+  - user account exists for the email
+routes:
+  - magic-link.request
+  - magic-link.store
+  - magic-link.authenticate
+depends_on:
+  - path: app/Services/MagicLinkService.php
+    reason: token generation, hashing, expiry and single-use verification
+  - path: app/Mail/MagicLinkEmail.php
+    reason: email carrying the sign-in URL
+integrations:
+  - Mail (MagicLinkEmail sent synchronously)
+steps:
+  - action: follow "Send me a magic link" from the login page (GET /magic-link)
+    expected: Auth/MagicLinkRequest page rendered
+  - action: submit email (POST /magic-link)
+    expected: 64-char token generated, sha256 hash stored with 15 min expiry, email sent, back with status "Magic link sent to your email!"
+  - action: open the link (GET /magic-link/authenticate?token=..&email=..)
+    expected: token marked used, user logged in, session regenerated, auth_method=magic_link stored in session
+  - action: post-login redirect
+    expected: no passkey -> passkey.register; has passkey -> intended budgets.index with show_passkey_prompt flash
+postconditions:
+  - user is authenticated for the current session only
+  - the magic link token has used_at set
+business_rules:
+  - email must exist in users (exists:users,email)
+  - POST /magic-link throttled 6/min; GET /magic-link/authenticate throttled 10/min
+  - expiry configurable via auth.magic_link_expiry_minutes (default 15)
+  - magic-link sign-in does not create a TrustedDevice
+  - raw token and URL are never logged
+scenarios:
+  - id: request_form_renders
+    kind: happy_path
+    description: Guest can load the magic link request page.
+    coverage: uncovered
+  - id: link_emailed
+    kind: happy_path
+    description: Submitting a known email stores a hashed token and sends MagicLinkEmail to that address.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::requesting a magic link emails a single-use link and stores only a hash'
+  - id: link_signs_in_user_with_passkey
+    kind: happy_path
+    description: A valid link logs the user in, regenerates the session and redirects to budgets.index with show_passkey_prompt.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::a valid magic link signs in a user with a passkey and sends them to their budgets'
+  - id: link_signs_in_user_without_passkey
+    kind: alternate
+    description: A user with no passkey is redirected to passkey.register after a valid link.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::a valid magic link signs in a user without a passkey and sends them to passkey registration'
+  - id: unknown_email_rejected
+    kind: validation
+    description: An email that does not belong to any user fails validation and no mail is sent.
+    coverage: uncovered
+  - id: request_throttled
+    kind: edge
+    description: More than 6 link requests per minute are throttled.
+    coverage: uncovered
+  - id: no_trusted_device_created
+    kind: edge
+    description: Signing in by magic link does not create a TrustedDevice or set the device cookie.
+    coverage: uncovered
+  - id: email_delivery
+    kind: integration
+    description: The emailed URL points at magic-link.authenticate with the raw token and email.
+    coverage: uncovered
+  - id: authenticated_user_redirected
+    kind: authorization
+    description: Magic link routes are guest-only; an authenticated user is redirected to the dashboard.
+    coverage: uncovered
+known_issues:
+  - "exists:users,email on POST /magic-link reveals whether an account exists for an email (account enumeration)."
+  - MagicLinkController::store treats a mail transport exception as an uncaught 500 rather than the "Failed to send magic link" error branch (sendMagicLink returns a model, never false).
+confidence: high
+evidence:
+  - routes/auth.php guest group
+  - app/Http/Controllers/MagicLinkController.php
+  - app/Services/MagicLinkService.php
+  - app/Models/MagicLinkToken.php
+last_verified: null

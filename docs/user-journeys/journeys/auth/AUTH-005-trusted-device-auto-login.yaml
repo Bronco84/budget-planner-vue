@@ -1,0 +1,86 @@
+schema: 1
+id: AUTH-005
+name: Returning user is signed in automatically on a trusted device
+domain: auth
+status: implemented
+priority: critical
+summary: >
+  After a passkey login or registration the browser holds an httpOnly
+  device_token cookie (90 days). On a later request from a guest session the
+  RememberDevice middleware matches the cookie against a valid TrustedDevice
+  whose fingerprint equals the request's, logs the user in and refreshes
+  last_used_at. Guest-only pages such as /login then redirect to the dashboard,
+  which forwards to the budgets index.
+actors:
+  - returning user
+preconditions:
+  - browser holds a device_token cookie issued by AUTH-001 or AUTH-002
+  - the TrustedDevice has not expired or been revoked
+routes:
+  - login
+  - dashboard
+  - webauthn.login.options
+depends_on:
+  - path: app/Http/Middleware/RememberDevice.php
+    reason: performs the cookie lookup and Auth::loginUsingId on every web request
+  - path: app/Services/DeviceTokenService.php
+    reason: decrypts stored tokens and matches the cookie value
+  - path: app/Services/DeviceFingerprintService.php
+    reason: fingerprint (user agent + Accept-Language + Accept-Encoding + Accept) must match
+  - path: app/Models/TrustedDevice.php
+    reason: valid() scope and markAsUsed()
+steps:
+  - action: return to the site with a device_token cookie and no session
+    expected: RememberDevice finds the matching valid device and logs the user in
+  - action: land on /login
+    expected: guest middleware redirects to /dashboard, which redirects to budgets.index
+postconditions:
+  - user is authenticated
+  - TrustedDevice.last_used_at updated
+business_rules:
+  - auto-login is skipped when already authenticated and on the logout route
+  - expired devices (expires_at in the past) are ignored
+  - the cookie is secure, httpOnly, SameSite=Lax, lifetime auth.device_remember_days (default 90)
+  - "/dashboard is auth-only and simply redirects to budgets.index"
+scenarios:
+  - id: valid_cookie_auto_logs_in
+    kind: happy_path
+    description: A request carrying a valid device cookie with a matching fingerprint is authenticated as the device owner.
+    coverage: uncovered
+  - id: auto_logged_in_user_skips_login_page
+    kind: happy_path
+    description: An auto-logged-in visit to /login redirects through /dashboard to budgets.index.
+    coverage: uncovered
+  - id: expired_device_ignored
+    kind: edge
+    description: A cookie whose device is past expires_at leaves the request as a guest.
+    coverage: uncovered
+  - id: fingerprint_mismatch_ignored
+    kind: edge
+    description: A valid token presented with different browser headers is not accepted.
+    coverage: uncovered
+  - id: unknown_or_tampered_cookie_ignored
+    kind: authentication
+    description: A device_token value that matches no stored device does not authenticate anyone.
+    coverage: uncovered
+  - id: revoked_device_no_longer_logs_in
+    kind: authorization
+    description: After the device is revoked (AUTH-012) or the user logs out (AUTH-006) the cookie no longer signs the user in.
+    coverage: uncovered
+  - id: login_options_stay_json_when_auto_logged_in
+    kind: integration
+    description: The login-options endpoint still returns JSON when the request is authenticated (guards the auto-login regression).
+    coverage: covered
+    tests:
+      - tests/Feature/WebAuthnLoginOptionsTest.php::an authenticated request to login options returns json, not an html redirect
+known_issues:
+  - "Suspected: the fingerprint includes the request Accept header. Devices are created on webauthn/login (axios sends Accept: application/json) or webauthn/register (fetch, Accept: application/json), but full page loads send Accept: text/html,..., so the fingerprint never matches on a normal visit. Auto-login then only fires on JSON requests such as webauthn/login/options."
+  - DeviceTokenService::verifyDeviceToken loads and decrypts every valid TrustedDevice for every user on each guest request with a cookie (O(n) scan, no indexed lookup).
+  - RememberDevice calls Auth::loginUsingId without regenerating the session ID.
+confidence: medium
+evidence:
+  - bootstrap/app.php web middleware stack (RememberDevice before EnsureUserHasPasskey)
+  - app/Http/Middleware/RememberDevice.php
+  - app/Services/DeviceTokenService.php, app/Services/DeviceFingerprintService.php
+  - routes/web.php dashboard route
+last_verified: null

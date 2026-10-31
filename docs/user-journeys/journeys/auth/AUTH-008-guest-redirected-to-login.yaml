@@ -1,0 +1,57 @@
+schema: 1
+id: AUTH-008
+name: Unauthenticated visitor is redirected to sign in
+domain: auth
+status: implemented
+priority: high
+summary: >
+  A guest who opens the site root or any auth-protected page (dashboard, profile,
+  budgets, settings) is redirected to /login instead of seeing data; JSON callers
+  receive 401. After signing in the user lands on the intended page where the
+  login flow uses redirect()->intended.
+actors:
+  - guest
+preconditions:
+  - no session and no usable trusted-device cookie
+routes:
+  - GET /
+  - dashboard
+  - profile.edit
+  - login
+steps:
+  - action: open / or a protected page such as /dashboard or /profile
+    expected: 302 to /login
+  - action: sign in (AUTH-001 or AUTH-003)
+    expected: user continues to the app
+postconditions:
+  - no protected data was rendered to the guest
+business_rules:
+  - "/ always redirects to login (authenticated users are then bounced to dashboard by the guest guard)"
+  - the auth middleware returns 401 for requests expecting JSON
+scenarios:
+  - id: root_redirects_to_login
+    kind: happy_path
+    description: GET / redirects to the login route.
+    coverage: covered
+    tests:
+      - tests/Feature/ExampleTest.php::test_the_application_returns_a_successful_response
+  - id: protected_page_redirects_guest
+    kind: authentication
+    description: A guest requesting a budget page is redirected to login.
+    coverage: partial
+    tests:
+      - tests/Feature/SecurityAuthorizationTest.php::unauthenticated user cannot access budgets
+    note: asserted for budgets.show only; dashboard and profile.edit guest redirects are not tested.
+  - id: json_request_gets_401
+    kind: edge
+    description: A guest JSON request to an auth route (e.g. /api/preferences/active-budget) gets 401, not an HTML redirect.
+    coverage: uncovered
+  - id: intended_url_restored_after_magic_link
+    kind: alternate
+    description: After a magic-link login the user is sent to the originally requested URL.
+    coverage: uncovered
+confidence: high
+evidence:
+  - routes/web.php root, dashboard and profile routes
+  - Illuminate\Auth\Middleware\Authenticate default redirect to route('login')
+last_verified: null

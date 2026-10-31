@@ -27,6 +27,7 @@
     "require-dev": {
         "beyondcode/laravel-dump-server": "^2.1",
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.4",
         "laravel/breeze": "^2.3",
         "laravel/nova-devtool": "^1.8",
         "laravel/pail": "^1.2.2",
@@ -34,11 +35,11 @@
         "laravel/sail": "^1.41",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "larastan/larastan": "^3.4",
         "pestphp/pest": "^3.8",
         "pestphp/pest-plugin-laravel": "^3.2",
         "phpstan/phpstan": "^2.1",
-        "phpunit/phpunit": "^11.5.3"
+        "phpunit/phpunit": "^11.5.3",
+        "symfony/yaml": "^7.4"
     },
     "autoload": {
         "psr-4": {
@@ -49,7 +50,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "Tooling\\Journeys\\": "tooling/journeys/src/"
         }
     },
     "scripts": {
@@ -84,6 +86,13 @@
         ],
         "pint:test": [
             "vendor/bin/pint --test"
+        ],
+        "post-install-cmd": [
+            "@php tooling/journeys/install-hooks.php"
+        ],
+        "journeys": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php bin/journeys"
         ]
     },
     "extra": {

@@ -64,3 +64,71 @@ jobs:
       # Passes with zero errors; remaining findings are warnings only.
       - name: Lint (ESLint)
         run: npm run lint
+
+  journeys:
+    name: User journeys
+    runs-on: ubuntu-latest
+    env:
+      COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # impact analysis needs the merge base
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+
+      - name: Prepare application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Schema, references, generated INDEX.md, coverage baseline, unmapped
+      # routes (strict), and static route extraction vs `route:list`.
+      - name: Validate journey catalog
+        run: php bin/journeys validate --strict --with-app
+
+      - name: Analyzer tests
+        run: php artisan test tests/Unit/Journeys
+        env:
+          JOURNEYS_REQUIRE_NODE: '1'
+
+      - name: Impact analysis
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then BASE="HEAD~1"; fi
+          php bin/journeys impacted --base "$BASE"
+          php bin/journeys impacted --base "$BASE" --json > journeys-impact.json
+          php bin/journeys coverage --json > journeys-coverage.json
+          php bin/journeys graph --json > journeys-graph.json
+          # Mandatory: new routes need a journey; recorded coverage must not drop.
+          php -r '$r = json_decode(file_get_contents("journeys-impact.json"), true);
+            foreach ($r["new_unmapped_routes"] as $x) echo "::error::new route without a journey: $x\n";
+            foreach ($r["coverage_regressions"] as $x) echo "::error::$x\n";
+            exit($r["new_unmapped_routes"] || $r["coverage_regressions"] ? 1 : 0);'
+
+      - name: Upload journey reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-reports
+          path: journeys-*.json
+          if-no-files-found: ignore

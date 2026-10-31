@@ -1,0 +1,111 @@
+schema: 1
+id: RECUR-006
+name: User discovers recurring patterns and creates templates from them
+domain: recurring
+status: implemented
+priority: high
+summary: >
+  From the recurring list the user opens "Analyze transactions", picks an in-budget
+  account and analysis settings (period, minimum occurrences, confidence threshold) and
+  runs the analysis. Unlinked transactions are grouped by normalised description, a
+  frequency is inferred from spacing, and patterns meeting the thresholds are shown. The
+  user selects patterns, confirms/edits them in a modal and creates templates in bulk.
+actors:
+  - authenticated budget owner
+preconditions:
+  - user owns a budget with an account that has several months of unlinked transactions
+routes:
+  - recurring-transactions.analysis
+  - recurring-transactions.analysis.analyze
+  - GET /budget/{budget}/recurring-transactions-analysis/analyze
+  - recurring-transactions.analysis.create-templates
+  - GET /budget/{budget}/recurring-transactions-analysis/create-templates
+depends_on:
+  - path: app/Services/RecurringTransactionAnalysisService.php
+    reason: analyzeAccount pattern detection and createTemplatesFromPatterns
+  - path: resources/js/Pages/RecurringTransactions/Partials/RecurringTransactionConfirmationModal.vue
+    reason: confirmation modal that edits patterns before template creation
+integrations: []
+steps:
+  - action: open budget/{budget}/recurring-transactions-analysis
+    expected: RecurringTransactions/Analysis with accounts where include_in_budget is true
+  - action: run analysis (POST .../analyze, Inertia form)
+    expected: same page re-rendered with analysisResult (patterns, frequency, day, amount, confidence, summary)
+  - action: refresh the browser on the POST URL (GET .../analyze or GET .../create-templates)
+    expected: redirected back to the analysis page instead of a 405
+  - action: select patterns, confirm in the modal and submit (POST .../create-templates)
+    expected: templates created; redirect to recurring index with "Successfully created N recurring transaction templates."
+postconditions:
+  - new RecurringTransactionTemplates exist for the account
+business_rules:
+  - analysis_period_months 3-24 (default 6), min_occurrences 2-10 (default 3), confidence_threshold 0-1 (default 0.6)
+  - only unlinked transactions on the chosen account within the period are analysed
+  - the account must belong to the budget in the URL, otherwise JSON 403
+  - every action is guarded by can:view,budget (including template creation)
+scenarios:
+  - id: detects_monthly_pattern
+    kind: happy_path
+    description: Five monthly charges on the same day are detected as a monthly pattern with day_of_month, amount and confidence above threshold.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/RecurringTransactionAnalysisServiceTest.php::detects a monthly recurring charge
+  - id: analysis_page_renders
+    kind: happy_path
+    description: Owner opens the analysis page and runs an analysis through the controller.
+    coverage: uncovered
+  - id: create_templates_from_confirmation
+    kind: happy_path
+    description: Confirmed patterns become templates and the user lands on the recurring index with a success flash.
+    coverage: uncovered
+  - id: below_min_occurrences_ignored
+    kind: edge
+    description: Groups with fewer occurrences than min_occurrences are not reported.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/RecurringTransactionAnalysisServiceTest.php::ignores groups below the minimum occurrence threshold
+  - id: no_transactions
+    kind: empty_state
+    description: An account with no unlinked transactions returns success false with a "No unlinked transactions" message and zero totals.
+    coverage: covered
+    tests:
+      - tests/Feature/Services/RecurringTransactionAnalysisServiceTest.php::reports no patterns when the account has no transactions
+  - id: settings_validation
+    kind: validation
+    description: Out-of-range period, occurrence or confidence values fail validation.
+    coverage: uncovered
+  - id: bimonthly_confirmation
+    kind: edge
+    description: A bimonthly pattern confirmed in the modal keeps both days of the month.
+    coverage: uncovered
+    note: currently broken; the modal's bimonthly_first_day/second_day keys are not template columns (see known_issues).
+  - id: refresh_fallback_redirects
+    kind: recovery
+    description: GET on the analyze/create-templates URLs redirects to the analysis page.
+    coverage: uncovered
+  - id: cross_user_budget_forbidden
+    kind: authorization
+    description: Another user cannot open the analysis page or analyse transactions in a budget they do not own.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot open another users recurring transaction analysis
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot analyze another users transactions
+  - id: foreign_account_rejected
+    kind: authorization
+    description: An account from another budget passed to analyze or create-templates on the user's own budget is rejected with 403.
+    coverage: uncovered
+known_issues:
+  - prepareTemplateData (confirmation path) writes bimonthly_first_day/bimonthly_second_day, which are not fillable columns; first_day_of_month is silently dropped, so bimonthly templates fall back to day 1 in projections.
+  - Confirmation-path templates store average_amount in dollars while min_amount/max_amount are stored in cents; the legacy path stores average in dollars and min/max from amount_stats, so units are inconsistent.
+  - Templates created via the confirmation modal never link the transactions that formed the pattern (linkMatchingTransactionsToTemplate returns 0), so the same transactions remain unlinked and reappear in the next analysis.
+  - The legacy pattern path links transaction ids taken from the request payload (selected_patterns[].transactions[].id) with no budget filter, allowing foreign transactions to be linked.
+  - selected_patterns items are not validated; failures become per-item errors stored in the template_creation_result session key, but the redirect always uses the success flash (with "Some templates could not be created" text), so partial failures are easy to miss.
+  - Template creation is a write action guarded only by the budget view ability.
+  - The 403 for a foreign account is returned as JSON to an Inertia request, which renders as an error modal rather than a validation message.
+  - Exception messages are echoed to the user in the "Analysis failed:" / "Template creation failed:" flash.
+confidence: high
+evidence:
+  - app/Http/Controllers/RecurringTransactionAnalysisController.php
+  - app/Services/RecurringTransactionAnalysisService.php analyzeAccount/createTemplatesFromPatterns/prepareTemplateData
+  - routes/web.php GET fallback closures for analyze and create-templates
+  - resources/js/Pages/RecurringTransactions/Analysis.vue and Partials/RecurringTransactionConfirmationModal.vue
+last_verified: null

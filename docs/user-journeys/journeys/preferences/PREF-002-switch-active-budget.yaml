@@ -1,0 +1,75 @@
+schema: 1
+id: PREF-002
+name: User switches their active budget
+domain: preferences
+status: implemented
+priority: high
+summary: >
+  The BudgetSwitcher in the authenticated layout lets a user pick another budget
+  they own or share. The choice is stored as the active_budget_id preference;
+  the switcher then navigates to the same route for the new budget. The active
+  budget drives /budgets, /dashboard and the other budget-less redirect routes.
+actors:
+  - authenticated user
+preconditions:
+  - user owns or is linked to more than one budget
+routes:
+  - preferences.active-budget.set
+  - preferences.active-budget.get
+depends_on:
+  - path: resources/js/Components/BudgetSwitcher.vue
+    reason: dropdown that posts the new active budget and navigates
+  - path: app/Models/User.php
+    reason: getActiveBudget/setActiveBudget with access checks and fallback
+steps:
+  - action: choose a budget in the switcher
+    expected: POST /api/preferences/active-budget {budget_id}
+  - action: server validates access
+    expected: JSON active_budget summary; preference stored
+  - action: switcher navigates
+    expected: current route reloaded with the new budget id (or the budget page)
+postconditions:
+  - active_budget_id preference equals the chosen budget
+business_rules:
+  - budget_id required, integer, exists, and the user must own or be linked to it
+  - getActiveBudget clears a stale preference (deleted budget or lost access) and falls back to the first accessible budget, or null
+  - GET returns active_budget null with a message when the user has no budgets
+scenarios:
+  - id: switch_to_owned_budget
+    kind: happy_path
+    description: Setting an owned budget stores it and returns its summary.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can switch their active budget'
+  - id: switch_to_shared_budget
+    kind: alternate
+    description: A budget shared with the user via linked_budgets can be made active.
+    coverage: uncovered
+  - id: invalid_budget_rejected
+    kind: validation
+    description: A missing, non-integer or non-existent budget_id fails validation.
+    coverage: uncovered
+  - id: no_budgets_empty_state
+    kind: empty_state
+    description: GET active-budget returns null when the user has no budgets.
+    coverage: uncovered
+  - id: stale_preference_falls_back
+    kind: recovery
+    description: If the stored budget was deleted or access was revoked, the preference is cleared and the first accessible budget is used.
+    coverage: uncovered
+  - id: cannot_activate_foreign_budget
+    kind: authorization
+    description: Setting another user's unshared budget fails with "You do not have access to this budget."
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot activate another users budget'
+  - id: guest_rejected
+    kind: authentication
+    description: A guest JSON request to either endpoint gets 401.
+    coverage: uncovered
+confidence: medium
+evidence:
+  - routes/web.php preferences routes
+  - app/Http/Controllers/Api/UserPreferencesController.php getActiveBudget/setActiveBudget
+  - resources/js/Components/BudgetSwitcher.vue
+last_verified: null

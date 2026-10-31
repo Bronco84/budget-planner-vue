@@ -1,0 +1,68 @@
+schema: 1
+id: PLAID-004
+name: User syncs all Plaid-linked accounts in a budget at once
+domain: plaid
+status: implemented
+priority: high
+summary: >
+  From the budget overview the user clicks "Sync transactions". The server iterates
+  every PlaidAccount whose local account belongs to the budget, syncs each one, sums
+  the imported/updated counts and redirects back. The page then reloads transactions
+  and accounts.
+actors:
+  - budget owner
+preconditions:
+  - the budget has at least one Plaid-linked account
+routes:
+  - plaid.sync-all
+depends_on:
+  - path: app/Services/PlaidService.php
+    reason: syncTransactions per linked account
+integrations:
+  - Plaid API (/transactions/get, /accounts/get, /liabilities/get, /investments/holdings/get)
+steps:
+  - action: click sync on Budgets/Show (POST budget/{budget}/plaid/sync-all)
+    expected: redirect back with "Synced N new and updated M transactions."
+  - action: page handles success
+    expected: toast shows the flash message and transactions/accounts props reload
+postconditions:
+  - all linked accounts in the budget have fresh transactions and balances
+business_rules:
+  - limited to 3 requests per minute
+  - PRODUCT_NOT_READY accounts are skipped silently
+  - errors are only shown when every account failed and nothing was imported or updated
+scenarios:
+  - id: sync_all_happy
+    kind: happy_path
+    description: All linked accounts are synced and the combined counts are flashed.
+    coverage: uncovered
+  - id: no_linked_accounts
+    kind: empty_state
+    description: A budget with no Plaid accounts redirects back with "No Plaid-connected accounts found."
+    coverage: uncovered
+    note: SecurityRateLimitingTest exercises this path but asserts only that it is not 429.
+  - id: sync_all_rate_limited
+    kind: edge
+    description: The fourth sync-all within a minute returns 429.
+    coverage: covered
+    tests:
+      - tests/Feature/SecurityRateLimitingTest.php::plaid sync-all endpoint has stricter rate limiting
+  - id: partial_failure_reported
+    kind: integration
+    description: When some accounts fail, the successful totals are flashed; when all fail the user gets "Failed to sync transactions."
+    coverage: uncovered
+    note: unreachable today because per-account errors are swallowed in PlaidService (see known_issues).
+  - id: cross_user_denied
+    kind: authorization
+    description: Syncing another user's budget returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot sync all transactions on another users budget
+known_issues:
+  - per-account exceptions never reach the controller because PlaidService::syncTransactions swallows them, so the error aggregation and the all-failed error flash never trigger; failures read as "Synced 0 ...".
+  - Budgets/Show.vue only toasts flash.message on success; an error flash (e.g. "No Plaid-connected accounts found.") is not displayed by that handler.
+confidence: high
+evidence:
+  - app/Http/Controllers/PlaidController.php syncAllTransactions()
+  - resources/js/Pages/Budgets/Show.vue sync-all handler
+last_verified: null

@@ -1,0 +1,70 @@
+schema: 1
+id: AUTH-004
+name: Guest opens an expired, used or tampered magic link
+domain: auth
+status: implemented
+priority: high
+summary: >
+  Exceptional path of magic-link sign-in. When the token is unknown, expired,
+  already used, or the email in the URL does not match the token's owner, no
+  session is created and the guest is redirected to the login page with a
+  magic_link error so they can request a new link.
+actors:
+  - guest
+preconditions:
+  - guest holds a magic link URL that is no longer valid
+routes:
+  - magic-link.authenticate
+  - login
+depends_on:
+  - path: app/Services/MagicLinkService.php
+    reason: verifyToken applies the valid() scope (not expired, not used)
+steps:
+  - action: open an invalid link (GET /magic-link/authenticate?token=..&email=..)
+    expected: redirect to /login with errors.magic_link "Invalid or expired magic link."
+  - action: request a fresh link from the login page
+    expected: continues as AUTH-003
+postconditions:
+  - guest remains unauthenticated
+business_rules:
+  - a token is valid only while expires_at is in the future and used_at is null
+  - the email query parameter must equal the token owner's email
+  - missing token or email fails request validation
+scenarios:
+  - id: invalid_link_redirects_to_login
+    kind: happy_path
+    description: An unknown token redirects to login with a magic_link error and the guest stays unauthenticated.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::a tampered magic link token is rejected'
+  - id: expired_token_rejected
+    kind: edge
+    description: A token past expires_at is rejected.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::an expired magic link is rejected'
+  - id: used_token_rejected
+    kind: edge
+    description: Reusing a token that already signed someone in is rejected (single use).
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::a magic link cannot be used twice'
+  - id: missing_parameters_rejected
+    kind: validation
+    description: A request without token or email fails validation without authenticating.
+    coverage: uncovered
+  - id: email_mismatch_rejected
+    kind: authentication
+    description: A valid token presented with a different email does not sign anyone in.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::a magic link presented with a different email address is rejected'
+known_issues:
+  - PasskeyLogin.vue only renders the status prop, so the errors.magic_link message is never shown; the guest silently lands on the login page.
+  - verifyToken marks the token used before the controller checks the email, so a mismatched-email request burns a still-valid link.
+confidence: high
+evidence:
+  - app/Http/Controllers/MagicLinkController.php authenticate()
+  - app/Services/MagicLinkService.php verifyToken()
+  - resources/js/Pages/Auth/PasskeyLogin.vue
+last_verified: null

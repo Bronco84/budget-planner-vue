@@ -1,0 +1,89 @@
+schema: 1
+id: AUTH-009
+name: Stale CSRF token is re-synced so writes keep working
+domain: auth
+status: implemented
+priority: high
+summary: >
+  Laravel rotates the session CSRF token on login, magic-link login and logout,
+  but the <meta name="csrf-token"> tag is only rendered on a full page load. The
+  client keeps itself in sync - every Inertia response shares the live token
+  which app.js writes into the meta tag and axios defaults; an axios request that
+  still 419s fetches GET /csrf-token once (single shared in-flight refresh) and
+  replays; an Inertia visit that 419s triggers a full reload.
+actors:
+  - authenticated user
+  - guest
+preconditions:
+  - the session token has rotated or expired under an open page
+routes:
+  - GET /csrf-token
+  - login
+depends_on:
+  - path: resources/js/bootstrap.js
+    reason: setCsrfToken, axios 419 interceptor and shared /csrf-token refresh
+  - path: resources/js/app.js
+    reason: router success listener syncs the shared token; invalid listener reloads on 419
+  - path: app/Http/Middleware/HandleInertiaRequests.php
+    reason: shares csrf_token on every Inertia response
+steps:
+  - action: perform a client-side navigation after the token rotated
+    expected: page props carry the new csrf_token; meta tag and axios header updated
+  - action: an axios POST is sent with a stale token
+    expected: 419, client fetches /csrf-token, retries once with the new token
+  - action: an Inertia visit returns 419
+    expected: window.location.reload() pulls a fresh page and token
+postconditions:
+  - subsequent write requests succeed without the user refreshing manually
+business_rules:
+  - "/csrf-token is a public GET in the web group returning {csrf_token}"
+  - each axios request is retried at most once (_retry flag)
+  - raw fetch() callers (e.g. Budgets/Show account-type-order, PasskeyRegister) read the meta tag and get no automatic retry
+scenarios:
+  - id: inertia_shares_live_token
+    kind: happy_path
+    description: Inertia page props include the current session CSRF token.
+    coverage: covered
+    tests:
+      - tests/Feature/CsrfTokenSyncTest.php::inertia responses share the live csrf token
+  - id: shared_token_follows_rotation
+    kind: recovery
+    description: After the session token rotates (logout) the next Inertia response shares the rotated token.
+    coverage: covered
+    tests:
+      - tests/Feature/CsrfTokenSyncTest.php::the shared token follows a session token rotation
+  - id: refresh_endpoint_returns_token
+    kind: happy_path
+    description: GET /csrf-token returns the session token as JSON.
+    coverage: covered
+    tests:
+      - tests/Feature/CsrfTokenSyncTest.php::the csrf token endpoint returns the session token
+  - id: axios_419_retry
+    kind: recovery
+    description: A 419 axios response triggers one /csrf-token fetch shared by concurrent requests and a single replay.
+    coverage: uncovered
+    note: client-side behaviour; no JS unit tests exist and Playwright specs are stale.
+  - id: inertia_419_reload
+    kind: recovery
+    description: An Inertia visit that returns 419 reloads the page instead of leaving the user stuck.
+    coverage: uncovered
+    note: client-side behaviour; needs a browser test.
+  - id: stale_token_rejected
+    kind: validation
+    description: A POST with a stale CSRF token is rejected with 419.
+    coverage: uncovered
+    note: Laravel disables CSRF verification while running unit tests, so this needs an explicit middleware-enabled test.
+  - id: token_endpoint_public
+    kind: authorization
+    description: The token endpoint is intentionally public; it only reveals the caller's own session token.
+    coverage: not_applicable
+    note: no resource ownership; same-origin policy prevents other sites reading the response.
+known_issues:
+  - App\Http\Middleware\VerifyCsrfToken is never registered (Laravel 12 uses ValidateCsrfToken), so its $except list including webauthn/* has no effect; webauthn routes are CSRF-protected in practice.
+  - Raw fetch() writes do not go through the axios 419 retry, so they still fail if the page never navigated after a rotation.
+confidence: medium
+evidence:
+  - routes/web.php /csrf-token closure
+  - uncommitted changes in resources/js/bootstrap.js, resources/js/app.js and app/Http/Middleware/HandleInertiaRequests.php
+  - tests/Feature/CsrfTokenSyncTest.php (passing, uncommitted)
+last_verified: null

@@ -1,0 +1,71 @@
+schema: 1
+id: ACCOUNT-003
+name: Owner configures credit-card autopay from a checking or savings account
+domain: accounts
+status: implemented
+priority: medium
+summary: >
+  For a Plaid credit card with liability (statement) data, the owner enables or
+  disables autopay in the credit-card details panel, choosing a checking or savings
+  source account in the same budget and an optional fixed amount override. The
+  dashboard projections then deduct the statement payment from the source account.
+actors:
+  - budget owner
+preconditions:
+  - the account is a Plaid credit card with liability data
+  - a Plaid depository checking/savings account exists in the same budget
+routes:
+  - accounts.updateAutopay
+depends_on:
+  - path: resources/js/Components/AutopayConfiguration.vue
+    reason: form posting to the autopay endpoint
+  - path: resources/js/Components/CreditCardDetails.vue
+    reason: hosts the autopay configuration on the dashboard
+  - path: app/Models/Account.php
+    reason: isAutopayEligible / canBeAutopaySource rules
+integrations:
+  - Plaid liabilities data (eligibility)
+steps:
+  - action: toggle autopay and choose a source account (POST /budgets/{budget}/accounts/{account}/autopay)
+    expected: autopay fields saved; back with success message naming the source account
+  - action: disable autopay
+    expected: autopay_enabled false and source cleared
+postconditions:
+  - account autopay_enabled / autopay_source_account_id / autopay_amount_override_cents updated
+business_rules:
+  - only credit cards with statement data are eligible
+  - source account is required when enabling, must be in the same budget, must be Plaid depository checking/savings, and cannot be the card itself
+  - amount override is a non-negative integer of cents
+scenarios:
+  - id: enable_autopay
+    kind: happy_path
+    description: Enabling autopay with a valid source account saves the configuration.
+    coverage: uncovered
+  - id: disable_autopay
+    kind: alternate
+    description: Disabling autopay clears the source account.
+    coverage: uncovered
+  - id: ineligible_account_rejected
+    kind: validation
+    description: Non-credit-card or no-statement accounts get an error flash and no change.
+    coverage: uncovered
+  - id: invalid_source_rejected
+    kind: validation
+    description: Missing source, a non-depository source, or the card itself is rejected with an error flash.
+    coverage: uncovered
+  - id: source_from_other_budget_rejected
+    kind: authorization
+    description: A source account id from another budget is rejected ("must be in the same budget").
+    coverage: uncovered
+  - id: other_users_account_forbidden
+    kind: authorization
+    description: Posting autopay for another user's budget returns 403 (can:view,budget); cross-budget account returns 404.
+    coverage: uncovered
+known_issues:
+  - "updateAutopay has no $this->authorize('update', $account) call, unlike the other AccountController mutators; it relies solely on the budget-level can:view middleware plus scopeBindings."
+  - "The controller indexes $validated['autopay_source_account_id'] and ['autopay_amount_override_cents'] directly; omitting those nullable keys (instead of sending null) causes an undefined array key error."
+confidence: medium
+evidence:
+  - app/Http/Controllers/AccountController.php updateAutopay
+  - resources/js/Components/AutopayConfiguration.vue
+last_verified: null

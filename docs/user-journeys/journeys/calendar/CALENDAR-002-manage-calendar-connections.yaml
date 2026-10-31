@@ -1,0 +1,78 @@
+schema: 1
+id: CALENDAR-002
+name: User syncs, enables/disables or removes a calendar connection
+domain: calendar
+status: implemented
+priority: medium
+summary: >
+  From the calendar connections page the user can re-sync events from Google
+  (refreshing the access token if expired), toggle whether a connection's events show
+  on the financial calendar, or remove the connection. Each action is authorised by
+  CalendarConnectionPolicy (owner only) and redirects back.
+actors:
+  - authenticated user
+preconditions:
+  - the user has at least one CalendarConnection
+routes:
+  - calendar.connections.sync
+  - calendar.connections.toggle
+  - calendar.connections.destroy
+depends_on:
+  - path: app/Policies/CalendarConnectionPolicy.php
+    reason: update/delete abilities require connection.user_id to match
+  - path: app/Services/GoogleCalendarService.php
+    reason: refreshTokenIfNeeded and syncEvents
+integrations:
+  - Google Calendar API (events.list), Google OAuth token refresh
+steps:
+  - action: click Sync (POST /calendar/connections/{calendarConnection}/sync)
+    expected: events re-synced; redirect back with "Synced N events from <calendar>"
+  - action: click toggle (POST .../toggle)
+    expected: is_active flipped; redirect back
+  - action: confirm remove (DELETE /calendar/connections/{calendarConnection})
+    expected: connection deleted; redirect back
+postconditions:
+  - inactive connections' events are excluded from the calendar month view (CALENDAR-003)
+business_rules:
+  - only the owning user may sync, toggle or delete a connection
+  - an expired token without a refresh token fails with "No refresh token available"
+scenarios:
+  - id: sync_connection
+    kind: happy_path
+    description: The owner re-syncs a connection and sees the synced count.
+    coverage: uncovered
+    note: currently fails with 403, see known_issues.
+  - id: toggle_connection
+    kind: happy_path
+    description: The owner toggles a connection active/inactive.
+    coverage: uncovered
+  - id: remove_connection
+    kind: happy_path
+    description: The owner removes a connection.
+    coverage: uncovered
+  - id: unknown_connection
+    kind: edge
+    description: A non-existent connection id returns 404.
+    coverage: uncovered
+  - id: token_refresh_failure
+    kind: recovery
+    description: An expired token that cannot be refreshed (revoked access, no refresh token) redirects back with "Sync failed".
+    coverage: uncovered
+  - id: google_api_failure
+    kind: integration
+    description: A Google API error during events.list is reported as a sync failure without 500.
+    coverage: uncovered
+  - id: cross_user_denied
+    kind: authorization
+    description: Another user's connection cannot be synced, toggled or deleted (403).
+    coverage: uncovered
+known_issues:
+  - "route parameter is {calendarConnection} but the controller methods type-hint CalendarConnection $connection, so implicit binding does not apply; Laravel injects an empty model, the policy compares user id to null and every sync/toggle/destroy request returns 403 for the owner too (suspected, verify with a feature test)."
+  - "success messages are flashed under 'success', which is not shared with Inertia, and Connections.vue renders no flash, so the user gets no feedback."
+  - sync error flashes include raw exception messages.
+confidence: medium
+evidence:
+  - routes/web.php calendar.connections.* parameter names
+  - app/Http/Controllers/CalendarConnectionController.php sync(), toggle(), destroy()
+  - resources/js/Pages/Calendar/Connections.vue
+last_verified: null

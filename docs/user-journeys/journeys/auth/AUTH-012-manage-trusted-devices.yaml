@@ -1,0 +1,78 @@
+schema: 1
+id: AUTH-012
+name: User reviews and revokes trusted devices
+domain: auth
+status: implemented
+priority: high
+summary: >
+  The profile page lists the user's trusted devices (name, browser, platform,
+  IP, auth method, last used). The user can revoke a single device or revoke all
+  devices other than the current browser, which stops those browsers being
+  auto-signed-in (AUTH-005).
+actors:
+  - authenticated user
+preconditions:
+  - user is authenticated and has trusted devices
+routes:
+  - profile.edit
+  - trusted-devices.revoke
+  - trusted-devices.revoke-all
+depends_on:
+  - path: resources/js/Pages/Profile/Partials/ManageTrustedDevicesForm.vue
+    reason: list and revoke UI
+  - path: app/Services/DeviceFingerprintService.php
+    reason: identifies the current device for revoke-all
+steps:
+  - action: open /profile
+    expected: trusted devices listed newest-used first
+  - action: revoke one (DELETE /settings/trusted-devices/{device})
+    expected: device deleted, back with status "Device revoked successfully."
+  - action: revoke all others (POST /settings/trusted-devices/revoke-all)
+    expected: every device whose fingerprint differs from the current request deleted
+postconditions:
+  - revoked devices can no longer auto-login
+business_rules:
+  - revoking a device owned by another user aborts 403
+  - revoke-all keeps devices matching the current request fingerprint
+scenarios:
+  - id: profile_lists_devices
+    kind: happy_path
+    description: The profile page includes the user's trusted devices.
+    coverage: partial
+    tests:
+      - tests/Feature/ProfileTest.php::test_profile_page_is_displayed
+    note: only asserts 200; does not inspect the trustedDevices prop.
+  - id: revoke_single_device
+    kind: happy_path
+    description: Revoking a device deletes it.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can revoke one of their trusted devices'
+  - id: revoke_all_other_devices
+    kind: happy_path
+    description: Revoke-all deletes every device except the one matching the current fingerprint.
+    coverage: uncovered
+  - id: no_devices_empty_state
+    kind: empty_state
+    description: A user with no trusted devices sees an empty list.
+    coverage: uncovered
+  - id: cannot_revoke_other_users_device
+    kind: authorization
+    description: Revoking another user's device returns 403 and leaves it intact.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user cannot revoke another users trusted device'
+  - id: revoked_device_stops_auto_login
+    kind: integration
+    description: After revocation the old device cookie no longer authenticates.
+    coverage: uncovered
+known_issues:
+  - "TrustedDeviceController::index renders Settings/TrustedDevices (missing page), has no route, and references a non-existent trusted-devices.index breadcrumb."
+  - ProfileController::edit lists expired devices too (no valid() scope) and does not flag the current device, so the UI cannot tell which device revoke-all keeps.
+  - "Because the fingerprint includes the Accept header (see AUTH-005), revoke-all from a page request likely deletes the current browser's device as well."
+confidence: medium
+evidence:
+  - routes/auth.php auth group
+  - app/Http/Controllers/TrustedDeviceController.php
+  - app/Http/Controllers/ProfileController.php edit()
+last_verified: null

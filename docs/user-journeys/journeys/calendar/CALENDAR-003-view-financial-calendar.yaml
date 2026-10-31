@@ -1,0 +1,61 @@
+schema: 1
+id: CALENDAR-003
+name: User views the financial calendar for a month
+domain: calendar
+status: implemented
+priority: medium
+summary: >
+  The Calendar page shows a month grid for the user's active budget (or a budget chosen
+  via budget_id) combining posted transactions, projected occurrences of active
+  recurring templates and events from active Google Calendar connections. The user
+  navigates months via year/month query parameters.
+actors:
+  - authenticated user
+preconditions:
+  - the user has at least one budget
+routes:
+  - calendar.index
+depends_on:
+  - path: app/Models/RecurringTransactionTemplate.php
+    reason: projected recurring occurrences per frequency
+integrations: []
+steps:
+  - action: open /calendar (optionally ?year=&month=&budget_id=)
+    expected: Calendar/Index rendered with calendarData, calendarEvents, the user's budgets and currentMonth
+postconditions:
+  - none (read-only)
+business_rules:
+  - users without a budget are redirected to budgets.create with a message
+  - budget_id must pass BudgetPolicy view (owner only)
+  - only events from active calendar connections are shown
+scenarios:
+  - id: month_renders
+    kind: happy_path
+    description: The current month renders transactions, projected recurring items and calendar events.
+    coverage: uncovered
+  - id: no_budget_redirect
+    kind: empty_state
+    description: A user with no budgets is redirected to budget creation.
+    coverage: uncovered
+  - id: invalid_month_params
+    kind: validation
+    description: Non-numeric or out-of-range year/month parameters are handled.
+    coverage: uncovered
+    note: year/month are not validated before Carbon::create, see known_issues.
+  - id: inactive_connection_events_hidden
+    kind: edge
+    description: Events from a disabled connection are not shown.
+    coverage: uncovered
+  - id: other_users_budget_denied
+    kind: authorization
+    description: Passing another user's budget_id returns 403.
+    coverage: covered
+    tests:
+      - tests/Feature/NestedRouteAuthorizationTest.php::user cannot view another users budget via calendar budget_id param
+known_issues:
+  - year and month query params are passed unvalidated to Carbon::create, so values like month=13 roll over silently and non-numeric values can raise a 500.
+confidence: medium
+evidence:
+  - app/Http/Controllers/CalendarController.php index(), generateCalendarData(), projectRecurringTransactions()
+  - resources/js/Pages/Calendar/Index.vue
+last_verified: null

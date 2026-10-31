@@ -1,0 +1,71 @@
+schema: 1
+id: PROPERTY-001
+name: Owner records a property or vehicle asset
+domain: properties
+status: implemented
+priority: medium
+summary: >
+  The owner opens the properties list (or the dashboard's add-property link), fills
+  in the create form for a property, vehicle or other asset with its current value
+  and type-specific details, and optionally links an unassigned mortgage/loan/line
+  of credit account to it.
+actors:
+  - budget owner
+preconditions:
+  - user owns the budget
+routes:
+  - budgets.properties.index
+  - budgets.properties.create
+  - budgets.properties.store
+depends_on:
+  - path: resources/js/Pages/Properties/Index.vue
+    reason: list page with empty state and create link
+  - path: resources/js/Pages/Properties/Create.vue
+    reason: create form (value entered in dollars, sent as cents)
+integrations: []
+steps:
+  - action: visit /budgets/{budget}/properties
+    expected: Properties/Index rendered with properties and linked accounts, newest first
+  - action: open /budgets/{budget}/properties/create
+    expected: Properties/Create rendered with unlinked liability accounts and property types
+  - action: submit (POST /budgets/{budget}/properties)
+    expected: property stored with api_source=manual and value_updated_at=now, chosen liability account linked
+postconditions:
+  - Property exists for the budget; optional liability account has property_id set
+business_rules:
+  - type is one of property, vehicle, other; current_value_cents integer >= 0
+  - year_built 1800..next year; vehicle_year 1900..next year; VIN max 17
+  - only liability accounts (mortgage, loan, line of credit) without a property are offered for linking; the link is applied only if the account is in this budget
+scenarios:
+  - id: index_lists_properties
+    kind: happy_path
+    description: Owner sees their budget's properties with linked accounts.
+    coverage: uncovered
+  - id: create_property
+    kind: happy_path
+    description: Valid submission stores the property and returns the user to the list.
+    coverage: uncovered
+    note: currently fails after the insert because of the redirect bug in known_issues.
+  - id: no_properties_empty_state
+    kind: empty_state
+    description: A budget with no properties shows the empty state with a create link.
+    coverage: uncovered
+  - id: invalid_property_rejected
+    kind: validation
+    description: Bad type, negative value or out-of-range years return validation errors.
+    coverage: uncovered
+  - id: link_account_from_other_budget_ignored
+    kind: edge
+    description: A linked_account_id that exists but belongs to another budget passes validation but is not linked.
+    coverage: uncovered
+  - id: other_users_budget_forbidden
+    kind: authorization
+    description: Index/create return 403 (view) and store returns 403 (update) for another user's budget.
+    coverage: uncovered
+known_issues:
+  - "PropertyController@store redirects to route('budgets.assets.index'), which does not exist (RouteNotFoundException). The property is created but the user gets a 500 instead of returning to the list. Same bug in update and destroy (PROPERTY-002)."
+confidence: high
+evidence:
+  - app/Http/Controllers/PropertyController.php index/create/store
+  - php artisan route:list (no budgets.assets.* routes)
+last_verified: null

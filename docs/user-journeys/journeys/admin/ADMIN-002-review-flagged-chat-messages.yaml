@@ -1,0 +1,57 @@
+schema: 1
+id: ADMIN-002
+name: Administrator reviews flagged chat messages in Nova
+domain: admin
+status: implemented
+priority: low
+summary: >
+  Messages flagged by chat moderation (CHAT-002) are stored as FlaggedChatMessage rows
+  with flag type, content excerpt, action taken and request metadata. An administrator
+  reviews them in the Nova FlaggedChatMessage resource and can mark them reviewed.
+actors:
+  - administrator
+preconditions:
+  - user passes the viewNova gate
+  - moderation has flagged at least one message
+routes: []
+depends_on:
+  - path: app/Nova/FlaggedChatMessage.php
+    reason: Nova resource listing flagged messages with Reviewed toggle
+  - path: app/Models/FlaggedChatMessage.php
+    reason: flagged message model
+  - path: app/Services/ChatService.php
+    reason: flagMessage() creates the rows
+integrations:
+  - Laravel Nova
+steps:
+  - action: open Flagged Chat Messages in Nova
+    expected: list of flags with user, conversation and flag type
+  - action: open a record and set Reviewed
+    expected: record saved as reviewed
+postconditions:
+  - reviewed flags are distinguishable from unreviewed ones
+business_rules:
+  - stored content is truncated to 1000 characters; metadata includes IP and user agent
+scenarios:
+  - id: review_flag
+    kind: happy_path
+    description: An admin can list flagged messages and mark one reviewed.
+    coverage: uncovered
+  - id: no_flags
+    kind: empty_state
+    description: With no flags the resource index is empty.
+    coverage: uncovered
+  - id: non_admin_denied
+    kind: authorization
+    description: Non-admins cannot reach the resource (viewNova gate).
+    coverage: partial
+    tests:
+      - tests/Feature/SecurityNovaAccessTest.php::non-admin users cannot access nova
+    note: gate decision only; no HTTP test against the Nova resource.
+known_issues:
+  - no Nova action exists to ban/unban a user or act on a flag; bans are automatic and cache-only (ContentModerationService), so an admin cannot lift a mistaken 24-hour ban from Nova.
+confidence: medium
+evidence:
+  - app/Nova/FlaggedChatMessage.php
+  - app/Services/ChatService.php flagMessage()
+last_verified: null

@@ -32,10 +32,10 @@ test('owner invites a viewer who accepts, is promoted to editor, adds a transact
         await owner.page.locator('#invite-role').selectOption('viewer');
         await owner.page.getByRole('button', { name: 'Send invite' }).click();
 
-        // The "Invitation sent" flash isn't rendered on this page; the pending list is the feedback.
+        await expect(owner.page.getByText(`Invitation sent to ${invitee.email.toLowerCase()}.`)).toBeVisible();
         await expect(owner.page.getByRole('heading', { name: 'Pending invitations (1)' })).toBeVisible();
         await expect(owner.page.locator('#invite-email')).toHaveValue('');
-        await expect(owner.page.locator('li', { hasText: invitee.email })).toContainText('viewer');
+        await expect(owner.page.locator('li:not([data-sonner-toast])', { hasText: invitee.email })).toContainText('viewer');
     });
 
     await test.step('invitee opens the emailed link and accepts', async () => {
@@ -45,6 +45,7 @@ test('owner invites a viewer who accepts, is promoted to editor, adds a transact
         await invitee.page.getByRole('button', { name: 'Accept and open budget' }).click();
 
         await invitee.page.waitForURL(new RegExp(`/budgets/${budget.id}$`));
+        await expect(invitee.page.getByText(`You joined "${budget.name}" as a viewer.`)).toBeVisible();
         await expect(invitee.page.getByText('Active Budget').locator('..')).toContainText(budget.name);
     });
 
@@ -76,6 +77,7 @@ test('owner invites a viewer who accepts, is promoted to editor, adds a transact
         await row.locator('select').selectOption('editor');
         expect((await update).status()).toBeLessThan(400);
         await expect(row.locator('select')).toHaveValue('editor');
+        await expect(owner.page.getByText(/ is now an editor\.$/)).toBeVisible();
     });
 
     await test.step('the editor can now change data and adds a transaction', async () => {
@@ -97,6 +99,7 @@ test('owner invites a viewer who accepts, is promoted to editor, adds a transact
         await owner.page.locator(`[data-member="${invitee.email}"]`).getByRole('button', { name: 'Remove' }).click();
         await expect(owner.page.locator(`[data-member="${invitee.email}"]`)).toHaveCount(0);
         await expect(owner.page.getByRole('heading', { name: 'Members (1)' })).toBeVisible();
+        await expect(owner.page.getByText(/ no longer has access to this budget\.$/)).toBeVisible();
 
         invitee.errors.allow(new RegExp(`status of 403 .*\\/budgets\\/${budget.id}\\)$`));
         const response = await invitee.page.goto(`/budgets/${budget.id}`);

@@ -76,6 +76,7 @@ import { computed } from 'vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import InputError from '@/Components/InputError.vue';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps({
   status: { type: String, required: true },
@@ -85,10 +86,16 @@ const props = defineProps({
 });
 
 const page = usePage();
+const toast = useToast();
 const errors = computed(() => page.props.errors || {});
 const form = useForm({});
 
 const accept = () => {
-  form.post(route('invitations.accept', props.token));
+  // Lands on the budget; toast the "You joined ..." flash there.
+  form.post(route('invitations.accept', props.token), {
+    onSuccess: (visited) => {
+      if (visited.props.flash?.message) toast.success(visited.props.flash.message);
+    },
+  });
 };
 </script>

@@ -128,6 +128,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Sharing/BudgetMemberManagementTest.php::a stranger cannot leave or view the sharing page
+  - id: member_change_flashes_shown
+    kind: happy_path
+    description: Changing a role or removing a member flashes flash.message on the Sharing page, which toasts it.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/SharingFlashMessagesTest.php::changing a member role flashes a confirmation on the sharing page
+      - tests/Feature/Sharing/SharingFlashMessagesTest.php::removing a member flashes a confirmation on the sharing page
+      - 'tests/playwright/sharing.spec.js::owner invites a viewer who accepts, is promoted to editor, adds a transaction and is removed'
   - id: sharing_ui_end_to_end
     kind: happy_path
     description: The Sharing page and read-only dashboard render correctly for each role in a browser.

@@ -6,7 +6,9 @@
  *   which depends on external services and the account's institutions;
  * - the browser's own /favicon.ico request (public/favicon.ico is an empty
  *   file, which Herd's nginx answers with a 404);
- * - the 409 location visit that plaid.js's guard answers budget creation with.
+ * - the 409 location visit that plaid.js's guard answers budget creation with;
+ * - Herd's dev tooling (/herd-studio/*), injected into every page by Herd's
+ *   nginx on the local site, not part of the app.
  */
 function isIgnoredResourceFailure(msg, appOrigin) {
     if (!msg.text().startsWith('Failed to load resource')) {
@@ -20,6 +22,7 @@ function isIgnoredResourceFailure(msg, appOrigin) {
     return (
         parsed.origin !== appOrigin ||
         parsed.pathname === '/favicon.ico' ||
+        parsed.pathname.startsWith('/herd-studio/') ||
         (parsed.pathname === '/budgets' && msg.text().includes('status of 409'))
     );
 }

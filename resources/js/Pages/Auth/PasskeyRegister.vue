@@ -361,7 +361,9 @@ const registerPasskey = async () => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(credentialData),
+      // The typed name becomes the passkey's alias; blank lets the server
+      // name it from the device.
+      body: JSON.stringify({ ...credentialData, name: passkeyName.value.trim() || null }),
     });
 
     console.log('Register response status:', registerResponse.status);

@@ -53,7 +53,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [AUTH-006](journeys/auth/AUTH-006-sign-out.yaml) | User signs out and the device is forgotten | high | yes | yes | yes | missing | missing | yes | **covered** |
 | [AUTH-007](journeys/auth/AUTH-007-passkey-enforcement.yaml) | Signed-in user without a passkey is forced to enrol one | critical | yes | yes | yes | missing | yes | yes | **covered** |
 | [AUTH-008](journeys/auth/AUTH-008-guest-redirected-to-login.yaml) | Unauthenticated visitor is redirected to sign in | high | yes | yes | yes | yes | missing | no | **covered** |
-| [AUTH-009](journeys/auth/AUTH-009-csrf-session-refresh.yaml) | Stale CSRF token is re-synced so writes keep working | high | yes | yes | n/a | missing | yes | yes | **covered** |
+| [AUTH-009](journeys/auth/AUTH-009-csrf-session-refresh.yaml) | Stale CSRF token is re-synced so writes keep working | high | yes | yes | n/a | yes | yes | yes | **covered** |
 | [AUTH-010](journeys/auth/AUTH-010-verify-email.yaml) | User verifies their email address | low | yes | yes | yes | yes | missing | no | **covered** |
 | [AUTH-011](journeys/auth/AUTH-011-manage-passkeys.yaml) | User adds, renames and removes passkeys | high | yes | yes | yes | yes | missing | yes | **covered** |
 | [AUTH-012](journeys/auth/AUTH-012-manage-trusted-devices.yaml) | User reviews and revokes trusted devices | high | yes | yes | yes | missing | yes | no | **covered** |
@@ -363,13 +363,13 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **SHARE-001** Owner invites someone to a budget and they join _(implemented, critical)_
   - Routes: `budgets.invitations.store`, `budgets.invitations.destroy`, `invitations.show`, `invitations.accept`, `register`, `POST /register`
-  - Tests: `tests/Feature/Auth/InvitationRegistrationTest.php`, `tests/Feature/Sharing/BudgetInvitationTest.php`, `tests/playwright/sharing.spec.js`
+  - Tests: `tests/Feature/Auth/InvitationRegistrationTest.php`, `tests/Feature/Sharing/BudgetInvitationTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`, `tests/playwright/sharing.spec.js`
 - **SHARE-002** Owner manages budget members and their roles _(implemented, critical)_
   - Routes: `budgets.sharing.index`, `budgets.members.update`, `budgets.members.destroy`
-  - Tests: `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/Feature/Sharing/BudgetRoleMatrixTest.php`, `tests/playwright/sharing.spec.js`
+  - Tests: `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/Feature/Sharing/BudgetRoleMatrixTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`, `tests/playwright/sharing.spec.js`
 - **SHARE-003** Member leaves a budget or the owner transfers primary ownership _(implemented, high)_
   - Routes: `budgets.membership.leave`, `budgets.ownership.transfer`
-  - Tests: `tests/Feature/Sharing/BudgetMemberManagementTest.php`
+  - Tests: `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`
 
 ### transactions
 

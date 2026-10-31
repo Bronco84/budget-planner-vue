@@ -9,10 +9,7 @@ import { addVirtualAuthenticator, completePasskeyRegistration } from './support/
 /** The profile's Passkeys section. */
 const passkeysSection = (page) =>
     page.locator('section', { has: page.getByRole('heading', { name: 'Passkeys', exact: true }) });
-/**
- * Listed passkeys. The name typed at registration is not saved; each gets a
- * device-derived alias instead (WebAuthnCredentialObserver; see AUTH-011 known_issues).
- */
+/** Listed passkeys, by alias (the name typed at registration, else a device-derived one). */
 const listedPasskeys = (page) => passkeysSection(page).locator('h4');
 
 test('a new account must enrol a passkey and then continues to its budgets', async ({ throwawayUser }) => {
@@ -23,7 +20,8 @@ test('a new account must enrol a passkey and then continues to its budgets', asy
     await expect(user.page).toHaveURL(/\/budgets\/create$/);
 
     await user.page.goto('/profile');
-    await expect(listedPasskeys(user.page)).toHaveCount(1);
+    // Named with what was typed at registration.
+    await expect(listedPasskeys(user.page)).toHaveText(['E2E virtual authenticator']);
     expect(user.errors).toEqual([]);
 });
 
@@ -43,6 +41,8 @@ test('a passkey added from the profile returns to the profile', async ({ throwaw
 
     await completePasskeyRegistration(page, /^\/profile$/, 'E2E second device');
     await expect(listedPasskeys(page)).toHaveCount(2);
+    // The typed name is saved as the new passkey's alias.
+    await expect(listedPasskeys(page).filter({ hasText: /^E2E second device$/ })).toHaveCount(1);
     expect((await secondDevice.credentials()).length).toBe(1);
     expect(errors).toEqual([]);
 });

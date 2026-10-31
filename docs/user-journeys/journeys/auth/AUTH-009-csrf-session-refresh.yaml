@@ -55,6 +55,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/CsrfTokenSyncTest.php::the shared token follows a session token rotation
+  - id: partial_reload_keeps_live_token
+    kind: alternate
+    description: A partial reload (router.reload({ only })) still returns the live csrf_token (shared with Inertia::always), so the router 'success' re-sync never restores a stale token over one the 419 retry just refreshed.
+    coverage: covered
+    tests:
+      - tests/Feature/CsrfTokenSyncTest.php::a partial reload still shares the live csrf token
+      - 'tests/playwright/csrf.spec.js::a partial reload keeps the refreshed CSRF token instead of restoring the stale one'
   - id: refresh_endpoint_returns_token
     kind: happy_path
     description: GET /csrf-token returns the session token as JSON.
@@ -89,8 +96,7 @@ scenarios:
     description: The token endpoint is intentionally public; it only reveals the caller's own session token.
     coverage: not_applicable
     note: no resource ownership; same-origin policy prevents other sites reading the response.
-known_issues:
-  - "A partial reload (router.reload({ only })) doesn't return the shared csrf_token prop, but Inertia keeps the merged stale value and the router 'success' handler re-applies it, overwriting a token just refreshed by the 419 retry. E.g. after reordering account types (PREF-001) every later write 419s once and is retried."
+known_issues: []
 confidence: medium
 evidence:
   - routes/web.php /csrf-token closure

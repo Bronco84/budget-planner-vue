@@ -44,6 +44,10 @@ class BudgetController extends Controller
      */
     public function index(Request $request): Response|RedirectResponse
     {
+        // This only redirects, so keep any flash (e.g. "You left the budget ...")
+        // for the page the user actually lands on.
+        $request->session()->reflash();
+
         // A guest who opened an invitation link and then signed in is sent back to it.
         if ($pendingInvitation = $request->session()->pull(BudgetInvitationController::PENDING_SESSION_KEY)) {
             return redirect()->to($pendingInvitation);

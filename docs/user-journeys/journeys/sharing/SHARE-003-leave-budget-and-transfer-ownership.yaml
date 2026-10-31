@@ -22,9 +22,11 @@ depends_on:
     reason: leave (successor selection, last-owner guard) and transferOwnership
   - path: resources/js/Pages/Budgets/Sharing.vue
     reason: Leave budget and Make primary owner actions
+  - path: app/Http/Controllers/BudgetController.php
+    reason: budgets.index redirect after leaving; reflashes so the leave confirmation reaches the landing page
 steps:
   - action: member clicks Leave budget (DELETE budgets/{budget}/membership)
-    expected: pivot row removed, redirect to budgets.index (which falls back to another budget)
+    expected: pivot row removed, redirect to budgets.index (which falls back to another budget or the create page, keeping the flash) and the "You left ..." flash is toasted there
   - action: primary owner clicks Make primary owner on a member (POST budgets/{budget}/transfer-ownership)
     expected: budgets.user_id becomes that member (their pivot row removed); the previous primary owner becomes an owner member
 postconditions:
@@ -71,6 +73,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Sharing/BudgetMemberManagementTest.php::a stranger cannot leave or view the sharing page
+  - id: leave_flash_survives_redirect
+    kind: alternate
+    description: The "You left ..." flash survives the budgets.index redirect (reflash) and reaches the dashboard of another budget, or the create page when none is left.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/SharingFlashMessagesTest.php::leaving a budget keeps the confirmation through the budgets index redirect
+      - tests/Feature/Sharing/SharingFlashMessagesTest.php::leaving the only budget you can access keeps the confirmation on the create page
   - id: invalid_transfer_target
     kind: validation
     description: A transfer to someone who is not a member fails validation.

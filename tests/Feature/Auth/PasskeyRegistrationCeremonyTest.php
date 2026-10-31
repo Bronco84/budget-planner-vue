@@ -109,3 +109,50 @@ test('an attestation for a different origin or challenge is rejected and stores 
     'insecure origin' => ['http://budget-planner-vue.test', false],
     'wrong challenge' => [WEBAUTHN_TEST_ORIGIN, true],
 ]);
+
+test('the passkey name typed at registration is saved as its alias', function () {
+    $user = User::factory()->create();
+    $options = $this->actingAs($user)->postJson(route('webauthn.register.options'))->assertOk()->json();
+    $authenticator = new SoftwareAuthenticator;
+
+    $this->actingAs($user)
+        ->postJson(route('webauthn.register'), [
+            ...$authenticator->attest($options, WEBAUTHN_TEST_ORIGIN),
+            'name' => '  Work laptop  ',
+        ])
+        ->assertNoContent();
+
+    expect(WebAuthnCredential::findOrFail($authenticator->credentialId())->alias)->toBe('Work laptop');
+});
+
+test('a blank passkey name falls back to the device name', function () {
+    $user = User::factory()->create();
+    $options = $this->actingAs($user)->postJson(route('webauthn.register.options'))->assertOk()->json();
+    $authenticator = new SoftwareAuthenticator;
+
+    $this->actingAs($user)
+        ->withHeader('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36')
+        ->postJson(route('webauthn.register'), [
+            ...$authenticator->attest($options, WEBAUTHN_TEST_ORIGIN),
+            'name' => '   ',
+        ])
+        ->assertNoContent();
+
+    expect(WebAuthnCredential::findOrFail($authenticator->credentialId())->alias)->toBe('Computer - macOS - Chrome');
+});
+
+test('an over-long passkey name is rejected and nothing is saved', function () {
+    $user = User::factory()->create();
+    $options = $this->actingAs($user)->postJson(route('webauthn.register.options'))->assertOk()->json();
+    $authenticator = new SoftwareAuthenticator;
+
+    $this->actingAs($user)
+        ->postJson(route('webauthn.register'), [
+            ...$authenticator->attest($options, WEBAUTHN_TEST_ORIGIN),
+            'name' => str_repeat('a', 256),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('name');
+
+    expect(WebAuthnCredential::count())->toBe(0);
+});

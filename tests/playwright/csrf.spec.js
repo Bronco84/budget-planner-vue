@@ -67,8 +67,7 @@ test('a fetch write with a rotated CSRF token is replayed once with a fresh toke
 
     await expect(groupTitles).toHaveText(['Savings Accounts', 'Checking Accounts']);
 
-    // The replayed save persisted. (The refreshed token does not stick: the partial
-    // reload that follows re-applies the stale csrf_token prop; see AUTH-009 known_issues.)
+    // The replayed save persisted.
     await page.reload();
     await expect(groupTitles).toHaveText(['Savings Accounts', 'Checking Accounts']);
 
@@ -149,6 +148,34 @@ test('an Inertia visit answered with 419 reloads the page instead of leaving it 
     await page.unroute(recurring);
     await page.getByRole('link', { name: 'Recurring', exact: true }).click();
     await expect(page.getByText('No recurring transactions have been set up yet.')).toBeVisible();
+
+    expect(errors).toEqual([]);
+});
+
+test('a partial reload keeps the refreshed CSRF token instead of restoring the stale one', async ({ throwawayUser }) => {
+    const { user, page, errors } = await ownerWithTwoAccountTypes(throwawayUser);
+    errors.allow(/status of 419 .*\/api\/preferences\/account-type-order\)$/);
+    const handle = (title) => page.locator('.drag-handle', { hasText: title });
+
+    const staleToken = await rotateSessionToken(page, user.email);
+
+    // The drag's save 419s, refreshes the token and replays; then the page
+    // partially reloads (only: [...]). That reload must hand back the live token.
+    const reloaded = page.waitForResponse((r) => !!r.request().headers()['x-inertia-partial-data']);
+    await handle('Savings Accounts').dragTo(handle('Checking Accounts'));
+    const partial = await (await reloaded).json();
+    const { csrf_token: liveToken } = await (await page.request.get('/csrf-token')).json();
+    expect(partial.props.csrf_token).toBe(liveToken);
+    await expect(page.locator('meta[name="csrf-token"]')).toHaveAttribute('content', liveToken);
+    expect(liveToken).not.toBe(staleToken);
+
+    // So the next write goes straight through, with no 419 and no refresh.
+    const seen = recordResponses(page, /^\/(csrf-token|api\/preferences\/account-type-order)$/);
+    const status = await page.evaluate(async () =>
+        (await window.axios.post('/api/preferences/account-type-order', { order: ['checking', 'savings'] })).status,
+    );
+    expect(status).toBe(200);
+    expect(seen).toEqual(['POST /api/preferences/account-type-order 200']);
 
     expect(errors).toEqual([]);
 });

@@ -201,6 +201,7 @@ import { computed } from 'vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps({
   budget: { type: Object, required: true },
@@ -213,12 +214,21 @@ const props = defineProps({
 });
 
 const page = usePage();
+const toast = useToast();
 const errors = computed(() => page.props.errors || {});
 
 const inviteForm = useForm({
   email: '',
   role: 'viewer',
 });
+
+// Show the outcome each action flashes (flash.message / flash.error). After
+// leaving, this runs once the page the user lands on has rendered.
+const showFlash = (visited) => {
+  const { message, error } = visited.props.flash || {};
+  if (message) toast.success(message);
+  if (error) toast.error(error);
+};
 
 const article = (role) => (role === 'editor' || role === 'owner' ? 'an' : 'a');
 
@@ -233,31 +243,34 @@ const formatDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month:
 const invite = () => {
   inviteForm.post(route('budgets.invitations.store', props.budget.id), {
     preserveScroll: true,
-    onSuccess: () => inviteForm.reset('email'),
+    onSuccess: (visited) => {
+      inviteForm.reset('email');
+      showFlash(visited);
+    },
   });
 };
 
 const changeRole = (member, role) => {
-  router.patch(route('budgets.members.update', [props.budget.id, member.id]), { role }, { preserveScroll: true });
+  router.patch(route('budgets.members.update', [props.budget.id, member.id]), { role }, { preserveScroll: true, onSuccess: showFlash });
 };
 
 const removeMember = (member) => {
   if (!confirm(`Remove ${member.name} from this budget?`)) return;
-  router.delete(route('budgets.members.destroy', [props.budget.id, member.id]), { preserveScroll: true });
+  router.delete(route('budgets.members.destroy', [props.budget.id, member.id]), { preserveScroll: true, onSuccess: showFlash });
 };
 
 const transferOwnership = (member) => {
   if (!confirm(`Make ${member.name} the primary owner? You will stay on as an owner.`)) return;
-  router.post(route('budgets.ownership.transfer', props.budget.id), { user_id: member.id }, { preserveScroll: true });
+  router.post(route('budgets.ownership.transfer', props.budget.id), { user_id: member.id }, { preserveScroll: true, onSuccess: showFlash });
 };
 
 const revokeInvitation = (invitation) => {
   if (!confirm(`Revoke the invitation for ${invitation.email}?`)) return;
-  router.delete(route('budgets.invitations.destroy', [props.budget.id, invitation.id]), { preserveScroll: true });
+  router.delete(route('budgets.invitations.destroy', [props.budget.id, invitation.id]), { preserveScroll: true, onSuccess: showFlash });
 };
 
 const leave = () => {
   if (!confirm(`Leave "${props.budget.name}"?`)) return;
-  router.delete(route('budgets.membership.leave', props.budget.id));
+  router.delete(route('budgets.membership.leave', props.budget.id), { onSuccess: showFlash });
 };
 </script>

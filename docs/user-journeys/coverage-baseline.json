@@ -142,6 +142,7 @@
         "AUTH-009": {
             "inertia_shares_live_token": "covered",
             "shared_token_follows_rotation": "covered",
+            "partial_reload_keeps_live_token": "covered",
             "refresh_endpoint_returns_token": "covered",
             "axios_419_retry": "covered",
             "inertia_419_reload": "covered",
@@ -163,6 +164,8 @@
             "add_additional_passkey": "covered",
             "duplicate_credential_rejected": "covered",
             "add_passkey_returns_to_profile": "covered",
+            "registration_name_saved": "covered",
+            "registration_name_too_long": "covered",
             "rename_passkey": "covered",
             "delete_passkey": "covered",
             "rename_requires_name": "covered",
@@ -723,6 +726,7 @@
             "invalid_invite_input_rejected": "covered",
             "invites_rate_limited": "covered",
             "mail_failure_reported": "covered",
+            "outcome_flashes_shown": "covered",
             "invitation_ui_end_to_end": "covered"
         },
         "SHARE-002": {
@@ -737,6 +741,7 @@
             "role_reflected_in_ui_props": "covered",
             "legacy_admin_is_owner": "covered",
             "stranger_cannot_view_sharing": "covered",
+            "member_change_flashes_shown": "covered",
             "sharing_ui_end_to_end": "covered"
         },
         "SHARE-003": {
@@ -746,6 +751,7 @@
             "last_owner_cannot_leave": "covered",
             "transfer_restricted": "covered",
             "stranger_cannot_leave": "covered",
+            "leave_flash_survives_redirect": "covered",
             "invalid_transfer_target": "covered"
         },
         "TRANSFER-001": {

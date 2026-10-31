@@ -6,6 +6,7 @@ use App\Models\Budget;
 use App\Models\Category;
 use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -40,7 +41,10 @@ class HandleInertiaRequests extends Middleware
             // regenerated (passkey login, magic link, logout) and the app keeps
             // navigating client-side. Ship the live token on every Inertia
             // response so the client can re-sync — see resources/js/app.js.
-            'csrf_token' => $request->session()->token(),
+            // always(): partial reloads (only: [...]) must carry it too, or
+            // Inertia keeps the previous page's stale value and app.js writes
+            // it back over a token the 419 retry just refreshed.
+            'csrf_token' => Inertia::always(fn () => $request->session()->token()),
             'auth' => [
                 'user' => $request->user(),
             ],

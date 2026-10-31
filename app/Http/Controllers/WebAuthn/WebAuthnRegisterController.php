@@ -42,6 +42,12 @@ class WebAuthnRegisterController
      */
     public function register(AttestedRequest $request): Response|JsonResponse
     {
+        // The optional name typed on the registration page. Blank leaves the
+        // alias to WebAuthnCredentialObserver, which names it from the device.
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+        ]);
+
         try {
             // Ensure user is authenticated
             if (! Auth::check()) {
@@ -56,7 +62,8 @@ class WebAuthnRegisterController
             ]);
 
             // Save the WebAuthn credential
-            $credential = $request->save();
+            // forceFill: alias is not fillable on Laragear's model.
+            $credential = $request->save(array_filter(['alias' => $validated['name'] ?? null]));
 
             \Log::info('Passkey credential saved', [
                 'user_id' => $user->id,

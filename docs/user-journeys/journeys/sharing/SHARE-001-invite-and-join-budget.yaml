@@ -140,6 +140,15 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Sharing/BudgetInvitationTest.php::a failed invitation email is reported without losing the invitation
+      - tests/Feature/Sharing/SharingFlashMessagesTest.php::a failed invitation email flashes an error on the sharing page
+  - id: outcome_flashes_shown
+    kind: happy_path
+    description: Sending and revoking an invitation flash flash.message on the Sharing page, which toasts it; accepting toasts the "You joined ..." flash on the budget dashboard.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/SharingFlashMessagesTest.php::sending an invitation flashes a confirmation on the sharing page
+      - tests/Feature/Sharing/SharingFlashMessagesTest.php::revoking an invitation flashes a confirmation on the sharing page
+      - 'tests/playwright/sharing.spec.js::owner invites a viewer who accepts, is promoted to editor, adds a transaction and is removed'
   - id: invitation_ui_end_to_end
     kind: happy_path
     description: Sharing page and invitation landing page render and drive the flow in a browser.
@@ -148,7 +157,6 @@ scenarios:
       - 'tests/playwright/sharing.spec.js::owner invites a viewer who accepts, is promoted to editor, adds a transaction and is removed'
     note: Local-only E2E (throwaway owner and invitee); the invitation link is read from the email in Herd's local mail store. Covers the existing-user path; registering through the link is feature-tested only.
 known_issues:
-  - "Sharing.vue renders no flash messages, so the owner gets no \"Invitation sent\" confirmation (only the pending list updates) and the mail_failure_reported error flash is never shown; the dashboard doesn't show the invitee's \"You joined ...\" flash either."
   - "Invitation emails are sent synchronously; a slow mail transport delays the owner's request."
 confidence: high
 evidence:

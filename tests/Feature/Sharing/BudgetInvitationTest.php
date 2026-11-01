@@ -184,6 +184,18 @@ test('invitations require a valid email and role', function () {
     expect(BudgetInvitation::count())->toBe(0);
 });
 
+test('an invitation email with a CRLF header injection is rejected and nothing is sent', function () {
+    $this->actingAs($this->owner)
+        ->post(route('budgets.invitations.store', $this->budget), [
+            'email' => "\"a\r\nBcc: victim@example.com\"@example.com",
+            'role' => 'editor',
+        ])
+        ->assertSessionHasErrors('email');
+
+    expect(BudgetInvitation::count())->toBe(0);
+    Mail::assertNothingSent();
+});
+
 test('re-inviting the same email replaces the pending invitation', function () {
     $first = inviteToBudget($this->budget, $this->owner, 'erin@example.com', 'viewer');
     $second = inviteToBudget($this->budget, $this->owner, 'erin@example.com', 'editor');

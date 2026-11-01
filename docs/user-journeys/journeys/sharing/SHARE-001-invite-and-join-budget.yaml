@@ -123,11 +123,12 @@ scenarios:
       - tests/Feature/Auth/InvitationRegistrationTest.php::an invitation token registers only one account
   - id: invalid_invite_input_rejected
     kind: validation
-    description: Invalid email or role, or an email that already belongs to a member, is rejected without sending mail.
+    description: Invalid email or role, or an email that already belongs to a member (including a quoted local part carrying CRLF header injection), is rejected without sending mail.
     coverage: covered
     tests:
       - tests/Feature/Sharing/BudgetInvitationTest.php::invitations require a valid email and role
       - tests/Feature/Sharing/BudgetInvitationTest.php::inviting someone who is already a member is rejected and no email is sent
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an invitation email with a CRLF header injection is rejected and nothing is sent
   - id: invites_rate_limited
     kind: edge
     description: More than 10 invitations a minute are throttled (429).

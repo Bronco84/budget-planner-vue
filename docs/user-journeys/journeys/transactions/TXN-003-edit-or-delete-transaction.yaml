@@ -33,7 +33,7 @@ postconditions:
 business_rules:
   - same validation as create, scoped to the budget (category_id must belong to the budget)
   - a legacy unlinked category string is offered as its own option and kept when saved unchanged
-  - transfer legs (transfer_id set) cannot be updated or deleted here; the request redirects to the transfer's edit page with an error flash and nothing changes
+  - transfer legs (transfer_id set) cannot be updated or deleted here; the request redirects to the transfer's edit page with an error flash (toasted by Transactions/Edit on the visit's success) and nothing changes
 scenarios:
   - id: edit_page_renders
     kind: happy_path

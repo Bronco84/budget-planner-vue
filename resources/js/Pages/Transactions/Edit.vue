@@ -309,7 +309,10 @@ const form = useForm({
 // Form submission
 const submit = () => {
   form.patch(route('budget.transaction.update', [props.budget.id, props.transaction.id]), {
-    onSuccess: () => {
+    onSuccess: (visited) => {
+      // A transfer leg is refused with a redirect to the transfer's edit
+      // page and a flashed error; show it (and the success message) there.
+      toast.flash(visited);
       // Reload activity log to show the update
       loadActivities();
     }
@@ -327,7 +330,9 @@ const confirmDelete = async () => {
   });
   
   if (confirmed) {
-    router.delete(route('budget.transaction.destroy', [props.budget.id, props.transaction.id]));
+    router.delete(route('budget.transaction.destroy', [props.budget.id, props.transaction.id]), {
+      onSuccess: (visited) => toast.flash(visited),
+    });
   }
 };
 

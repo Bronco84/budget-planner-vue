@@ -205,7 +205,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Calendar/CalendarConnectionTest.php`, `tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php`
 - **CALENDAR-002** User syncs, enables/disables or removes a calendar connection _(implemented, medium)_
   - Routes: `calendar.connections.sync`, `calendar.connections.toggle`, `calendar.connections.destroy`
-  - Tests: `tests/Feature/Calendar/CalendarConnectionTest.php`, `tests/Feature/Calendar/CalendarSyncTokenRefreshTest.php`
+  - Tests: `tests/Feature/Calendar/CalendarConnectionTest.php`, `tests/Feature/Calendar/CalendarSyncTokenRefreshTest.php`, `tests/Feature/Calendar/GoogleCalendarSyncTest.php`
 - **CALENDAR-003** User views the financial calendar for a month _(implemented, medium)_
   - Routes: `calendar.index`
   - Tests: `tests/Feature/Calendar/CalendarMonthContentsTest.php`, `tests/Feature/Calendar/CalendarMonthValidationTest.php`, `tests/Feature/Calendar/CalendarRecurrenceTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`

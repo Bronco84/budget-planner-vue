@@ -37,6 +37,8 @@ business_rules:
   - only the owning user may sync, toggle or delete a connection
   - sync failures flash a generic "Sync failed. Please try again."; the exception is only logged
   - an expired token without a refresh token fails with "No refresh token available"
+  - sync reads every events.list page; only after the whole window is listed are the connection's stored events in that window that Google no longer returned (deleted, cancelled or moved out) removed
+  - a sync that fails part-way removes nothing
 scenarios:
   - id: sync_connection
     kind: happy_path
@@ -44,6 +46,19 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Calendar/CalendarConnectionTest.php::the owner can sync a calendar connection
+  - id: sync_removes_deleted_events
+    kind: happy_path
+    description: Events deleted or cancelled in Google disappear locally on the next sync; all pages are read first, and other connections' events are untouched.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/GoogleCalendarSyncTest.php::sync walks every page and removes window events that google no longer returns
+      - tests/Feature/Calendar/GoogleCalendarSyncTest.php::pruning only touches the syncing connection
+  - id: partial_listing_keeps_events
+    kind: recovery
+    description: A Google failure on a later page fails the sync without deleting any stored event.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/GoogleCalendarSyncTest.php::a failed page leaves stored events untouched
   - id: toggle_connection
     kind: happy_path
     description: The owner toggles a connection active/inactive.

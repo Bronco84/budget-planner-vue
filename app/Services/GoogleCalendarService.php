@@ -138,19 +138,35 @@ class GoogleCalendarService
         ];
 
         try {
-            $events = $calendar->events->listEvents($connection->calendar_id, $optParams);
             $syncedCount = 0;
+            $seenEventIds = [];
 
-            foreach ($events->getItems() as $event) {
-                $this->syncEvent($connection, $event);
-                $syncedCount++;
-            }
+            // Walk every page: events.list returns at most 250 items per page,
+            // and the prune below is only safe once the whole window is known.
+            do {
+                $events = $calendar->events->listEvents($connection->calendar_id, $optParams);
+
+                foreach ($events->getItems() as $event) {
+                    if ($event->getStatus() === 'cancelled') {
+                        continue;
+                    }
+
+                    $this->syncEvent($connection, $event);
+                    $seenEventIds[] = $event->getId();
+                    $syncedCount++;
+                }
+
+                $optParams['pageToken'] = $events->getNextPageToken();
+            } while ($optParams['pageToken']);
+
+            $deletedCount = $this->deleteRemovedEvents($connection, $seenEventIds, $startDate, $endDate);
 
             $connection->markSynced();
 
             Log::info('Google Calendar sync completed', [
                 'connection_id' => $connection->id,
                 'events_synced' => $syncedCount,
+                'events_deleted' => $deletedCount,
             ]);
 
             return $syncedCount;
@@ -206,30 +222,20 @@ class GoogleCalendarService
     }
 
     /**
-     * Delete events that were removed from Google Calendar.
+     * Delete this connection's events in the synced window that Google no
+     * longer returned (deleted, cancelled or moved out of the window). Only
+     * call this after a complete listing of that window.
+     *
+     * @param  array<int, string>  $seenEventIds
      */
-    public function deleteRemovedEvents(CalendarConnection $connection): int
+    protected function deleteRemovedEvents(CalendarConnection $connection, array $seenEventIds, Carbon $startDate, Carbon $endDate): int
     {
-        $this->refreshTokenIfNeeded($connection);
-
-        $this->client->setAccessToken($connection->access_token);
-        $calendar = new GoogleCalendar($this->client);
-
-        $deletedCount = 0;
-        $localEvents = $connection->events;
-
-        foreach ($localEvents as $localEvent) {
-            try {
-                $calendar->events->get($connection->calendar_id, $localEvent->google_event_id);
-            } catch (\Google_Service_Exception $e) {
-                if ($e->getCode() === 404) {
-                    $localEvent->delete();
-                    $deletedCount++;
-                }
-            }
-        }
-
-        return $deletedCount;
+        return CalendarEvent::query()
+            ->where('calendar_connection_id', $connection->id)
+            ->where('start_date', '>=', $startDate)
+            ->where('start_date', '<', $endDate)
+            ->whereNotIn('google_event_id', $seenEventIds)
+            ->delete();
     }
 
     /**

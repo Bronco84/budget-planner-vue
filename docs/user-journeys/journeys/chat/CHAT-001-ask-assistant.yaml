@@ -52,6 +52,7 @@ postconditions:
   - the conversation contains the user message and the assistant reply
 business_rules:
   - message is required, max 2000 chars; conversation_id and budget_id must exist
+  - the panel sends one turn at a time; the send button and Enter do nothing from the start request until that reply's stream ends or fails, and each reply's deltas go to its own placeholder
   - the question is sent in the POST body, never in a URL; GET /chat/stream with a query string is not a route (405)
   - starting a stream with a budget the user cannot view (BudgetPolicy view) returns 403 before moderation
   - a stream id is 40 random characters, bound to the user who started it, single use (claimed atomically) and expires after 2 minutes; other users', reused, expired or unknown ids return 404

@@ -31,6 +31,8 @@ const currentBudgetId = computed(() => page.props.budget?.id ?? page.props.activ
 const messages = ref([]);
 const currentMessage = ref('');
 const isLoading = ref(false);
+// True from the start request until the reply's stream ends or fails; one turn at a time.
+const isSending = ref(false);
 const error = ref(null);
 const currentConversationId = ref(null);
 const conversations = ref([]);
@@ -172,9 +174,10 @@ const loadConversation = async (conversationId) => {
 };
 
 const sendMessage = async () => {
-    if (!currentMessage.value.trim()) {
+    if (!currentMessage.value.trim() || isSending.value) {
         return;
     }
+    isSending.value = true;
 
     // Sending is explicit intent to see the reply.
     isPinnedToBottom.value = true;
@@ -194,15 +197,29 @@ const sendMessage = async () => {
     messages.value.push(userMessage);
 
     // Create a placeholder for the assistant message
-    const assistantMessage = {
+    messages.value.push({
         role: 'assistant',
         content: '',
         created_at: new Date().toISOString(),
         streaming: true
-    };
-    messages.value.push(assistantMessage);
+    });
+
+    // Keep the reactive entries for this turn: deltas, completion and failure
+    // act on them, not on whatever happens to be last in the list by then.
+    const sentMessage = messages.value[messages.value.length - 2];
+    const placeholder = messages.value[messages.value.length - 1];
 
     const previousConversationId = currentConversationId.value;
+    // The conversation this turn belongs to, even if the user switches away mid-stream.
+    let turnConversationId = previousConversationId;
+
+    // Drop this turn's two messages (if still shown) and give the text back.
+    const discardTurn = () => {
+        messages.value = messages.value.filter(m => m !== sentMessage && m !== placeholder);
+        if (!currentMessage.value.trim()) {
+            currentMessage.value = messageText;
+        }
+    };
 
     try {
         // POST the question (kept out of URLs and server logs); moderation runs
@@ -248,18 +265,18 @@ const sendMessage = async () => {
         eventSource.addEventListener('conversation_id', (event) => {
             const data = JSON.parse(event.data);
             console.log('🆔 Got conversation ID:', data.conversation_id);
-            currentConversationId.value = data.conversation_id;
+            turnConversationId = data.conversation_id;
+            // Adopt it only if the user is still looking at this turn
+            if (currentConversationId.value === previousConversationId && messages.value.includes(placeholder)) {
+                currentConversationId.value = data.conversation_id;
+            }
         });
 
         // Handle text_delta events
         eventSource.addEventListener('text_delta', (event) => {
             const data = JSON.parse(event.data);
             console.log('📝 Got delta:', data.delta);
-            // Update the message directly in the reactive array
-            const lastMessage = messages.value[messages.value.length - 1];
-            if (lastMessage && lastMessage.role === 'assistant') {
-                lastMessage.content += data.delta;
-            }
+            placeholder.content += data.delta;
         });
 
         // Handle stream_end event
@@ -267,12 +284,9 @@ const sendMessage = async () => {
             const data = JSON.parse(event.data);
             console.log('🏁 Stream ended:', data.finish_reason);
 
-            // Mark as no longer streaming
-            const lastMessage = messages.value[messages.value.length - 1];
-            if (lastMessage && lastMessage.role === 'assistant') {
-                lastMessage.streaming = false;
-            }
+            placeholder.streaming = false;
             eventSource.close();
+            isSending.value = false;
 
             // Save the complete message to the database
             try {
@@ -283,8 +297,8 @@ const sendMessage = async () => {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        message: lastMessage ? lastMessage.content : '',
-                        conversation_id: currentConversationId.value
+                        message: placeholder.content,
+                        conversation_id: turnConversationId
                     })
                 });
 
@@ -317,30 +331,24 @@ const sendMessage = async () => {
 
             // The server discards a failed turn (and a conversation it just
             // created), so fall back to the conversation we started from.
-            currentConversationId.value = previousConversationId;
-            
-            // Mark as no longer streaming
-            const lastMessage = messages.value[messages.value.length - 1];
-            if (lastMessage && lastMessage.role === 'assistant') {
-                lastMessage.streaming = false;
+            if (currentConversationId.value === turnConversationId) {
+                currentConversationId.value = previousConversationId;
             }
-            eventSource.close();
 
-            // Remove the failed messages
-            messages.value.pop(); // assistant
-            messages.value.pop(); // user
-            // Restore the message to input
-            currentMessage.value = messageText;
+            placeholder.streaming = false;
+            eventSource.close();
+            isSending.value = false;
+
+            // Remove the failed messages and restore the text to the input
+            discardTurn();
         });
 
     } catch (err) {
         console.error('❌ Send error:', err);
         error.value = err.message || 'Failed to send message. Please try again.';
-        // Remove the failed messages
-        messages.value.pop(); // assistant
-        messages.value.pop(); // user
-        // Restore the message to input
-        currentMessage.value = messageText;
+        isSending.value = false;
+        // Remove the failed messages and restore the text to the input
+        discardTurn();
     }
 };
 
@@ -708,7 +716,7 @@ watch(isResizing, (newValue) => {
                 ></textarea>
                 <button
                     @click="sendMessage"
-                    :disabled="!currentMessage.trim()"
+                    :disabled="!currentMessage.trim() || isSending"
                     class="flex-shrink-0 p-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
                     title="Send message"
                 >

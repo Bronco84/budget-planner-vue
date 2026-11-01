@@ -779,14 +779,6 @@ class PlaidService
     }
 
     /**
-     * Find an existing active PlaidConnection for the given institution.
-     */
-    public function findConnectionByInstitution(Budget $budget, string $institutionName): ?PlaidConnection
-    {
-        return PlaidConnection::forInstitution($budget, $institutionName)->first();
-    }
-
-    /**
      * Link multiple Plaid accounts to budget accounts under a single connection.
      *
      * @param  array  $accountData  Array of [local_account, plaid_account_data] pairs
@@ -869,51 +861,6 @@ class PlaidService
                 'balance_updated_at' => now(),
             ]
         );
-    }
-
-    /**
-     * Link a Plaid account to an application account.
-     *
-     * @param  string|null  $institutionLogo  Base64-encoded logo from Plaid
-     * @param  string|null  $institutionUrl  Institution website URL
-     */
-    public function linkAccount(
-        Budget $budget,
-        Account $account,
-        string $accessToken,
-        string $plaidAccountId,
-        ?string $itemId = null,
-        ?string $institutionName = null,
-        ?string $institutionId = null,
-        ?string $institutionLogo = null,
-        ?string $institutionUrl = null
-    ): PlaidAccount {
-        // Ensure we have a valid item ID
-        if ($itemId === null || empty($itemId)) {
-            $itemId = 'plaid-item-'.uniqid();
-        }
-
-        // Get the account data from Plaid
-        $plaidAccounts = $this->getAccounts($accessToken);
-        $plaidAccountData = collect($plaidAccounts)->firstWhere('account_id', $plaidAccountId);
-
-        if (! $plaidAccountData) {
-            throw new \Exception("Plaid account {$plaidAccountId} not found");
-        }
-
-        // Create or find the PlaidConnection
-        $plaidConnection = $this->createOrFindConnection(
-            $budget,
-            $accessToken,
-            $itemId,
-            $institutionId,
-            $institutionName,
-            $institutionLogo,
-            $institutionUrl
-        );
-
-        // Link the account to the connection
-        return $this->linkAccountToConnection($plaidConnection, $account, $plaidAccountData);
     }
 
     /**

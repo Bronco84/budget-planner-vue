@@ -287,6 +287,57 @@ test('a pending transaction with a new Plaid id replaces its pending look-alike 
         ->and(Transaction::where('account_id', $account->id)->count())->toBe(3);
 });
 
+test('a sync only matches Plaid ids on its own account, never another budget\'s rows for the same Item', function () {
+    // Another budget once linked this Item; after unlinking, its imported rows keep their Plaid ids.
+    $otherBudget = Budget::factory()->create(['user_id' => $this->user->id]);
+    $otherAccount = Account::factory()->create(['budget_id' => $otherBudget->id, 'type' => 'checking']);
+    $otherPosted = Transaction::create([
+        'budget_id' => $otherBudget->id, 'account_id' => $otherAccount->id, 'description' => 'KEEP ME',
+        'category' => 'Mine', 'amount_in_cents' => -100, 'date' => '2026-03-01',
+        'plaid_transaction_id' => 'tx-shared', 'is_plaid_imported' => true,
+    ]);
+    $otherPending = Transaction::create([
+        'budget_id' => $otherBudget->id, 'account_id' => $otherAccount->id, 'description' => 'BAKERY',
+        'category' => 'Food', 'amount_in_cents' => -300, 'date' => '2026-03-10',
+        'plaid_transaction_id' => 'tx-shared-pending', 'is_plaid_imported' => true,
+    ]);
+
+    // The same Item is now linked in this budget.
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => [
+            [
+                'transaction_id' => 'tx-shared', 'account_id' => 'plaid-checking', 'amount' => 12.34,
+                'date' => '2026-03-02', 'name' => 'Corner Hardware', 'pending' => false, 'category' => ['Shops'],
+            ],
+            [
+                'transaction_id' => 'tx-shared-posted', 'account_id' => 'plaid-checking', 'amount' => 3.00,
+                'date' => '2026-03-11', 'name' => 'BAKERY', 'pending' => false,
+                'pending_transaction_id' => 'tx-shared-pending',
+            ],
+        ]])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 2 new and updated 0 transactions.');
+
+    // This budget gets its own rows.
+    expect(Transaction::where('account_id', $account->id)->pluck('plaid_transaction_id')->sort()->values()->all())
+        ->toBe(['tx-shared', 'tx-shared-posted'])
+        ->and(Transaction::where('account_id', $account->id)->where('plaid_transaction_id', 'tx-shared')->sole())
+        ->budget_id->toBe($this->budget->id)
+        ->description->toBe('Corner Hardware');
+
+    // The other budget's rows are neither updated nor deleted.
+    expect($otherPosted->fresh())
+        ->description->toBe('KEEP ME')
+        ->amount_in_cents->toBe(-100)
+        ->and($otherPending->fresh()?->plaid_transaction_id)->toBe('tx-shared-pending');
+});
+
 test('a sync holds the connection lock while it imports, so concurrent syncs cannot insert the same transaction twice', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
     $lockKey = PlaidService::syncLockKey($plaidAccount);

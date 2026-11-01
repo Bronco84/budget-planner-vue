@@ -1083,8 +1083,12 @@ class PlaidService
                     ]
                 );
 
-                // Check if we already have a transaction for this Plaid transaction
-                $existingTransaction = Transaction::where('plaid_transaction_id', $transaction['transaction_id'])->first();
+                // Check if we already have a transaction for this Plaid transaction on this
+                // account: rows another budget imported from the same Item carry the same
+                // Plaid ids and are not ours to update.
+                $existingTransaction = Transaction::where('account_id', $plaidAccount->account_id)
+                    ->where('plaid_transaction_id', $transaction['transaction_id'])
+                    ->first();
 
                 if ($existingTransaction) {
                     // Update existing transaction
@@ -1170,7 +1174,8 @@ class PlaidService
                 if (isset($transaction['pending_transaction_id']) && ! empty($transaction['pending_transaction_id'])) {
                     // This is a settled transaction that was previously pending
                     // Find the transaction linked to the pending plaid transaction
-                    $pendingTransaction = Transaction::where('plaid_transaction_id', $transaction['pending_transaction_id'])
+                    $pendingTransaction = Transaction::where('account_id', $plaidAccount->account_id)
+                        ->where('plaid_transaction_id', $transaction['pending_transaction_id'])
                         ->first();
 
                     if ($pendingTransaction) {

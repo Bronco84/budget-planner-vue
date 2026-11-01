@@ -34,7 +34,7 @@ steps:
 postconditions:
   - template reflects the submitted values, or a duplicate exists, or the template is gone
 business_rules:
-  - update uses the same validation as store (frequency/day rules, bimonthly distinct days, amount required unless dynamic)
+  - update uses the same validation as store (frequency/day rules, bimonthly distinct days, amount required unless dynamic, inline regex rules must compile)
   - rules omitted from the update payload are deleted; rule ids not belonging to the template are ignored
   - submitted rules (new and existing) get priority = position in the payload + 1, matching store
   - duplicate copies the template and its rules in one DB transaction
@@ -91,6 +91,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateEditTest.php::updating with an invalid schedule or an end date before the start date is rejected
+  - id: update_rejects_invalid_regex_rule
+    kind: validation
+    description: Saving the template with an inline regex rule that does not compile is rejected and the rules are left unchanged.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::updating a template with a malformed regex rule is rejected
   - id: cross_budget_template_not_found
     kind: authorization
     description: A template from another budget addressed through the user's own budget returns 404 for edit and destroy.

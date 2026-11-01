@@ -47,6 +47,7 @@ business_rules:
   - average_amount (a dynamic template's starting average) is entered in dollars and stored in cents with the sign entered; it is the projected amount while a dynamic template has no matching transactions
   - the "Make Recurring" source transaction is linked with link_source manual; transactions linked by inline rules get link_source rule
   - end_date must be on or after start_date
+  - inline regex rules must carry a pattern preg_match can compile (same ValidRegexRulePattern check as the rules endpoints, RECUR-003)
   - create and store require the budget update ability; index requires view
 scenarios:
   - id: create_fixed_template
@@ -89,6 +90,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringTemplateCreateTest.php::a schedule missing its day for the chosen frequency is rejected
+  - id: inline_regex_rule_validated
+    kind: validation
+    description: An inline regex rule whose pattern does not compile (no delimiters, unbalanced group) is rejected against that rule's value and nothing is created; a valid pattern is saved.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::creating a template with a malformed regex rule is rejected
+      - tests/Feature/Recurring/RecurringTransactionRuleRegexTest.php::creating a template with a valid regex rule succeeds
   - id: amount_required_unless_dynamic
     kind: validation
     description: A non-dynamic template without an amount fails validation; a dynamic one is saved with amount_in_cents 0.

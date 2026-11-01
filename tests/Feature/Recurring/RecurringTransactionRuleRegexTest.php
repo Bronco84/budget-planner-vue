@@ -121,3 +121,55 @@ test('non regex rules are not subject to pattern validation', function () {
 
     expect($this->template->rules()->count())->toBe(1);
 });
+
+function regexTemplatePayload(array $rules): array
+{
+    return [
+        'description' => 'Netflix',
+        'amount' => -15.99,
+        'account_id' => test()->account->id,
+        'frequency' => 'monthly',
+        'start_date' => '2026-01-01',
+        'day_of_month' => 5,
+        'is_dynamic_amount' => false,
+        'rules' => $rules,
+    ];
+}
+
+test('creating a template with a malformed regex rule is rejected', function (string $pattern) {
+    $this->actingAs($this->user)
+        ->post(route('recurring-transactions.store', $this->budget), regexTemplatePayload([
+            ['field' => 'description', 'operator' => 'contains', 'value' => 'netflix('],
+            ['field' => 'description', 'operator' => 'regex', 'value' => $pattern],
+        ]))
+        ->assertRedirect()
+        ->assertSessionHasErrors('rules.1.value')
+        ->assertSessionDoesntHaveErrors('rules.0.value');
+
+    expect(RecurringTransactionTemplate::where('description', 'Netflix')->exists())->toBeFalse();
+})->with([
+    'unbalanced group' => ['/netflix(/'],
+    'no delimiters' => ['netflix'],
+]);
+
+test('creating a template with a valid regex rule succeeds', function () {
+    $this->actingAs($this->user)
+        ->post(route('recurring-transactions.store', $this->budget), regexTemplatePayload([
+            ['field' => 'description', 'operator' => 'regex', 'value' => '/^netflix\.com/'],
+        ]))
+        ->assertSessionHasNoErrors();
+
+    $template = RecurringTransactionTemplate::where('description', 'Netflix')->sole();
+    expect($template->rules()->pluck('value')->all())->toBe(['/^netflix\.com/']);
+});
+
+test('updating a template with a malformed regex rule is rejected', function () {
+    $this->actingAs($this->user)
+        ->patch(route('recurring-transactions.update', regexRuleParams()), regexTemplatePayload([
+            ['field' => 'description', 'operator' => 'regex', 'value' => '/[unterminated/'],
+        ]))
+        ->assertRedirect()
+        ->assertSessionHasErrors('rules.0.value');
+
+    expect($this->template->rules()->count())->toBe(0);
+});

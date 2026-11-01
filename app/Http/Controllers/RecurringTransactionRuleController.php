@@ -6,6 +6,7 @@ use App\Models\Budget;
 use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
+use App\Rules\ValidRegexRulePattern;
 use App\Services\RecurringTransactionService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -55,7 +56,7 @@ class RecurringTransactionRuleController extends Controller
         $validated = $request->validate([
             'field' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
             'operator' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
-            'value' => ['required', 'string', 'max:255', $this->validRegexPatternRule($request)],
+            'value' => ['required', 'string', 'max:255', new ValidRegexRulePattern],
             'is_case_sensitive' => 'boolean',
             'priority' => 'integer|min:1',
             'is_active' => 'boolean',
@@ -87,7 +88,7 @@ class RecurringTransactionRuleController extends Controller
         $validated = $request->validate([
             'field' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
             'operator' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
-            'value' => ['required', 'string', 'max:255', $this->validRegexPatternRule($request)],
+            'value' => ['required', 'string', 'max:255', new ValidRegexRulePattern],
             'is_case_sensitive' => 'boolean',
             'priority' => 'integer|min:1',
             'is_active' => 'boolean',
@@ -138,7 +139,7 @@ class RecurringTransactionRuleController extends Controller
         $validated = $request->validate([
             'field' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getFieldOptions())),
             'operator' => 'required|string|in:'.implode(',', array_keys(RecurringTransactionRule::getOperatorOptions())),
-            'value' => ['required', 'string', 'max:255', $this->validRegexPatternRule($request)],
+            'value' => ['required', 'string', 'max:255', new ValidRegexRulePattern],
             'is_case_sensitive' => 'boolean',
         ]);
 
@@ -335,26 +336,5 @@ class RecurringTransactionRuleController extends Controller
             ->where('date', '>=', now()->subDays(90)->toDateString())
             ->latest('date')
             ->get();
-    }
-
-    /**
-     * Validation rule rejecting regex rule values that preg_match cannot compile.
-     *
-     * The value is matched exactly as RecurringTransactionRule::matchesTransaction()
-     * uses it: a full pattern including delimiters, lowercased unless case sensitive.
-     */
-    private function validRegexPatternRule(Request $request): \Closure
-    {
-        return function (string $attribute, mixed $value, \Closure $fail) use ($request) {
-            if ($request->input('operator') !== RecurringTransactionRule::OPERATOR_REGEX || ! is_string($value)) {
-                return;
-            }
-
-            $pattern = $request->boolean('is_case_sensitive') ? $value : strtolower($value);
-
-            if (@preg_match($pattern, '') === false) {
-                $fail('The :attribute must be a valid regular expression including delimiters, e.g. /^netflix/.');
-            }
-        };
     }
 }

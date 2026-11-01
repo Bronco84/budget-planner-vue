@@ -8,6 +8,7 @@ use App\Models\PlaidTransaction;
 use App\Models\RecurringTransactionRule;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
+use App\Rules\ValidRegexRulePattern;
 use App\Services\RecurringTransactionService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
@@ -131,7 +132,7 @@ class RecurringTransactionController extends Controller
             'rules' => 'array',
             'rules.*.field' => 'required|string|in:description,amount,category',
             'rules.*.operator' => 'required|string|in:contains,equals,starts_with,ends_with,regex,greater_than,less_than',
-            'rules.*.value' => 'required|string|max:255',
+            'rules.*.value' => ['required', 'string', 'max:255', new ValidRegexRulePattern],
             'rules.*.is_case_sensitive' => 'boolean',
         ]);
 
@@ -301,7 +302,7 @@ class RecurringTransactionController extends Controller
             'rules.*.id' => 'nullable|integer|exists:recurring_transaction_rules,id',
             'rules.*.field' => 'required|string|in:description,amount,category',
             'rules.*.operator' => 'required|string|in:contains,equals,starts_with,ends_with,regex,greater_than,less_than',
-            'rules.*.value' => 'required|string|max:255',
+            'rules.*.value' => ['required', 'string', 'max:255', new ValidRegexRulePattern],
             'rules.*.is_case_sensitive' => 'boolean',
         ]);
 

@@ -436,6 +436,8 @@ class PlaidController extends Controller
         try {
             $institutionId = $validated['metadata']['institution']['institution_id'] ?? null;
             $institutionName = $validated['metadata']['institution']['name'];
+            /** @var PlaidConnection|null $previousConnection */
+            $previousConnection = $existingPlaidAccount->plaidConnection;
 
             // Reuse a connection only for the same Plaid Item (never by institution:
             // another Item there has a different access token).
@@ -453,6 +455,8 @@ class PlaidController extends Controller
                     'account_id' => $account->id,
                     'connection_id' => $existingConnection->id,
                 ]);
+
+                $this->removeConnectionLeftEmpty($previousConnection, $existingConnection);
 
                 $syncError = $this->syncAfterLinking([$existingPlaidAccount->fresh()]);
 
@@ -486,6 +490,8 @@ class PlaidController extends Controller
                 'connection_id' => $plaidConnection->id,
             ]);
 
+            $this->removeConnectionLeftEmpty($previousConnection, $plaidConnection);
+
             $syncError = $this->syncAfterLinking([$existingPlaidAccount->fresh()]);
 
             return redirect()->route('budgets.show', $budget)
@@ -502,6 +508,32 @@ class PlaidController extends Controller
             $this->discardExchangedItem($accessToken, $itemId, $budget);
 
             return redirect()->back()->with('error', $this->userSafeError($e, 'Failed to re-link account. Please try again.'));
+        }
+    }
+
+    /**
+     * After a re-link moved an account off its previous connection, delete that
+     * connection and remove its Item at Plaid when no accounts are left on it, as
+     * unlinking does, so the stale Item stops being billed.
+     */
+    private function removeConnectionLeftEmpty(?PlaidConnection $previous, PlaidConnection $current): void
+    {
+        if (! $previous || $previous->id === $current->id || $previous->hasAccounts()) {
+            return;
+        }
+
+        Log::info('Cleaning up PlaidConnection left empty by a re-link', [
+            'connection_id' => $previous->id,
+            'institution_name' => $previous->institution_name,
+            'budget_id' => $previous->budget_id,
+        ]);
+
+        $previous->delete();
+
+        // Revoke the old access token at Plaid; a failure is logged, not shown. Never
+        // for the Item the account now uses, which would cut off the new connection.
+        if ($previous->plaid_item_id !== $current->plaid_item_id) {
+            $this->plaidService->removeConnectionItem($previous);
         }
     }
 

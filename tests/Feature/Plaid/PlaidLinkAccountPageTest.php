@@ -151,6 +151,7 @@ test('re-linking an account with a stale Plaid link onto an active connection re
     ]);
     $plaidAccount = plaidLinkPageLinkAccount($stale, $this->account);
     $active = plaidLinkPageConnection($this->budget, ['plaid_item_id' => 'item-fresh']);
+    $this->plaid->on('/item/remove', ['request_id' => 'req-remove']);
 
     $this->actingAs($this->user)
         ->post(route('plaid.store', [$this->budget, $this->account]), plaidLinkPagePayload())
@@ -158,13 +159,18 @@ test('re-linking an account with a stale Plaid link onto an active connection re
         ->assertSessionMissing('error')
         ->assertSessionHas('message', 'Account re-linked successfully to existing Tartan Bank connection.');
 
-    expect(PlaidConnection::count())->toBe(2)
+    expect(PlaidConnection::count())->toBe(1)
         ->and(PlaidAccount::count())->toBe(1)
         ->and($plaidAccount->fresh())
         ->plaid_connection_id->toBe($active->id)
         ->plaid_account_id->toBe('acc-fresh')
         ->current_balance_cents->toBe(41025)
         ->and($this->plaid->paths())->not->toContain('/institutions/get_by_id');
+
+    // The stale connection, now empty, is deleted and its Item removed at Plaid.
+    expect(PlaidConnection::find($stale->id))->toBeNull()
+        ->and($active->fresh())->not->toBeNull()
+        ->and($this->plaid->bodyFor('/item/remove'))->toBe(['access_token' => 'access-sandbox-existing']);
 });
 
 test('linking requires a public token, institution name and account id', function () {

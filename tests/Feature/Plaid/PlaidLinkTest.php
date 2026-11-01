@@ -31,7 +31,8 @@ beforeEach(function () {
             'type' => 'depository', 'subtype' => 'checking',
             'balances' => ['current' => 1234.56, 'available' => 1200.00],
         ]]])
-        ->on('/transactions/get', ['transactions' => []]);
+        ->on('/transactions/get', ['transactions' => []])
+        ->on('/item/remove', ['request_id' => 'req-remove']);
 });
 
 function plaidLinkPayload(): array
@@ -81,6 +82,39 @@ test('re-linking an account with a stale Plaid link creates a connection from th
         ->plaid_account_id->toBe('acc-checking-new')
         ->current_balance_cents->toBe(123456)
         ->and(PlaidAccount::count())->toBe(1);
+
+    // The stale connection is left with no accounts: it is deleted and its Item removed.
+    expect(PlaidConnection::find($stale->id))->toBeNull()
+        ->and($this->plaid->bodiesFor('/item/remove'))->toBe([['access_token' => 'access-sandbox-old']]);
+});
+
+test('re-linking keeps the previous connection and its Item while other accounts still use it', function () {
+    $stale = PlaidConnection::create([
+        'budget_id' => $this->budget->id,
+        'plaid_item_id' => 'item-old',
+        'institution_name' => 'First Platypus Bank',
+        'access_token' => 'access-sandbox-old',
+        'status' => PlaidConnection::STATUS_ERROR,
+    ]);
+    foreach ([$this->account, Account::factory()->savings()->create(['budget_id' => $this->budget->id])] as $i => $account) {
+        PlaidAccount::create([
+            'plaid_connection_id' => $stale->id,
+            'account_id' => $account->id,
+            'plaid_account_id' => "acc-old-{$i}",
+            'account_name' => 'Account',
+            'account_type' => 'depository',
+            'account_subtype' => 'checking',
+            'current_balance_cents' => 0,
+        ]);
+    }
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.store', [$this->budget, $this->account]), plaidLinkPayload())
+        ->assertSessionHas('message', 'Account re-linked to Plaid successfully.');
+
+    expect($stale->fresh())->not->toBeNull()
+        ->and($stale->plaidAccounts()->count())->toBe(1)
+        ->and($this->plaid->paths())->not->toContain('/item/remove');
 });
 
 test('linking an account reuses the active connection for the same Plaid item', function () {

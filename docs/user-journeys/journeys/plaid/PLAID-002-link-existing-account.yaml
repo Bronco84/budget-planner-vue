@@ -40,6 +40,7 @@ business_rules:
   - when an Item's connection is reused, the token just exchanged is stored on it, so syncs use the token the account was read with
   - if linking fails after the token exchange and no stored connection holds the new Item (by item id or token), the Item is removed at Plaid (/item/remove, best effort)
   - an account that already has a PlaidAccount is re-linked in place instead of duplicated
+  - when a re-link leaves the previous connection with no accounts, that connection is deleted and its Item removed at Plaid (/item/remove, best effort, skipped for the Item now in use), as unlinking the last account does; a previous connection still holding other accounts is kept
   - metadata.institution.institution_id and metadata.item.id (or metadata.item_id) are optional, validated and used for connection matching and creation; a missing item id gets a generated plaid-item-<uniqid> on the server (Link.vue sends null rather than inventing one)
   - a failed post-link transaction sync keeps the link and adds a user-safe error flash
   - the selected metadata.account.id must exist in Plaid's /accounts/get response or linking fails
@@ -83,6 +84,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidLinkTest.php::re-linking an account with a stale Plaid link creates a connection from the Link metadata
+      - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::re-linking an account with a stale Plaid link onto an active connection reuses it
+  - id: relink_removes_empty_previous_connection
+    kind: edge
+    description: Re-linking deletes the previous connection and removes its Item at Plaid once no accounts are left on it, so the stale Item stops being billed; a previous connection other accounts still use is kept and its Item left alone.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkTest.php::re-linking an account with a stale Plaid link creates a connection from the Link metadata
+      - tests/Feature/Plaid/PlaidLinkTest.php::re-linking keeps the previous connection and its Item while other accounts still use it
       - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::re-linking an account with a stale Plaid link onto an active connection reuses it
   - id: linked_page_shows_metadata
     kind: alternate

@@ -31,6 +31,8 @@ steps:
     expected: PayoffPlans/Create with availableCashFlow and debtAccounts (liabilities with a nonzero balance, current_balance_cents reported as abs(balance)); empty state when none
   - action: submit the wizard (POST .../payoff-plans)
     expected: existing active plans deactivated; plan, debts (starting balance = abs(account's current balance)) and goals (priority = order added) created; redirect to payoff-plans.show
+  - action: submit input the server rejects
+    expected: the wizard lists every validation message above the step and returns to the earliest step owning an error; the debts step requires a numeric APR and the goals step a goal name before Next
 postconditions:
   - exactly one active payoff plan exists for the budget (the new one)
 business_rules:

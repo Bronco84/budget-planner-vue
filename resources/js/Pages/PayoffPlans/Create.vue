@@ -56,6 +56,14 @@
 
           <form @submit.prevent="handleSubmit">
             <div class="p-6">
+              <!-- Server validation errors; the inputs they belong to may be on another step -->
+              <div v-if="hasErrors" class="mb-6 rounded-md bg-red-50 border border-red-200 p-4" role="alert">
+                <p class="text-sm font-medium text-red-800">The plan could not be created:</p>
+                <ul class="mt-2 list-disc pl-5 space-y-1 text-sm text-red-700">
+                  <li v-for="(message, field) in form.errors" :key="field">{{ message }}</li>
+                </ul>
+              </div>
+
               <!-- Step 1: Cash Flow Analysis -->
               <div v-if="currentStep === 0">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Cash Flow Analysis</h3>
@@ -659,12 +667,17 @@ const canProceed = computed(() => {
     return form.name && form.start_date;
   }
   if (currentStep.value === 1) {
+    // A cleared number input is '' (and '' >= 0 is true), so require a number
     return form.debts.length > 0 && form.debts.every(d =>
-      d.interest_rate >= 0 && d.minimum_payment_cents >= 0
+      typeof d.interest_rate === 'number' && d.interest_rate >= 0 && d.interest_rate <= 100
+        && d.minimum_payment_cents >= 0
     );
   }
   if (currentStep.value === 2) {
     return form.strategy && form.monthly_extra_payment_cents >= 0;
+  }
+  if (currentStep.value === 3) {
+    return form.goals.every(g => g.name && g.name.trim() !== '');
   }
   return true;
 });
@@ -745,7 +758,25 @@ const previousStep = () => {
   }
 };
 
+const hasErrors = computed(() => Object.keys(form.errors).length > 0);
+
+// The step whose inputs own a validation error key (e.g. goals.0.name -> Goals)
+const stepForField = (field) => {
+  if (['name', 'description', 'start_date'].includes(field)) return 0;
+  if (field.startsWith('debts')) return 1;
+  if (['strategy', 'monthly_extra_payment_cents'].includes(field)) return 2;
+  if (field.startsWith('goals')) return 3;
+  return 4;
+};
+
 const handleSubmit = () => {
-  form.post(route('payoff-plans.store', props.budget.id));
+  form.post(route('payoff-plans.store', props.budget.id), {
+    onError: (errors) => {
+      const fields = Object.keys(errors);
+      if (fields.length > 0) {
+        currentStep.value = Math.min(...fields.map(stepForField));
+      }
+    },
+  });
 };
 </script>

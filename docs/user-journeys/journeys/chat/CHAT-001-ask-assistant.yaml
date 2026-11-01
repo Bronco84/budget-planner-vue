@@ -60,6 +60,7 @@ business_rules:
   - the assistant turn is always the server-generated text; a reply failing validateResponse is neither sent nor stored (in-band SSE error instead)
   - tools are scoped to the requested budget only if the user can view it (BudgetPolicy view), else to the user's active budget; with no budget no tools are offered
   - transaction queries are clamped to the last 12 months and the result count is capped
+  - a context builder that skips a failing piece logs a warning with ids and marks the result partial (projections monthly_cash_flow is_complete false with excluded_accounts, autopay_projections_unavailable, payoff projection_unavailable) instead of presenting it as complete
   - provider rate-limit/overload/too-large errors map to specific safe messages; anything else to a generic message; raw provider text is never returned
   - when the provider fails or the reply fails validation, the persisted user message is deleted (and a conversation created by that request, if nothing else references it), matching the panel, which drops the turn
   - ChatPanel shows the in-band SSE error message (event.data) when present, otherwise a generic connection error, and falls back to the conversation id it started from
@@ -162,6 +163,15 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Chat/ChatAssistantRequestTest.php::chat messages are validated before anything is stored or sent to the provider'
+  - id: partial_context_marked_partial
+    kind: recovery
+    description: When cash flow fails for an account or autopay projections fail, the failure is logged and the projections context says which part is missing instead of passing a partial total off as complete.
+    coverage: covered
+    tests:
+      - tests/Feature/Chat/ChatContextPartialResultsTest.php::a failing account is logged and the cash-flow total is marked partial
+      - tests/Feature/Chat/ChatContextPartialResultsTest.php::a complete cash-flow total is marked complete
+      - tests/Feature/Chat/ChatContextPartialResultsTest.php::failed autopay projections are logged and reported as unavailable, not empty
+    note: The payoff plan projection_unavailable flag is not tested (no PayoffPlan factory).
   - id: provider_error_safe_message
     kind: integration
     description: Provider rate limit, overload or request-too-large failures return the specific safe message (JSON 500 on send, in-band SSE error event on stream) and log the real cause.

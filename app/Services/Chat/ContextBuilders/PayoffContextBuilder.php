@@ -6,6 +6,7 @@ use App\Contracts\ContextBuilderInterface;
 use App\Models\Budget;
 use App\Models\User;
 use App\Services\PayoffPlanService;
+use Illuminate\Support\Facades\Log;
 
 class PayoffContextBuilder implements ContextBuilderInterface
 {
@@ -37,6 +38,7 @@ class PayoffContextBuilder implements ContextBuilderInterface
 
                 // Calculate projection if possible
                 $projection = null;
+                $projectionFailed = false;
                 try {
                     $projectionData = $this->payoffPlanService->calculatePayoffProjection($plan);
                     if (! empty($projectionData['timeline'])) {
@@ -48,7 +50,13 @@ class PayoffContextBuilder implements ContextBuilderInterface
                         ];
                     }
                 } catch (\Exception $e) {
-                    // Projection calculation failed, continue without it
+                    // Continue without it, but say it failed rather than that there is none.
+                    $projectionFailed = true;
+                    Log::warning('Chat payoff context: projection failed for plan', [
+                        'payoff_plan_id' => $plan->id,
+                        'budget_id' => $plan->budget_id,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
 
                 return [
@@ -61,6 +69,7 @@ class PayoffContextBuilder implements ContextBuilderInterface
                     'total_debt' => $totalDebt,
                     'total_minimum_payments' => $totalMinimumPayments,
                     'projection' => $projection,
+                    'projection_unavailable' => $projectionFailed,
                 ];
             })
             ->toArray();

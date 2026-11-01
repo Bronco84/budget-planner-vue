@@ -872,7 +872,11 @@ class ChatService
 
         if (isset($data['monthly_cash_flow'])) {
             $cf = $data['monthly_cash_flow'];
-            $prompt .= 'Projected Monthly Cash Flow: $'.number_format($cf['total_monthly_cash_flow'] ?? 0, 2)."\n\n";
+            $prompt .= 'Projected Monthly Cash Flow: $'.number_format($cf['total_monthly_cash_flow'] ?? 0, 2);
+            if (! empty($cf['excluded_accounts'])) {
+                $prompt .= ' (PARTIAL: excludes '.implode(', ', $cf['excluded_accounts']).', which could not be calculated)';
+            }
+            $prompt .= "\n\n";
         }
 
         if (! empty($data['account_projections'])) {

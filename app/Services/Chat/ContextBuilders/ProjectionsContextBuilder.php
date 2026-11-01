@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\BudgetService;
 use App\Services\RecurringTransactionService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ProjectionsContextBuilder implements ContextBuilderInterface
 {
@@ -37,7 +38,7 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
         // Calculate monthly cash flow
         $monthlyCashFlow = $this->calculateMonthlyCashFlow($budget);
 
-        return [
+        $context = [
             'projection_period' => [
                 'start' => $startDate->format('Y-m-d'),
                 'end' => $endDate->format('Y-m-d'),
@@ -46,8 +47,14 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
             'monthly_cash_flow' => $monthlyCashFlow,
             'account_projections' => $accountProjections,
             'upcoming_transactions' => $upcomingTransactions,
-            'autopay_projections' => $autopayProjections,
+            'autopay_projections' => $autopayProjections ?? [],
         ];
+
+        if ($autopayProjections === null) {
+            $context['autopay_projections_unavailable'] = 'Autopay projections could not be calculated; they are missing, not zero.';
+        }
+
+        return $context;
     }
 
     /**
@@ -144,9 +151,10 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
     }
 
     /**
-     * Build autopay projections for credit cards.
+     * Build autopay projections for credit cards, or null when they could not
+     * be calculated (so the assistant is not told there are none).
      */
-    protected function buildAutopayProjections(Budget $budget, Carbon $startDate, Carbon $endDate): array
+    protected function buildAutopayProjections(Budget $budget, Carbon $startDate, Carbon $endDate): ?array
     {
         try {
             $autopayProjections = $this->recurringService->generateAutopayProjections(
@@ -165,17 +173,24 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
                 ];
             })->toArray();
         } catch (\Exception $e) {
-            return [];
+            Log::warning('Chat projections: autopay projections failed', [
+                'budget_id' => $budget->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 
     /**
-     * Calculate estimated monthly cash flow.
+     * Calculate estimated monthly cash flow. Accounts whose cash flow fails are
+     * left out and named, and the result is marked incomplete.
      */
     protected function calculateMonthlyCashFlow(Budget $budget): array
     {
         $totalCashFlow = 0;
         $accountBreakdown = [];
+        $excludedAccounts = [];
 
         foreach ($budget->accounts as $account) {
             try {
@@ -189,15 +204,28 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
                     ];
                 }
             } catch (\Exception $e) {
-                // Skip accounts that fail
+                $excludedAccounts[] = $account->name;
+                Log::warning('Chat projections: monthly cash flow failed for account', [
+                    'budget_id' => $budget->id,
+                    'account_id' => $account->id,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 
-        return [
+        $cashFlow = [
             'total_monthly_cash_flow' => round($totalCashFlow / 100, 2),
             'is_positive' => $totalCashFlow >= 0,
             'by_account' => $accountBreakdown,
+            'is_complete' => $excludedAccounts === [],
         ];
+
+        if ($excludedAccounts !== []) {
+            $cashFlow['excluded_accounts'] = $excludedAccounts;
+            $cashFlow['note'] = 'Partial: cash flow could not be calculated for the excluded accounts, so the total and is_positive leave them out. Say so rather than presenting the total as complete.';
+        }
+
+        return $cashFlow;
     }
 
     /**

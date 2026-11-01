@@ -224,7 +224,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **CHAT-001** User asks the AI assistant a question about their finances _(implemented, high)_
   - Routes: `chat.stream.start`, `chat.stream`, `chat.stream.complete`, `chat.send`
-  - Tests: `tests/Feature/AssistantToolFactoryTest.php`, `tests/Feature/Chat/ChatAssistantRequestTest.php`, `tests/Feature/Chat/ChatStreamStartTest.php`, `tests/Feature/ChatAssistantTest.php`, `tests/playwright/chat.spec.js`
+  - Tests: `tests/Feature/AssistantToolFactoryTest.php`, `tests/Feature/Chat/ChatAssistantRequestTest.php`, `tests/Feature/Chat/ChatContextPartialResultsTest.php`, `tests/Feature/Chat/ChatStreamStartTest.php`, `tests/Feature/ChatAssistantTest.php`, `tests/playwright/chat.spec.js`
 - **CHAT-002** Chat message is blocked, throttled or refused by moderation _(implemented, high)_
   - Routes: `chat.send`, `chat.stream.start`
   - Tests: `tests/Feature/Chat/ChatModerationLimitsTest.php`, `tests/Feature/Chat/ChatModerationOutcomesTest.php`, `tests/Feature/Chat/ChatStreamStartTest.php`, `tests/Feature/ChatAssistantTest.php`, `tests/playwright/chat.spec.js`

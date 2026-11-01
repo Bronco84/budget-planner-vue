@@ -116,8 +116,11 @@ class RecurringTransactionRule extends Model
         $fieldValue = $this->getFieldValueFromTransaction($transaction);
         $ruleValue = $this->value;
 
-        // If case sensitivity is off and we're dealing with strings, convert to lowercase
-        if (! $this->is_case_sensitive && is_string($fieldValue) && is_string($ruleValue)) {
+        // If case sensitivity is off and we're dealing with strings, convert to lowercase.
+        // A regex pattern is never lowercased (that would turn \S into \s, \D into \d...);
+        // it gets the i modifier instead, see regexPattern().
+        if (! $this->is_case_sensitive && $this->operator !== self::OPERATOR_REGEX
+            && is_string($fieldValue) && is_string($ruleValue)) {
             $fieldValue = strtolower($fieldValue);
             $ruleValue = strtolower($ruleValue);
         }
@@ -139,7 +142,8 @@ class RecurringTransactionRule extends Model
             case self::OPERATOR_REGEX:
                 // The value is a full pattern with delimiters; one that doesn't
                 // compile (validated on input, but may predate validation) matches nothing.
-                return is_string($fieldValue) && @preg_match($ruleValue, $fieldValue) === 1;
+                return is_string($fieldValue) && is_string($ruleValue)
+                    && @preg_match(self::regexPattern($ruleValue, (bool) $this->is_case_sensitive), $fieldValue) === 1;
 
             case self::OPERATOR_GREATER_THAN:
                 return is_numeric($fieldValue) && $fieldValue > (float) $ruleValue;
@@ -150,6 +154,18 @@ class RecurringTransactionRule extends Model
             default:
                 return false;
         }
+    }
+
+    /**
+     * The pattern preg_match runs for a regex rule value.
+     *
+     * The value is a full pattern with delimiters and is used exactly as written;
+     * a case-insensitive rule appends the i modifier (modifiers follow the closing
+     * delimiter, and a repeated i is harmless) rather than lowercasing the pattern.
+     */
+    public static function regexPattern(string $value, bool $caseSensitive): string
+    {
+        return $caseSensitive ? $value : $value.'i';
     }
 
     /**

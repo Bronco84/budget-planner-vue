@@ -42,9 +42,7 @@ class ValidRegexRulePattern implements DataAwareRule, ValidationRule
         }
 
         $caseSensitive = filter_var(data_get($this->data, $prefix.'is_case_sensitive', false), FILTER_VALIDATE_BOOLEAN);
-        $pattern = $caseSensitive ? $value : strtolower($value);
-
-        if (@preg_match($pattern, '') === false) {
+        if (@preg_match(RecurringTransactionRule::regexPattern($value, $caseSensitive), '') === false) {
             $fail('The :attribute must be a valid regular expression including delimiters, e.g. /^netflix/.');
         }
     }

@@ -173,3 +173,65 @@ test('updating a template with a malformed regex rule is rejected', function () 
 
     expect($this->template->rules()->count())->toBe(0);
 });
+
+test('case insensitive regex rules keep escape classes as written', function (string $pattern, string $matching, string $other) {
+    $rule = new RecurringTransactionRule([
+        'field' => 'description',
+        'operator' => 'regex',
+        'value' => $pattern,
+        'is_case_sensitive' => false,
+        'is_active' => true,
+    ]);
+
+    expect($rule->matchesTransaction(new Transaction(['description' => $matching])))->toBeTrue()
+        ->and($rule->matchesTransaction(new Transaction(['description' => $other])))->toBeFalse();
+})->with([
+    'non-space \S' => ['/^AMZN\S+/', 'amzn*mktp 123', 'AMZN MKTP'],
+    'non-digit \D' => ['/^ref\D{3}$/', 'REF-AB', 'REF123'],
+    'non-word \W' => ['/^pay\W/', 'PAY*NETFLIX', 'PAYPAL'],
+    'mixed case pattern' => ['/^NetFlix\.com/', 'NETFLIX.COM 1234', 'NETFLIXCOM'],
+]);
+
+test('case sensitive regex rules match case exactly', function () {
+    $rule = new RecurringTransactionRule([
+        'field' => 'description',
+        'operator' => 'regex',
+        'value' => '/^NETFLIX/',
+        'is_case_sensitive' => true,
+        'is_active' => true,
+    ]);
+
+    expect($rule->matchesTransaction(new Transaction(['description' => 'NETFLIX.COM'])))->toBeTrue()
+        ->and($rule->matchesTransaction(new Transaction(['description' => 'netflix.com'])))->toBeFalse();
+});
+
+test('a case insensitive regex rule with escape classes is accepted and links what it describes', function () {
+    Transaction::factory()->create([
+        'budget_id' => $this->budget->id,
+        'account_id' => $this->account->id,
+        'description' => 'AMZN*MKTP US',
+        'date' => now()->subDays(5)->toDateString(),
+    ]);
+    Transaction::factory()->create([
+        'budget_id' => $this->budget->id,
+        'account_id' => $this->account->id,
+        'description' => 'AMZN MKTP US',
+        'date' => now()->subDays(4)->toDateString(),
+    ]);
+
+    $this->actingAs($this->user)
+        ->post(route('recurring-transactions.rules.store', regexRuleParams()), [
+            'field' => 'description',
+            'operator' => 'regex',
+            'value' => '/^AMZN\S+/',
+            'is_case_sensitive' => false,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($this->user)
+        ->get(route('recurring-transactions.rules.preview', regexRuleParams()))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('matchingTransactions', 1)
+            ->where('matchingTransactions.0.transaction.description', 'AMZN*MKTP US'));
+});

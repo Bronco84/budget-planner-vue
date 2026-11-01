@@ -1072,37 +1072,9 @@ class PlaidService
                     // This handles cases where Plaid assigns a new ID to an updated pending transaction
                     $pendingDuplicate = null;
                     if ($transaction['pending'] ?? false) {
-                        $amountInCents = -1 * $transaction['amount'] * 100;
-                        $transactionDate = Carbon::parse($transaction['date']);
-
-                        // Search for potential duplicate pending transactions
-                        $pendingDuplicate = Transaction::where('account_id', $plaidAccount->account_id)
-                            ->where('is_plaid_imported', true)
-                            ->whereNotNull('plaid_transaction_id')
-                            // Match amount within $1 tolerance (for rounding differences)
-                            ->whereBetween('amount_in_cents', [$amountInCents - 100, $amountInCents + 100])
-                            // Match date within ±3 days (pending transactions can shift dates)
-                            ->whereBetween('date', [
-                                $transactionDate->copy()->subDays(3),
-                                $transactionDate->copy()->addDays(3),
-                            ])
-                            // Match description similarity (extract key identifiers)
-                            ->where(function ($query) use ($transaction) {
-                                $description = $transaction['name'];
-                                // Extract numeric identifiers (like account numbers, reference numbers)
-                                preg_match_all('/\d{4,}/', $description, $matches);
-                                if (! empty($matches[0])) {
-                                    foreach ($matches[0] as $identifier) {
-                                        $query->orWhere('description', 'LIKE', "%{$identifier}%");
-                                    }
-                                } else {
-                                    // Fallback: match first 20 characters
-                                    $prefix = substr($description, 0, 20);
-                                    $query->where('description', 'LIKE', "{$prefix}%");
-                                }
-                            })
-                            ->orderByRaw('ABS(DATEDIFF(date, ?)) ASC', [$transaction['date']])
-                            ->first();
+                        // Only rows Plaid still reports as pending: a posted look-alike is a
+                        // different purchase and must keep its own id, edits and receipts.
+                        $pendingDuplicate = $this->pendingLookalikes($plaidAccount, $transaction)->first();
                     }
 
                     // A posted transaction that settles a pending one we already imported

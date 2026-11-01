@@ -230,6 +230,62 @@ test('a posted transaction settles its pending row in place, keeping the user ed
     'matched without a link' => [false],
 ]);
 
+test('a pending transaction with a new Plaid id replaces its pending look-alike but never a posted one', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+
+    // A: an earlier purchase at the same merchant that has already posted.
+    $posted = Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'CORNER CAFE',
+        'category' => 'Coffee', 'amount_in_cents' => -500, 'date' => '2026-03-10',
+        'plaid_transaction_id' => 'tx-a', 'is_plaid_imported' => true, 'notes' => 'mine',
+    ]);
+    PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-a', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => false, 'amount' => 5.00, 'date' => '2026-03-10', 'name' => 'CORNER CAFE',
+    ]);
+    // P: a pending purchase at a hardware store that Plaid re-sends under a new id.
+    $pending = Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'HARDWARE 4821',
+        'category' => 'Uncategorized', 'amount_in_cents' => -2000, 'date' => '2026-03-12',
+        'plaid_transaction_id' => 'tx-p1', 'is_plaid_imported' => true,
+    ]);
+    PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-p1', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => true, 'amount' => 20.00, 'date' => '2026-03-12', 'name' => 'HARDWARE 4821',
+    ]);
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => [
+            [
+                'transaction_id' => 'tx-b', 'account_id' => 'plaid-checking', 'amount' => 5.25,
+                'date' => '2026-03-11', 'name' => 'CORNER CAFE', 'pending' => true,
+            ],
+            [
+                'transaction_id' => 'tx-p2', 'account_id' => 'plaid-checking', 'amount' => 20.50,
+                'date' => '2026-03-13', 'name' => 'HARDWARE 4821', 'pending' => true,
+            ],
+        ]])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 1 new and updated 1 transactions.');
+
+    // The posted purchase keeps its id and edits; the new pending one is its own row.
+    expect($posted->fresh())
+        ->plaid_transaction_id->toBe('tx-a')
+        ->notes->toBe('mine')
+        ->amount_in_cents->toBe(-500)
+        ->and(Transaction::where('plaid_transaction_id', 'tx-b')->sole()->id)->not->toBe($posted->id);
+
+    // The re-sent pending purchase is merged into the existing pending row.
+    expect($pending->fresh())
+        ->plaid_transaction_id->toBe('tx-p2')
+        ->amount_in_cents->toBe(-2050)
+        ->and(Transaction::where('account_id', $account->id)->count())->toBe(3);
+});
+
 test('syncing a credit card also refreshes its statement liability data', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'credit', 'credit card', 'credit card');
 

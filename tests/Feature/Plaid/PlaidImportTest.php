@@ -350,6 +350,7 @@ test('an account fetch failure on import shows an error and creates nothing', fu
 
 test('a failure while linking imported accounts rolls back every local write', function () {
     stubSuccessfulPlaidImport($this->plaid);
+    $this->plaid->on('/item/remove', ['request_id' => 'req-remove']);
     PlaidAccount::creating(function (PlaidAccount $plaidAccount) {
         if ($plaidAccount->plaid_account_id === 'acc-savings') {
             throw new RuntimeException('simulated database failure');
@@ -365,7 +366,9 @@ test('a failure while linking imported accounts rolls back every local write', f
     expect(session('error'))->not->toContain('simulated')
         ->and($this->budget->accounts()->count())->toBe(0)
         ->and(PlaidAccount::count())->toBe(0)
-        ->and(PlaidConnection::count())->toBe(0);
+        ->and(PlaidConnection::count())->toBe(0)
+        // Nothing holds the exchanged token, so its Item is removed at Plaid.
+        ->and($this->plaid->bodyFor('/item/remove'))->toBe(['access_token' => 'access-sandbox-xyz']);
 });
 
 test('import keeps the accounts but reports when the initial transaction sync fails', function () {

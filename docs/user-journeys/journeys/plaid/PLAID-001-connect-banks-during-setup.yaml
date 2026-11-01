@@ -48,7 +48,7 @@ business_rules:
   - institution details are looked up by metadata.institution.institution_id, falling back to a name search; missing details are tolerated
   - the connection is keyed by metadata.item.id (or metadata.item_id), so re-importing the same item reuses its connection; a random plaid-item-<uniqid> id is generated only when Link sends none
   - an account already linked under that item keeps its local Account on re-import (no duplicate is created)
-  - local account creation and linking run in one DB transaction; any failure rolls back every local write
+  - local account creation and linking run in one DB transaction; any failure rolls back every local write, and the just-exchanged Item is removed at Plaid (/item/remove, best effort) unless a stored connection holds it
   - an /accounts/get failure is an import error, not a zero-account success
   - a failed initial transaction sync keeps the imported accounts and adds a user-safe error flash
   - link token failures are logged and render the page with linkToken null (connect button disabled)
@@ -127,7 +127,7 @@ scenarios:
       - tests/Feature/Plaid/PlaidImportTest.php::re-importing an account that is already linked reuses its local account
   - id: import_is_atomic
     kind: recovery
-    description: A failure while creating or linking the local accounts rolls back every local write, leaving no orphan accounts, PlaidAccounts or connection.
+    description: A failure while creating or linking the local accounts rolls back every local write, leaving no orphan accounts, PlaidAccounts or connection, and removes the unused Item at Plaid.
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidImportTest.php::a failure while linking imported accounts rolls back every local write

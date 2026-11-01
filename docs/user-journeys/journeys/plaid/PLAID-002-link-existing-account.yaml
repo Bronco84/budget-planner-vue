@@ -7,7 +7,7 @@ priority: high
 summary: >
   From an account (budget page or account edit page) the user opens the Bank Connection
   page, launches Plaid Link and picks the matching bank account. The server exchanges the
-  public token and either reuses an active connection for the same item/institution,
+  public token and either reuses an active connection for the same Plaid item,
   re-links a previously linked (orphaned) PlaidAccount, or creates a new connection, then
   runs a transaction sync. The same page shows connection metadata for linked accounts.
 actors:
@@ -20,10 +20,10 @@ routes:
   - plaid.store
 depends_on:
   - path: app/Services/PlaidService.php
-    reason: createLinkToken, exchangePublicToken, getAccounts, linkAccount, linkAccountToConnection, createOrFindConnection, syncTransactions
+    reason: createLinkToken, exchangePublicToken, getAccounts, linkAccountToConnection, createOrFindConnection, removeItem, syncTransactions
 integrations:
   - Plaid Link
-  - Plaid API (/link/token/create, /item/public_token/exchange, /accounts/get, /institutions/*)
+  - Plaid API (/link/token/create, /item/public_token/exchange, /accounts/get, /institutions/*, /item/remove)
 steps:
   - action: open budget/{budget}/account/{account}/plaid/link
     expected: Plaid/Link rendered with linkToken, isLinked flag and connection metadata when already linked
@@ -36,7 +36,9 @@ postconditions:
   - transactions for the account have been synced (best effort)
 business_rules:
   - "linking an account (plaid.link, plaid.store) is owner-only (BudgetPolicy::manageConnections); editors and viewers get 403"
-  - an existing active connection is matched by plaid_item_id first, then institution_id (when not null), scoped to the budget
+  - an existing active connection is reused only when its plaid_item_id matches, scoped to the budget; a different Item at the same institution gets its own connection holding its own access token (never matched by institution_id)
+  - when an Item's connection is reused, the token just exchanged is stored on it, so syncs use the token the account was read with
+  - if linking fails after the token exchange and no stored connection holds the new Item (by item id or token), the Item is removed at Plaid (/item/remove, best effort)
   - an account that already has a PlaidAccount is re-linked in place instead of duplicated
   - metadata.institution.institution_id and metadata.item.id (or metadata.item_id) are optional, validated and used for connection matching and creation; a missing item id gets a generated plaid-item-<uniqid> on the server (Link.vue sends null rather than inventing one)
   - a failed post-link transaction sync keeps the link and adds a user-safe error flash
@@ -56,13 +58,28 @@ scenarios:
       - tests/Feature/Plaid/PlaidLinkAccountPageTest.php::linking an account with no matching connection creates a new connection
   - id: store_reuses_existing_connection
     kind: alternate
-    description: Linking an account from an item/institution already connected in the budget attaches it to the existing connection.
+    description: Linking an account from a Plaid item already connected in the budget attaches it to that item's connection.
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidLinkTest.php::linking an account reuses the active connection for the same Plaid item
+  - id: store_new_item_same_institution
+    kind: alternate
+    description: Linking an account from a new Plaid item at an institution already connected under another item (or with no item id) creates a separate connection with the new access token; the older connection and its token are untouched.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkTest.php::linking a new Plaid item at an institution already connected stores it as its own connection
+      - tests/Feature/Plaid/PlaidLinkTest.php::a link with no Plaid item id never joins another connection at the same institution
+      - tests/Feature/Plaid/PlaidLinkTest.php::re-linking a stale account at an institution connected under another item creates its own connection
+  - id: failed_link_removes_unstored_item
+    kind: recovery
+    description: When linking fails after the exchange and no connection holds the new Item, it is removed at Plaid; an Item an existing connection holds is left in place.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidLinkTest.php::a link that fails before the new item is stored removes that item at Plaid
+      - tests/Feature/Plaid/PlaidLinkTest.php::a failed link for an item an existing connection holds leaves that item in place
   - id: relink_orphaned_account
     kind: alternate
-    description: An account with a stale PlaidAccount is updated to point at the active or newly created connection (created from the Link metadata's item and institution ids).
+    description: An account with a stale PlaidAccount is updated to point at the active connection for the same item, or a newly created connection (created from the Link metadata's item and institution ids).
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidLinkTest.php::re-linking an account with a stale Plaid link creates a connection from the Link metadata

@@ -187,7 +187,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Budgets/BudgetLifecycleTest.php`
 - **BUDGET-002** Owner views the budget dashboard and account ledger _(implemented, critical)_
   - Routes: `budgets.show`
-  - Tests: `tests/Feature/Budgets/BudgetDashboardTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Services/BudgetServiceTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/playwright/smoke.spec.js`
+  - Tests: `tests/Feature/Budgets/BudgetDashboardTest.php`, `tests/Feature/Projections/ProjectionCacheInvalidationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Services/BudgetServiceTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/playwright/smoke.spec.js`
 - **BUDGET-003** User lands on, or switches, their active budget _(implemented, high)_
   - Routes: `budgets.index`, `transactions.index`, `preferences.active-budget.set`
   - Tests: `tests/Feature/Budgets/ActiveBudgetNavigationTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`

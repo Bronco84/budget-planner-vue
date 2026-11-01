@@ -39,7 +39,16 @@ business_rules:
   - date_range must be one of 7, 30, 90 or custom and start_date a Y-m-d date; invalid values fall back to the defaults instead of erroring
   - accounts excluded from total balance are ignored by the total; liabilities are subtracted
   - with no accounts the page renders an empty "No Accounts Yet" state and no ledger
+  - projected transactions are cached per account and date range for an hour under a per-account version; any change to the account, its templates, transactions, transfers or autopay replaces the version, invalidating every cached range on any cache store
 scenarios:
+  - id: projection_cache_invalidated
+    kind: edge
+    description: A cached projection (any horizon, including 0 months and beyond 12) reflects a template change or a new transfer on the next load, on the database cache store, without dropping other accounts' cached projections.
+    coverage: covered
+    tests:
+      - tests/Feature/Projections/ProjectionCacheInvalidationTest.php::a cached projection is invalidated when a template changes, for every projection window
+      - tests/Feature/Projections/ProjectionCacheInvalidationTest.php::a cached projection is invalidated when a transfer is added
+      - tests/Feature/Projections/ProjectionCacheInvalidationTest.php::invalidating one account leaves another account cached projections in place
   - id: owner_views_dashboard
     kind: happy_path
     description: Owner with an account gets a 200 dashboard.

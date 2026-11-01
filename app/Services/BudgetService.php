@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class BudgetService
 {
@@ -129,8 +130,10 @@ class BudgetService
         Carbon $endDate,
         int $budgetId
     ): Collection {
-        // Cache key includes account ID and date range for granular cache control
-        $cacheKey = "account:{$account->id}:projections:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}";
+        // Cache key includes the account's projection version (replaced on every
+        // invalidation, so every date range is dropped at once) and the date range.
+        $version = self::projectionCacheVersion($account->id);
+        $cacheKey = "account:{$account->id}:projections:{$version}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}";
 
         // Get raw projection data from cache or compute
         $cachedData = Cache::remember($cacheKey, self::PROJECTION_CACHE_TTL, function () use ($account, $startDate, $endDate, $budgetId) {
@@ -257,50 +260,31 @@ class BudgetService
 
     /**
      * Clear the projection cache for an account.
-     * Generates and clears all possible cache keys for common projection date ranges.
+     *
+     * Projections are cached under one key per date range and the database
+     * store production uses cannot delete keys by pattern, so the keys carry a
+     * per-account version instead. Replacing the version orphans every cached
+     * range at once (including ranges no caller enumerates); the orphans
+     * expire with their TTL.
      */
     public static function clearProjectionCache(int $accountId): void
     {
-        // Generate cache keys for common projection date ranges (1-12 months)
-        // This ensures we clear all cached projections regardless of cache driver
-        $today = Carbon::now();
-
-        for ($months = 1; $months <= 12; $months++) {
-            $startDate = $today->copy()->addDay()->startOfDay()->format('Y-m-d');
-            $endDate = $today->copy()->addMonths($months)->endOfMonth()->format('Y-m-d');
-            $cacheKey = "account:{$accountId}:projections:{$startDate}:{$endDate}";
-            Cache::forget($cacheKey);
-        }
-
-        // Also try Redis pattern matching for Redis/Memcached drivers
-        self::forgetCachePattern("account:{$accountId}:projections:*");
+        Cache::forever(self::projectionCacheVersionKey($accountId), (string) Str::uuid());
     }
 
     /**
-     * Forget cache keys matching a pattern.
-     * For Redis/Memcached cache drivers that support pattern-based deletion.
+     * The current projection cache version for an account. A random token
+     * rather than a counter, so a version key lost to eviction can never fall
+     * back to a value older cached projections were stored under.
      */
-    protected static function forgetCachePattern(string $pattern): void
+    protected static function projectionCacheVersion(int $accountId): string
     {
-        $cacheDriver = config('cache.default');
+        return Cache::rememberForever(self::projectionCacheVersionKey($accountId), fn () => (string) Str::uuid());
+    }
 
-        if (in_array($cacheDriver, ['redis', 'memcached'])) {
-            // These drivers support pattern-based deletion
-            try {
-                $store = Cache::getStore();
-                if (method_exists($store, 'getRedis')) {
-                    $redis = $store->getRedis()->connection();
-                    $prefix = config('cache.prefix', 'laravel_cache');
-                    $keys = $redis->keys($prefix.':'.str_replace('*', '*', $pattern));
-                    if (! empty($keys)) {
-                        $redis->del($keys);
-                    }
-                }
-            } catch (\Exception $e) {
-                // Silently fail for pattern deletion
-            }
-        }
-        // For file/array/database cache, keys are cleared individually in clearProjectionCache
+    protected static function projectionCacheVersionKey(int $accountId): string
+    {
+        return "account:{$accountId}:projections_version";
     }
 
     /**

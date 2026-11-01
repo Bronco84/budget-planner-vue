@@ -40,6 +40,7 @@ business_rules:
   - ITEM_LOGIN_REQUIRED marks the PlaidConnection as 'error' (PlaidConnection::markAsError) and flashes "Your bank needs you to sign in again. Use Re-authenticate to reconnect this account."
   - a connect timeout flashes "Couldn't reach the bank connection service, please try again."; any other failure "Failed to sync transactions. Please try again."
   - investment accounts tolerate a transaction fetch failure (continue to balance/holdings) unless it is ITEM_LOGIN_REQUIRED
+  - a posted transaction that settles an imported pending one (by pending_transaction_id, or else the closest still-pending look-alike on the account) updates that row in place with the new Plaid id, amount and date, so its category, notes, recurring link and attachments are kept
   - /transactions/get is paged (options.count 500, increasing options.offset) until total_transactions is reached, so the whole 180-day window is imported for every account on the Item
 scenarios:
   - id: sync_imports_transactions
@@ -54,6 +55,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::syncing pages through every transaction Plaid has, not just the first page
+  - id: pending_settles_in_place
+    kind: edge
+    description: When a pending purchase posts, the existing row is updated in place rather than replaced, so the user's category, notes, recurring link and receipts survive.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncTest.php::a posted transaction settles its pending row in place, keeping the user edits and receipts
   - id: balance_uses_current
     kind: happy_path
     description: Balance refresh stores Plaid's current balance on both PlaidAccount and Account.

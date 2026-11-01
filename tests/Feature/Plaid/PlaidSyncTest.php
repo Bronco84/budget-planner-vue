@@ -2,10 +2,13 @@
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\File;
+use App\Models\FileAttachment;
 use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
 use App\Models\PlaidStatementHistory;
 use App\Models\PlaidTransaction;
+use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\PlaidService;
@@ -165,6 +168,67 @@ test('syncing pages through every transaction Plaid has, not just the first page
     ])->and(Transaction::where('account_id', $account->id)->count())->toBe(550)
         ->and(Transaction::where('plaid_transaction_id', 'tx-1098')->exists())->toBeTrue();
 });
+
+test('a posted transaction settles its pending row in place, keeping the user edits and receipts', function (bool $linked) {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+    $template = RecurringTransactionTemplate::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $account->id]);
+
+    $pending = Transaction::create([
+        'budget_id' => $this->budget->id,
+        'account_id' => $account->id,
+        'description' => 'BLUE BOTTLE COFFEE',
+        'category' => 'Coffee',
+        'amount_in_cents' => -475,
+        'date' => '2026-03-11',
+        'plaid_transaction_id' => 'tx-pending',
+        'is_plaid_imported' => true,
+        'notes' => 'team offsite',
+        'recurring_transaction_template_id' => $template->id,
+        'link_source' => Transaction::LINK_SOURCE_MANUAL,
+    ]);
+    PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-pending', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => true, 'amount' => 4.75, 'date' => '2026-03-11', 'name' => 'BLUE BOTTLE COFFEE',
+    ]);
+    $file = File::create([
+        'hash' => str_repeat('a', 64), 'original_name' => 'receipt.pdf', 'mime_type' => 'application/pdf',
+        'size_bytes' => 12, 'extension' => 'pdf', 'uploaded_by' => $this->user->id,
+    ]);
+    $attachment = FileAttachment::create([
+        'file_id' => $file->id, 'attachable_type' => Transaction::class,
+        'attachable_id' => $pending->id, 'attached_by' => $this->user->id,
+    ]);
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => [[
+            'transaction_id' => 'tx-posted', 'account_id' => 'plaid-checking', 'amount' => 5.25,
+            'date' => '2026-03-12', 'name' => 'BLUE BOTTLE COFFEE', 'pending' => false, 'category' => ['Food and Drink'],
+            'pending_transaction_id' => $linked ? 'tx-pending' : null,
+        ]]])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 0 new and updated 1 transactions.');
+
+    expect(Transaction::where('account_id', $account->id)->sole()->id)->toBe($pending->id);
+
+    $settled = $pending->fresh();
+    expect($settled)
+        ->plaid_transaction_id->toBe('tx-posted')
+        ->amount_in_cents->toBe(-525)
+        ->category->toBe('Coffee')
+        ->notes->toBe('team offsite')
+        ->recurring_transaction_template_id->toBe($template->id)
+        ->and($settled->date->toDateString())->toBe('2026-03-12')
+        ->and($attachment->fresh()->attachable_id)->toBe($settled->id)
+        ->and($settled->fileAttachments()->count())->toBe(1)
+        ->and(PlaidTransaction::where('plaid_transaction_id', 'tx-posted')->sole()->pending)->toBeFalse();
+})->with([
+    'linked by pending_transaction_id' => [true],
+    'matched without a link' => [false],
+]);
 
 test('syncing a credit card also refreshes its statement liability data', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'credit', 'credit card', 'credit card');

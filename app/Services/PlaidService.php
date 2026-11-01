@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class PlaidService
@@ -1104,6 +1105,11 @@ class PlaidService
                             ->first();
                     }
 
+                    // A posted transaction that settles a pending one we already imported
+                    $settledPending = ($transaction['pending'] ?? false)
+                        ? null
+                        : $this->findSettledPendingTransaction($plaidAccount, $transaction);
+
                     if ($pendingDuplicate) {
                         // Update the existing pending transaction with the new Plaid ID
                         $pendingDuplicate->update([
@@ -1121,6 +1127,24 @@ class PlaidService
                             'old_date' => $pendingDuplicate->getOriginal('date'),
                             'new_date' => $transaction['date'],
                             'amount' => $transaction['amount'],
+                        ]);
+
+                        $updated++;
+                    } elseif ($settledPending) {
+                        // Settle the pending row in place, so the user's category, notes,
+                        // recurring link and attachments stay with the transaction.
+                        $oldPlaidId = $settledPending->plaid_transaction_id;
+
+                        $settledPending->update([
+                            'plaid_transaction_id' => $transaction['transaction_id'],
+                            'amount_in_cents' => -1 * $transaction['amount'] * 100,
+                            'date' => $transaction['date'],
+                        ]);
+
+                        Log::info('Settled pending transaction in place', [
+                            'transaction_id' => $settledPending->id,
+                            'pending_plaid_id' => $oldPlaidId,
+                            'settled_plaid_id' => $transaction['transaction_id'],
                         ]);
 
                         $updated++;
@@ -1160,60 +1184,24 @@ class PlaidService
                     }
                 } elseif (! ($transaction['pending'] ?? false)) {
                     // This is a settled transaction without a pending_transaction_id
-                    // Use fuzzy matching to find and remove any matching pending transactions
+                    // Use fuzzy matching to find and remove any remaining matching pending transactions
                     // This handles cases where Plaid doesn't provide the pending_transaction_id link
-                    $amountInCents = -1 * $transaction['amount'] * 100;
-                    $transactionDate = Carbon::parse($transaction['date']);
-
-                    // Search for matching pending transactions to clean up
-                    $matchingPendingTransactions = Transaction::where('account_id', $plaidAccount->account_id)
-                        ->where('is_plaid_imported', true)
-                        ->whereNotNull('plaid_transaction_id')
-                        // Exclude the current transaction (if it was just created/updated)
-                        ->where('plaid_transaction_id', '!=', $transaction['transaction_id'])
-                        // Match amount within $1 tolerance (for rounding differences)
-                        ->whereBetween('amount_in_cents', [$amountInCents - 100, $amountInCents + 100])
-                        // Match date within ±3 days (pending transactions can shift dates)
-                        ->whereBetween('date', [
-                            $transactionDate->copy()->subDays(3),
-                            $transactionDate->copy()->addDays(3),
-                        ])
-                        // Match description similarity (extract key identifiers)
-                        ->where(function ($query) use ($transaction) {
-                            $description = $transaction['name'];
-                            // Extract numeric identifiers (like account numbers, reference numbers)
-                            preg_match_all('/\d{4,}/', $description, $matches);
-                            if (! empty($matches[0])) {
-                                foreach ($matches[0] as $identifier) {
-                                    $query->orWhere('description', 'LIKE', "%{$identifier}%");
-                                }
-                            } else {
-                                // Fallback: match first 20 characters (handles cases like "SOUTHERN REPROGR BIWEEKLY")
-                                $prefix = substr($description, 0, 20);
-                                $query->where('description', 'LIKE', "{$prefix}%");
-                            }
-                        })
-                        ->get();
+                    $matchingPendingTransactions = $this->pendingLookalikes($plaidAccount, $transaction);
 
                     // Delete matching pending transactions (they've been replaced by this settled one)
                     foreach ($matchingPendingTransactions as $matchingPending) {
-                        // Verify the pending transaction is actually pending in Plaid by checking PlaidTransaction
-                        $plaidPendingTransaction = PlaidTransaction::where('plaid_transaction_id', $matchingPending->plaid_transaction_id)->first();
+                        $matchingPending->delete();
 
-                        if ($plaidPendingTransaction && $plaidPendingTransaction->pending) {
-                            $matchingPending->delete();
-
-                            Log::info('Deleted pending transaction after settlement (fuzzy match)', [
-                                'deleted_transaction_id' => $matchingPending->id,
-                                'deleted_plaid_id' => $matchingPending->plaid_transaction_id,
-                                'settled_transaction_id' => $transaction['transaction_id'],
-                                'match_criteria' => [
-                                    'amount' => $transaction['amount'],
-                                    'date' => $transaction['date'],
-                                    'description' => $transaction['name'],
-                                ],
-                            ]);
-                        }
+                        Log::info('Deleted pending transaction after settlement (fuzzy match)', [
+                            'deleted_transaction_id' => $matchingPending->id,
+                            'deleted_plaid_id' => $matchingPending->plaid_transaction_id,
+                            'settled_transaction_id' => $transaction['transaction_id'],
+                            'match_criteria' => [
+                                'amount' => $transaction['amount'],
+                                'date' => $transaction['date'],
+                                'description' => $transaction['name'],
+                            ],
+                        ]);
                     }
                 }
             }
@@ -1300,6 +1288,68 @@ class PlaidService
 
             throw $e;
         }
+    }
+
+    /**
+     * The imported pending transaction that a posted Plaid transaction settles: the row
+     * named by pending_transaction_id, or, when Plaid gives no link, the closest
+     * still-pending look-alike on the account.
+     *
+     * @param  array<string, mixed>  $transaction  a posted Plaid transaction
+     */
+    private function findSettledPendingTransaction(PlaidAccount $plaidAccount, array $transaction): ?Transaction
+    {
+        if (! empty($transaction['pending_transaction_id'])) {
+            return Transaction::where('account_id', $plaidAccount->account_id)
+                ->where('plaid_transaction_id', $transaction['pending_transaction_id'])
+                ->first();
+        }
+
+        return $this->pendingLookalikes($plaidAccount, $transaction)->first();
+    }
+
+    /**
+     * Imported transactions on the account that Plaid last reported as pending and that
+     * look like $transaction: amount within $1, date within 3 days and a similar
+     * description. Closest date first.
+     *
+     * @param  array<string, mixed>  $transaction
+     * @return Collection<int, Transaction>
+     */
+    private function pendingLookalikes(PlaidAccount $plaidAccount, array $transaction)
+    {
+        $amountInCents = -1 * $transaction['amount'] * 100;
+        $transactionDate = Carbon::parse($transaction['date'])->startOfDay();
+
+        return Transaction::where('account_id', $plaidAccount->account_id)
+            ->where('is_plaid_imported', true)
+            ->whereNotNull('plaid_transaction_id')
+            ->where('plaid_transaction_id', '!=', $transaction['transaction_id'])
+            // Only rows that are still pending in Plaid
+            ->whereIn('plaid_transaction_id', PlaidTransaction::select('plaid_transaction_id')->where('pending', true))
+            // Match amount within $1 tolerance (for rounding differences)
+            ->whereBetween('amount_in_cents', [$amountInCents - 100, $amountInCents + 100])
+            // Match date within ±3 days (pending transactions can shift dates)
+            ->whereDate('date', '>=', $transactionDate->copy()->subDays(3)->toDateString())
+            ->whereDate('date', '<=', $transactionDate->copy()->addDays(3)->toDateString())
+            // Match description similarity (extract key identifiers)
+            ->where(function ($query) use ($transaction) {
+                $description = $transaction['name'];
+                // Extract numeric identifiers (like account numbers, reference numbers)
+                preg_match_all('/\d{4,}/', $description, $matches);
+                if (! empty($matches[0])) {
+                    foreach ($matches[0] as $identifier) {
+                        $query->orWhere('description', 'LIKE', "%{$identifier}%");
+                    }
+                } else {
+                    // Fallback: match first 20 characters (handles cases like "SOUTHERN REPROGR BIWEEKLY")
+                    $prefix = substr($description, 0, 20);
+                    $query->where('description', 'LIKE', "{$prefix}%");
+                }
+            })
+            ->get()
+            ->sortBy(fn (Transaction $candidate) => abs($candidate->date->diffInDays($transactionDate, false)))
+            ->values();
     }
 
     /**

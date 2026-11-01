@@ -36,10 +36,10 @@ steps:
     expected: guest middleware redirects to /dashboard, which redirects to budgets.index
 postconditions:
   - user is authenticated
-  - TrustedDevice.last_used_at updated
+  - TrustedDevice.last_used_at updated, and TrustedDevice.session_id set to the regenerated session id
 business_rules:
   - auto-login is skipped when already authenticated and on the logout route
-  - auto-login regenerates the session id (Laravel's SessionGuard::login)
+  - auto-login regenerates the session id (Laravel's SessionGuard::login); the new id is recorded on the device so revoking it (AUTH-012) ends that session
   - expired devices (expires_at in the past) are ignored
   - the cookie is secure, httpOnly, SameSite=Lax, lifetime auth.device_remember_days (default 90)
   - "/dashboard is auth-only and simply redirects to budgets.index"

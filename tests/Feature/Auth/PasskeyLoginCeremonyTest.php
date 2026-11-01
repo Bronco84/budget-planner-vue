@@ -61,7 +61,9 @@ test('a valid passkey assertion signs the user in and issues a trusted device co
 
     $device = TrustedDevice::sole();
     expect($device->user_id)->toBe($user->id)
-        ->and($device->auth_method)->toBe('passkey');
+        ->and($device->auth_method)->toBe('passkey')
+        // The regenerated (post-login) session, so revoking the device ends it.
+        ->and($device->session_id)->not->toBeNull()->toBe(session()->getId());
     $response->assertCookie('device_token', Crypt::decryptString($device->device_token));
 
     // The authenticator's signature counter is persisted for clone detection.

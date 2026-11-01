@@ -41,8 +41,9 @@ class RememberDevice
                 // Auto-login the user
                 Auth::loginUsingId($device->user_id);
 
-                // Update last used timestamp
-                $device->markAsUsed();
+                // Update last used timestamp and record the session the login
+                // just migrated to, so revoking the device ends it.
+                $device->markAsUsed($request->hasSession() ? $request->session()->getId() : null);
 
                 return $next($request);
             }

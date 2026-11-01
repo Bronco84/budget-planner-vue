@@ -178,7 +178,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Auth/PasskeyAndDeviceManagementTest.php`, `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php`, `tests/Feature/Auth/ProfilePasskeyListTest.php`, `tests/playwright/passkeys.spec.js`
 - **AUTH-012** User reviews and revokes trusted devices _(implemented, high)_
   - Routes: `profile.edit`, `trusted-devices.revoke`, `trusted-devices.revoke-all`
-  - Tests: `tests/Feature/Auth/PasskeyAndDeviceManagementTest.php`, `tests/Feature/Auth/TrustedDeviceFingerprintTest.php`, `tests/Feature/Auth/TrustedDeviceRevocationTest.php`
+  - Tests: `tests/Feature/Auth/PasskeyAndDeviceManagementTest.php`, `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/Auth/TrustedDeviceFingerprintTest.php`, `tests/Feature/Auth/TrustedDeviceRevocationTest.php`
 
 ### budgets
 

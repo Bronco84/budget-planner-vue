@@ -8,7 +8,7 @@ summary: >
   The profile page lists the user's trusted devices (name, browser, platform,
   IP, auth method, last used). The user can revoke a single device or revoke all
   devices other than the current browser, which stops those browsers being
-  auto-signed-in (AUTH-005).
+  auto-signed-in (AUTH-005) and signs out their live sessions.
 actors:
   - authenticated user
 preconditions:
@@ -26,14 +26,18 @@ steps:
   - action: open /profile
     expected: trusted devices listed newest-used first
   - action: revoke one (DELETE /settings/trusted-devices/{device})
-    expected: device deleted, back with status "Device revoked successfully."
+    expected: device deleted and the session it last signed in with ended, back with status "Device revoked successfully."
   - action: revoke all others (POST /settings/trusted-devices/revoke-all)
-    expected: every device whose fingerprint differs from the current request deleted
+    expected: every device whose fingerprint differs from the current request deleted, and every other session of the user ended
 postconditions:
   - revoked devices can no longer auto-login
+  - revoked devices' live sessions are signed out
 business_rules:
   - revoking a device owned by another user aborts 403
   - revoke-all keeps devices matching the current request fingerprint
+  - each sign-in (passkey login/registration, device auto-login) records the regenerated session id on the trusted device; revoking the device deletes that sessions row (database session driver), unless it is the requesting session
+  - revoke-all deletes every sessions row of the user except the requesting session, including magic-link sessions that have no trusted device
+  - devices created before session ids were recorded have none until their next sign-in, so revoking one of them only ends its session via revoke-all
   - the profile lists only unexpired devices (TrustedDevice::valid()) and flags the one matching the current request fingerprint with is_current, shown as a "This device" badge
 scenarios:
   - id: profile_lists_devices
@@ -73,6 +77,26 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Auth/TrustedDeviceRevocationTest.php::a revoked device cookie no longer signs the browser in
+  - id: revoke_ends_device_session
+    kind: happy_path
+    description: Revoking a device deletes the stored session it last signed in with, leaving the user's other sessions and other users' sessions alone.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceRevocationTest.php::revoking a device ends the live session it signed in with
+      - tests/Feature/Auth/TrustedDeviceRevocationTest.php::a device auto sign-in records the session it signed in with
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a valid passkey assertion signs the user in and issues a trusted device cookie'
+  - id: revoke_current_device_keeps_session
+    kind: edge
+    description: Revoking the device the request itself comes from deletes the device but keeps the current session signed in.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceRevocationTest.php::revoking the device the request comes from keeps the current session
+  - id: revoke_all_ends_other_sessions
+    kind: happy_path
+    description: Revoke-all deletes every other stored session of the user (including magic-link sessions) and keeps the current one.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceRevocationTest.php::revoking all other devices signs out every other session of the user
   - id: new_device_email_links_to_profile
     kind: integration
     description: The new-device login email's Manage Devices button links to the profile page (profile.edit), where devices are managed.
@@ -84,5 +108,6 @@ confidence: medium
 evidence:
   - routes/auth.php auth group
   - app/Http/Controllers/TrustedDeviceController.php
+  - app/Services/DeviceTokenService.php endDeviceSession() / endOtherSessions()
   - app/Http/Controllers/ProfileController.php edit()
 last_verified: null

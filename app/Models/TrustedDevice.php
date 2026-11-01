@@ -18,6 +18,7 @@ class TrustedDevice extends Model
         'last_used_at',
         'expires_at',
         'auth_method',
+        'session_id',
     ];
 
     protected $casts = [
@@ -50,11 +51,15 @@ class TrustedDevice extends Model
     }
 
     /**
-     * Update the last used timestamp.
+     * Update the last used timestamp and, when given, the session the device
+     * is now signed in with (so revoking the device can end that session).
      */
-    public function markAsUsed(): void
+    public function markAsUsed(?string $sessionId = null): void
     {
-        $this->update(['last_used_at' => now()]);
+        $this->update(array_filter([
+            'last_used_at' => now(),
+            'session_id' => $sessionId,
+        ]));
     }
 
     /**

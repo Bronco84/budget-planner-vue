@@ -274,3 +274,80 @@ test('editors and viewers cannot invite or revoke invitations', function (string
     expect(BudgetInvitation::count())->toBe(1);
     Mail::assertNothingSent();
 })->with(['editor', 'viewer']);
+
+test('an owner member who is removed, demoted or leaves loses the invitations they issued', function (string $how) {
+    $member = User::factory()->create();
+    $this->budget->connected_users()->attach($member->id, ['access_level' => 'owner']);
+    $token = inviteToBudget($this->budget, $member, 'alt@example.com', 'owner');
+    $alt = User::factory()->create(['email' => 'alt@example.com']);
+
+    match ($how) {
+        'removed' => $this->actingAs($this->owner)
+            ->delete(route('budgets.members.destroy', [$this->budget, $member]))
+            ->assertSessionHasNoErrors(),
+        'demoted' => $this->actingAs($this->owner)
+            ->patch(route('budgets.members.update', [$this->budget, $member]), ['role' => 'editor'])
+            ->assertSessionHasNoErrors(),
+        'left' => $this->actingAs($member)
+            ->delete(route('budgets.membership.leave', $this->budget))
+            ->assertSessionHasNoErrors(),
+    };
+
+    expect(BudgetInvitation::count())->toBe(0);
+
+    $this->actingAs($alt)->post(route('invitations.accept', $token))->assertSessionHas('error');
+    expect($this->budget->roleFor($alt))->toBeNull();
+})->with(['removed', 'demoted', 'left']);
+
+test('a primary owner who leaves loses the invitations they issued', function () {
+    $successor = User::factory()->create();
+    $this->budget->connected_users()->attach($successor->id, ['access_level' => 'owner']);
+    inviteToBudget($this->budget, $this->owner, 'alt@example.com', 'owner');
+    inviteToBudget($this->budget, $successor, 'friend@example.com', 'viewer');
+
+    $this->actingAs($this->owner)
+        ->delete(route('budgets.membership.leave', $this->budget))
+        ->assertSessionHasNoErrors();
+
+    expect(BudgetInvitation::pluck('email')->all())->toBe(['friend@example.com']);
+});
+
+test('re-saving an owner member as owner keeps the invitations they issued', function () {
+    $member = User::factory()->create();
+    $this->budget->connected_users()->attach($member->id, ['access_level' => 'owner']);
+    inviteToBudget($this->budget, $member, 'friend@example.com', 'viewer');
+
+    $this->actingAs($this->owner)
+        ->patch(route('budgets.members.update', [$this->budget, $member]), ['role' => 'owner'])
+        ->assertSessionHasNoErrors();
+
+    expect(BudgetInvitation::count())->toBe(1);
+});
+
+test('an invitation whose inviter no longer owns the budget cannot be accepted', function () {
+    $member = User::factory()->create();
+    $this->budget->connected_users()->attach($member->id, ['access_level' => 'owner']);
+    $token = inviteToBudget($this->budget, $member, 'alt@example.com', 'owner');
+    $alt = User::factory()->create(['email' => 'alt@example.com']);
+
+    // Demoted by a path that leaves their invitations in place.
+    $this->budget->connected_users()->updateExistingPivot($member->id, ['access_level' => 'viewer']);
+
+    $this->actingAs($alt)->post(route('invitations.accept', $token))->assertSessionHasErrors('invitation');
+
+    expect($this->budget->roleFor($alt))->toBeNull()
+        ->and(BudgetInvitation::sole()->accepted_at)->toBeNull();
+});
+
+test('an invitation whose inviter was deleted cannot be accepted', function () {
+    $member = User::factory()->create();
+    $this->budget->connected_users()->attach($member->id, ['access_level' => 'owner']);
+    $token = inviteToBudget($this->budget, $member, 'alt@example.com', 'editor');
+    $alt = User::factory()->create(['email' => 'alt@example.com']);
+
+    $this->budget->connected_users()->detach($member->id);
+    $member->delete();
+
+    $this->actingAs($alt)->post(route('invitations.accept', $token))->assertSessionHasErrors('invitation');
+    expect($this->budget->roleFor($alt))->toBeNull();
+});

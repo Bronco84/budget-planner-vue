@@ -36,7 +36,15 @@ business_rules:
   - the last owner cannot leave (validation error on membership)
   - a leaving primary owner is replaced by the owner member who joined first
   - only the primary owner can transfer primary ownership, and only to a current member
+  - leaving (as a member or as the primary owner) deletes the pending invitations the leaver issued for the budget
 scenarios:
+  - id: leaver_loses_invitations
+    kind: authorization
+    description: A member or primary owner who leaves has the pending invitations they issued deleted; other owners' invitations stay.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an owner member who is removed, demoted or leaves loses the invitations they issued
+      - tests/Feature/Sharing/BudgetInvitationTest.php::a primary owner who leaves loses the invitations they issued
   - id: member_leaves
     kind: happy_path
     description: A viewer, editor or owner member leaves and loses access.

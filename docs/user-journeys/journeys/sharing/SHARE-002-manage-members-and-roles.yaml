@@ -57,8 +57,16 @@ business_rules:
   - "{member} resolves through budget->members() (pivot only), so the primary owner and non-members 404 on member routes: the primary owner can't be downgraded or removed"
   - budgets always keep at least one owner (the primary owner)
   - the legacy 'admin' access level is treated as owner (and migrated to 'owner')
+  - removing a member or changing their role below owner deletes the pending invitations they issued for the budget
   - viewers get a read-only dashboard (no edit, sync, add or connect controls); editors see edit controls but not owner controls
 scenarios:
+  - id: demoted_or_removed_owner_loses_invitations
+    kind: authorization
+    description: Removing an owner member or demoting them below owner deletes the pending invitations they issued; re-saving them as owner keeps them.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an owner member who is removed, demoted or leaves loses the invitations they issued
+      - tests/Feature/Sharing/BudgetInvitationTest.php::re-saving an owner member as owner keeps the invitations they issued
   - id: members_listed_with_roles
     kind: happy_path
     description: Any member sees the primary owner first and every member with their role, with a Sharing breadcrumb.

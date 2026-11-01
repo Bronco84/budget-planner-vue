@@ -366,10 +366,10 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Auth/InvitationRegistrationTest.php`, `tests/Feature/Sharing/BudgetInvitationTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`, `tests/playwright/sharing.spec.js`
 - **SHARE-002** Owner manages budget members and their roles _(implemented, critical)_
   - Routes: `budgets.sharing.index`, `budgets.members.update`, `budgets.members.destroy`
-  - Tests: `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/Feature/Sharing/BudgetRoleMatrixTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`, `tests/playwright/sharing.spec.js`
+  - Tests: `tests/Feature/Sharing/BudgetInvitationTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/Feature/Sharing/BudgetRoleMatrixTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`, `tests/playwright/sharing.spec.js`
 - **SHARE-003** Member leaves a budget or the owner transfers primary ownership _(implemented, high)_
   - Routes: `budgets.membership.leave`, `budgets.ownership.transfer`
-  - Tests: `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`
+  - Tests: `tests/Feature/Sharing/BudgetInvitationTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/Feature/Sharing/SharingFlashMessagesTest.php`
 
 ### transactions
 

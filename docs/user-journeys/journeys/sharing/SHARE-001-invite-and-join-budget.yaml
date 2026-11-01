@@ -60,6 +60,7 @@ business_rules:
   - re-inviting an email replaces its pending invitation (new token, role and expiry)
   - inviting an existing member (including the primary owner) is rejected
   - accepting never downgrades an existing stronger role
+  - an invitation is void once its inviter no longer owns the budget (removed, demoted, left or deleted); accept rejects it with a validation error on invitation
   - POST invitations is throttled to 10/min (budgets.invitations.store), accept to 10/min, the landing page to 30/min
   - a mail failure keeps the invitation and flashes an error
 scenarios:
@@ -121,6 +122,13 @@ scenarios:
       - tests/Feature/Sharing/BudgetInvitationTest.php::an invitation can only be accepted once
       - tests/Feature/Auth/InvitationRegistrationTest.php::expired, used and tampered invitation tokens cannot be used to register
       - tests/Feature/Auth/InvitationRegistrationTest.php::an invitation token registers only one account
+  - id: invitation_void_when_inviter_loses_ownership
+    kind: authorization
+    description: An invitation whose inviter was demoted below owner, removed or deleted cannot be accepted, so a removed owner cannot re-enter through an invitation they issued.
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an invitation whose inviter no longer owns the budget cannot be accepted
+      - tests/Feature/Sharing/BudgetInvitationTest.php::an invitation whose inviter was deleted cannot be accepted
   - id: invalid_invite_input_rejected
     kind: validation
     description: Invalid email or role, or an email that already belongs to a member (including a quoted local part carrying CRLF header injection), is rejected without sending mail.

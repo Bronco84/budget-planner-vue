@@ -105,6 +105,16 @@ class BudgetSharingService
 
             /** @var Budget $budget */
             $budget = $invitation->budget()->firstOrFail();
+
+            // An invitation is only as good as its inviter's standing: once
+            // they stop owning the budget, what they issued is void.
+            $inviter = $invitation->inviter()->first();
+            if ($budget->roleFor($inviter) !== BudgetRole::Owner) {
+                throw ValidationException::withMessages([
+                    'invitation' => 'This invitation is invalid, expired or has already been used.',
+                ]);
+            }
+
             $current = $budget->roleFor($user);
 
             // Never downgrade someone who already has a stronger role.
@@ -128,7 +138,13 @@ class BudgetSharingService
     {
         $this->assertSharedMember($budget, $member);
 
-        $budget->connected_users()->updateExistingPivot($member->id, ['access_level' => $role->value]);
+        DB::transaction(function () use ($budget, $member, $role) {
+            $budget->connected_users()->updateExistingPivot($member->id, ['access_level' => $role->value]);
+
+            if ($role !== BudgetRole::Owner) {
+                $this->revokeInvitationsIssuedBy($budget, $member);
+            }
+        });
     }
 
     /**
@@ -139,7 +155,10 @@ class BudgetSharingService
     {
         $this->assertSharedMember($budget, $member);
 
-        $budget->connected_users()->detach($member->id);
+        DB::transaction(function () use ($budget, $member) {
+            $budget->connected_users()->detach($member->id);
+            $this->revokeInvitationsIssuedBy($budget, $member);
+        });
     }
 
     /**
@@ -153,6 +172,7 @@ class BudgetSharingService
         DB::transaction(function () use ($budget, $user) {
             if (! $budget->isPrimaryOwner($user)) {
                 $budget->connected_users()->detach($user->id);
+                $this->revokeInvitationsIssuedBy($budget, $user);
 
                 return;
             }
@@ -171,6 +191,7 @@ class BudgetSharingService
 
             $budget->connected_users()->detach($successor->id);
             $budget->forceFill(['user_id' => $successor->id])->save();
+            $this->revokeInvitationsIssuedBy($budget, $user);
         });
     }
 
@@ -242,6 +263,15 @@ class BudgetSharingService
                 'member' => 'That person is not a member of this budget.',
             ]);
         }
+    }
+
+    /**
+     * Delete the pending invitations $user issued for $budget, so a grant
+     * cannot outlive the inviter's ownership.
+     */
+    private function revokeInvitationsIssuedBy(Budget $budget, User $user): void
+    {
+        $budget->invitations()->pending()->where('invited_by', $user->id)->delete();
     }
 
     private function rank(BudgetRole $role): int

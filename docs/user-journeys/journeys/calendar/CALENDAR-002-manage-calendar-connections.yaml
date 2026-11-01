@@ -39,6 +39,7 @@ business_rules:
   - an expired token without a refresh token fails with "No refresh token available"
   - sync reads every events.list page; only after the whole window is listed are the connection's stored events in that window that Google no longer returned (deleted, cancelled or moved out) removed
   - a sync that fails part-way removes nothing
+  - events are keyed per connection (calendar_connection_id, google_event_id), so an event shared by several app users is stored once for each of their connections
 scenarios:
   - id: sync_connection
     kind: happy_path
@@ -53,6 +54,12 @@ scenarios:
     tests:
       - tests/Feature/Calendar/GoogleCalendarSyncTest.php::sync walks every page and removes window events that google no longer returns
       - tests/Feature/Calendar/GoogleCalendarSyncTest.php::pruning only touches the syncing connection
+  - id: shared_event_per_user
+    kind: edge
+    description: Two users invited to the same Google event each keep their own copy; one user's sync does not take it from the other.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/GoogleCalendarSyncTest.php::an event shared by two users is stored once for each of their connections
   - id: partial_listing_keeps_events
     kind: recovery
     description: A Google failure on a later page fails the sync without deleting any stored event.

@@ -151,3 +151,23 @@ test('pruning only touches the syncing connection', function () {
     expect($service->syncEvents($connection))->toBe(0)
         ->and(CalendarEvent::where('google_event_id', 'someone-elses')->exists())->toBeTrue();
 });
+
+test('an event shared by two users is stored once for each of their connections', function () {
+    $alice = User::factory()->create();
+    $bob = User::factory()->create();
+    $aliceConnection = syncTestConnection($alice);
+    $bobConnection = syncTestConnection($bob);
+    $start = now()->addDays(3)->startOfHour()->toRfc3339String();
+
+    [$service] = fakeGoogleCalendarService([[syncTestGoogleEvent('shared-meeting', $start, 'Shared meeting')]]);
+
+    $service->syncEvents($aliceConnection);
+    $service->syncEvents($bobConnection);
+    $service->syncEvents($aliceConnection);
+
+    expect(CalendarEvent::where('google_event_id', 'shared-meeting')->count())->toBe(2)
+        ->and(CalendarEvent::where('user_id', $alice->id)->where('calendar_connection_id', $aliceConnection->id)->pluck('google_event_id')->all())
+        ->toBe(['shared-meeting'])
+        ->and(CalendarEvent::where('user_id', $bob->id)->where('calendar_connection_id', $bobConnection->id)->pluck('google_event_id')->all())
+        ->toBe(['shared-meeting']);
+});

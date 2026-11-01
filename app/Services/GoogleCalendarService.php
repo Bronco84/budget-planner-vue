@@ -193,12 +193,14 @@ class GoogleCalendarService
         $startDate = $allDay ? Carbon::parse($start->date) : Carbon::parse($start->dateTime);
         $endDate = $allDay && $end->date ? Carbon::parse($end->date) : ($end->dateTime ? Carbon::parse($end->dateTime) : null);
 
+        // Google event ids are only unique within a calendar: an event shared
+        // by several invitees has the same id in each of their calendars.
         return CalendarEvent::updateOrCreate(
             [
+                'calendar_connection_id' => $connection->id,
                 'google_event_id' => $googleEvent->getId(),
             ],
             [
-                'calendar_connection_id' => $connection->id,
                 'user_id' => $connection->user_id,
                 'ical_uid' => $googleEvent->getICalUID(),
                 'title' => $googleEvent->getSummary() ?? '(No title)',

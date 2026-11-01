@@ -76,6 +76,15 @@ test('downloading a budget file streams the object stored on the s3 disk', funct
         ->and($response->headers->get('Content-Disposition'))->toContain('statement.pdf');
 });
 
+test('downloading a budget file whose stored object is missing returns 503, not an empty 200', function () {
+    $attachment = budgetFilesAttachment($this->budget, $this->user);
+    Storage::disk('s3')->delete('hash-statement');
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.files.download', [$this->budget, $attachment]))
+        ->assertStatus(503);
+});
+
 test('deleting a budget file removes the attachment, file and s3 object', function () {
     $attachment = budgetFilesAttachment($this->budget, $this->user);
 

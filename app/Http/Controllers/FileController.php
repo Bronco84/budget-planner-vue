@@ -13,6 +13,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class FileController extends Controller
 {
@@ -198,7 +199,11 @@ class FileController extends Controller
 
             // Stream file from S3 through Laravel
             return $this->fileService->downloadResponse($attachment);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Exception $e) {
+            report($e);
+
             abort(500, 'Failed to download file');
         }
     }

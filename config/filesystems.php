@@ -57,7 +57,9 @@ return [
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
-            'report' => false,
+            // Report swallowed storage failures (missing objects, outages,
+            // bad credentials) to the exception handler instead of hiding them.
+            'report' => true,
         ],
 
     ],

@@ -71,6 +71,12 @@ scenarios:
     tests:
       - tests/Feature/Files/BudgetFilesTest.php::downloading a budget file streams the object stored on the s3 disk
       - tests/Feature/Files/BudgetFilesTest.php::deleting a budget file removes the attachment, file and s3 object
+  - id: download_missing_object_returns_503
+    kind: recovery
+    description: Downloading a budget file whose stored S3 object is missing (or unreadable) logs the error and returns 503 instead of a 200 with an empty body.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/BudgetFilesTest.php::downloading a budget file whose stored object is missing returns 503, not an empty 200
   - id: oversized_file_rejected
     kind: validation
     description: Files over 10MB fail validation.

@@ -240,8 +240,20 @@ class FileService
     public function downloadResponse(FileAttachment $attachment): Response
     {
         $file = $attachment->file;
+        $contents = Storage::disk('s3')->get($file->hash);
 
-        return response(Storage::disk('s3')->get($file->hash), 200, [
+        // A null read means the object is missing or the disk failed (the disk
+        // reports the cause). Never answer 200 with an empty body.
+        if ($contents === null) {
+            Log::error('Stored file could not be read for download', [
+                'attachment_id' => $attachment->id,
+                'file_id' => $file->id,
+            ]);
+
+            abort(503, 'This file is temporarily unavailable.');
+        }
+
+        return response($contents, 200, [
             'Content-Type' => $file->mime_type,
             'Content-Disposition' => $this->getContentDispositionHeader($file->original_name),
             'Content-Length' => $file->size_bytes,

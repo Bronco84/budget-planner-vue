@@ -8,6 +8,8 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\FileService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 /*
@@ -173,4 +175,45 @@ test('a failure deleting an attachment returns a generic error', function () {
         ->assertExactJson(['error' => 'Failed to delete file. Please try again.']);
 
     expect($response->getContent())->not->toContain('SQLSTATE');
+});
+
+test('downloading a receipt whose stored object is missing fails loudly instead of returning an empty file', function () {
+    Log::spy();
+    $user = User::factory()->create();
+    $attachmentId = $this->actingAs($user)
+        ->post(route('transactions.files.upload', fileTestTransactionFor($user)), ['file' => receiptUpload('receipt.pdf')])
+        ->json('attachment.id');
+    Storage::disk('s3')->delete(FileAttachment::findOrFail($attachmentId)->file->hash);
+
+    $this->actingAs($user)
+        ->get(route('files.download', $attachmentId))
+        ->assertStatus(503);
+
+    Log::shouldHaveReceived('error')
+        ->withArgs(fn ($message, $context) => $message === 'Stored file could not be read for download'
+            && $context['attachment_id'] === $attachmentId)
+        ->once();
+});
+
+test('an unexpected failure while downloading a receipt is reported before the 500', function () {
+    Exceptions::fake();
+    $user = User::factory()->create();
+    $attachmentId = $this->actingAs($user)
+        ->post(route('transactions.files.upload', fileTestTransactionFor($user)), ['file' => receiptUpload('receipt.pdf')])
+        ->json('attachment.id');
+
+    $this->mock(FileService::class, function ($mock) {
+        $mock->shouldReceive('canUserAccessAttachment')->andReturnTrue();
+        $mock->shouldReceive('downloadResponse')->andThrow(new RuntimeException('S3 credentials rejected'));
+    });
+
+    $this->actingAs($user)
+        ->get(route('files.download', $attachmentId))
+        ->assertStatus(500);
+
+    Exceptions::assertReported(fn (RuntimeException $e) => $e->getMessage() === 'S3 credentials rejected');
+});
+
+test('the s3 disk reports storage failures it does not throw', function () {
+    expect(config('filesystems.disks.s3.report'))->toBeTrue();
 });

@@ -55,6 +55,7 @@ business_rules:
   - any budget member may list and download attachments; uploading and deleting needs the editor role (FileService::canUserAccessAttachment with write, BudgetPolicy::update)
   - de-duplication is scoped to the uploading user (files unique on hash + uploaded_by), so a user never sees another user's filename
   - upload/delete failures return a generic error; only FileValidationException messages are shown to the user
+  - an unreadable stored object (missing or storage failure) is logged and returns 503, never an empty 200
 scenarios:
   - id: upload_to_transaction
     kind: happy_path
@@ -109,6 +110,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Files/TransactionFileAttachmentTest.php::a failure deleting an attachment returns a generic error
+  - id: download_missing_object_fails_loudly
+    kind: recovery
+    description: When the stored S3 object is missing or the disk fails, download logs the error and returns 503 instead of a 200 with an empty body; any other download failure is reported before the 500. The s3 disk reports the failures it swallows (report true, throw false).
+    coverage: covered
+    tests:
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::downloading a receipt whose stored object is missing fails loudly instead of returning an empty file
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::an unexpected failure while downloading a receipt is reported before the 500
+      - tests/Feature/Files/TransactionFileAttachmentTest.php::the s3 disk reports storage failures it does not throw
   - id: other_users_transaction_files_forbidden
     kind: authorization
     description: Upload, list, download and delete on another user's transaction or attachment return 403.

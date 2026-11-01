@@ -451,7 +451,15 @@ class PlaidService
     }
 
     /**
-     * Get transactions for a specific date range
+     * Page size for /transactions/get (Plaid's maximum is 500, its default only 100).
+     */
+    public const TRANSACTIONS_PAGE_SIZE = 500;
+
+    /**
+     * Get every transaction in a date range for an Item, across all of its accounts.
+     *
+     * /transactions/get is paginated: each call returns at most options.count rows plus
+     * total_transactions, so this pages with options.offset until it has them all.
      *
      * @throws \Exception
      */
@@ -462,17 +470,28 @@ class PlaidService
         }
 
         try {
-            $response = $this->client->post('/transactions/get', [
-                'json' => [
-                    'access_token' => $accessToken,
-                    'start_date' => is_string($startDate) ? $startDate : $startDate->format('Y-m-d'),
-                    'end_date' => is_string($endDate) ? $endDate : $endDate->format('Y-m-d'),
-                ],
-            ]);
+            $transactions = [];
 
-            $result = json_decode($response->getBody(), true);
+            do {
+                $response = $this->client->post('/transactions/get', [
+                    'json' => [
+                        'access_token' => $accessToken,
+                        'start_date' => is_string($startDate) ? $startDate : $startDate->format('Y-m-d'),
+                        'end_date' => is_string($endDate) ? $endDate : $endDate->format('Y-m-d'),
+                        'options' => [
+                            'count' => self::TRANSACTIONS_PAGE_SIZE,
+                            'offset' => count($transactions),
+                        ],
+                    ],
+                ]);
 
-            return $result['transactions'] ?? [];
+                $result = json_decode($response->getBody(), true);
+                $page = $result['transactions'] ?? [];
+                array_push($transactions, ...$page);
+                $total = (int) ($result['total_transactions'] ?? count($transactions));
+            } while ($page !== [] && count($transactions) < $total);
+
+            return $transactions;
         } catch (RequestException $e) {
             $response = null;
             $errorDetails = null;

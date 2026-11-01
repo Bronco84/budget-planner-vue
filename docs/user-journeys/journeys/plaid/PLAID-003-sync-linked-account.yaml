@@ -40,6 +40,7 @@ business_rules:
   - ITEM_LOGIN_REQUIRED marks the PlaidConnection as 'error' (PlaidConnection::markAsError) and flashes "Your bank needs you to sign in again. Use Re-authenticate to reconnect this account."
   - a connect timeout flashes "Couldn't reach the bank connection service, please try again."; any other failure "Failed to sync transactions. Please try again."
   - investment accounts tolerate a transaction fetch failure (continue to balance/holdings) unless it is ITEM_LOGIN_REQUIRED
+  - /transactions/get is paged (options.count 500, increasing options.offset) until total_transactions is reached, so the whole 180-day window is imported for every account on the Item
 scenarios:
   - id: sync_imports_transactions
     kind: happy_path
@@ -47,6 +48,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::syncing a linked account imports new and updates existing transactions
+  - id: sync_pages_all_transactions
+    kind: edge
+    description: When the Item has more transactions than one /transactions/get page, sync keeps paging until total_transactions and imports all of this account's rows.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncTest.php::syncing pages through every transaction Plaid has, not just the first page
   - id: balance_uses_current
     kind: happy_path
     description: Balance refresh stores Plaid's current balance on both PlaidAccount and Account.

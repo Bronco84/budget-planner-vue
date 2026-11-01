@@ -88,6 +88,36 @@ final class FakePlaidApi
     }
 
     /**
+     * A /transactions/get stub that pages like Plaid: it honours options.count and
+     * options.offset (Plaid defaults count to 100) and reports total_transactions.
+     *
+     * @param  list<array<string, mixed>>  $transactions
+     */
+    public static function pagedTransactions(array $transactions): callable
+    {
+        return function (array $body) use ($transactions) {
+            $count = $body['options']['count'] ?? 100;
+            $offset = $body['options']['offset'] ?? 0;
+
+            return [
+                'transactions' => array_slice($transactions, $offset, $count),
+                'total_transactions' => count($transactions),
+            ];
+        };
+    }
+
+    /**
+     * @return list<array<string, mixed>> the bodies of every request to $path, in order
+     */
+    public function bodiesFor(string $path): array
+    {
+        return array_values(array_map(
+            fn (array $request) => $request['body'],
+            array_filter($this->requests, fn (array $request) => $request['path'] === $path)
+        ));
+    }
+
+    /**
      * @return list<string>
      */
     public function paths(): array

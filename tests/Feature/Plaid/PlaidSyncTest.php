@@ -106,6 +106,7 @@ test('syncing a linked account imports new and updates existing transactions', f
         'access_token' => 'access-sandbox-sync',
         'start_date' => '2025-09-16',
         'end_date' => '2026-03-15',
+        'options' => ['count' => 500, 'offset' => 0],
     ])->and($this->plaid->unexpected)->toBe([]);
 
     expect($existing->fresh())
@@ -133,6 +134,36 @@ test('syncing a linked account imports new and updates existing transactions', f
         ->available_balance_cents->toBe(340000)
         ->and($account->fresh()->current_balance_cents)->toBe(348766)
         ->and($plaidAccount->plaidConnection->fresh()->last_sync_at->toDateTimeString())->toBe('2026-03-15 10:00:00');
+});
+
+test('syncing pages through every transaction Plaid has, not just the first page', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+
+    // 1,100 transactions across the Item: newest first, alternating with another account's.
+    $all = [];
+    for ($i = 0; $i < 1100; $i++) {
+        $all[] = [
+            'transaction_id' => "tx-{$i}", 'account_id' => $i % 2 === 0 ? 'plaid-checking' : 'plaid-savings',
+            'amount' => 1.00, 'date' => Carbon\Carbon::parse('2026-03-14')->subDays(intdiv($i, 10))->toDateString(),
+            'name' => "Purchase {$i}", 'pending' => false,
+        ];
+    }
+
+    $this->plaid
+        ->on('/transactions/get', FakePlaidApi::pagedTransactions($all))
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 550 new and updated 0 transactions.');
+
+    expect(array_column($this->plaid->bodiesFor('/transactions/get'), 'options'))->toBe([
+        ['count' => 500, 'offset' => 0],
+        ['count' => 500, 'offset' => 500],
+        ['count' => 500, 'offset' => 1000],
+    ])->and(Transaction::where('account_id', $account->id)->count())->toBe(550)
+        ->and(Transaction::where('plaid_transaction_id', 'tx-1098')->exists())->toBeTrue();
 });
 
 test('syncing a credit card also refreshes its statement liability data', function () {

@@ -98,7 +98,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [RECUR-002](journeys/recurring/RECUR-002-edit-duplicate-delete-template.yaml) | User edits, duplicates or deletes a recurring template | high | yes | partial | yes | yes | missing | no | **partial** |
 | [RECUR-003](journeys/recurring/RECUR-003-manage-matching-rules.yaml) | User manages a template's transaction matching rules | high | yes | yes | yes | yes | missing | no | **covered** |
 | [RECUR-004](journeys/recurring/RECUR-004-inspect-and-correct-linked-transactions.yaml) | User inspects and corrects a template's linked transactions | medium | yes | yes | yes | yes | missing | no | **covered** |
-| [RECUR-005](journeys/recurring/RECUR-005-bulk-link-matching-transactions.yaml) | User reviews and bulk-links unlinked transactions to templates | medium | yes | yes | yes | missing | missing | no | **covered** |
+| [RECUR-005](journeys/recurring/RECUR-005-bulk-link-matching-transactions.yaml) | User reviews and bulk-links unlinked transactions to templates | medium | yes | yes | yes | yes | missing | no | **covered** |
 | [RECUR-006](journeys/recurring/RECUR-006-discover-patterns-and-create-templates.yaml) | User discovers recurring patterns and creates templates from them | high | yes | yes | yes | yes | yes | no | **covered** |
 | [REPORT-001](journeys/reports/REPORT-001-reports-dashboard.yaml) | User reviews the financial reports dashboard | high | yes | yes | yes | yes | missing | no | **covered** |
 | [REPORT-002](journeys/reports/REPORT-002-monthly-yearly-statistics.yaml) | User views monthly and yearly budget statistics | medium | yes | yes | yes | missing | missing | yes | **covered** |

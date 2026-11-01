@@ -6,6 +6,8 @@ use App\Models\PlaidTransaction;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\RecurringTransactionService;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -91,6 +93,62 @@ test('find matching shows the empty state with no templates or no matching trans
             ->where('totalTemplates', 0)
             ->where('totalMatches', 0)
             ->has('templatesWithMatches', 0));
+});
+
+test('find matching reports entity and description matches with linked counts, without loading linked transactions or raw plaid data', function () {
+    $template = RecurringTransactionTemplate::factory()->create([
+        'budget_id' => $this->budget->id, 'account_id' => $this->account->id,
+        'description' => 'Electric bill', 'plaid_entity_id' => 'ent-power',
+    ]);
+    foreach (range(1, 3) as $i) {
+        Transaction::factory()->create([
+            'budget_id' => $this->budget->id, 'account_id' => $this->account->id,
+            'recurring_transaction_template_id' => $template->id,
+        ]);
+    }
+    $byCounterparty = recurBulkPlaidTransaction($this->account, 'ptx-cp', 'POWER CO 123', ['date' => '2026-03-05']);
+    PlaidTransaction::where('plaid_transaction_id', 'ptx-cp')->update([
+        'counterparties' => json_encode([['name' => 'Power Co', 'entity_id' => 'ent-power']]),
+        'original_data' => json_encode(['raw' => str_repeat('x', 100)]),
+    ]);
+    $byMerchant = recurBulkPlaidTransaction($this->account, 'ptx-me', 'PWR AUTOPAY', ['date' => '2026-02-05']);
+    PlaidTransaction::where('plaid_transaction_id', 'ptx-me')->update(['merchant_entity_id' => 'ent-power', 'merchant_name' => 'Power Co']);
+    $byDescription = recurBulkPlaidTransaction($this->account, 'ptx-desc', 'Electric bill', ['date' => '2026-01-05']);
+    recurBulkPlaidTransaction($this->account, 'ptx-none', 'Corner Bakery');
+
+    DB::enableQueryLog();
+    $result = app(RecurringTransactionService::class)->findMatchingTransactionsForTemplates($this->budget);
+    $queries = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    expect($result['total_templates'])->toBe(1)
+        ->and($result['total_matches'])->toBe(3)
+        ->and($result['templates_with_matches'][0]['template'])->toMatchArray([
+            'id' => $template->id,
+            'linked_count' => 3,
+            'account_name' => $this->account->name,
+        ])
+        ->and($result['templates_with_matches'][0]['matching_transactions'])->toBe([
+            [
+                'id' => $byCounterparty->id, 'description' => 'POWER CO 123', 'plaid_description' => 'POWER CO 123',
+                'merchant_name' => null, 'amount_in_cents' => -999, 'date' => '2026-03-05',
+                'account_id' => $this->account->id, 'account_name' => $this->account->name,
+            ],
+            [
+                'id' => $byMerchant->id, 'description' => 'PWR AUTOPAY', 'plaid_description' => 'PWR AUTOPAY',
+                'merchant_name' => 'Power Co', 'amount_in_cents' => -999, 'date' => '2026-02-05',
+                'account_id' => $this->account->id, 'account_name' => $this->account->name,
+            ],
+            [
+                'id' => $byDescription->id, 'description' => 'Electric bill', 'plaid_description' => 'Electric bill',
+                'merchant_name' => null, 'amount_in_cents' => -999, 'date' => '2026-01-05',
+                'account_id' => $this->account->id, 'account_name' => $this->account->name,
+            ],
+        ])
+        // Linked transactions are counted in SQL, not loaded per template.
+        ->and($queries->filter(fn ($sql) => str_contains($sql, '"recurring_transaction_template_id" in'))->all())->toBe([])
+        // The raw Plaid payload columns are never selected.
+        ->and($queries->filter(fn ($sql) => str_contains($sql, 'from "plaid_transactions"') && str_contains($sql, 'select *'))->all())->toBe([]);
 });
 
 test('an already linked transaction is not re-linked and nothing is reported as linked', function () {

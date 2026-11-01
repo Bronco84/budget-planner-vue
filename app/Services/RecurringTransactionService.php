@@ -998,8 +998,10 @@ class RecurringTransactionService
         $results = [];
 
         // Get all recurring templates for this budget
+        // Linked transactions are only counted, so count them in SQL.
         $templates = RecurringTransactionTemplate::where('budget_id', $budget->id)
-            ->with(['account', 'transactions'])
+            ->with('account')
+            ->withCount('transactions')
             ->orderBy('description')
             ->get();
 
@@ -1011,11 +1013,15 @@ class RecurringTransactionService
             ];
         }
 
-        // Get all unlinked Plaid transactions for this budget
+        // Get all unlinked Plaid transactions for this budget, with only the Plaid
+        // fields matching and display read (not the raw payload columns)
         $unlinkedTransactions = Transaction::where('budget_id', $budget->id)
             ->whereNull('recurring_transaction_template_id')
             ->whereNotNull('plaid_transaction_id')
-            ->with('plaidTransaction', 'account')
+            ->with([
+                'plaidTransaction:id,plaid_transaction_id,name,merchant_name,merchant_entity_id,counterparties',
+                'account:id,name',
+            ])
             ->orderBy('date', 'desc')
             ->get();
 
@@ -1053,7 +1059,7 @@ class RecurringTransactionService
                         'frequency' => $template->frequency,
                         'account_id' => $template->account_id,
                         'account_name' => $template->account?->name,
-                        'linked_count' => $template->transactions->count(),
+                        'linked_count' => $template->transactions_count,
                         'plaid_entity_id' => $template->plaid_entity_id,
                         'plaid_entity_name' => $template->plaid_entity_name,
                     ],

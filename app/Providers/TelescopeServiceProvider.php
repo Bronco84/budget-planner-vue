@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Gate;
+use Laravel\Telescope\EntryType;
 use Laravel\Telescope\IncomingEntry;
 use Laravel\Telescope\Telescope;
 use Laravel\Telescope\TelescopeApplicationServiceProvider;
@@ -18,9 +19,10 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
         $this->hideSensitiveRequestDetails();
 
-        // Log everything since this is a single-user app
+        // Log everything since this is a single-user app, except outside
+        // local: mail, whose bodies carry live magic-link and invitation URLs.
         Telescope::filter(function (IncomingEntry $entry) {
-            return true;
+            return $this->app->environment('local') || $entry->type !== EntryType::MAIL;
         });
     }
 
@@ -35,8 +37,11 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
         Telescope::hideRequestParameters(['_token']);
 
+        // Telescope masks these in response headers too: set-cookie carries
+        // the session and the 90-day trusted-device token.
         Telescope::hideRequestHeaders([
             'cookie',
+            'set-cookie',
             'x-csrf-token',
             'x-xsrf-token',
         ]);

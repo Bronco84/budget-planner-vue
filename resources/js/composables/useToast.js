@@ -31,6 +31,19 @@ export function useToast() {
         },
 
         /**
+         * Toast the outcome a redirect flashed (flash.message / flash.error).
+         * Pass it the page an Inertia visit's onSuccess receives; Inertia
+         * treats a redirect back as success, so a flashed refusal is only
+         * visible if the caller shows it.
+         * @param {Object} visited - The page object from onSuccess
+         */
+        flash(visited) {
+            const { message, error } = visited?.props?.flash || {};
+            if (message) this.success(message);
+            if (error) this.error(error);
+        },
+
+        /**
          * Show a confirmation dialog
          * @param {Object} options - Configuration options
          * @param {string} options.title - Dialog title

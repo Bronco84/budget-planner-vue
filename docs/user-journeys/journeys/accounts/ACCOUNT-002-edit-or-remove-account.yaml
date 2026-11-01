@@ -32,9 +32,9 @@ steps:
   - action: save changes (PUT /budgets/{budget}/accounts/{account})
     expected: account updated, redirect to budgets.show
   - action: fetch logo (POST .../fetch-logo) or clear logo (DELETE .../logo)
-    expected: logo_url set from the institution mapping (custom_logo cleared) or both cleared; back with flash message
+    expected: logo_url set from the institution mapping (custom_logo cleared) or both cleared; back with flash message, which the edit page toasts
   - action: delete account (DELETE /budgets/{budget}/accounts/{account})
-    expected: account deleted and redirect to dashboard, or back with error when it has transactions
+    expected: account deleted and redirect to dashboard, or back with a flash error (toasted on the edit page) when it has transfers or transactions
 postconditions:
   - account updated, logo changed, or account removed
 business_rules:

@@ -299,6 +299,7 @@ import { ref, computed, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import RecurringTransactionConfirmationModal from './Partials/RecurringTransactionConfirmationModal.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps({
   budget: Object,
@@ -307,6 +308,8 @@ const props = defineProps({
 });
 
 // Form for analysis parameters
+const toast = useToast();
+
 const form = useForm({
   account_id: '',
   analysis_period_months: 6,
@@ -341,6 +344,8 @@ const allPatternsSelected = computed(() => {
 const runAnalysis = () => {
   form.post(route('recurring-transactions.analysis.analyze', props.budget.id), {
     onSuccess: (page) => {
+      // A failed analysis redirects back with flash.error
+      toast.flash(page);
       if (page.props.analysisResult) {
         analysisResults.value = page.props.analysisResult;
         selectedPatterns.value = [];
@@ -374,6 +379,8 @@ const handleTemplateCreation = async (templatesData) => {
 
   templateForm.post(route('recurring-transactions.analysis.create-templates', props.budget.id), {
     onSuccess: (page) => {
+      // Partial or failed creation flashes an error; success flashes a message
+      toast.flash(page);
       creatingTemplates.value = false;
       selectedPatterns.value = [];
       showConfirmationModal.value = false;

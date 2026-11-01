@@ -20,7 +20,7 @@ depends_on:
 integrations: []
 steps:
   - action: confirm delete (DELETE /budgets/{budget}/categories/{category})
-    expected: category removed and back with success flash, or back with an error naming the transaction count
+    expected: category removed and back with success flash, or back with an error naming the transaction count; the delete modal toasts either flash
 postconditions:
   - category deleted only when no transaction references it
 business_rules:

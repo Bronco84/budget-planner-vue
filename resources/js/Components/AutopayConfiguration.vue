@@ -111,6 +111,7 @@
 import { ref, computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps({
   account: {
@@ -145,6 +146,8 @@ const amountOverrideDollars = ref(
     ? (props.account.autopay_amount_override_cents / 100).toFixed(2)
     : ''
 );
+
+const toast = useToast();
 
 const form = useForm({
   autopay_enabled: props.account?.autopay_enabled || false,
@@ -184,9 +187,8 @@ const paymentAmount = computed(() => {
 const submitAutopayConfig = () => {
   form.post(`/budgets/${props.budgetId}/accounts/${props.account.id}/autopay`, {
     preserveScroll: true,
-    onSuccess: () => {
-      // Form will be reset by Inertia
-    },
+    // Refusals (ineligible card, bad source account) redirect back with flash.error
+    onSuccess: (visited) => toast.flash(visited),
   });
 };
 

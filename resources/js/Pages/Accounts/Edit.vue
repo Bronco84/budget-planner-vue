@@ -452,6 +452,7 @@ import Modal from '@/Components/Modal.vue';
 import PlaidSyncTimestamp from '@/Components/PlaidSyncTimestamp.vue';
 import InstitutionLogo from '@/Components/InstitutionLogo.vue';
 import { resizeLogo } from '@/utils/logoImage.js';
+import { useToast } from '@/composables/useToast';
 
 // Define props to receive the budget and account
 const props = defineProps({
@@ -499,6 +500,8 @@ const getAccountTypeDisplayName = (type) => {
   };
   return typeMap[type?.toLowerCase()] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Unknown');
 };
+
+const toast = useToast();
 
 // Set up account status based on include_in_budget
 const accountStatus = ref(props.account.include_in_budget ? 'active' : 'excluded');
@@ -609,6 +612,7 @@ const fetchLogo = () => {
   router.post(route('accounts.fetchLogo', [props.budget.id, props.account.id]), {}, {
     preserveScroll: true,
     preserveState: false, // Force full page refresh to get updated account data
+    onSuccess: (visited) => toast.flash(visited),
     onFinish: () => {
       fetchingLogo.value = false;
     },
@@ -624,6 +628,7 @@ const clearLogo = () => {
   router.delete(route('accounts.clearLogo', [props.budget.id, props.account.id]), {
     preserveScroll: true,
     preserveState: false, // Force full page refresh to get updated account data
+    onSuccess: (visited) => toast.flash(visited),
     onFinish: () => {
       if (logoInput.value) {
         logoInput.value.value = '';
@@ -660,6 +665,8 @@ const deleteAccount = () => {
   deleting.value = true;
 
   form.delete(route('budgets.accounts.destroy', [props.budget.id, props.account.id]), {
+    // A refusal (transfers or transactions) redirects back with flash.error
+    onSuccess: (visited) => toast.flash(visited),
     onFinish: () => {
       deleting.value = false;
       closeModal();

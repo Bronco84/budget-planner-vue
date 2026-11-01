@@ -3,6 +3,7 @@ import { useForm } from '@inertiajs/vue3';
 import Modal from '@/Components/Modal.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps({
     show: {
@@ -22,6 +23,7 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 
 const form = useForm({});
+const toast = useToast();
 
 const closeModal = () => {
     form.clearErrors();
@@ -33,7 +35,9 @@ const deleteCategory = () => {
 
     form.delete(route('budgets.categories.destroy', [props.budget.id, props.category.id]), {
         preserveScroll: true,
-        onSuccess: () => {
+        // A refusal (category still has transactions) redirects back with flash.error
+        onSuccess: (visited) => {
+            toast.flash(visited);
             closeModal();
         },
     });

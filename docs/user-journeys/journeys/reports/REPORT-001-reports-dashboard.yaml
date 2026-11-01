@@ -36,6 +36,7 @@ business_rules:
   - budget performance allocation = category monthly amount x months in the range, where each partial calendar month counts as days covered / days in that month
   - budget performance and spending-by-category match transactions to categories by category_id, falling back to the legacy category string for unlinked rows (spending patterns group by the linked category's current name)
   - income vs expenses values each template at its projected amount (RecurringTransactionService::projectedAmount, so dynamic templates use their calculated amount), uses only active templates (started, not ended) and normalises frequencies to monthly (weekly x4.33, biweekly x2.17, bimonthly x2, quarterly /3, yearly /12, daily x30.44)
+  - date_range must be one of 30days, 3months, 6months, ytd, year, all, custom; custom start/end dates must fall between 2000-01-01 and 2100-12-31 (invalid input redirects back with validation errors)
   - requires budget view ability
 scenarios:
   - id: dashboard_renders
@@ -114,6 +115,12 @@ scenarios:
     tests:
       - tests/Feature/Reports/ReportsDateRangeTest.php::reports reject an unparsable or inverted custom date range
       - tests/Feature/Reports/ReportsDateRangeTest.php::reports accept a valid custom date range
+  - id: invalid_preset_or_span
+    kind: validation
+    description: An unknown or non-string date_range preset, or a custom date outside 2000-01-01..2100-12-31, is rejected instead of erroring or looping over centuries.
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsDateRangeTest.php::reports reject an unknown date range preset or a date outside the supported span
   - id: cross_user_forbidden
     kind: authorization
     description: Another user cannot open reports for a budget they do not own (403).

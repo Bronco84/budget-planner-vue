@@ -131,3 +131,58 @@ test('an account id that is not in the budget falls back to the default account'
             ->component('Budgets/Show')
             ->where('selectedAccountId', $checking->id));
 })->with(['other budget', 'nonexistent']);
+
+test('invalid projection months are ignored and never saved as the preference', function (mixed $requested) {
+    Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+    $this->user->setPreference("budget_{$this->budget->id}_projection_months", 3);
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.show', [$this->budget, 'projection_months' => $requested]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('projectionParams.months', 3));
+
+    expect((int) $this->user->fresh()->getPreference("budget_{$this->budget->id}_projection_months"))->toBe(3);
+})->with([
+    'far above the offered range' => [100000],
+    'just above the offered range' => [13],
+    'negative' => [-1],
+    'non-integer' => ['six'],
+    'fractional' => ['1.5'],
+    'array' => [[6]],
+]);
+
+test('zero projection months is accepted and saved', function () {
+    Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.show', [$this->budget, 'projection_months' => 0]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('projectionParams.months', 0));
+
+    expect((int) $this->user->fresh()->getPreference("budget_{$this->budget->id}_projection_months"))->toBe(0);
+});
+
+test('an out-of-range saved projection preference is clamped when read', function () {
+    Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+    $this->user->setPreference("budget_{$this->budget->id}_projection_months", 100000);
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.show', $this->budget))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('projectionParams.months', 12));
+});
+
+test('malformed date range and start date fall back instead of erroring', function (array $query) {
+    Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.show', array_merge([$this->budget], $query)))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('Budgets/Show'));
+})->with([
+    'unknown preset' => [['date_range' => 'forever']],
+    'array preset' => [['date_range' => ['custom']]],
+    'unparsable custom start' => [['date_range' => 'custom', 'start_date' => 'not-a-date']],
+    'array custom start' => [['date_range' => 'custom', 'start_date' => ['2026-01-01']]],
+    'valid custom start' => [['date_range' => 'custom', 'start_date' => '2026-01-01']],
+]);

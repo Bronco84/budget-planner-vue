@@ -11,11 +11,17 @@ use App\Services\PlaidService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class BudgetController extends Controller
 {
+    /**
+     * Projection horizon the dashboard offers (BudgetProjectionModal: 0-12 months).
+     */
+    private const MAX_PROJECTION_MONTHS = 12;
+
     /**
      * Create the controller instance.
      */
@@ -170,8 +176,17 @@ class BudgetController extends Controller
 
         // Get saved projection months preference for this budget, default to 1
         $preferenceKey = "budget_{$budget->id}_projection_months";
+        // Clamp the saved value so an out-of-range preference can't break the dashboard.
         $savedProjectionMonths = (int) $user->getPreference($preferenceKey, 1);
-        $monthsToProject = $savedProjectionMonths;
+        $monthsToProject = max(0, min(self::MAX_PROJECTION_MONTHS, $savedProjectionMonths));
+
+        // Query params that fail validation are ignored (fall back to defaults) rather than
+        // erroring, so a bad link never breaks the dashboard or gets saved as a preference.
+        $query = Validator::make($request->query(), [
+            'projection_months' => ['integer', 'between:0,'.self::MAX_PROJECTION_MONTHS],
+            'date_range' => ['string', 'in:7,30,90,custom'],
+            'start_date' => ['string', 'date_format:Y-m-d'],
+        ])->valid();
 
         // Only process account data if budget has accounts
         if ($budget->accounts->count() > 0) {
@@ -188,15 +203,15 @@ class BudgetController extends Controller
 
             // Get projection and date range parameters
             // If request has projection_months, use it and save as preference
-            if ($request->has('projection_months')) {
-                $monthsToProject = (int) $request->input('projection_months');
+            if (isset($query['projection_months'])) {
+                $monthsToProject = (int) $query['projection_months'];
                 // Save the preference for next time
                 if ($monthsToProject !== $savedProjectionMonths) {
                     $user->setPreference($preferenceKey, $monthsToProject);
                 }
             }
-            $dateRange = $request->input('date_range', '90');
-            $startDate = $budgetService->parseDateRange($dateRange, $request->input('start_date'));
+            $dateRange = $query['date_range'] ?? '90';
+            $startDate = $budgetService->parseDateRange($dateRange, $query['start_date'] ?? null);
             $endDate = now()->addMonths($monthsToProject)->endOfMonth();
 
             // Get all transactions (actual, pending, and projected)

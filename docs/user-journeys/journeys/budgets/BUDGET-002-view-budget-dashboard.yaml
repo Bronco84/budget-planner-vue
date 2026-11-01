@@ -35,6 +35,8 @@ business_rules:
   - "any member can view the dashboard; budgetAccess (role, can.edit/manage/manage_connections) hides edit, sync, add, connect and settings controls from viewers, and owner controls from editors (server policies still enforce)"
   - per_page is clamped to 10..200 (default 100)
   - default date range is 90 days; default projection horizon is the saved preference or 1 month
+  - projection_months must be an integer 0..12 (the range BudgetProjectionModal offers); invalid values are ignored and never saved, and a saved preference is clamped to 0..12 when read
+  - date_range must be one of 7, 30, 90 or custom and start_date a Y-m-d date; invalid values fall back to the defaults instead of erroring
   - accounts excluded from total balance are ignored by the total; liabilities are subtracted
   - with no accounts the page renders an empty "No Accounts Yet" state and no ledger
 scenarios:
@@ -66,6 +68,20 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetDashboardTest.php::requested projection months are saved and reused on the next visit
+      - tests/Feature/Budgets/BudgetDashboardTest.php::zero projection months is accepted and saved
+  - id: invalid_projection_months_ignored
+    kind: validation
+    description: Out-of-range, non-integer or array projection_months is ignored (the saved preference is used and not overwritten), and an out-of-range saved preference is clamped to 12.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetDashboardTest.php::invalid projection months are ignored and never saved as the preference
+      - tests/Feature/Budgets/BudgetDashboardTest.php::an out-of-range saved projection preference is clamped when read
+  - id: malformed_date_range_falls_back
+    kind: validation
+    description: An unknown or array date_range, or an unparsable start_date, falls back to the default range and renders 200.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetDashboardTest.php::malformed date range and start date fall back instead of erroring
   - id: foreign_account_id_falls_back
     kind: edge
     description: An account_id belonging to another budget, or that does not exist, falls back to the budget's default account instead of erroring.

@@ -45,3 +45,15 @@ test('reports reject an unparsable or inverted custom date range', function (arr
     'unparsable end' => [['start_date' => '2026-01-01', 'end_date' => 'garbage'], 'end_date'],
     'start after end' => [['start_date' => '2026-05-01', 'end_date' => '2026-01-01'], 'end_date'],
 ]);
+
+test('reports reject an unknown date range preset or a date outside the supported span', function (array $query, string $field) {
+    $this->actingAs($this->user)
+        ->get(route('reports.index', array_merge([$this->budget], $query)))
+        ->assertRedirect()
+        ->assertSessionHasErrors($field);
+})->with([
+    'array preset' => [['date_range' => ['custom']], 'date_range'],
+    'unknown preset' => [['date_range' => 'forever'], 'date_range'],
+    'start before 2000' => [['date_range' => 'custom', 'start_date' => '0001-01-01', 'end_date' => '2026-01-01'], 'start_date'],
+    'end after 2100' => [['date_range' => 'custom', 'start_date' => '2026-01-01', 'end_date' => '9999-12-31'], 'end_date'],
+]);

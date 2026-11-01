@@ -23,9 +23,12 @@ class ReportsController extends Controller
     {
         $this->authorize('view', $budget);
 
+        // Bound custom dates to the range the 'all' preset covers, so a hand-typed
+        // date can't make the per-interval loops below run for centuries.
         $request->validate([
-            'start_date' => 'nullable|date',
-            'end_date' => ['nullable', 'date', Rule::when($request->filled('start_date'), 'after_or_equal:start_date')],
+            'date_range' => ['nullable', 'string', Rule::in(['30days', '3months', '6months', 'ytd', 'year', 'all', 'custom'])],
+            'start_date' => 'nullable|date|after_or_equal:2000-01-01|before_or_equal:2100-12-31',
+            'end_date' => ['nullable', 'date', 'after_or_equal:2000-01-01', 'before_or_equal:2100-12-31', Rule::when($request->filled('start_date'), 'after_or_equal:start_date')],
         ]);
 
         // Load relationships

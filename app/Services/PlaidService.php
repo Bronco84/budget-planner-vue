@@ -15,7 +15,9 @@ use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class PlaidService
@@ -957,14 +959,41 @@ class PlaidService
     }
 
     /**
+     * How long a sync waits for another sync of the same connection to finish.
+     */
+    public const SYNC_LOCK_WAIT_SECONDS = 60;
+
+    /**
+     * The cache lock that serialises syncs of one Plaid connection.
+     */
+    public static function syncLockKey(PlaidAccount $plaidAccount): string
+    {
+        return 'plaid-sync:connection:'.$plaidAccount->plaid_connection_id;
+    }
+
+    /**
      * Sync transactions from Plaid to the application.
+     *
+     * Syncs of the same connection run one at a time (two members, two tabs, or Sync all
+     * alongside a single sync), because the import checks for an existing row before
+     * inserting and concurrent runs would insert the same transaction twice.
      *
      * @param  int  $days  Number of days in the past to sync
      * @return array{imported: int, updated: int}
      *
      * @throws \Exception when Plaid fails; ITEM_LOGIN_REQUIRED also marks the connection as errored
+     * @throws LockTimeoutException when another sync of the connection does not finish in time
      */
     public function syncTransactions(PlaidAccount $plaidAccount, int $days = 180): array
+    {
+        return Cache::lock(self::syncLockKey($plaidAccount), 600)
+            ->block(self::SYNC_LOCK_WAIT_SECONDS, fn () => $this->syncTransactionsUnlocked($plaidAccount, $days));
+    }
+
+    /**
+     * @return array{imported: int, updated: int}
+     */
+    private function syncTransactionsUnlocked(PlaidAccount $plaidAccount, int $days): array
     {
         $endDate = Carbon::today();
         $startDate = Carbon::today()->subDays($days);

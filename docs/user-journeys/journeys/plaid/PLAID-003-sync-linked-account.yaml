@@ -42,6 +42,7 @@ business_rules:
   - investment accounts tolerate a transaction fetch failure (continue to balance/holdings) unless it is ITEM_LOGIN_REQUIRED
   - a posted transaction that settles an imported pending one (by pending_transaction_id, or else the closest still-pending look-alike on the account) updates that row in place with the new Plaid id, amount and date, so its category, notes, recurring link and attachments are kept
   - a pending transaction arriving under a new Plaid id is merged into the closest look-alike that Plaid still reports as pending (amount within $1, date within 3 days, similar description); posted look-alikes are never matched
+  - syncs of one Plaid connection run one at a time (cache lock plaid-sync:connection:{id}, waiting up to 60s for a running sync before failing with the generic sync error), so concurrent syncs cannot import the same transaction twice
   - /transactions/get is paged (options.count 500, increasing options.offset) until total_transactions is reached, so the whole 180-day window is imported for every account on the Item
 scenarios:
   - id: sync_imports_transactions
@@ -68,6 +69,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::a pending transaction with a new Plaid id replaces its pending look-alike but never a posted one
+  - id: concurrent_syncs_serialised
+    kind: edge
+    description: A sync holds a per-connection lock while it imports and releases it afterwards, so two members or tabs syncing at once cannot duplicate transactions.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncTest.php::a sync holds the connection lock while it imports, so concurrent syncs cannot insert the same transaction twice
   - id: balance_uses_current
     kind: happy_path
     description: Balance refresh stores Plaid's current balance on both PlaidAccount and Account.

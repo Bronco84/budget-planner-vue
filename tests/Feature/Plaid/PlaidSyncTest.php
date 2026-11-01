@@ -12,6 +12,7 @@ use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\PlaidService;
+use Illuminate\Support\Facades\Cache;
 use Tests\Support\FakePlaidApi;
 
 /*
@@ -284,6 +285,37 @@ test('a pending transaction with a new Plaid id replaces its pending look-alike 
         ->plaid_transaction_id->toBe('tx-p2')
         ->amount_in_cents->toBe(-2050)
         ->and(Transaction::where('account_id', $account->id)->count())->toBe(3);
+});
+
+test('a sync holds the connection lock while it imports, so concurrent syncs cannot insert the same transaction twice', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $lockKey = PlaidService::syncLockKey($plaidAccount);
+    $lockFreeDuringImport = null;
+
+    $this->plaid
+        ->on('/transactions/get', function () use ($lockKey, &$lockFreeDuringImport) {
+            $probe = Cache::lock($lockKey, 10);
+            $lockFreeDuringImport = $probe->get();
+            if ($lockFreeDuringImport) {
+                $probe->release();
+            }
+
+            return ['transactions' => [[
+                'transaction_id' => 'tx-once', 'account_id' => 'plaid-checking', 'amount' => 3.00,
+                'date' => '2026-03-14', 'name' => 'Bakery', 'pending' => false,
+            ]]];
+        })
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    app(PlaidService::class)->syncTransactions($plaidAccount);
+
+    expect($lockFreeDuringImport)->toBeFalse()
+        ->and(Transaction::where('plaid_transaction_id', 'tx-once')->count())->toBe(1);
+
+    // Released afterwards, so the next sync can run.
+    $after = Cache::lock($lockKey, 10);
+    expect($after->get())->toBeTrue();
+    $after->release();
 });
 
 test('syncing a credit card also refreshes its statement liability data', function () {

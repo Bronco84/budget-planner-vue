@@ -66,7 +66,7 @@ return [
     | When true, magic link emails are queued so the response time does not
     | reveal whether an account exists. Magic links are the fallback sign-in,
     | so only enable this once a queue worker is running; otherwise links
-    | are never delivered.
+    | are never delivered. New-device sign-in alerts use the same switch.
     |
     */
 

@@ -59,10 +59,27 @@ class DeviceTokenService
             'auth_method' => $authMethod,
         ]);
 
-        // Send new device login notification email (queued for performance)
-        Mail::to($user->email)->queue(new NewDeviceLogin($user, $device));
+        $this->sendNewDeviceAlert($user, $device);
 
         return $device;
+    }
+
+    /**
+     * Email the user about a sign-in from a new device. Queued only when a
+     * worker is known to be running (auth.magic_link_queue, the same switch
+     * as magic links); a mail failure is reported but never fails the
+     * sign-in or registration that already succeeded.
+     */
+    private function sendNewDeviceAlert(User $user, TrustedDevice $device): void
+    {
+        try {
+            $mail = Mail::to($user->email);
+            $message = new NewDeviceLogin($user, $device);
+
+            config('auth.magic_link_queue') ? $mail->queue($message) : $mail->send($message);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

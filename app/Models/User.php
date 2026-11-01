@@ -122,6 +122,8 @@ class User extends Authenticatable implements MustVerifyEmail, WebAuthnAuthentic
 
     /**
      * Get the user's trusted devices.
+     *
+     * @return HasMany<TrustedDevice, $this>
      */
     public function trustedDevices(): HasMany
     {

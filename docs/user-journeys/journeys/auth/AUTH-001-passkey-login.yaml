@@ -37,6 +37,7 @@ business_rules:
   - a failed assertion returns 422 without creating a session
   - challenges are single use (pulled from the session on the first attempt)
   - an assertion whose signature counter does not advance past the stored one is treated as a cloned authenticator and the credential is disabled; authenticators that always report 0 (synced passkeys) are allowed
+  - the first sign-in from a new device emails a NewDeviceLogin alert, sent during the request unless auth.magic_link_queue is on (the same switch as magic links, off until production runs a queue worker); a mail failure is reported and never fails the sign-in
 scenarios:
   - id: login_page_renders
     kind: happy_path
@@ -85,6 +86,18 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::authenticators that do not implement a signature counter can sign in repeatedly'
+  - id: new_device_alert_sent
+    kind: alternate
+    description: A sign-in that trusts a new device sends the new-device alert synchronously by default, and queues it only when the queue switch is on.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::signing in on a new device sends the alert immediately unless the queue switch is on'
+  - id: new_device_alert_failure_does_not_fail_login
+    kind: recovery
+    description: When the new-device alert cannot be sent, the error is reported and the sign-in still returns 204 with the trusted-device cookie.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a new device alert that fails to send does not fail the passkey sign-in'
   - id: options_rate_limited
     kind: edge
     description: Login option requests beyond 10 per minute are throttled.

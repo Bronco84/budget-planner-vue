@@ -34,7 +34,7 @@ depends_on:
     reason: fingerprints the browser for the trusted device
 integrations:
   - WebAuthn (laragear/webauthn), browser credential API
-  - Mail (NewDeviceLogin notification queued on first trust of a device)
+  - Mail (NewDeviceLogin notification on first trust of a device; sent synchronously unless auth.magic_link_queue is on, and a send failure is reported without failing the registration)
 steps:
   - action: visit /register
     expected: Auth/Register page rendered with name + email fields

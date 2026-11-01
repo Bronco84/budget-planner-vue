@@ -1,10 +1,13 @@
 <?php
 
+use App\Mail\NewDeviceLogin;
 use App\Models\TrustedDevice;
 use App\Models\User;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
 use Tests\Support\SoftwareAuthenticator;
 
@@ -193,4 +196,41 @@ test('authenticators that do not implement a signature counter can sign in repea
     }
 
     expect(WebAuthnCredential::sole()->counter)->toBe(0);
+});
+
+test('signing in on a new device sends the alert immediately unless the queue switch is on', function (bool $queue) {
+    config(['auth.magic_link_queue' => $queue]);
+    Mail::fake();
+    $authenticator = new SoftwareAuthenticator;
+    $user = enrolledPasskeyUser($authenticator);
+
+    $this->postJson(route('webauthn.login'), passkeyAssertion($authenticator))->assertNoContent();
+
+    if ($queue) {
+        Mail::assertQueued(NewDeviceLogin::class, fn ($mail) => $mail->hasTo($user->email));
+        Mail::assertNotSent(NewDeviceLogin::class);
+    } else {
+        Mail::assertSent(NewDeviceLogin::class, fn ($mail) => $mail->hasTo($user->email));
+        Mail::assertNotQueued(NewDeviceLogin::class);
+    }
+})->with([
+    'no queue worker (default)' => [false],
+    'queue worker running' => [true],
+]);
+
+test('a new device alert that fails to send does not fail the passkey sign-in', function () {
+    $authenticator = new SoftwareAuthenticator;
+    $user = enrolledPasskeyUser($authenticator);
+    $assertion = passkeyAssertion($authenticator);
+
+    Mail::shouldReceive('to')->andThrow(new RuntimeException('SMTP down'));
+    $this->mock(ExceptionHandler::class, function ($mock) {
+        $mock->shouldReceive('report')->once()->with(Mockery::on(fn ($e) => $e->getMessage() === 'SMTP down'));
+    });
+
+    $response = $this->postJson(route('webauthn.login'), $assertion)->assertNoContent();
+
+    $this->assertAuthenticatedAs($user);
+    $device = TrustedDevice::sole();
+    $response->assertCookie('device_token', Crypt::decryptString($device->device_token));
 });

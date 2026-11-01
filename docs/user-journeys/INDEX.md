@@ -345,7 +345,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **REPORT-001** User reviews the financial reports dashboard _(implemented, high)_
   - Routes: `reports.index`
-  - Tests: `tests/Feature/Reports/ReportsCalculationsTest.php`, `tests/Feature/Reports/ReportsDashboardTest.php`, `tests/Feature/Reports/ReportsDateRangeTest.php`, `tests/Feature/Reports/ReportsNetWorthQueryTest.php`
+  - Tests: `tests/Feature/Reports/ReportsCalculationsTest.php`, `tests/Feature/Reports/ReportsCashFlowTest.php`, `tests/Feature/Reports/ReportsDashboardTest.php`, `tests/Feature/Reports/ReportsDateRangeTest.php`, `tests/Feature/Reports/ReportsNetWorthQueryTest.php`
 - **REPORT-002** User views monthly and yearly budget statistics _(implemented, medium)_
   - Routes: `budget.statistics.monthly`, `budget.statistics.yearly`
   - Tests: `tests/Feature/Budgets/BudgetStatisticsTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/YearlyStatisticsQueryTest.php`, `tests/playwright/smoke.spec.js`

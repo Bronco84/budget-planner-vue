@@ -59,6 +59,14 @@ scenarios:
     tests:
       - tests/Feature/Reports/ReportsNetWorthQueryTest.php::net worth series for all accounts matches the pinned values
       - tests/Feature/Reports/ReportsNetWorthQueryTest.php::net worth balances are computed with one grouped query instead of one sum per account per data point
+  - id: cash_flow_series
+    kind: happy_path
+    description: Monthly cash flow lists every calendar month in the range (empty months as zero), with income and expenses bucketed by transaction month in one pass; 'all' starts at January 2000, so its averages include the empty months before the budget's first transaction.
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsCashFlowTest.php::cash flow monthly totals for all accounts match the pinned values
+      - tests/Feature/Reports/ReportsCashFlowTest.php::cash flow filtered to one account matches the pinned values
+      - tests/Feature/Reports/ReportsCashFlowTest.php::all time cash flow keeps one entry per month from January 2000 to now
   - id: liability_history_direction
     kind: edge
     description: Historical credit card balances roll back opposite to assets (a purchase after the date means the debt was lower then).

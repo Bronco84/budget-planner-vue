@@ -288,17 +288,16 @@ class ReportsController extends Controller
             $transactionsQuery->where('account_id', $selectedAccount->id);
         }
 
-        $transactions = $transactionsQuery->orderBy('date')->get();
+        // Bucket by month once, rather than rescanning every transaction for each
+        // month in the range (the 'all' preset spans hundreds of months).
+        $transactionsByMonth = $transactionsQuery->orderBy('date')->get()
+            ->groupBy(fn ($transaction) => Carbon::parse($transaction->date)->format('Y-m'));
 
-        // Group by month
         $monthlyData = [];
         $currentMonth = $startDate->copy()->startOfMonth();
 
         while ($currentMonth <= $endDate) {
-            $monthKey = $currentMonth->format('Y-m');
-            $monthTransactions = $transactions->filter(function ($transaction) use ($currentMonth) {
-                return Carbon::parse($transaction->date)->format('Y-m') === $currentMonth->format('Y-m');
-            });
+            $monthTransactions = $transactionsByMonth->get($currentMonth->format('Y-m'), collect());
 
             $income = $monthTransactions->where('amount_in_cents', '>', 0)->sum('amount_in_cents');
             $expenses = abs($monthTransactions->where('amount_in_cents', '<', 0)->sum('amount_in_cents'));

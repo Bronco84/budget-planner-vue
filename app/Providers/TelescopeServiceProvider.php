@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Gate;
-use Laravel\Telescope\EntryType;
 use Laravel\Telescope\IncomingEntry;
 use Laravel\Telescope\Telescope;
 use Laravel\Telescope\TelescopeApplicationServiceProvider;
@@ -19,10 +18,16 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
         $this->hideSensitiveRequestDetails();
 
-        // Log everything since this is a single-user app, except outside
-        // local: mail, whose bodies carry live magic-link and invitation URLs.
+        // Record everything locally. Elsewhere keep only what diagnoses a
+        // failure: request, mail and AI payloads carry members' financial
+        // data, magic-link URLs and API keys. routes/console.php prunes
+        // entries after 48 hours.
         Telescope::filter(function (IncomingEntry $entry) {
-            return $this->app->environment('local') || $entry->type !== EntryType::MAIL;
+            return $this->app->environment('local')
+                || $entry->isReportableException()
+                || $entry->isFailedRequest()
+                || $entry->isFailedJob()
+                || $entry->isSlowQuery();
         });
     }
 
@@ -44,6 +49,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
             'set-cookie',
             'x-csrf-token',
             'x-xsrf-token',
+            'x-api-key',
         ]);
     }
 

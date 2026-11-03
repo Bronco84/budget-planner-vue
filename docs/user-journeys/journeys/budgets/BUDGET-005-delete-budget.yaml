@@ -24,7 +24,7 @@ integrations:
   - AWS S3 (file storage)
 depends_on:
   - path: app/Services/BudgetDeletionService.php
-    reason: resolved with app() in BudgetController::destroy; attachment, S3 and Plaid cleanup
+    reason: resolved with app() in BudgetController::destroy; attachment, S3, Plaid and activity-log cleanup
 steps:
   - action: confirm delete on Budgets/Edit (DELETE /budgets/{budget})
     expected: budget deleted, active preference cleared if it pointed at it, redirect to budgets.index
@@ -37,6 +37,7 @@ business_rules:
   - deletion is a hard delete (no SoftDeletes on Budget)
   - FileAttachment rows on the budget and its transactions are deleted; each file is removed (row and S3 object) only when nothing else uses it (File::deleteFromS3IfUnused)
   - each of the budget's PlaidConnections has its item removed at Plaid (/item/remove) after the local delete; a Plaid failure is logged and never blocks the delete
+  - "the budget's activity-log rows are erased with it: rows whose subject is the budget, one of its transactions, any attachment ever made on it or its transactions (including detached ones, found by the attachable recorded in the row's properties), and its files that no longer exist; activity on live budgets is kept indefinitely (no time-based pruning)"
 scenarios:
   - id: owner_deletes_budget
     kind: happy_path
@@ -63,6 +64,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Budgets/BudgetDeletionTest.php::a Plaid failure removing an item still deletes the budget locally
+  - id: activity_history_erased
+    kind: integration
+    description: The budget's activity history (transaction details, file names) is erased; history of other, live budgets and of files they still use is kept.
+    coverage: covered
+    tests:
+      - tests/Feature/Budgets/BudgetDeletionTest.php::deleting a budget erases its activity history and keeps the history of live budgets
   - id: deleting_last_budget_leads_to_create
     kind: empty_state
     description: Deleting the only budget ends on the create-budget form.

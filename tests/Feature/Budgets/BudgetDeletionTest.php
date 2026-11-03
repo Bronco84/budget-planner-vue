@@ -7,7 +7,9 @@ use App\Models\FileAttachment;
 use App\Models\PlaidConnection;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\FileService;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Activitylog\Models\Activity;
 use Tests\Support\FakePlaidApi;
 
 /*
@@ -112,4 +114,36 @@ test('a Plaid failure removing an item still deletes the budget locally', functi
     expect($this->plaid->paths())->toContain('/item/remove')
         ->and(Budget::find($this->budget->id))->toBeNull()
         ->and(PlaidConnection::count())->toBe(0);
+});
+
+test('deleting a budget erases its activity history and keeps the history of live budgets', function () {
+    $account = Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+    $transaction = Transaction::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $account->id]);
+    $transaction->update(['notes' => 'Dinner with Sam']);
+    $receipt = budgetDeletionStoredFile($this->user, 'hash-receipt');
+    budgetDeletionAttach($receipt, $transaction, $this->user);
+    $transaction->logActivity('File attached', ['file_name' => 'receipt.pdf'], $this->user->id);
+    activity()->performedOn($this->budget)->causedBy($this->user)->log('File attached to budget');
+    // An attachment detached before the budget is deleted still leaves history behind.
+    $detached = budgetDeletionStoredFile($this->user, 'hash-detached');
+    app(FileService::class)->detachFile(budgetDeletionAttach($detached, $this->budget, $this->user), $this->user->id);
+
+    $otherBudget = Budget::factory()->create(['user_id' => $this->user->id]);
+    $otherAccount = Account::factory()->checking()->create(['budget_id' => $otherBudget->id]);
+    $otherTransaction = Transaction::factory()->create(['budget_id' => $otherBudget->id, 'account_id' => $otherAccount->id]);
+    $shared = budgetDeletionStoredFile($this->user, 'hash-shared');
+    budgetDeletionAttach($shared, $this->budget, $this->user);
+    $otherAttachment = budgetDeletionAttach($shared, $otherBudget, $this->user);
+    $kept = Activity::query()
+        ->where(fn ($query) => $query->whereMorphedTo('subject', $otherTransaction)
+            ->orWhereMorphedTo('subject', $otherAttachment)
+            ->orWhereMorphedTo('subject', $shared))
+        ->pluck('id')->sort()->values()->all();
+    expect($kept)->not->toBeEmpty();
+
+    $this->actingAs($this->user)
+        ->delete(route('budgets.destroy', $this->budget))
+        ->assertRedirect(route('budgets.index'));
+
+    expect(Activity::pluck('id')->sort()->values()->all())->toBe($kept);
 });

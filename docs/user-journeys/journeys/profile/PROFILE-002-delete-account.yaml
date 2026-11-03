@@ -50,7 +50,7 @@ business_rules:
   - "session auth.authenticated_at must be within auth.delete_account_reauth_minutes; otherwise the email error is \"For your security, sign in again before deleting your account.\""
   - WebAuthn credentials are deleted explicitly (polymorphic, no FK); trusted devices, magic-link tokens, memberships and preferences cascade via FKs
   - a shared budget the user primarily owns passes to the longest-standing owner member (budget_user created_at, then id), as leaving would; with no owner member deletion is blocked with "You are the last owner of \"<name>\". Make another member an owner, or delete the budget, before deleting your account." and nothing is changed or logged out
-  - an unshared budget is destroyed like BUDGET-005 (attachments, unused S3 objects, Plaid items)
+  - an unshared budget is destroyed like BUDGET-005 (attachments, unused S3 objects, Plaid items, activity-log history); activity on shared budgets that live on is kept, as is the user's causer reference in it
   - on budgets that live on, the user's scenarios (scenarios.user_id), attachments (file_attachments.attached_by) and files (files.uploaded_by) pass to the budget's primary owner; a file whose content the owner already has a record for merges into that record (a duplicate attachment on the same item is dropped); a file attached nowhere is removed with its S3 object when unused
 scenarios:
   - id: account_deleted
@@ -107,6 +107,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::deleting an account hands a shared budget to the longest-standing other owner and keeps the users files on it
+  - id: destroyed_budget_activity_erased
+    kind: integration
+    description: Activity history of the budgets destroyed with the account is erased; that of shared budgets handed on is kept.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::deleting an account erases the activity history of its destroyed budgets and keeps that of shared ones
   - id: last_owner_of_shared_budget_blocked
     kind: validation
     description: The last owner of a shared budget (other members are editors or viewers) cannot delete their account until another member is an owner or the budget is deleted.

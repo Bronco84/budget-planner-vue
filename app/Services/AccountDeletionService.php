@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Spatie\Activitylog\Models\Activity;
 
 /**
  * Deletes a user account without taking other people's data with it.
@@ -176,6 +177,7 @@ class AccountDeletionService
         try {
             if ($file->deleteFromS3IfUnused()) {
                 $file->delete();
+                Activity::query()->whereMorphedTo('subject', $file)->delete();
             }
         } catch (\Throwable $e) {
             Log::warning('Failed to remove an unused file while deleting an account', [

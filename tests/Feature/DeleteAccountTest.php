@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Spatie\Activitylog\Models\Activity;
 use Tests\Support\FakePlaidApi;
 
 /*
@@ -315,4 +316,32 @@ test('a member deleting their account leaves their receipts and scenarios on the
     Storage::disk('s3')->assertExists('hash-carol-receipt');
     Storage::disk('s3')->assertExists('hash-same');
     Storage::disk('s3')->assertMissing('hash-unattached');
+});
+
+test('deleting an account erases the activity history of its destroyed budgets and keeps that of shared ones', function () {
+    Storage::fake('s3');
+    FakePlaidApi::install();
+    $alice = passkeyOnlyUser();
+    $bob = User::factory()->create();
+    $solo = Budget::factory()->create(['user_id' => $alice->id]);
+    $soloAccount = Account::factory()->checking()->create(['budget_id' => $solo->id]);
+    $soloTransaction = Transaction::factory()->create(['budget_id' => $solo->id, 'account_id' => $soloAccount->id]);
+    deleteAccountAttach(deleteAccountStoredFile($alice, 'hash-solo'), $soloTransaction, $alice);
+    $shared = Budget::factory()->create(['user_id' => $alice->id]);
+    $shared->connected_users()->attach($bob->id, ['access_level' => 'owner']);
+    $sharedAccount = Account::factory()->checking()->create(['budget_id' => $shared->id]);
+    $sharedTransaction = Transaction::factory()->create(['budget_id' => $shared->id, 'account_id' => $sharedAccount->id]);
+    $sharedReceipt = deleteAccountStoredFile($alice, 'hash-shared');
+    $sharedAttachment = deleteAccountAttach($sharedReceipt, $sharedTransaction, $alice);
+    $kept = Activity::query()
+        ->where(fn ($query) => $query->whereMorphedTo('subject', $sharedTransaction)
+            ->orWhereMorphedTo('subject', $sharedAttachment)
+            ->orWhereMorphedTo('subject', $sharedReceipt))
+        ->pluck('id')->sort()->values()->all();
+    expect($kept)->toHaveCount(3);
+
+    deleteAccountFor($alice)->assertSessionHasNoErrors()->assertRedirect('/');
+
+    expect(Activity::pluck('id')->sort()->values()->all())->toBe($kept)
+        ->and(Activity::whereMorphedTo('subject', $soloTransaction)->exists())->toBeFalse();
 });

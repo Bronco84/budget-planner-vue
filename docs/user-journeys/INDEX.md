@@ -89,7 +89,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [PREF-001](journeys/preferences/PREF-001-reorder-account-type-sections.yaml) | User reorders account type sections and the order persists | medium | yes | yes | yes | yes | yes | yes | **covered** |
 | [PREF-002](journeys/preferences/PREF-002-switch-active-budget.yaml) | User switches their active budget | high | yes | yes | yes | yes | yes | no | **covered** |
 | [PROFILE-001](journeys/profile/PROFILE-001-update-profile-information.yaml) | User updates their name and email | medium | yes | yes | yes | yes | missing | no | **covered** |
-| [PROFILE-002](journeys/profile/PROFILE-002-delete-account.yaml) | User deletes their account | medium | yes | yes | yes | missing | yes | no | **covered** |
+| [PROFILE-002](journeys/profile/PROFILE-002-delete-account.yaml) | User deletes their account | medium | yes | yes | yes | yes | yes | no | **covered** |
 | [PROJECT-001](journeys/projections/PROJECT-001-account-balance-projection.yaml) | User views an account's projected balance | critical | yes | yes | yes | missing | missing | yes | **covered** |
 | [PROJECT-002](journeys/projections/PROJECT-002-budget-projected-transactions.yaml) | User views projected transactions for the whole budget | low | yes | yes | yes | missing | missing | no | **covered** |
 | [PROPERTY-001](journeys/properties/PROPERTY-001-add-property.yaml) | Owner records a property or vehicle asset | medium | yes | yes | yes | missing | missing | no | **covered** |

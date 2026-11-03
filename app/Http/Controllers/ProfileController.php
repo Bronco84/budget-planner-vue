@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\AccountDeletionService;
 use App\Services\DeviceFingerprintService;
 use App\Services\DeviceTokenService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -80,7 +80,7 @@ class ProfileController extends Controller
     /**
      * Delete the user's account.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request, AccountDeletionService $accountDeletion): RedirectResponse
     {
         $user = $request->user();
 
@@ -98,14 +98,13 @@ class ProfileController extends Controller
             ]);
         }
 
+        $accountDeletion->assertDeletable($user);
+
         Auth::logout();
 
-        // Trusted devices, magic-link tokens, budgets and preferences cascade via
-        // foreign keys; WebAuthn credentials are polymorphic so are removed here.
-        DB::transaction(function () use ($user) {
-            $user->webAuthnCredentials()->delete();
-            $user->delete();
-        });
+        // Shared budgets pass to another owner and the user's files on them are kept;
+        // unshared budgets are destroyed with their S3 objects and Plaid items.
+        $accountDeletion->delete($user);
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

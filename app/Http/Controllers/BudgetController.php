@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Budget;
-use App\Models\PlaidConnection;
+use App\Services\BudgetDeletionService;
 use App\Services\BudgetService;
-use App\Services\FileService;
 use App\Services\PlaidService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -311,14 +310,7 @@ class BudgetController extends Controller
             $user->setActiveBudget(null);
         }
 
-        // Neither has a database cascade: polymorphic attachments, and items at Plaid.
-        $plaidConnections = PlaidConnection::where('budget_id', $budget->id)->get();
-        app(FileService::class)->deleteBudgetAttachments($budget);
-
-        $budget->delete();
-
-        $plaidService = app(PlaidService::class);
-        $plaidConnections->each(fn (PlaidConnection $connection) => $plaidService->removeConnectionItem($connection));
+        app(BudgetDeletionService::class)->destroy($budget);
 
         return redirect()->route('budgets.index')
             ->with('message', 'Budget deleted successfully');

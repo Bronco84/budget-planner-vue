@@ -1,11 +1,20 @@
 <?php
 
+use App\Models\Account;
+use App\Models\Budget;
+use App\Models\File;
+use App\Models\FileAttachment;
 use App\Models\MagicLinkToken;
+use App\Models\PlaidConnection;
+use App\Models\Scenario;
+use App\Models\Transaction;
 use App\Models\TrustedDevice;
 use App\Models\User;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Tests\Support\FakePlaidApi;
 
 /*
  * PROFILE-002. Accounts are passkey-only, so deletion is confirmed by typing the
@@ -153,4 +162,157 @@ test('a trusted device auto login records the authentication time', function () 
 
     $this->assertAuthenticatedAs($user);
     expect(session('auth.authenticated_at'))->toBe(now()->getTimestamp());
+});
+
+/*
+ * PROFILE-002 with budgets: shared budgets pass to the longest-standing other
+ * owner, unshared budgets are destroyed with their S3 objects and Plaid items,
+ * and what the user added to budgets that live on is kept under the budget owner.
+ */
+
+function deleteAccountStoredFile(User $user, string $hash): File
+{
+    Storage::disk('s3')->put($hash, 'content-'.$hash);
+
+    return File::create([
+        'hash' => $hash,
+        'original_name' => $hash.'.pdf',
+        'mime_type' => 'application/pdf',
+        'size_bytes' => 12,
+        'extension' => 'pdf',
+        'uploaded_by' => $user->id,
+    ]);
+}
+
+function deleteAccountAttach(File $file, $attachable, User $user): FileAttachment
+{
+    return FileAttachment::create([
+        'file_id' => $file->id,
+        'attachable_type' => $attachable::class,
+        'attachable_id' => $attachable->id,
+        'attached_by' => $user->id,
+    ]);
+}
+
+function deleteAccountFor(User $user)
+{
+    return test()->actingAs($user)
+        ->withSession(freshlyAuthenticated())
+        ->from(route('profile.edit'))
+        ->delete(route('profile.destroy'), ['email' => $user->email]);
+}
+
+test('deleting an account destroys unshared budgets with their S3 objects and Plaid items', function () {
+    Storage::fake('s3');
+    $plaid = FakePlaidApi::install();
+    $plaid->on('/item/remove', ['request_id' => 'req-1']);
+    $user = passkeyOnlyUser();
+    $budget = Budget::factory()->create(['user_id' => $user->id]);
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    $transaction = Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id]);
+    deleteAccountAttach(deleteAccountStoredFile($user, 'hash-receipt'), $transaction, $user);
+    PlaidConnection::create([
+        'budget_id' => $budget->id,
+        'plaid_item_id' => 'item-solo',
+        'institution_name' => 'First Platypus Bank',
+        'access_token' => 'access-item-solo',
+        'status' => PlaidConnection::STATUS_ACTIVE,
+    ]);
+
+    deleteAccountFor($user)->assertSessionHasNoErrors()->assertRedirect('/');
+
+    expect(User::find($user->id))->toBeNull()
+        ->and(Budget::find($budget->id))->toBeNull()
+        ->and(File::count())->toBe(0)
+        ->and(FileAttachment::count())->toBe(0)
+        ->and($plaid->bodyFor('/item/remove'))->toBe(['access_token' => 'access-item-solo']);
+    Storage::disk('s3')->assertMissing('hash-receipt');
+});
+
+test('deleting an account hands a shared budget to the longest-standing other owner and keeps the users files on it', function () {
+    Storage::fake('s3');
+    FakePlaidApi::install();
+    $alice = passkeyOnlyUser();
+    $bob = User::factory()->create();
+    $carol = User::factory()->create();
+    $dave = User::factory()->create();
+    $budget = Budget::factory()->create(['user_id' => $alice->id]);
+    $budget->connected_users()->attach($carol->id, ['access_level' => 'editor']);
+    $this->travel(1)->minutes();
+    $budget->connected_users()->attach($bob->id, ['access_level' => 'owner']);
+    $this->travel(1)->minutes();
+    $budget->connected_users()->attach($dave->id, ['access_level' => 'owner']);
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    $transaction = Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id]);
+    $receipt = deleteAccountStoredFile($alice, 'hash-alice-receipt');
+    $attachment = deleteAccountAttach($receipt, $transaction, $alice);
+    $scenario = Scenario::create(['budget_id' => $budget->id, 'user_id' => $alice->id, 'name' => 'Raise']);
+
+    deleteAccountFor($alice)->assertSessionHasNoErrors()->assertRedirect('/');
+
+    $budget->refresh();
+    expect(User::find($alice->id))->toBeNull()
+        ->and($budget->user_id)->toBe($bob->id)
+        ->and($budget->connected_users()->pluck('users.id')->sort()->values()->all())->toBe([$carol->id, $dave->id])
+        ->and(Transaction::find($transaction->id))->not->toBeNull()
+        ->and($receipt->fresh()->uploaded_by)->toBe($bob->id)
+        ->and($attachment->fresh()->attached_by)->toBe($bob->id)
+        ->and($scenario->fresh()->user_id)->toBe($bob->id);
+    Storage::disk('s3')->assertExists('hash-alice-receipt');
+});
+
+test('account deletion is blocked while the user is the last owner of a shared budget', function () {
+    $alice = passkeyOnlyUser();
+    $carol = User::factory()->create();
+    $budget = Budget::factory()->create(['user_id' => $alice->id, 'name' => 'Household']);
+    $budget->connected_users()->attach($carol->id, ['access_level' => 'editor']);
+    $solo = Budget::factory()->create(['user_id' => $alice->id]);
+
+    deleteAccountFor($alice)
+        ->assertSessionHasErrors(['email' => 'You are the last owner of "Household". Make another member an owner, or delete the budget, before deleting your account.'])
+        ->assertRedirect(route('profile.edit'));
+
+    $this->assertAuthenticatedAs($alice);
+    expect(User::find($alice->id))->not->toBeNull()
+        ->and(Budget::find($budget->id))->not->toBeNull()
+        ->and(Budget::find($solo->id))->not->toBeNull()
+        ->and($budget->connected_users()->count())->toBe(1);
+});
+
+test('a member deleting their account leaves their receipts and scenarios on the owners budget', function () {
+    Storage::fake('s3');
+    FakePlaidApi::install();
+    $alice = User::factory()->create();
+    $carol = passkeyOnlyUser();
+    $budget = Budget::factory()->create(['user_id' => $alice->id]);
+    $budget->connected_users()->attach($carol->id, ['access_level' => 'editor']);
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    $transaction = Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id]);
+    $receipt = deleteAccountStoredFile($carol, 'hash-carol-receipt');
+    $receiptAttachment = deleteAccountAttach($receipt, $transaction, $carol);
+    // Carol uploaded content Alice already has a record for: it merges into Alice's.
+    $alicesCopy = deleteAccountStoredFile($alice, 'hash-same');
+    deleteAccountAttach($alicesCopy, $budget, $alice);
+    $duplicate = deleteAccountStoredFile($carol, 'hash-same');
+    $duplicateAttachment = deleteAccountAttach($duplicate, $transaction, $carol);
+    $collidingAttachment = deleteAccountAttach($duplicate, $budget, $carol);
+    $unattached = deleteAccountStoredFile($carol, 'hash-unattached');
+    $scenario = Scenario::create(['budget_id' => $budget->id, 'user_id' => $carol->id, 'name' => 'Trip']);
+
+    deleteAccountFor($carol)->assertSessionHasNoErrors()->assertRedirect('/');
+
+    expect(User::find($carol->id))->toBeNull()
+        ->and($budget->fresh()->user_id)->toBe($alice->id)
+        ->and($budget->connected_users()->count())->toBe(0)
+        ->and($receipt->fresh()->uploaded_by)->toBe($alice->id)
+        ->and($receiptAttachment->fresh()->attached_by)->toBe($alice->id)
+        ->and(File::find($duplicate->id))->toBeNull()
+        ->and($duplicateAttachment->fresh()->file_id)->toBe($alicesCopy->id)
+        ->and($duplicateAttachment->fresh()->attached_by)->toBe($alice->id)
+        ->and(FileAttachment::find($collidingAttachment->id))->toBeNull()
+        ->and(File::find($unattached->id))->toBeNull()
+        ->and($scenario->fresh()->user_id)->toBe($alice->id);
+    Storage::disk('s3')->assertExists('hash-carol-receipt');
+    Storage::disk('s3')->assertExists('hash-same');
+    Storage::disk('s3')->assertMissing('hash-unattached');
 });

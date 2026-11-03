@@ -9,8 +9,13 @@ summary: >
   typing their account email. Deletion is only allowed when the session
   authenticated (passkey, magic link or trusted device) within
   auth.delete_account_reauth_minutes (default 15). On success they are logged
-  out, their passkeys and the user row are deleted (owned data cascades), the
-  session invalidated and they are redirected to /.
+  out and AccountDeletionService runs: each budget they primarily own and share
+  passes to the longest-standing other owner (BudgetSharingService::leave()
+  succession; deletion is blocked when no other owner exists), each unshared
+  budget is destroyed with full S3/Plaid cleanup (BudgetDeletionService), and
+  their files, attachments and scenarios on budgets that live on are reassigned
+  to that budget's primary owner. Then their passkeys and the user row are
+  deleted, the session invalidated and they are redirected to /.
 actors:
   - authenticated user
 preconditions:
@@ -19,6 +24,12 @@ routes:
   - profile.edit
   - profile.destroy
 depends_on:
+  - path: app/Services/AccountDeletionService.php
+    reason: resolved from the container in destroy(); succession, unshared budget cleanup and authorship reassignment
+  - path: app/Services/BudgetDeletionService.php
+    reason: destroys unshared budgets with their attachments, S3 objects and Plaid items
+  - path: app/Services/BudgetSharingService.php
+    reason: leave() hands a shared budget to the longest-standing other owner
   - path: resources/js/Pages/Profile/Partials/DeleteUserForm.vue
     reason: confirmation modal with the type-your-email field
   - path: app/Listeners/RecordAuthenticationTime.php
@@ -29,13 +40,18 @@ steps:
   - action: click Delete Account and type the account email
     expected: modal submits DELETE /profile with email
   - action: server checks the email (case-insensitive) and that the session authenticated recently
-    expected: user logged out, passkeys and user deleted in a transaction, session invalidated, redirect to /
+    expected: if they are the last owner of a shared budget, an email error and nothing changes; otherwise user logged out, shared budgets handed on, unshared budgets destroyed, passkeys and user deleted, session invalidated, redirect to /
 postconditions:
   - the user record, its WebAuthn credentials, trusted devices and magic-link tokens no longer exist
+  - budgets only the user had access to no longer exist, nor do their attachments, unused S3 objects or Plaid items
+  - shared budgets the user primarily owned now belong to the longest-standing other owner (owner or legacy admin member) and keep everything the user added
 business_rules:
   - email is required and must equal the account email, ignoring case
   - "session auth.authenticated_at must be within auth.delete_account_reauth_minutes; otherwise the email error is \"For your security, sign in again before deleting your account.\""
-  - WebAuthn credentials are deleted explicitly (polymorphic, no FK); trusted devices, magic-link tokens, budgets and preferences cascade via FKs
+  - WebAuthn credentials are deleted explicitly (polymorphic, no FK); trusted devices, magic-link tokens, memberships and preferences cascade via FKs
+  - a shared budget the user primarily owns passes to the longest-standing owner member (budget_user created_at, then id), as leaving would; with no owner member deletion is blocked with "You are the last owner of \"<name>\". Make another member an owner, or delete the budget, before deleting your account." and nothing is changed or logged out
+  - an unshared budget is destroyed like BUDGET-005 (attachments, unused S3 objects, Plaid items)
+  - on budgets that live on, the user's scenarios (scenarios.user_id), attachments (file_attachments.attached_by) and files (files.uploaded_by) pass to the budget's primary owner; a file whose content the owner already has a record for merges into that record (a duplicate attachment on the same item is dropped); a file attached nowhere is removed with its S3 object when unused
 scenarios:
   - id: account_deleted
     kind: happy_path
@@ -79,6 +95,30 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a passkey only user can delete their account by typing their email in a fresh session
+  - id: unshared_budgets_destroyed_with_cleanup
+    kind: integration
+    description: Budgets nobody else shares are destroyed with their attachments, S3 objects and Plaid items.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::deleting an account destroys unshared budgets with their S3 objects and Plaid items
+  - id: shared_budget_passes_to_next_owner
+    kind: alternate
+    description: A shared budget passes to the longest-standing other owner and keeps the deleting user's files and scenarios under that owner.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::deleting an account hands a shared budget to the longest-standing other owner and keeps the users files on it
+  - id: last_owner_of_shared_budget_blocked
+    kind: validation
+    description: The last owner of a shared budget (other members are editors or viewers) cannot delete their account until another member is an owner or the budget is deleted.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::account deletion is blocked while the user is the last owner of a shared budget
+  - id: member_contributions_kept
+    kind: alternate
+    description: A member deleting their account leaves their receipts and scenarios on the owner's budget, reassigned to the owner.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::a member deleting their account leaves their receipts and scenarios on the owners budget
   - id: device_cookie_cleared
     kind: integration
     description: The device_token cookie is expired on the deletion response.
@@ -91,10 +131,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a guest cannot delete an account
-known_issues: []
+known_issues:
+  - The Delete Account copy still says all of the account's resources and data will be permanently deleted, but shared budgets and the user's contributions to others' budgets now live on.
 confidence: medium
 evidence:
   - app/Http/Controllers/ProfileController.php destroy()
+  - app/Services/AccountDeletionService.php
   - database/migrations/2026_01_05_210006_make_password_nullable_in_users_table.php
   - app/Http/Controllers/PasskeyAuthController.php registerStore() creates users without a password
   - app/Listeners/RecordAuthenticationTime.php

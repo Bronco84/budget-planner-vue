@@ -277,6 +277,69 @@ test('a posted transaction settles its pending row in place, keeping the user ed
     'matched without a link' => [false],
 ]);
 
+test('a leftover pending row is deleted only after its receipts and user edits move to the settled row', function (bool $linked) {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+
+    // Legacy state: the posted transaction was already imported next to its pending row.
+    $settled = Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'BLUE BOTTLE COFFEE',
+        'category' => 'Food and Drink', 'amount_in_cents' => -525, 'date' => '2026-03-12',
+        'plaid_transaction_id' => 'tx-posted', 'is_plaid_imported' => true,
+    ]);
+    PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-posted', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => false, 'amount' => 5.25, 'date' => '2026-03-12', 'name' => 'BLUE BOTTLE COFFEE', 'category' => 'Food and Drink',
+    ]);
+    $pending = Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'BLUE BOTTLE COFFEE with Sam',
+        'category' => 'Coffee', 'amount_in_cents' => -475, 'date' => '2026-03-11',
+        'plaid_transaction_id' => 'tx-pending', 'is_plaid_imported' => true,
+    ]);
+    PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-pending', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => true, 'amount' => 4.75, 'date' => '2026-03-11', 'name' => 'BLUE BOTTLE COFFEE', 'category' => 'Food and Drink',
+    ]);
+
+    $file = fn (string $hash) => File::create([
+        'hash' => str_repeat($hash, 64), 'original_name' => "{$hash}.pdf", 'mime_type' => 'application/pdf',
+        'size_bytes' => 12, 'extension' => 'pdf', 'uploaded_by' => $this->user->id,
+    ]);
+    $attach = fn (File $file, Transaction $to) => FileAttachment::create([
+        'file_id' => $file->id, 'attachable_type' => Transaction::class,
+        'attachable_id' => $to->id, 'attached_by' => $this->user->id,
+    ]);
+    $receipt = $file('a');
+    $shared = $file('b');
+    $moved = $attach($receipt, $pending);
+    $attach($shared, $pending);
+    $attach($shared, $settled);
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => [[
+            'transaction_id' => 'tx-posted', 'account_id' => 'plaid-checking', 'amount' => 5.25,
+            'date' => '2026-03-12', 'name' => 'BLUE BOTTLE COFFEE', 'pending' => false, 'category' => ['Food and Drink'],
+            'pending_transaction_id' => $linked ? 'tx-pending' : null,
+        ]]])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 0 new and updated 1 transactions.');
+
+    expect($pending->fresh())->toBeNull()
+        ->and($settled->fresh())
+        ->category->toBe('Coffee')
+        ->description->toBe('BLUE BOTTLE COFFEE with Sam')
+        ->amount_in_cents->toBe(-525)
+        ->and($moved->fresh()->attachable_id)->toBe($settled->id)
+        ->and($settled->fileAttachments()->pluck('file_id')->sort()->values()->all())->toBe([$receipt->id, $shared->id])
+        ->and(FileAttachment::where('attachable_type', Transaction::class)->where('attachable_id', $pending->id)->exists())->toBeFalse();
+})->with([
+    'linked by pending_transaction_id' => [true],
+    'matched without a link' => [false],
+]);
+
 test('a pending transaction with a new Plaid id replaces its pending look-alike but never a posted one', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
     $account = $plaidAccount->account;

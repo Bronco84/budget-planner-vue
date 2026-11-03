@@ -1045,6 +1045,7 @@ class PlaidService
                 if ($existingTransaction) {
                     // Refresh the Plaid-owned fields; the category only while the user has not set one
                     $existingTransaction->update($this->plaidRefreshAttributes($existingTransaction, $transaction, $previousPlaidCategory));
+                    $current = $existingTransaction;
 
                     $updated++;
                 } else {
@@ -1073,6 +1074,8 @@ class PlaidService
                             ),
                         ]);
 
+                        $current = $pendingDuplicate;
+
                         Log::info('Updated pending transaction with new Plaid ID (duplicate prevented)', [
                             'transaction_id' => $pendingDuplicate->id,
                             'old_plaid_id' => $pendingDuplicate->getOriginal('plaid_transaction_id'),
@@ -1094,6 +1097,8 @@ class PlaidService
                             'date' => $transaction['date'],
                         ]);
 
+                        $current = $settledPending;
+
                         Log::info('Settled pending transaction in place', [
                             'transaction_id' => $settledPending->id,
                             'pending_plaid_id' => $oldPlaidId,
@@ -1103,7 +1108,7 @@ class PlaidService
                         $updated++;
                     } else {
                         // Create new transaction
-                        Transaction::create([
+                        $current = Transaction::create([
                             'budget_id' => $plaidAccount->account->budget_id,
                             'account_id' => $plaidAccount->account_id,
                             'description' => $transaction['name'],
@@ -1127,7 +1132,9 @@ class PlaidService
                         ->first();
 
                     if ($pendingTransaction) {
-                        // Delete the pending transaction since it's now settled
+                        // Delete the pending transaction since it's now settled, keeping its
+                        // receipts and the user's edits on the settled row
+                        $this->carryOverPendingEdits($pendingTransaction, $current);
                         $pendingTransaction->delete();
 
                         // Log the deletion for debugging
@@ -1144,6 +1151,7 @@ class PlaidService
 
                     // Delete matching pending transactions (they've been replaced by this settled one)
                     foreach ($matchingPendingTransactions as $matchingPending) {
+                        $this->carryOverPendingEdits($matchingPending, $current);
                         $matchingPending->delete();
 
                         Log::info('Deleted pending transaction after settlement (fuzzy match)', [
@@ -1261,14 +1269,57 @@ class PlaidService
             'date' => $transaction['date'],
         ];
 
-        $categoryIsPlaids = ! $row->category_id
-            && in_array($row->category, [null, '', 'Uncategorized', $previousPlaidCategory], true);
-
-        if ($categoryIsPlaids) {
+        if ($this->categoryIsPlaids($row, $previousPlaidCategory)) {
             $attributes['category'] = $transaction['category'][0] ?? 'Uncategorized';
         }
 
         return $attributes;
+    }
+
+    /**
+     * Whether a row's category is still the one Plaid gave it: not linked to a budget
+     * category, and Uncategorized or the category Plaid last reported for it.
+     */
+    private function categoryIsPlaids(Transaction $row, ?string $plaidCategory): bool
+    {
+        return ! $row->category_id
+            && in_array($row->category, [null, '', 'Uncategorized', $plaidCategory], true);
+    }
+
+    /**
+     * Before a leftover pending row is deleted in favour of the settled one, move its
+     * attachments to the settled row and carry over a category or description the user
+     * set on it, so nothing the user added is lost with the pending row.
+     */
+    private function carryOverPendingEdits(Transaction $pending, Transaction $settled): void
+    {
+        $settledFileIds = $settled->fileAttachments()->pluck('file_id');
+
+        foreach ($pending->fileAttachments as $attachment) {
+            if ($settledFileIds->contains($attachment->file_id)) {
+                // Already attached to the settled row: the file stays referenced there.
+                $attachment->delete();
+            } else {
+                $attachment->update(['attachable_id' => $settled->id]);
+            }
+        }
+
+        $pendingPlaid = PlaidTransaction::where('plaid_transaction_id', $pending->plaid_transaction_id)->first();
+        $edits = [];
+
+        if (! $this->categoryIsPlaids($pending, $pendingPlaid?->category)
+            && $this->categoryIsPlaids($settled, PlaidTransaction::where('plaid_transaction_id', $settled->plaid_transaction_id)->value('category'))) {
+            $edits['category_id'] = $pending->category_id;
+            $edits['category'] = $pending->category;
+        }
+
+        if ($pendingPlaid && $pending->description !== $pendingPlaid->name) {
+            $edits['description'] = $pending->description;
+        }
+
+        if ($edits) {
+            $settled->update($edits);
+        }
     }
 
     /**

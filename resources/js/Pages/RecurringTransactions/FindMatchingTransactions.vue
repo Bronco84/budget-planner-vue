@@ -12,10 +12,22 @@
                 <h2 class="text-xl font-semibold text-gray-900">Find Matching Transactions</h2>
                 <p class="text-sm text-gray-600 mt-1">
                   Found <span class="font-semibold">{{ totalMatches }}</span> unlinked transactions 
-                  matching <span class="font-semibold">{{ totalTemplates }}</span> recurring templates.
+                  matching <span class="font-semibold">{{ totalTemplates }}</span> recurring templates
+                  {{ months === 'all' ? 'across all history' : `from the last ${months} months` }}.
                 </p>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <label for="match-range" class="sr-only">Search transactions from</label>
+                <select
+                  id="match-range"
+                  :value="months"
+                  class="py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  @change="changeRange($event.target.value)"
+                >
+                  <option v-for="option in monthOptions" :key="option" :value="option">
+                    {{ rangeLabel(option) }}
+                  </option>
+                </select>
                 <Link
                   :href="route('recurring-transactions.index', budget.id)"
                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 transition"
@@ -46,6 +58,14 @@
               <p class="mt-1 text-sm text-gray-500">
                 All unlinked transactions have already been reviewed or don't match any templates.
               </p>
+              <button
+                v-if="olderRange"
+                type="button"
+                class="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                @click="changeRange(olderRange)"
+              >
+                Show older transactions ({{ rangeLabel(olderRange).toLowerCase() }})
+              </button>
             </div>
 
             <!-- Templates with Matches -->
@@ -165,7 +185,22 @@ const props = defineProps({
   templatesWithMatches: Array,
   totalTemplates: Number,
   totalMatches: Number,
+  months: { type: String, default: '12' },
+  monthOptions: { type: Array, default: () => ['12', '24', '36', 'all'] },
 });
+
+const rangeLabel = (option) => (option === 'all' ? 'All history' : `Last ${option} months`);
+
+// The next longer range to offer from the empty state, if any.
+const olderRange = computed(() => {
+  const index = props.monthOptions.indexOf(props.months);
+  return index >= 0 && index < props.monthOptions.length - 1 ? props.monthOptions[index + 1] : null;
+});
+
+// Reload the suggestions for another range; selections start over with the new list.
+const changeRange = (value) => {
+  router.get(route('recurring-transactions.find-matching', props.budget.id), { months: value }, { preserveScroll: true });
+};
 
 // Track selected transactions per template
 const selectedTransactions = reactive({});

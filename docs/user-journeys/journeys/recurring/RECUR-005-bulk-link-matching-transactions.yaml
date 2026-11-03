@@ -5,9 +5,10 @@ domain: recurring
 status: implemented
 priority: medium
 summary: >
-  From the recurring list the user opens "Find matching transactions", which scans every
-  unlinked Plaid-imported transaction in the budget against every template (Plaid entity
-  id first, then description matching). The user ticks the suggestions to accept and
+  From the recurring list the user opens "Find matching transactions", which scans the
+  unlinked Plaid-imported transactions from the last 12 months (a range selector shows
+  older ones: 24 or 36 months, or all history) against every template (Plaid entity id
+  first, then description matching). The user ticks the suggestions to accept and
   submits; the selected transactions are linked to their templates.
 actors:
   - authenticated budget owner
@@ -23,13 +24,16 @@ integrations:
   - Plaid transaction counterparties and merchant_entity_id (read-only)
 steps:
   - action: open budget/{budget}/recurring-transactions/find-matching
-    expected: RecurringTransactions/FindMatchingTransactions lists templates with matching unlinked transactions plus totals
+    expected: RecurringTransactions/FindMatchingTransactions lists templates with matching unlinked transactions from the last 12 months plus totals
+  - action: pick an older range in the selector, or "Show older transactions" from the empty state (GET ...?months=24|36|all)
+    expected: the page reloads with suggestions from that range; selections start over
   - action: select transactions and submit (POST .../link-transactions)
     expected: selected, still-unlinked transactions linked; redirect to index with "Successfully linked N transaction(s)..." or info "No transactions were linked."
 postconditions:
   - chosen transactions carry the template id
 business_rules:
   - only transactions with a plaid_transaction_id and no existing template link are suggested
+  - candidates are bounded to transactions dated within the selected range (months query param 12, 24, 36 or all; default 12); any other value, including an array, falls back to 12
   - entity match checks counterparties[].entity_id and merchant_entity_id; fallback is description exact / contains (5+ chars) / fuzzy 70%
   - already-linked transactions are skipped, never re-linked
   - selected suggestions are linked with link_source manual (the user chose them), so rule re-evaluation never removes them
@@ -49,6 +53,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringBulkLinkTest.php::find matching reports entity and description matches with linked counts, without loading linked transactions or raw plaid data
+  - id: range_bounds_candidates
+    kind: alternate
+    description: Suggestions default to the last 12 months; choosing 24 months or all history includes older transactions, and an unknown range falls back to 12 months.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringBulkLinkTest.php::find matching suggests only the last 12 months by default and searches older ranges on request
   - id: no_templates_or_matches
     kind: empty_state
     description: A budget with no templates or no matching transactions shows the empty state.
@@ -81,7 +91,7 @@ scenarios:
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::bulk linking rejects transaction ids from another budget and links nothing
       - tests/Feature/Recurring/RecurringCrossBudgetReferenceTest.php::bulk linking rejects a template from another budget and links nothing
 known_issues:
-  - Matching description fuzzy threshold (70% similar_text) runs every template against every unlinked transaction in PHP (O(templates x transactions)), and candidates have no date bound, so the page still grows with Plaid history on large budgets (PR-035; the date bound is held for an owner decision).
+  - Matching description fuzzy threshold (70% similar_text) runs every template against every candidate transaction in PHP (O(templates x transactions)); the default 12-month range bounds it, but choosing "All history" still scans the whole Plaid history.
 confidence: high
 evidence:
   - app/Http/Controllers/RecurringTransactionController.php findMatchingTransactions/linkSelectedTransactions

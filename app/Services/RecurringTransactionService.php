@@ -991,9 +991,12 @@ class RecurringTransactionService
      * Find unlinked transactions that match existing recurring transaction templates.
      * Returns structured data for UI display with manual approval.
      *
+     * Only transactions dated within the last $months months are candidates, so the
+     * scan stays bounded as Plaid history grows; null searches the whole history.
+     *
      * @return array Array of templates with their matching unlinked transactions
      */
-    public function findMatchingTransactionsForTemplates(Budget $budget): array
+    public function findMatchingTransactionsForTemplates(Budget $budget, ?int $months = 12): array
     {
         $results = [];
 
@@ -1018,6 +1021,7 @@ class RecurringTransactionService
         $unlinkedTransactions = Transaction::where('budget_id', $budget->id)
             ->whereNull('recurring_transaction_template_id')
             ->whereNotNull('plaid_transaction_id')
+            ->when($months !== null, fn ($query) => $query->where('date', '>=', now()->subMonthsNoOverflow($months)->toDateString()))
             ->with([
                 'plaidTransaction:id,plaid_transaction_id,name,merchant_name,merchant_entity_id,counterparties',
                 'account:id,name',

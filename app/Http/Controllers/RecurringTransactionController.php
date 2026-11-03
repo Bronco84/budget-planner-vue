@@ -22,6 +22,13 @@ use Inertia\Response;
 
 class RecurringTransactionController extends Controller
 {
+    /**
+     * Ranges (months back, or 'all') Find Matching Transactions can search, and its default.
+     */
+    private const MATCHING_RANGES = ['12', '24', '36', 'all'];
+
+    private const MATCHING_RANGE_DEFAULT = '12';
+
     protected RecurringTransactionService $recurringTransactionService;
 
     /**
@@ -676,17 +683,28 @@ class RecurringTransactionController extends Controller
     /**
      * Show page to find and review matching transactions for templates.
      */
-    public function findMatchingTransactions(Budget $budget): Response
+    public function findMatchingTransactions(Request $request, Budget $budget): Response
     {
         $this->authorize('view', $budget);
 
-        $matchingData = $this->recurringTransactionService->findMatchingTransactionsForTemplates($budget);
+        // How far back to look for candidates: one of the offered ranges, else the default.
+        $range = $request->query('months');
+        if (! in_array($range, self::MATCHING_RANGES, true)) {
+            $range = self::MATCHING_RANGE_DEFAULT;
+        }
+
+        $matchingData = $this->recurringTransactionService->findMatchingTransactionsForTemplates(
+            $budget,
+            $range === 'all' ? null : (int) $range,
+        );
 
         return Inertia::render('RecurringTransactions/FindMatchingTransactions', [
             'budget' => $budget,
             'templatesWithMatches' => $matchingData['templates_with_matches'],
             'totalTemplates' => $matchingData['total_templates'],
             'totalMatches' => $matchingData['total_matches'],
+            'months' => $range,
+            'monthOptions' => self::MATCHING_RANGES,
         ]);
     }
 

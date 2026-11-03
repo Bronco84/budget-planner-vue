@@ -16,6 +16,8 @@ use Inertia\Testing\AssertableInertia as Assert;
  */
 
 beforeEach(function () {
+    // Suggestions are bounded to a recent window, so pin "now" near the fixtures' dates.
+    $this->travelTo('2026-11-02 12:00:00');
     $this->user = User::factory()->create();
     $this->budget = Budget::factory()->create(['user_id' => $this->user->id]);
     $this->account = Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
@@ -150,6 +152,32 @@ test('find matching reports entity and description matches with linked counts, w
         // The raw Plaid payload columns are never selected.
         ->and($queries->filter(fn ($sql) => str_contains($sql, 'from "plaid_transactions"') && str_contains($sql, 'select *'))->all())->toBe([]);
 });
+
+test('find matching suggests only the last 12 months by default and searches older ranges on request', function (mixed $months, string $range, array $expected) {
+    RecurringTransactionTemplate::factory()->create([
+        'budget_id' => $this->budget->id, 'account_id' => $this->account->id, 'description' => 'Hulu',
+    ]);
+    $recent = recurBulkPlaidTransaction($this->account, 'ptx-recent', 'Hulu', ['date' => '2025-11-02']);
+    $lastYear = recurBulkPlaidTransaction($this->account, 'ptx-last-year', 'Hulu', ['date' => '2025-11-01']);
+    $old = recurBulkPlaidTransaction($this->account, 'ptx-old', 'Hulu', ['date' => '2023-06-01']);
+    $ids = ['recent' => $recent->id, 'lastYear' => $lastYear->id, 'old' => $old->id];
+
+    $this->actingAs($this->user)
+        ->get(route('recurring-transactions.find-matching', ['budget' => $this->budget, 'months' => $months]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('months', $range)
+            ->where('monthOptions', ['12', '24', '36', 'all'])
+            ->where('totalMatches', count($expected))
+            ->where('templatesWithMatches.0.matching_transactions', fn ($rows) => collect($rows)->pluck('id')->all()
+                === array_map(fn ($key) => $ids[$key], $expected)));
+})->with([
+    'default' => [null, '12', ['recent']],
+    'last 24 months' => ['24', '24', ['recent', 'lastYear']],
+    'all history' => ['all', 'all', ['recent', 'lastYear', 'old']],
+    'unknown range falls back' => ['7', '12', ['recent']],
+    'array falls back' => [['all'], '12', ['recent']],
+]);
 
 test('an already linked transaction is not re-linked and nothing is reported as linked', function () {
     $template = RecurringTransactionTemplate::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $this->account->id]);

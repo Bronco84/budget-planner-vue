@@ -5,6 +5,8 @@ use App\Models\Budget;
 use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
 use App\Models\User;
+use App\Services\PlaidService;
+use Illuminate\Support\Facades\Cache;
 use Tests\Support\FakePlaidApi;
 
 /*
@@ -138,4 +140,101 @@ test('sync all skips accounts whose Plaid data is not ready yet', function () {
         ->post(route('plaid.sync-all', $this->budget))
         ->assertSessionMissing('error')
         ->assertSessionHas('message', 'Synced 1 new and updated 0 transactions.');
+});
+
+/**
+ * Link another local account to an existing account's Plaid connection (same Item).
+ */
+function syncAllSiblingAccount(PlaidAccount $sibling, string $key, string $name): PlaidAccount
+{
+    $account = Account::factory()->checking()->create(['budget_id' => $sibling->account->budget_id, 'name' => $name]);
+
+    return PlaidAccount::create([
+        'plaid_connection_id' => $sibling->plaid_connection_id,
+        'account_id' => $account->id,
+        'plaid_account_id' => "plaid-{$key}",
+        'account_name' => $name,
+        'account_type' => 'depository',
+        'account_subtype' => 'checking',
+        'current_balance_cents' => 0,
+    ]);
+}
+
+test('sync all fetches each connection once and distributes it to every account of the connection', function () {
+    $first = syncAllLinkedAccount($this->budget, 'shared', 'Checking S1');
+    $second = syncAllSiblingAccount($first, 'shared-2', 'Checking S2');
+    $solo = syncAllLinkedAccount($this->budget, 'solo', 'Checking Solo');
+
+    $byToken = [
+        'access-shared' => ['plaid-shared' => ['tx-s1a', 'tx-s1b'], 'plaid-shared-2' => ['tx-s2a']],
+        'access-solo' => ['plaid-solo' => ['tx-solo']],
+    ];
+    $this->plaid
+        ->on('/transactions/get', fn (array $body) => ['transactions' => collect($byToken[$body['access_token']])
+            ->flatMap(fn (array $ids, string $plaidAccountId) => array_map(fn (string $id) => [
+                'transaction_id' => $id, 'account_id' => $plaidAccountId, 'amount' => 10.00,
+                'date' => '2026-03-10', 'name' => "Purchase {$id}", 'pending' => false,
+            ], $ids))->values()->all()])
+        ->on('/accounts/get', fn (array $body) => ['accounts' => array_map(fn (string $plaidAccountId) => [
+            'account_id' => $plaidAccountId, 'name' => 'Account', 'type' => 'depository', 'subtype' => 'checking',
+            'balances' => ['current' => strlen($plaidAccountId), 'available' => null],
+        ], array_keys($byToken[$body['access_token']]))]);
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync-all', $this->budget))
+        ->assertSessionMissing('error')
+        ->assertSessionHas('message', 'Synced 4 new and updated 0 transactions.');
+
+    // One transactions and one balances fetch per connection, not per account.
+    expect(array_column($this->plaid->bodiesFor('/transactions/get'), 'access_token'))->toBe(['access-shared', 'access-solo'])
+        ->and(array_column($this->plaid->bodiesFor('/accounts/get'), 'access_token'))->toBe(['access-shared', 'access-solo']);
+
+    // Each account got its own transactions and balance from the shared fetch.
+    expect($first->account->transactions()->pluck('plaid_transaction_id')->sort()->values()->all())->toBe(['tx-s1a', 'tx-s1b'])
+        ->and($second->account->transactions()->pluck('plaid_transaction_id')->all())->toBe(['tx-s2a'])
+        ->and($solo->account->transactions()->pluck('plaid_transaction_id')->all())->toBe(['tx-solo'])
+        ->and($first->fresh()->current_balance_cents)->toBe(strlen('plaid-shared') * 100)
+        ->and($second->fresh()->current_balance_cents)->toBe(strlen('plaid-shared-2') * 100);
+});
+
+test('a failed connection fetch fails each of its accounts without refetching', function () {
+    $first = syncAllLinkedAccount($this->budget, 'shared', 'Checking S1');
+    syncAllSiblingAccount($first, 'shared-2', 'Checking S2');
+    syncAllLinkedAccount($this->budget, 'solo', 'Checking Solo');
+    stubSyncAllTransactions($this->plaid, ['shared' => 'ITEM_LOGIN_REQUIRED', 'solo' => ['tx-solo']]);
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync-all', $this->budget))
+        ->assertSessionHas('message', 'Synced 1 new and updated 0 transactions. 2 accounts could not be synced: Checking S1, Checking S2.');
+
+    expect(array_column($this->plaid->bodiesFor('/transactions/get'), 'access_token'))->toBe(['access-shared', 'access-solo'])
+        ->and($first->plaidConnection->fresh()->status)->toBe(PlaidConnection::STATUS_ERROR);
+});
+
+test('sync all holds each connection lock while it imports that connection', function () {
+    $first = syncAllLinkedAccount($this->budget, 'shared', 'Checking S1');
+    syncAllSiblingAccount($first, 'shared-2', 'Checking S2');
+    $lockKey = PlaidService::syncLockKey($first);
+    $lockFreeDuringImport = null;
+
+    stubSyncAllTransactions($this->plaid, ['shared' => []]);
+    $this->plaid->on('/transactions/get', function () use ($lockKey, &$lockFreeDuringImport) {
+        $probe = Cache::lock($lockKey, 10);
+        $lockFreeDuringImport = $probe->get();
+        if ($lockFreeDuringImport) {
+            $probe->release();
+        }
+
+        return ['transactions' => []];
+    });
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync-all', $this->budget))
+        ->assertSessionHas('message', 'Synced 0 new and updated 0 transactions.');
+
+    expect($lockFreeDuringImport)->toBeFalse();
+
+    $after = Cache::lock($lockKey, 10);
+    expect($after->get())->toBeTrue();
+    $after->release();
 });

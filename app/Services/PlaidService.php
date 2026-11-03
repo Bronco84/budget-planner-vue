@@ -34,6 +34,14 @@ class PlaidService
 
     protected $isConfigured = false;
 
+    /**
+     * Item-wide Plaid responses (and errors) fetched during one connection sync, so every
+     * account of the connection is served from a single fetch. Null outside a sync.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $sharedFetches = null;
+
     public function __construct()
     {
         $this->clientId = config('services.plaid.client_id');
@@ -934,7 +942,87 @@ class PlaidService
     public function syncTransactions(PlaidAccount $plaidAccount, int $days = 180): array
     {
         return Cache::lock(self::syncLockKey($plaidAccount), 600)
-            ->block(self::SYNC_LOCK_WAIT_SECONDS, fn () => $this->syncTransactionsUnlocked($plaidAccount, $days));
+            ->block(self::SYNC_LOCK_WAIT_SECONDS, fn () => $this->withSharedFetches(
+                fn () => $this->syncTransactionsUnlocked($plaidAccount, $days)
+            ));
+    }
+
+    /**
+     * Sync several accounts of one Plaid connection, fetching the Item's transactions,
+     * balances, liabilities and holdings once and distributing them to each account.
+     * Holds the connection's sync lock for the whole run.
+     *
+     * @param  iterable<PlaidAccount>  $plaidAccounts  accounts that share one plaid_connection_id
+     * @return array<int, array{imported: int, updated: int}|\Exception> per PlaidAccount id: its counts, or the exception its sync failed with
+     *
+     * @throws LockTimeoutException when another sync of the connection does not finish in time
+     */
+    public function syncConnection(iterable $plaidAccounts, int $days = 180): array
+    {
+        $plaidAccounts = collect($plaidAccounts);
+
+        if ($plaidAccounts->isEmpty()) {
+            return [];
+        }
+
+        if ($plaidAccounts->pluck('plaid_connection_id')->unique()->count() > 1) {
+            throw new \InvalidArgumentException('syncConnection takes accounts of a single Plaid connection.');
+        }
+
+        return Cache::lock(self::syncLockKey($plaidAccounts->first()), 600)
+            ->block(self::SYNC_LOCK_WAIT_SECONDS, fn () => $this->withSharedFetches(function () use ($plaidAccounts, $days) {
+                $results = [];
+
+                foreach ($plaidAccounts as $plaidAccount) {
+                    try {
+                        $results[$plaidAccount->id] = $this->syncTransactionsUnlocked($plaidAccount, $days);
+                    } catch (\Exception $e) {
+                        $results[$plaidAccount->id] = $e;
+                    }
+                }
+
+                return $results;
+            }));
+    }
+
+    /**
+     * Run $work with Item-wide Plaid fetches shared: each one is made at most once and
+     * its response, or its error, is reused by every account synced inside $work.
+     */
+    private function withSharedFetches(callable $work): mixed
+    {
+        $this->sharedFetches = [];
+
+        try {
+            return $work();
+        } finally {
+            $this->sharedFetches = null;
+        }
+    }
+
+    /**
+     * Fetch Item-wide data once per connection sync (see withSharedFetches); outside a
+     * sync, fetch it directly. A failed fetch is rethrown to every caller.
+     */
+    private function sharedFetch(string $key, callable $fetch): mixed
+    {
+        if ($this->sharedFetches === null) {
+            return $fetch();
+        }
+
+        if (! array_key_exists($key, $this->sharedFetches)) {
+            try {
+                $this->sharedFetches[$key] = $fetch();
+            } catch (\Exception $e) {
+                $this->sharedFetches[$key] = $e;
+            }
+        }
+
+        if ($this->sharedFetches[$key] instanceof \Exception) {
+            throw $this->sharedFetches[$key];
+        }
+
+        return $this->sharedFetches[$key];
     }
 
     /**
@@ -963,10 +1051,9 @@ class PlaidService
             // Fetch transactions - may return empty for investment-only accounts
             $transactions = [];
             try {
-                $transactions = $this->getTransactions(
-                    $accessToken,
-                    $startDate,
-                    $endDate
+                $transactions = $this->sharedFetch(
+                    "transactions:{$accessToken}:{$startDate->toDateString()}:{$endDate->toDateString()}",
+                    fn () => $this->getTransactions($accessToken, $startDate, $endDate)
                 );
             } catch (\Exception $txError) {
                 // For investment accounts, transaction fetch failures are expected
@@ -1423,7 +1510,7 @@ class PlaidService
         }
 
         try {
-            $accounts = $this->getAccounts($accessToken);
+            $accounts = $this->sharedFetch("accounts:{$accessToken}", fn () => $this->getAccounts($accessToken));
 
             if (empty($accounts)) {
                 return false;
@@ -1512,7 +1599,7 @@ class PlaidService
 
         try {
             // Get liability data from Plaid (this returns ALL credit cards for the connection)
-            $liabilities = $this->getLiabilities($accessToken);
+            $liabilities = $this->sharedFetch("liabilities:{$accessToken}", fn () => $this->getLiabilities($accessToken));
 
             if (empty($liabilities)) {
                 Log::info('No liability data returned from Plaid', [
@@ -1534,7 +1621,7 @@ class PlaidService
 
             // Get account balance data to access credit limits
             // The liability endpoint returns account data alongside liability data
-            $accounts = $this->getAccounts($accessToken);
+            $accounts = $this->sharedFetch("accounts:{$accessToken}", fn () => $this->getAccounts($accessToken));
 
             // Build a map of account_id => account data for easy lookup
             $accountsMap = [];
@@ -1750,7 +1837,7 @@ class PlaidService
 
         try {
             // Get investment holdings from Plaid
-            $investmentData = $this->getInvestmentHoldings($accessToken);
+            $investmentData = $this->sharedFetch("investments:{$accessToken}", fn () => $this->getInvestmentHoldings($accessToken));
 
             if (empty($investmentData['holdings']) && empty($investmentData['securities'])) {
                 Log::info('No investment holdings data returned from Plaid', [

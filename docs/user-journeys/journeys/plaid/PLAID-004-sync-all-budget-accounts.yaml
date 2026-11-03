@@ -5,9 +5,10 @@ domain: plaid
 status: implemented
 priority: high
 summary: >
-  From the budget overview the user clicks "Sync transactions". The server iterates
-  every PlaidAccount whose local account belongs to the budget, syncs each one, sums
-  the imported/updated counts and redirects back. The page then reloads transactions
+  From the budget overview the user clicks "Sync transactions". The server groups
+  every PlaidAccount whose local account belongs to the budget by Plaid connection,
+  syncs each connection once inside the request (fetching the Item's data once and
+  distributing it to its accounts), sums the imported/updated counts and redirects back. The page then reloads transactions
   and accounts.
 actors:
   - budget owner
@@ -17,7 +18,7 @@ routes:
   - plaid.sync-all
 depends_on:
   - path: app/Services/PlaidService.php
-    reason: syncTransactions per linked account
+    reason: syncConnection per Plaid connection (shared Item-wide fetches, per-connection sync lock)
 integrations:
   - Plaid API (/transactions/get, /accounts/get, /liabilities/get, /investments/holdings/get)
 steps:
@@ -30,6 +31,8 @@ postconditions:
 business_rules:
   - "syncing needs the editor role (BudgetPolicy::sync): editors and owners may sync, viewers get 403"
   - limited to 3 requests per minute
+  - accounts are synced per Plaid connection in the request; each connection's /transactions/get, /accounts/get, /liabilities/get and /investments/holdings/get are fetched at most once and shared by its accounts, and a failed fetch fails each of those accounts without refetching
+  - each connection is synced under its sync lock (plaid-sync:connection:{id}); if it cannot be taken in time every account of that connection is reported as failed
   - PRODUCT_NOT_READY accounts are skipped silently
   - when every attempted account failed, the user gets a user-safe error flash ("Failed to sync transactions. Please try again." or the could-not-reach message)
   - 'when some accounts failed, the success message lists them ("N account(s) could not be synced: <names>."); raw Plaid text is only logged'
@@ -40,6 +43,19 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidSyncAllTest.php::syncing all accounts reports the combined counts
+  - id: one_fetch_per_connection
+    kind: edge
+    description: Several accounts on one Plaid connection are synced from a single transactions and balances fetch; each account still gets only its own transactions and balance, and a failed fetch fails all of the connection's accounts after one request.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::sync all fetches each connection once and distributes it to every account of the connection
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::a failed connection fetch fails each of its accounts without refetching
+  - id: connection_lock_held
+    kind: edge
+    description: Sync all holds each connection's sync lock while it imports that connection and releases it afterwards.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncAllTest.php::sync all holds each connection lock while it imports that connection
   - id: no_linked_accounts
     kind: empty_state
     description: A budget with no Plaid accounts redirects back with "No Plaid-connected accounts found."

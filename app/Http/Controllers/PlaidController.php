@@ -872,7 +872,7 @@ class PlaidController extends Controller
         // Find all accounts in this budget that have Plaid connections
         $plaidAccounts = PlaidAccount::whereHas('account', function ($query) use ($budget) {
             $query->where('budget_id', $budget->id);
-        })->get();
+        })->with(['account', 'plaidConnection'])->get();
 
         Log::info('Found Plaid accounts', [
             'count' => $plaidAccounts->count(),
@@ -899,17 +899,30 @@ class PlaidController extends Controller
         $failedAccounts = [];
         $lastError = null;
 
-        foreach ($plaidAccounts as $plaidAccount) {
-            $accountName = $plaidAccount->account ? $plaidAccount->account->name : 'Unknown';
-
+        // One sync per Plaid connection: the Item's transactions and balances are fetched
+        // once and shared by all of its accounts, rather than refetched per account.
+        foreach ($plaidAccounts->groupBy('plaid_connection_id') as $connectionAccounts) {
             try {
-                $result = $this->plaidService->syncTransactions($plaidAccount);
-                $totalImported += $result['imported'];
-                $totalUpdated += $result['updated'];
-                $succeeded++;
+                $results = $this->plaidService->syncConnection($connectionAccounts);
             } catch (\Exception $e) {
+                // The connection could not be synced at all (another sync held its lock).
+                $results = $connectionAccounts->mapWithKeys(fn (PlaidAccount $pa) => [$pa->id => $e])->all();
+            }
+
+            foreach ($connectionAccounts as $plaidAccount) {
+                $accountName = $plaidAccount->account ? $plaidAccount->account->name : 'Unknown';
+                $result = $results[$plaidAccount->id];
+
+                if (! $result instanceof \Exception) {
+                    $totalImported += $result['imported'];
+                    $totalUpdated += $result['updated'];
+                    $succeeded++;
+
+                    continue;
+                }
+
                 // Transaction data not ready yet (new credit cards): skip silently.
-                if (str_contains($e->getMessage(), 'PRODUCT_NOT_READY')) {
+                if (str_contains($result->getMessage(), 'PRODUCT_NOT_READY')) {
                     Log::info('Account transaction data not ready yet', [
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $accountName,
@@ -919,12 +932,12 @@ class PlaidController extends Controller
                 }
 
                 $failedAccounts[] = $accountName;
-                $lastError = $e;
+                $lastError = $result;
 
                 Log::error('Sync error', [
                     'plaid_account_id' => $plaidAccount->id,
                     'account_id' => $plaidAccount->account_id,
-                    'error' => $e->getMessage(),
+                    'error' => $result->getMessage(),
                 ]);
             }
         }

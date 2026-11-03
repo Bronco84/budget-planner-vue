@@ -203,6 +203,11 @@ class Transaction extends Model
 
     /**
      * Get the Plaid transaction data, if this was imported from Plaid.
+     *
+     * Raw rows are unique per (account_id, plaid_transaction_id). This relation matches
+     * on the Plaid id alone, so when one Item is synced into two budgets it may return
+     * the other account's copy; both carry the same Plaid data, so use it for Plaid's
+     * fields (name, merchant, counterparties) and query by account for anything else.
      */
     public function plaidTransaction(): BelongsTo
     {

@@ -46,6 +46,7 @@ business_rules:
   - a pending transaction arriving under a new Plaid id is merged into the closest look-alike that Plaid still reports as pending (amount within $1, date within 3 days, similar description); posted look-alikes are never matched
   - syncs of one Plaid connection run one at a time (cache lock plaid-sync:connection:{id}, waiting up to 60s for a running sync before failing with the generic sync error), so concurrent syncs cannot import the same transaction twice
   - a Plaid transaction id is matched only against rows on the synced account (existing-row update and pending_transaction_id cleanup), so rows another budget imported from the same Item are never updated or deleted
+  - raw plaid_transactions rows are unique per (account_id, plaid_transaction_id) and upserted on both, so an Item synced into two budgets keeps a separate raw row (and pending flag) per account; the account register joins raw rows on both columns
   - /transactions/get is paged (options.count 500, increasing options.offset) until total_transactions is reached, so the whole 180-day window is imported for every account on the Item
 scenarios:
   - id: sync_imports_transactions
@@ -90,6 +91,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::a sync only matches Plaid ids on its own account, never another budget's rows for the same Item
+    note: the same test checks each account keeps its own raw plaid_transactions row and the register lists the shared id once.
   - id: concurrent_syncs_serialised
     kind: edge
     description: A sync holds a per-connection lock while it imports and releases it afterwards, so two members or tabs syncing at once cannot duplicate transactions.
@@ -188,8 +190,7 @@ scenarios:
     tests:
       - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::an editor may sync a linked account and the whole budget
       - tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php::a viewer cannot sync
-known_issues:
-  - plaid_transactions.plaid_transaction_id is globally unique and PlaidTransaction::updateOrCreate is keyed on it alone, so when the same Item is synced in two budgets the raw row's account_id follows the last sync (production-review sibling of PR-037)
+known_issues: []
 confidence: high
 evidence:
   - app/Http/Controllers/PlaidController.php syncTransactions(), handleSyncException()

@@ -994,16 +994,18 @@ class PlaidService
 
                 // The category Plaid gave this transaction last time, before the upsert below
                 // overwrites it: a row still carrying it has not been recategorised by the user.
-                $previousPlaidCategory = PlaidTransaction::where('plaid_transaction_id', $transaction['transaction_id'])
+                $previousPlaidCategory = PlaidTransaction::where('account_id', $plaidAccount->account_id)
+                    ->where('plaid_transaction_id', $transaction['transaction_id'])
                     ->value('category');
 
-                // Store or update the Plaid transaction
+                // Store or update this account's raw copy of the Plaid transaction: an Item
+                // synced into two budgets delivers the same ids to both, and each keeps its own
                 $plaidTransaction = PlaidTransaction::updateOrCreate(
                     [
+                        'account_id' => $plaidAccount->account_id,
                         'plaid_transaction_id' => $transaction['transaction_id'],
                     ],
                     [
-                        'account_id' => $plaidAccount->account_id,
                         'plaid_account_id' => $transaction['account_id'],
                         'pending' => $transaction['pending'] ?? false,
                         'amount' => $transaction['amount'],
@@ -1070,7 +1072,9 @@ class PlaidService
                             ...$this->plaidRefreshAttributes(
                                 $pendingDuplicate,
                                 $transaction,
-                                PlaidTransaction::where('plaid_transaction_id', $pendingDuplicate->plaid_transaction_id)->value('category'),
+                                PlaidTransaction::where('account_id', $plaidAccount->account_id)
+                                    ->where('plaid_transaction_id', $pendingDuplicate->plaid_transaction_id)
+                                    ->value('category'),
                             ),
                         ]);
 
@@ -1304,11 +1308,16 @@ class PlaidService
             }
         }
 
-        $pendingPlaid = PlaidTransaction::where('plaid_transaction_id', $pending->plaid_transaction_id)->first();
+        $pendingPlaid = PlaidTransaction::where('account_id', $pending->account_id)
+            ->where('plaid_transaction_id', $pending->plaid_transaction_id)
+            ->first();
+        $settledPlaidCategory = PlaidTransaction::where('account_id', $settled->account_id)
+            ->where('plaid_transaction_id', $settled->plaid_transaction_id)
+            ->value('category');
         $edits = [];
 
         if (! $this->categoryIsPlaids($pending, $pendingPlaid?->category)
-            && $this->categoryIsPlaids($settled, PlaidTransaction::where('plaid_transaction_id', $settled->plaid_transaction_id)->value('category'))) {
+            && $this->categoryIsPlaids($settled, $settledPlaidCategory)) {
             $edits['category_id'] = $pending->category_id;
             $edits['category'] = $pending->category;
         }
@@ -1358,7 +1367,9 @@ class PlaidService
             ->whereNotNull('plaid_transaction_id')
             ->where('plaid_transaction_id', '!=', $transaction['transaction_id'])
             // Only rows that are still pending in Plaid
-            ->whereIn('plaid_transaction_id', PlaidTransaction::select('plaid_transaction_id')->where('pending', true))
+            ->whereIn('plaid_transaction_id', PlaidTransaction::select('plaid_transaction_id')
+                ->where('account_id', $plaidAccount->account_id)
+                ->where('pending', true))
             // Match amount within $1 tolerance (for rounding differences)
             ->whereBetween('amount_in_cents', [$amountInCents - 100, $amountInCents + 100])
             // Match date within ±3 days (pending transactions can shift dates)

@@ -85,7 +85,12 @@ class BudgetService
             ->selectRaw('transactions.date > ? as is_projected', [now()->toDateString()])
             ->selectRaw('false as is_recurring')
             ->with(['account', 'plaidTransaction'])
-            ->leftJoin('plaid_transactions', 'transactions.plaid_transaction_id', '=', 'plaid_transactions.plaid_transaction_id')
+            // Raw Plaid rows are unique per (account, Plaid id): join on both, or a Plaid id
+            // also synced into another budget would duplicate the transaction.
+            ->leftJoin('plaid_transactions', function ($join) {
+                $join->on('transactions.plaid_transaction_id', '=', 'plaid_transactions.plaid_transaction_id')
+                    ->on('transactions.account_id', '=', 'plaid_transactions.account_id');
+            })
             ->where(function ($query) use ($startDate, $endDate) {
                 $query->where('transactions.date', '>=', $startDate)
                     ->where('transactions.date', '<=', $endDate)

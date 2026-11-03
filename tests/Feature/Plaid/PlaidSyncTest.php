@@ -12,6 +12,7 @@ use App\Models\PlaidTransaction;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\BudgetService;
 use App\Services\PlaidService;
 use Illuminate\Support\Facades\Cache;
 use Tests\Support\FakePlaidApi;
@@ -410,6 +411,10 @@ test('a sync only matches Plaid ids on its own account, never another budget\'s 
         'category' => 'Food', 'amount_in_cents' => -300, 'date' => '2026-03-10',
         'plaid_transaction_id' => 'tx-shared-pending', 'is_plaid_imported' => true,
     ]);
+    $otherRaw = PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-shared', 'account_id' => $otherAccount->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => true, 'amount' => 1.00, 'date' => '2026-03-01', 'name' => 'KEEP ME',
+    ]);
 
     // The same Item is now linked in this budget.
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
@@ -445,6 +450,21 @@ test('a sync only matches Plaid ids on its own account, never another budget\'s 
         ->description->toBe('KEEP ME')
         ->amount_in_cents->toBe(-100)
         ->and($otherPending->fresh()?->plaid_transaction_id)->toBe('tx-shared-pending');
+
+    // Each account keeps its own raw Plaid row for the shared id.
+    expect($otherRaw->fresh())
+        ->account_id->toBe($otherAccount->id)
+        ->name->toBe('KEEP ME')
+        ->pending->toBeTrue()
+        ->and(PlaidTransaction::where('account_id', $account->id)->where('plaid_transaction_id', 'tx-shared')->sole())
+        ->name->toBe('Corner Hardware')
+        ->pending->toBeFalse();
+
+    // The account's register lists the shared transaction once, with its own pending flag.
+    $register = app(BudgetService::class)->getAccountTransactions($account, now()->subMonths(2), now(), 0)
+        ->where('plaid_transaction_id', 'tx-shared');
+    expect($register)->toHaveCount(1)
+        ->and((bool) $register->first()->pending)->toBeFalse();
 });
 
 test('a sync holds the connection lock while it imports, so concurrent syncs cannot insert the same transaction twice', function () {

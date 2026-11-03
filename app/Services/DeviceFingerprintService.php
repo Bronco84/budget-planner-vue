@@ -9,21 +9,36 @@ class DeviceFingerprintService
     /**
      * Generate a device fingerprint from request data.
      *
-     * Only headers a browser sends identically on every request are used. The
-     * Accept header is deliberately excluded: the device is trusted during a
-     * JSON passkey-login request, but later page loads send an HTML Accept.
+     * The fingerprint is a coarse second factor next to the device cookie
+     * token: browser family and operating system only, with no versions, so a
+     * browser update does not break trust. It deliberately leaves out the
+     * Accept headers (the device is trusted during a JSON passkey-login request
+     * but later page loads send an HTML Accept, and browsers change their
+     * Accept-Encoding list between releases).
      */
     public function generate(Request $request): string
     {
-        $components = [
+        $userAgent = $request->userAgent() ?? '';
+
+        return hash('sha256', implode('|', [
+            'v2',
+            $this->extractBrowser($userAgent),
+            $this->extractOS($userAgent),
+        ]));
+    }
+
+    /**
+     * The fingerprint format used before browser versions were dropped: the
+     * full User-Agent plus Accept-Language and Accept-Encoding. Devices trusted
+     * before the change still carry it until their next use upgrades them.
+     */
+    public function generateLegacy(Request $request): string
+    {
+        return hash('sha256', implode('|', [
             $request->userAgent() ?? '',
             $request->header('Accept-Language') ?? '',
             $request->header('Accept-Encoding') ?? '',
-        ];
-
-        $fingerprint = implode('|', $components);
-
-        return hash('sha256', $fingerprint);
+        ]));
     }
 
     /**
@@ -77,11 +92,12 @@ class DeviceFingerprintService
         if (str_contains($userAgent, 'Windows NT')) {
             return 'Windows';
         }
-        if (str_contains($userAgent, 'Mac OS X')) {
-            return 'macOS';
-        }
+        // iOS user agents also say "like Mac OS X", so check them first.
         if (str_contains($userAgent, 'iPhone') || str_contains($userAgent, 'iPad')) {
             return 'iOS';
+        }
+        if (str_contains($userAgent, 'Mac OS X') || str_contains($userAgent, 'Macintosh')) {
+            return 'macOS';
         }
         if (str_contains($userAgent, 'Android')) {
             return 'Android';
@@ -94,13 +110,13 @@ class DeviceFingerprintService
     }
 
     /**
-     * Verify if a fingerprint matches the current request.
+     * Verify if a fingerprint matches the current request, in either the
+     * current or the legacy format.
      */
     public function verify(Request $request, string $storedFingerprint): bool
     {
-        $currentFingerprint = $this->generate($request);
-
-        return $currentFingerprint === $storedFingerprint;
+        return hash_equals($storedFingerprint, $this->generate($request))
+            || hash_equals($storedFingerprint, $this->generateLegacy($request));
     }
 
     /**

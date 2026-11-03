@@ -8,7 +8,8 @@ summary: >
   After a passkey login or registration the browser holds an httpOnly
   device_token cookie (90 days). On a later request from a guest session the
   RememberDevice middleware matches the cookie against a valid TrustedDevice
-  whose fingerprint equals the request's, logs the user in and refreshes
+  whose fingerprint matches the request's browser family and OS, logs the
+  user in and refreshes
   last_used_at. Guest-only pages such as /login then redirect to the dashboard,
   which forwards to the budgets index.
 actors:
@@ -26,7 +27,7 @@ depends_on:
   - path: app/Services/DeviceTokenService.php
     reason: decrypts stored tokens and matches the cookie value
   - path: app/Services/DeviceFingerprintService.php
-    reason: fingerprint (user agent + Accept-Language + Accept-Encoding + Accept) must match
+    reason: fingerprint (browser family + OS, no versions) must match; the legacy full-User-Agent format is still accepted
   - path: app/Models/TrustedDevice.php
     reason: valid() scope and markAsUsed()
 steps:
@@ -41,6 +42,8 @@ business_rules:
   - auto-login is skipped when already authenticated and on the logout route
   - auto-login regenerates the session id (Laravel's SessionGuard::login); the new id is recorded on the device so revoking it (AUTH-012) ends that session
   - expired devices (expires_at in the past) are ignored
+  - the fingerprint is a coarse second factor next to the cookie token, browser family and OS only (no versions), so browser updates keep the device trusted
+  - devices fingerprinted the legacy way (full User-Agent + Accept-Language + Accept-Encoding) are still accepted when that matches and are moved to the current format on first use
   - the cookie is secure, httpOnly, SameSite=Lax, lifetime auth.device_remember_days (default 90)
   - "/dashboard is auth-only and simply redirects to budgets.index"
 scenarios:
@@ -76,6 +79,18 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::a device token presented from a different browser does not auto log in
+  - id: browser_update_keeps_trust
+    kind: edge
+    description: The same browser after a version update (and a changed Accept-Encoding list) is still auto-logged in.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::a browser update keeps the device trusted
+  - id: legacy_fingerprint_device_upgraded
+    kind: recovery
+    description: A device stored with the legacy fingerprint format still auto-logs in from the unchanged browser, and its fingerprint is rewritten to the current format.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::a device trusted with the legacy fingerprint still auto logs in and is moved to the current format
   - id: json_login_device_matches_page_loads
     kind: integration
     description: A device trusted during the JSON passkey-login request auto-logs in on a later HTML page load from the same browser (the fingerprint ignores the Accept header).

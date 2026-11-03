@@ -45,7 +45,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [ACCOUNT-003](journeys/accounts/ACCOUNT-003-configure-autopay.yaml) | Owner configures credit-card autopay from a checking or savings account | medium | yes | yes | yes | yes | missing | no | **covered** |
 | [ADMIN-001](journeys/admin/ADMIN-001-nova-admin-panel.yaml) | Administrator manages application data in the Nova panel | medium | yes | yes | yes | missing | yes | no | **covered** |
 | [ADMIN-002](journeys/admin/ADMIN-002-review-flagged-chat-messages.yaml) | Administrator reviews flagged chat messages in Nova | low | yes | yes | yes | missing | yes | no | **covered** |
-| [AUTH-001](journeys/auth/AUTH-001-passkey-login.yaml) | Guest signs in with a passkey | critical | yes | yes | n/a | yes | yes | yes | **covered** |
+| [AUTH-001](journeys/auth/AUTH-001-passkey-login.yaml) | Guest signs in with a passkey | critical | yes | yes | yes | yes | yes | yes | **covered** |
 | [AUTH-002](journeys/auth/AUTH-002-register-account-with-passkey.yaml) | Guest registers an account and enrols a first passkey | critical | yes | yes | yes | yes | yes | no | **covered** |
 | [AUTH-003](journeys/auth/AUTH-003-magic-link-sign-in.yaml) | Guest signs in with an emailed magic link | high | yes | yes | yes | yes | yes | no | **covered** |
 | [AUTH-004](journeys/auth/AUTH-004-invalid-magic-link.yaml) | Guest opens an expired, used or tampered magic link | high | yes | yes | yes | missing | yes | no | **covered** |
@@ -145,7 +145,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **AUTH-001** Guest signs in with a passkey _(implemented, critical)_
   - Routes: `login`, `GET /`, `webauthn.login.options`, `webauthn.login`
-  - Tests: `tests/Feature/Auth/AuthenticationTest.php`, `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/Auth/PasskeyLoginEndpointTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`, `tests/playwright/passkeys.spec.js`
+  - Tests: `tests/Feature/Auth/AuthenticationTest.php`, `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/Auth/PasskeyLoginEndpointTest.php`, `tests/Feature/Auth/TrustedDeviceFingerprintTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`, `tests/playwright/passkeys.spec.js`
 - **AUTH-002** Guest registers an account and enrols a first passkey _(implemented, critical)_
   - Routes: `register`, `POST /register`, `passkey.register`, `webauthn.register.options`, `webauthn.register`
   - Tests: `tests/Feature/Auth/InvitationRegistrationTest.php`, `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php`, `tests/Feature/Auth/PasskeyRegistrationErrorTest.php`, `tests/Feature/Auth/RegistrationFlowTest.php`, `tests/Feature/Auth/RegistrationTest.php`

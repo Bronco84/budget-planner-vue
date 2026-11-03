@@ -36,6 +36,7 @@ business_rules:
   - login options are rate limited to 10/min and are not guest-only, so an auto-logged-in request still receives JSON
   - a failed assertion returns 422 without creating a session
   - challenges are single use (pulled from the session on the first attempt)
+  - the trusted device is recognised by the device_token cookie the browser already holds, not by fingerprint (browser family + OS is shared by other machines); a browser without a cookie gets a new device row and a NewDeviceLogin email
   - an assertion whose signature counter does not advance past the stored one is treated as a cloned authenticator and the credential is disabled; authenticators that always report 0 (synced passkeys) are allowed
   - the first sign-in from a new device emails a NewDeviceLogin alert, sent during the request unless auth.magic_link_queue is on (the same switch as magic links, off until production runs a queue worker); a mail failure is reported and never fails the sign-in
 scenarios:
@@ -98,6 +99,18 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a new device alert that fails to send does not fail the passkey sign-in'
+  - id: relogin_reuses_device_by_cookie
+    kind: edge
+    description: Signing in again from a browser that holds a device cookie refreshes that device (moving a legacy fingerprint to the current format) and sends no new-device email, even if the browser has updated since.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::signing in again from a legacy device whose browser has since updated reuses it without a new device email
+  - id: same_browser_other_machine_is_new_device
+    kind: authentication
+    description: Another machine with the same browser and OS but no device cookie gets its own device and a new-device alert.
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::a second machine with the same browser and os is a new device and sends an alert
   - id: options_rate_limited
     kind: edge
     description: Login option requests beyond 10 per minute are throttled.

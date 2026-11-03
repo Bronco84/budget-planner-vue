@@ -89,12 +89,4 @@ class TrustedDevice extends Model
 
         return $this->last_used_at->diffForHumans();
     }
-
-    /**
-     * Check if this is the current device.
-     */
-    public function isCurrentDevice(string $fingerprint): bool
-    {
-        return $this->device_fingerprint === $fingerprint;
-    }
 }

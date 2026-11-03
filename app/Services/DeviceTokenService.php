@@ -21,21 +21,27 @@ class DeviceTokenService
 
     /**
      * Create or update a trusted device for the user.
+     *
+     * The browser is recognised by the device cookie it already holds, not by
+     * its fingerprint: the fingerprint is only browser family and OS, which
+     * many machines share, so matching on it alone would let a second laptop
+     * silently take over the first one's row without a new-device alert.
      */
     public function createTrustedDevice(User $user, Request $request, string $authMethod = 'passkey'): TrustedDevice
     {
         $fingerprint = $this->fingerprintService->generate($request);
         $deviceName = $this->fingerprintService->generateDeviceName($request);
 
-        // Check if a device with this fingerprint already exists for this user
-        $device = $user->trustedDevices()
-            ->where('device_fingerprint', $fingerprint)
-            ->first();
+        $token = $request->cookie($this->getCookieName());
+        $device = is_string($token) && $token !== '' ? $this->findByToken($token) : null;
 
-        if ($device) {
-            // Update existing device
+        if ($device && $device->user_id === $user->id) {
+            // Same browser re-authenticating: refresh it. This also moves a
+            // legacy or stale fingerprint to the current format, so a browser
+            // trusted before the format change does not raise a new-device alert.
             $device->update([
                 'device_name' => $deviceName,
+                'device_fingerprint' => $fingerprint,
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'last_used_at' => now(),
@@ -139,8 +145,48 @@ class DeviceTokenService
 
     /**
      * Verify a device token and return the device if valid.
+     *
+     * The token must match and the request must come from the same browser
+     * family and OS. A device still carrying a legacy fingerprint is moved to
+     * the current format on its first successful use.
      */
     public function verifyDeviceToken(string $token, Request $request): ?TrustedDevice
+    {
+        $device = $this->findByToken($token);
+
+        if (! $device || ! $this->fingerprintService->verify($request, $device->device_fingerprint)) {
+            return null;
+        }
+
+        $current = $this->fingerprintService->generate($request);
+
+        if (! hash_equals($device->device_fingerprint, $current)) {
+            $device->forceFill(['device_fingerprint' => $current])->saveQuietly();
+        }
+
+        return $device;
+    }
+
+    /**
+     * The trusted device this browser's cookie belongs to, if it is the user's.
+     */
+    public function currentDevice(User $user, Request $request): ?TrustedDevice
+    {
+        $token = $request->cookie($this->getCookieName());
+
+        if (! is_string($token) || $token === '') {
+            return null;
+        }
+
+        $device = $this->verifyDeviceToken($token, $request);
+
+        return $device && $device->user_id === $user->id ? $device : null;
+    }
+
+    /**
+     * Find the valid device a raw token belongs to, without checking the browser.
+     */
+    private function findByToken(string $token): ?TrustedDevice
     {
         try {
             $hash = self::hashToken($token);
@@ -150,9 +196,7 @@ class DeviceTokenService
 
             foreach ($candidates as $device) {
                 if ($this->tokenMatches($device, $token)) {
-                    return $this->fingerprintService->verify($request, $device->device_fingerprint)
-                        ? $device
-                        : null;
+                    return $device;
                 }
             }
 
@@ -165,9 +209,7 @@ class DeviceTokenService
                 if ($this->tokenMatches($device, $token)) {
                     $device->forceFill(['token_hash' => $hash])->saveQuietly();
 
-                    return $this->fingerprintService->verify($request, $device->device_fingerprint)
-                        ? $device
-                        : null;
+                    return $device;
                 }
             }
 

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Services\AccountDeletionService;
-use App\Services\DeviceFingerprintService;
 use App\Services\DeviceTokenService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
@@ -20,10 +19,12 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request, DeviceFingerprintService $fingerprintService): Response
+    public function edit(Request $request, DeviceTokenService $deviceTokenService): Response
     {
         $user = $request->user();
-        $currentFingerprint = $fingerprintService->generate($request);
+        // Identified by this browser's device cookie: the fingerprint is only
+        // browser family and OS, which other machines share.
+        $currentDeviceId = $deviceTokenService->currentDevice($user, $request)?->id;
 
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
@@ -50,7 +51,7 @@ class ProfileController extends Controller
                     'auth_method' => $device->auth_method,
                     'last_used_at' => $device->last_used_at,
                     'created_at' => $device->created_at,
-                    'is_current' => hash_equals($device->device_fingerprint, $currentFingerprint),
+                    'is_current' => $device->id === $currentDeviceId,
                 ]),
         ]);
     }

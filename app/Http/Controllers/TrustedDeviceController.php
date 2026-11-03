@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\TrustedDevice;
-use App\Services\DeviceFingerprintService;
 use App\Services\DeviceTokenService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,7 +10,6 @@ use Illuminate\Http\Request;
 class TrustedDeviceController extends Controller
 {
     public function __construct(
-        private DeviceFingerprintService $fingerprintService,
         private DeviceTokenService $deviceTokenService
     ) {}
 
@@ -36,15 +34,18 @@ class TrustedDeviceController extends Controller
     /**
      * Revoke all trusted devices except the current one, and sign out every
      * other session of the user.
+     *
+     * The current device is the one this browser's device cookie belongs to.
+     * The fingerprint alone cannot say: it is only browser family and OS, which
+     * other machines share.
      */
     public function revokeAll(Request $request): RedirectResponse
     {
         $user = $request->user();
-        $currentFingerprint = $this->fingerprintService->generate($request);
+        $current = $this->deviceTokenService->currentDevice($user, $request);
 
-        // Delete all devices except the current one
         $user->trustedDevices()
-            ->where('device_fingerprint', '!=', $currentFingerprint)
+            ->when($current, fn ($query) => $query->whereKeyNot($current->id))
             ->delete();
 
         $this->deviceTokenService->endOtherSessions($user, $request->session()->getId());

@@ -28,17 +28,17 @@ steps:
   - action: revoke one (DELETE /settings/trusted-devices/{device})
     expected: device deleted and the session it last signed in with ended, back with status "Device revoked successfully."
   - action: revoke all others (POST /settings/trusted-devices/revoke-all)
-    expected: every device whose fingerprint differs from the current request deleted, and every other session of the user ended
+    expected: every device except the one this browser's device cookie belongs to deleted, and every other session of the user ended
 postconditions:
   - revoked devices can no longer auto-login
   - revoked devices' live sessions are signed out
 business_rules:
   - revoking a device owned by another user aborts 403
-  - revoke-all keeps devices matching the current request fingerprint
+  - revoke-all keeps only the device this browser's device_token cookie belongs to (fingerprints are browser family + OS, which other machines share); without a cookie it revokes all
   - each sign-in (passkey login/registration, device auto-login) records the regenerated session id on the trusted device; revoking the device deletes that sessions row (database session driver), unless it is the requesting session
   - revoke-all deletes every sessions row of the user except the requesting session, including magic-link sessions that have no trusted device
   - devices created before session ids were recorded have none until their next sign-in, so revoking one of them only ends its session via revoke-all
-  - the profile lists only unexpired devices (TrustedDevice::valid()) and flags the one matching the current request fingerprint with is_current, shown as a "This device" badge
+  - the profile lists only unexpired devices (TrustedDevice::valid()) and flags the one this browser's device_token cookie belongs to with is_current, shown as a "This device" badge
 scenarios:
   - id: profile_lists_devices
     kind: happy_path
@@ -55,10 +55,11 @@ scenarios:
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can revoke one of their trusted devices'
   - id: revoke_all_other_devices
     kind: happy_path
-    description: Revoke-all deletes every device except the one matching the current fingerprint.
+    description: Revoke-all deletes every device except the current browser's, including another machine with the same browser and OS.
     coverage: covered
     tests:
       - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::revoking all other devices keeps the device for the current browser
+      - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::revoking all other devices revokes another machine with the same browser and os
   - id: no_devices_empty_state
     kind: empty_state
     description: A user with no trusted devices sees an empty list.

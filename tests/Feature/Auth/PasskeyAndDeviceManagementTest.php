@@ -4,6 +4,10 @@ use App\Mail\NewDeviceLogin;
 use App\Models\Budget;
 use App\Models\TrustedDevice;
 use App\Models\User;
+use App\Services\DeviceFingerprintService;
+use App\Services\DeviceTokenService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 
@@ -152,15 +156,24 @@ test('the new device login email links to the profile page to manage devices', f
 
 test('the profile lists only unexpired trusted devices and flags the current one', function () {
     $user = User::factory()->create();
-    $headers = ['User-Agent' => 'PestBrowser/1.0', 'Accept-Language' => 'en-US', 'Accept-Encoding' => 'gzip'];
-    $fingerprint = hash('sha256', implode('|', array_values($headers)));
+    $headers = ['User-Agent' => 'Mozilla/5.0 (Macintosh) Chrome/131.0', 'Accept-Language' => 'en-US', 'Accept-Encoding' => 'gzip'];
+    $request = Request::create('/', 'GET', server: ['HTTP_USER_AGENT' => $headers['User-Agent']]);
+    $fingerprint = app(DeviceFingerprintService::class)->generate($request);
+    $token = Str::random(64);
 
-    $current = trustedDevice($user, ['device_fingerprint' => $fingerprint]);
-    $other = trustedDevice($user);
+    // The current device is the one this browser's cookie belongs to; another
+    // machine with the same browser and OS shares the fingerprint but is not current.
+    $current = trustedDevice($user, [
+        'device_fingerprint' => $fingerprint,
+        'device_token' => Crypt::encryptString($token),
+        'token_hash' => DeviceTokenService::hashToken($token),
+    ]);
+    $other = trustedDevice($user, ['device_fingerprint' => $fingerprint]);
     trustedDevice($user, ['expires_at' => now()->subDay()]);
 
     $this->actingAs($user)
         ->withHeaders($headers)
+        ->withCookie('device_token', $token)
         ->get(route('profile.edit'))
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Profile/Edit')

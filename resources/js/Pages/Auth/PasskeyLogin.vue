@@ -48,24 +48,6 @@
             </div>
           </div>
 
-          <!-- Email Field (Optional) -->
-          <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Email (optional)
-            </label>
-            <input
-              id="email"
-              v-model="email"
-              type="email"
-              autocomplete="email webauthn"
-              placeholder="your@email.com"
-              class="block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
-            />
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Providing your email helps us find your passkey and offer better alternatives if needed.
-            </p>
-          </div>
-
           <!-- Passkey Login Button -->
           <div>
             <button
@@ -159,8 +141,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import TextInput from '@/Components/TextInput.vue';
 
 const props = defineProps({
   status: String,
@@ -172,7 +152,6 @@ const props = defineProps({
 
 const loading = ref(false);
 const error = ref('');
-const email = ref('');
 const isWebAuthnSupported = ref(true);
 
 onMounted(() => {
@@ -192,11 +171,10 @@ const loginWithPasskey = async () => {
   try {
     console.log('Starting passkey login...');
 
-    // Prepare request body with optional email
-    const requestBody = email.value ? { email: email.value } : {};
-
+    // Login is usernameless: the challenge carries no allowCredentials and the
+    // authenticator offers the passkeys it holds for this site.
     // Use Axios instead of fetch for better CSRF handling
-    const optionsResponse = await window.axios.post('/webauthn/login/options', requestBody, {
+    const optionsResponse = await window.axios.post('/webauthn/login/options', {}, {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -222,36 +200,13 @@ const loginWithPasskey = async () => {
       throw new Error('Invalid response from server. Please try again or use the magic link option.');
     }
 
-    // Validate and filter allowCredentials
-    let validCredentials = [];
-    if (options.allowCredentials && Array.isArray(options.allowCredentials)) {
-      // Filter out any credentials with missing or invalid IDs
-      validCredentials = options.allowCredentials.filter(cred => {
-        if (!cred || !cred.id || typeof cred.id !== 'string' || cred.id.trim() === '') {
-          console.warn('Skipping invalid credential:', cred);
-          return false;
-        }
-        return true;
-      });
-
-      // If all credentials were invalid, show a helpful error
-      if (options.allowCredentials.length > 0 && validCredentials.length === 0) {
-        console.error('All credentials were invalid. Original data:', options.allowCredentials);
-        throw new Error('Your passkey data appears to be corrupted. Please use the magic link option to sign in, then remove and re-add your passkey in Settings.');
-      }
-    }
-
     // The Laragear package returns the data directly, not nested in publicKey
     // Convert base64url strings to ArrayBuffers
     const publicKey = {
       challenge: base64urlToBuffer(options.challenge),
       timeout: options.timeout,
       rpId: options.rpId,
-      allowCredentials: validCredentials.map(cred => ({
-        type: cred.type,
-        id: base64urlToBuffer(cred.id),
-        transports: cred.transports,
-      })),
+      allowCredentials: [],
       userVerification: options.userVerification || 'preferred',
     };
 

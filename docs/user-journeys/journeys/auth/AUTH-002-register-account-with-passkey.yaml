@@ -51,7 +51,8 @@ business_rules:
   - "GET /register?invitation=<token> pre-fills (read-only) the invited email and shows the budget; an invalid token shows invitationError"
   - registration needs a valid invitation token for the same email (single use, 7-day expiry, see SHARE-001) or an email in config('auth.registration_allowlist') (REGISTRATION_ALLOWLIST, default the owner address, case-insensitive); anything else gets an "is currently restricted" error
   - registering through an invitation marks the email verified and joins the budget with the invited role
-  - name required max 255; email required, valid, unique (uniqueness is checked before the allowlist)
+  - name required max 255; email required, valid, unique (uniqueness is checked after the invitation/allowlist, so a guest without either gets the same "is currently restricted" answer for a registered email as for an unknown one)
+  - passkeys are registered as discoverable credentials (residentKey required) because login is usernameless (AUTH-001)
   - POST /register is throttled to 6 requests per minute
   - webauthn register routes require auth and are excluded from HandleInertiaRequests so they return JSON
   - PasskeyRegister renders in GuestLayout when isNewUser, otherwise AuthenticatedLayout
@@ -86,6 +87,18 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/RegistrationFlowTest.php::registration requires a name and a valid unused email'
+  - id: registration_does_not_reveal_accounts
+    kind: authorization
+    description: Without an invitation or allowlist entry, a registered email gets the same restricted error as an unknown one, not "already taken".
+    coverage: covered
+    tests:
+      - tests/Feature/Auth/RegistrationFlowTest.php::registering an existing account email without an invitation gets the same answer as an unknown email
+  - id: passkeys_registered_discoverable
+    kind: integration
+    description: Registration options require a resident (discoverable) key so the passkey works with usernameless login.
+    coverage: covered
+    tests:
+      - tests/Feature/WebAuthnLoginOptionsTest.php::passkey registration asks for a discoverable credential
   - id: registration_throttled
     kind: edge
     description: More than 6 registration submissions per minute are throttled (429).

@@ -26,13 +26,14 @@ steps:
   - action: visit / or /login
     expected: PasskeyLogin page rendered (/ redirects to login)
   - action: request assertion options (POST webauthn/login/options)
-    expected: JSON challenge returned, credentials with empty ids filtered out
+    expected: JSON challenge returned with no allowCredentials (usernameless); the authenticator offers its discoverable passkeys
   - action: submit signed assertion (POST webauthn/login)
     expected: 204, session authenticated, trusted-device cookie queued
 postconditions:
   - user is authenticated
   - a TrustedDevice record exists for this browser
 business_rules:
+  - login is usernameless (discoverable passkeys only); the login page has no email field and the options endpoint ignores any email, so it cannot reveal whether an address has an account
   - login options are rate limited to 10/min and are not guest-only, so an auto-logged-in request still receives JSON
   - a failed assertion returns 422 without creating a session
   - challenges are single use (pulled from the session on the first attempt)
@@ -52,6 +53,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/WebAuthnLoginOptionsTest.php::guest can fetch webauthn login options as json
+  - id: options_do_not_reveal_accounts
+    kind: authorization
+    description: Login options are the same for a registered email and an unknown one (no allowCredentials), so they cannot be used to enumerate accounts.
+    coverage: covered
+    tests:
+      - tests/Feature/WebAuthnLoginOptionsTest.php::login options are the same for a registered email and an unknown one
   - id: authenticated_options_stay_json
     kind: edge
     description: An already-authenticated (trusted device) request still gets JSON, not an HTML redirect.

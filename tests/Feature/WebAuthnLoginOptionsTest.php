@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Tests\Support\SoftwareAuthenticator;
 
 test('guest can fetch webauthn login options as json', function () {
     $response = $this->postJson('/webauthn/login/options');
@@ -21,4 +22,26 @@ test('an authenticated request to login options returns json, not an html redire
     $response->assertOk();
     $response->assertHeader('content-type', 'application/json');
     $response->assertJsonStructure(['challenge']);
+});
+
+test('login options are the same for a registered email and an unknown one', function () {
+    useWebAuthnTestRelyingParty();
+    $user = User::factory()->create(['email' => 'member@example.com']);
+    enrolPasskey($user, new SoftwareAuthenticator);
+    auth()->logout();
+
+    $known = $this->postJson('/webauthn/login/options', ['email' => 'member@example.com'])->assertOk()->json();
+    $unknown = $this->postJson('/webauthn/login/options', ['email' => 'nobody@example.com'])->assertOk()->json();
+
+    expect($known['allowCredentials'] ?? [])->toBe([])
+        ->and($unknown['allowCredentials'] ?? [])->toBe([])
+        ->and(array_keys($known))->toBe(array_keys($unknown));
+});
+
+test('passkey registration asks for a discoverable credential', function () {
+    $user = User::factory()->create();
+
+    $options = $this->actingAs($user)->postJson(route('webauthn.register.options'))->assertOk()->json();
+
+    expect($options['authenticatorSelection']['residentKey'] ?? null)->toBe('required');
 });

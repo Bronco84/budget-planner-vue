@@ -99,12 +99,15 @@ class PasskeyAuthController extends Controller
      * unexpired, unused budget invitation for the same email (the new user then
      * joins that budget with the invited role), or for an email in
      * config('auth.registration_allowlist').
+     *
+     * The invitation or allowlist is checked before the unique-email rule, so a
+     * guest without either cannot learn which addresses already have accounts.
      */
     public function registerStore(Request $request, BudgetSharingService $sharing): RedirectResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:'.User::class,
+            'email' => 'required|string|email|max:255',
             'invitation' => 'nullable|string|max:255',
         ]);
 
@@ -129,6 +132,8 @@ class PasskeyAuthController extends Controller
                 'email' => 'Registration is currently restricted. Please contact the administrator.',
             ])->withInput();
         }
+
+        $request->validate(['email' => 'unique:'.User::class]);
 
         $user = DB::transaction(function () use ($request, $invitation, $sharing) {
             $user = User::create([

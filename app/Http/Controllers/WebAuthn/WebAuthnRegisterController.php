@@ -32,8 +32,11 @@ class WebAuthnRegisterController
             abort(401, 'You must be logged in to register a passkey.');
         }
 
+        // Login is usernameless (no email lookup), so every passkey must be a
+        // discoverable credential the authenticator can offer on its own.
         return $request
             ->fastRegistration()
+            ->userless()
             ->toCreate();
     }
 

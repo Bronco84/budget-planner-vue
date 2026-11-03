@@ -69,7 +69,7 @@ test('a valid passkey assertion signs the user in and issues a trusted device co
     // The authenticator's signature counter is persisted for clone detection.
     expect(WebAuthnCredential::sole()->counter)->toBe(1);
 })->with([
-    'email first (allowCredentials)' => [true],
+    'with an email, which is ignored' => [true],
     'usernameless (discoverable credential)' => [false],
 ]);
 

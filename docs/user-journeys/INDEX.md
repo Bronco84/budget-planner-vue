@@ -148,7 +148,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Auth/AuthenticationTest.php`, `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/Auth/PasskeyLoginEndpointTest.php`, `tests/Feature/Auth/TrustedDeviceFingerprintTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`, `tests/playwright/passkeys.spec.js`
 - **AUTH-002** Guest registers an account and enrols a first passkey _(implemented, critical)_
   - Routes: `register`, `POST /register`, `passkey.register`, `webauthn.register.options`, `webauthn.register`
-  - Tests: `tests/Feature/Auth/InvitationRegistrationTest.php`, `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php`, `tests/Feature/Auth/PasskeyRegistrationErrorTest.php`, `tests/Feature/Auth/RegistrationFlowTest.php`, `tests/Feature/Auth/RegistrationTest.php`
+  - Tests: `tests/Feature/Auth/InvitationRegistrationTest.php`, `tests/Feature/Auth/PasskeyEnforcementTest.php`, `tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php`, `tests/Feature/Auth/PasskeyRegistrationErrorTest.php`, `tests/Feature/Auth/RegistrationFlowTest.php`, `tests/Feature/Auth/RegistrationTest.php`, `tests/Feature/WebAuthnLoginOptionsTest.php`
 - **AUTH-003** Guest signs in with an emailed magic link _(implemented, high)_
   - Routes: `magic-link.request`, `magic-link.store`, `magic-link.authenticate`
   - Tests: `tests/Feature/Auth/MagicLinkFlowTest.php`, `tests/Feature/Auth/MagicLinkTest.php`

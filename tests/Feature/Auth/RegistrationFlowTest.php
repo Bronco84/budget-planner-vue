@@ -47,6 +47,26 @@ test('registration requires a name and a valid unused email', function (array $p
     'already registered email' => [['name' => 'Owner', 'email' => REGISTRATION_OWNER_EMAIL], 'email'],
 ]);
 
+test('registering an existing account email without an invitation gets the same answer as an unknown email', function () {
+    User::factory()->create(['email' => 'member@example.com']);
+
+    $existing = $this->from(route('register'))
+        ->post(route('register'), ['name' => 'Probe', 'email' => 'member@example.com'])
+        ->assertRedirect(route('register'))
+        ->assertSessionHasErrors('email');
+    $existingError = session('errors')->first('email');
+
+    $this->flushSession();
+
+    $this->from(route('register'))
+        ->post(route('register'), ['name' => 'Probe', 'email' => 'nobody@example.com'])
+        ->assertSessionHasErrors('email');
+
+    expect($existingError)->toBe(session('errors')->first('email'))
+        ->and($existingError)->toBe('Registration is currently restricted. Please contact the administrator.')
+        ->and(User::count())->toBe(1);
+});
+
 test('registration submissions beyond six per minute are throttled', function () {
     foreach (range(1, 6) as $i) {
         $this->post(route('register'), ['name' => 'Stranger', 'email' => "stranger{$i}@example.com"])

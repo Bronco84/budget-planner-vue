@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\WebAuthn;
 
 use App\Services\DeviceTokenService;
-use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cookie;
-use Illuminate\Support\Facades\Log;
 use Laragear\WebAuthn\Http\Requests\AssertedRequest;
 use Laragear\WebAuthn\Http\Requests\AssertionRequest;
 
@@ -24,39 +22,17 @@ class WebAuthnLoginController
 
     /**
      * Returns the challenge to assertion.
+     *
+     * Login is usernameless: the challenge is the same for everyone and carries
+     * no allowCredentials, so the authenticator offers its discoverable
+     * passkeys. Any email in the request is ignored; looking it up would tell a
+     * guest whether that address has an account.
      */
     public function options(AssertionRequest $request): JsonResponse
     {
-        $validated = $request->validate(['email' => 'sometimes|email|string']);
-        $responsable = $request->toVerify($validated);
+        $response = $request->toVerify(null)->toResponse($request);
 
-        // Convert the Responsable to a Response to inspect/modify the data
-        $response = $responsable->toResponse($request);
-        $data = json_decode($response->getContent(), true);
-
-        // Filter out any credentials with null or empty IDs
-        if (isset($data['allowCredentials']) && is_array($data['allowCredentials'])) {
-            $originalCount = count($data['allowCredentials']);
-            $data['allowCredentials'] = array_values(array_filter($data['allowCredentials'], function ($cred) {
-                $isValid = isset($cred['id']) && is_string($cred['id']) && trim($cred['id']) !== '';
-                if (! $isValid) {
-                    Log::warning('Filtered out invalid WebAuthn credential', ['credential' => $cred]);
-                }
-
-                return $isValid;
-            }));
-
-            $filteredCount = count($data['allowCredentials']);
-            if ($originalCount !== $filteredCount) {
-                Log::warning('Filtered out invalid credentials', [
-                    'original_count' => $originalCount,
-                    'filtered_count' => $filteredCount,
-                    'email' => $validated['email'] ?? 'not provided',
-                ]);
-            }
-        }
-
-        return response()->json($data);
+        return response()->json(json_decode($response->getContent(), true));
     }
 
     /**

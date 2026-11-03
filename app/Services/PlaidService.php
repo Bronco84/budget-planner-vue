@@ -992,6 +992,11 @@ class PlaidService
                     continue;
                 }
 
+                // The category Plaid gave this transaction last time, before the upsert below
+                // overwrites it: a row still carrying it has not been recategorised by the user.
+                $previousPlaidCategory = PlaidTransaction::where('plaid_transaction_id', $transaction['transaction_id'])
+                    ->value('category');
+
                 // Store or update the Plaid transaction
                 $plaidTransaction = PlaidTransaction::updateOrCreate(
                     [
@@ -1038,13 +1043,8 @@ class PlaidService
                     ->first();
 
                 if ($existingTransaction) {
-                    // Update existing transaction
-                    $existingTransaction->update([
-                        'description' => $transaction['name'],
-                        'category' => $transaction['category'][0] ?? 'Uncategorized',
-                        'amount_in_cents' => -1 * $transaction['amount'] * 100, // Negate amount as Plaid uses positive for expenses
-                        'date' => $transaction['date'],
-                    ]);
+                    // Refresh the Plaid-owned fields; the category only while the user has not set one
+                    $existingTransaction->update($this->plaidRefreshAttributes($existingTransaction, $transaction, $previousPlaidCategory));
 
                     $updated++;
                 } else {
@@ -1066,10 +1066,11 @@ class PlaidService
                         // Update the existing pending transaction with the new Plaid ID
                         $pendingDuplicate->update([
                             'plaid_transaction_id' => $transaction['transaction_id'],
-                            'description' => $transaction['name'],
-                            'category' => $transaction['category'][0] ?? 'Uncategorized',
-                            'amount_in_cents' => -1 * $transaction['amount'] * 100,
-                            'date' => $transaction['date'],
+                            ...$this->plaidRefreshAttributes(
+                                $pendingDuplicate,
+                                $transaction,
+                                PlaidTransaction::where('plaid_transaction_id', $pendingDuplicate->plaid_transaction_id)->value('category'),
+                            ),
                         ]);
 
                         Log::info('Updated pending transaction with new Plaid ID (duplicate prevented)', [
@@ -1241,6 +1242,33 @@ class PlaidService
 
             throw $e;
         }
+    }
+
+    /**
+     * The fields a re-sync refreshes on an imported transaction: Plaid owns the amount,
+     * date and description. The category is refreshed only while it is still the one
+     * Plaid gave the row; once the user picks one (or it is linked to a budget category)
+     * Plaid never touches it again.
+     *
+     * @param  array<string, mixed>  $transaction  the Plaid transaction
+     * @return array<string, mixed>
+     */
+    private function plaidRefreshAttributes(Transaction $row, array $transaction, ?string $previousPlaidCategory): array
+    {
+        $attributes = [
+            'description' => $transaction['name'],
+            'amount_in_cents' => -1 * $transaction['amount'] * 100, // Negate amount as Plaid uses positive for expenses
+            'date' => $transaction['date'],
+        ];
+
+        $categoryIsPlaids = ! $row->category_id
+            && in_array($row->category, [null, '', 'Uncategorized', $previousPlaidCategory], true);
+
+        if ($categoryIsPlaids) {
+            $attributes['category'] = $transaction['category'][0] ?? 'Uncategorized';
+        }
+
+        return $attributes;
     }
 
     /**

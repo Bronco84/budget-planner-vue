@@ -40,6 +40,7 @@ business_rules:
   - ITEM_LOGIN_REQUIRED marks the PlaidConnection as 'error' (PlaidConnection::markAsError) and flashes "Your bank needs you to sign in again. Use Re-authenticate to reconnect this account."
   - a connect timeout flashes "Couldn't reach the bank connection service, please try again."; any other failure "Failed to sync transactions. Please try again."
   - investment accounts tolerate a transaction fetch failure (continue to balance/holdings) unless it is ITEM_LOGIN_REQUIRED
+  - a re-sync of an already imported transaction refreshes its amount, date and description from Plaid; its category is refreshed only while it is still the one Plaid gave it (no category_id, and Uncategorized or Plaid's previous category), so a category the user set, or a link to a budget category, is never overwritten
   - a posted transaction that settles an imported pending one (by pending_transaction_id, or else the closest still-pending look-alike on the account) updates that row in place with the new Plaid id, amount and date, so its category, notes, recurring link and attachments are kept
   - a pending transaction arriving under a new Plaid id is merged into the closest look-alike that Plaid still reports as pending (amount within $1, date within 3 days, similar description); posted look-alikes are never matched
   - syncs of one Plaid connection run one at a time (cache lock plaid-sync:connection:{id}, waiting up to 60s for a running sync before failing with the generic sync error), so concurrent syncs cannot import the same transaction twice
@@ -52,6 +53,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::syncing a linked account imports new and updates existing transactions
+  - id: resync_keeps_user_category
+    kind: edge
+    description: Re-syncing an imported transaction refreshes its amount, date and description, but keeps a category the user picked (a budget category or a typed name); a category Plaid set is refreshed.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncTest.php::a re-sync refreshes amount, date and description but never a category the user has set
   - id: sync_pages_all_transactions
     kind: edge
     description: When the Item has more transactions than one /transactions/get page, sync keeps paging until total_transactions and imports all of this account's rows.

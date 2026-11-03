@@ -2,6 +2,7 @@
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\Category;
 use App\Models\File;
 use App\Models\FileAttachment;
 use App\Models\PlaidAccount;
@@ -139,6 +140,51 @@ test('syncing a linked account imports new and updates existing transactions', f
         ->and($account->fresh()->current_balance_cents)->toBe(348766)
         ->and($plaidAccount->plaidConnection->fresh()->last_sync_at->toDateTimeString())->toBe('2026-03-15 10:00:00');
 });
+
+test('a re-sync refreshes amount, date and description but never a category the user has set', function (string $userSet) {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+    $groceries = Category::create(['budget_id' => $this->budget->id, 'name' => 'Groceries', 'amount' => 0]);
+
+    $row = fn (string $id, array $category) => Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'OLD '.$id,
+        'amount_in_cents' => -1000, 'date' => '2026-03-01', 'plaid_transaction_id' => $id,
+        'is_plaid_imported' => true, ...$category,
+    ]);
+    $raw = fn (string $id) => PlaidTransaction::create([
+        'plaid_transaction_id' => $id, 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => false, 'amount' => 10.00, 'date' => '2026-03-01', 'name' => 'OLD '.$id, 'category' => 'Food and Drink',
+    ]);
+
+    // The user's pick: a budget category, or a category name typed by hand.
+    $userRow = $row('tx-user', $userSet === 'budget category' ? ['category_id' => $groceries->id] : ['category' => 'Team lunch']);
+    $raw('tx-user');
+    // Still carrying the category Plaid gave it last time.
+    $plaidRow = $row('tx-plaid', ['category' => 'Food and Drink']);
+    $raw('tx-plaid');
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => array_map(fn (string $id) => [
+            'transaction_id' => $id, 'account_id' => 'plaid-checking', 'amount' => 12.34,
+            'date' => '2026-03-02', 'name' => 'NEW '.$id, 'pending' => false, 'category' => ['Shops'],
+        ], ['tx-user', 'tx-plaid'])])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 0 new and updated 2 transactions.');
+
+    expect($userRow->fresh())
+        ->description->toBe('NEW tx-user')
+        ->amount_in_cents->toBe(-1234)
+        ->category->toBe($userSet === 'budget category' ? 'Groceries' : 'Team lunch')
+        ->category_id->toBe($userSet === 'budget category' ? $groceries->id : null)
+        ->and($userRow->fresh()->date->toDateString())->toBe('2026-03-02');
+
+    expect($plaidRow->fresh())
+        ->description->toBe('NEW tx-plaid')
+        ->category->toBe('Shops');
+})->with(['budget category', 'typed category']);
 
 test('syncing pages through every transaction Plaid has, not just the first page', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');

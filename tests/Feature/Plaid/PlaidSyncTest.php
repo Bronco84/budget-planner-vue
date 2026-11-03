@@ -83,6 +83,10 @@ test('syncing a linked account imports new and updates existing transactions', f
         'plaid_transaction_id' => 'tx-existing',
         'is_plaid_imported' => true,
     ]);
+    PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-existing', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => false, 'amount' => 10.00, 'date' => '2026-03-01', 'name' => 'OLD NAME',
+    ]);
 
     $this->plaid
         ->on('/transactions/get', ['transactions' => [
@@ -186,6 +190,87 @@ test('a re-sync refreshes amount, date and description but never a category the 
         ->description->toBe('NEW tx-plaid')
         ->category->toBe('Shops');
 })->with(['budget category', 'typed category']);
+
+test('a re-sync keeps a description the user has edited, and refreshes one still carrying the name Plaid last sent', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+
+    $row = fn (string $id, string $description) => Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => $description,
+        'amount_in_cents' => -1000, 'date' => '2026-03-01', 'plaid_transaction_id' => $id, 'is_plaid_imported' => true,
+    ]);
+    $raw = fn (string $id) => PlaidTransaction::create([
+        'plaid_transaction_id' => $id, 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => false, 'amount' => 10.00, 'date' => '2026-03-01', 'name' => 'OLD '.$id,
+    ]);
+
+    $renamed = $row('tx-renamed', 'Birthday gift for Sam');
+    $raw('tx-renamed');
+    $untouched = $row('tx-untouched', 'OLD tx-untouched');
+    $raw('tx-untouched');
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => array_map(fn (string $id) => [
+            'transaction_id' => $id, 'account_id' => 'plaid-checking', 'amount' => 12.34,
+            'date' => '2026-03-02', 'name' => 'NEW '.$id, 'pending' => false,
+        ], ['tx-renamed', 'tx-untouched'])])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $sync = fn () => $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 0 new and updated 2 transactions.');
+
+    $sync();
+
+    expect($renamed->fresh())
+        ->description->toBe('Birthday gift for Sam')
+        ->amount_in_cents->toBe(-1234)
+        ->and($untouched->fresh()->description)->toBe('NEW tx-untouched');
+
+    // The next sync still leaves the user's description alone.
+    $sync();
+
+    expect($renamed->fresh()->description)->toBe('Birthday gift for Sam')
+        ->and($untouched->fresh()->description)->toBe('NEW tx-untouched');
+});
+
+test('a pending transaction re-sent under a new Plaid id keeps a description the user has edited', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+
+    $pending = Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'HARDWARE 4821 drill bits',
+        'category' => 'Uncategorized', 'amount_in_cents' => -2000, 'date' => '2026-03-12',
+        'plaid_transaction_id' => 'tx-p1', 'is_plaid_imported' => true,
+    ]);
+    PlaidTransaction::create([
+        'plaid_transaction_id' => 'tx-p1', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
+        'pending' => true, 'amount' => 20.00, 'date' => '2026-03-12', 'name' => 'HARDWARE 4821',
+    ]);
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => [[
+            'transaction_id' => 'tx-p2', 'account_id' => 'plaid-checking', 'amount' => 20.50,
+            'date' => '2026-03-13', 'name' => 'HARDWARE 4821 SEATTLE', 'pending' => true,
+        ]]])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $sync = fn () => $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 0 new and updated 1 transactions.');
+
+    $sync();
+
+    expect($pending->fresh())
+        ->plaid_transaction_id->toBe('tx-p2')
+        ->amount_in_cents->toBe(-2050)
+        ->description->toBe('HARDWARE 4821 drill bits');
+
+    // Now matched by its new id, the next sync keeps the description too.
+    $sync();
+
+    expect($pending->fresh()->description)->toBe('HARDWARE 4821 drill bits');
+});
 
 test('syncing pages through every transaction Plaid has, not just the first page', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
@@ -343,6 +428,13 @@ test('a leftover pending row is deleted only after its receipts, user edits, not
         ->and($moved->fresh()->attachable_id)->toBe($settled->id)
         ->and($settled->fileAttachments()->pluck('file_id')->sort()->values()->all())->toBe([$receipt->id, $shared->id])
         ->and(FileAttachment::where('attachable_type', Transaction::class)->where('attachable_id', $pending->id)->exists())->toBeFalse();
+
+    // The description carried over from the pending row survives the next sync.
+    $this->actingAs($this->user)
+        ->post(route('plaid.sync', [$this->budget, $account]))
+        ->assertSessionHas('message', 'Synced 0 new and updated 1 transactions.');
+
+    expect($settled->fresh()->description)->toBe('BLUE BOTTLE COFFEE with Sam');
 })->with([
     'linked by pending_transaction_id' => [true],
     'matched without a link' => [false],

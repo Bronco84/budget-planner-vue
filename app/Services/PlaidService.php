@@ -1079,11 +1079,11 @@ class PlaidService
                     continue;
                 }
 
-                // The category Plaid gave this transaction last time, before the upsert below
-                // overwrites it: a row still carrying it has not been recategorised by the user.
-                $previousPlaidCategory = PlaidTransaction::where('account_id', $plaidAccount->account_id)
+                // The category and name Plaid gave this transaction last time, before the upsert
+                // below overwrites them: a row still carrying them has not been edited by the user.
+                $previousPlaid = PlaidTransaction::where('account_id', $plaidAccount->account_id)
                     ->where('plaid_transaction_id', $transaction['transaction_id'])
-                    ->value('category');
+                    ->first(['category', 'name']);
 
                 // Store or update this account's raw copy of the Plaid transaction: an Item
                 // synced into two budgets delivers the same ids to both, and each keeps its own
@@ -1132,8 +1132,8 @@ class PlaidService
                     ->first();
 
                 if ($existingTransaction) {
-                    // Refresh the Plaid-owned fields; the category only while the user has not set one
-                    $existingTransaction->update($this->plaidRefreshAttributes($existingTransaction, $transaction, $previousPlaidCategory));
+                    // Refresh the Plaid-owned fields; the category and description only while the user has not set them
+                    $existingTransaction->update($this->plaidRefreshAttributes($existingTransaction, $transaction, $previousPlaid));
                     $current = $existingTransaction;
 
                     $updated++;
@@ -1161,7 +1161,7 @@ class PlaidService
                                 $transaction,
                                 PlaidTransaction::where('account_id', $plaidAccount->account_id)
                                     ->where('plaid_transaction_id', $pendingDuplicate->plaid_transaction_id)
-                                    ->value('category'),
+                                    ->first(['category', 'name']),
                             ),
                         ]);
 
@@ -1344,27 +1344,40 @@ class PlaidService
     }
 
     /**
-     * The fields a re-sync refreshes on an imported transaction: Plaid owns the amount,
-     * date and description. The category is refreshed only while it is still the one
-     * Plaid gave the row; once the user picks one (or it is linked to a budget category)
-     * Plaid never touches it again.
+     * The fields a re-sync refreshes on an imported transaction: Plaid owns the amount
+     * and date. The category and description are refreshed only while they are still
+     * the ones Plaid gave the row last time ($previousPlaid, its raw Plaid copy before
+     * this sync); once the user changes either, Plaid never touches it again.
      *
      * @param  array<string, mixed>  $transaction  the Plaid transaction
      * @return array<string, mixed>
      */
-    private function plaidRefreshAttributes(Transaction $row, array $transaction, ?string $previousPlaidCategory): array
+    private function plaidRefreshAttributes(Transaction $row, array $transaction, ?PlaidTransaction $previousPlaid): array
     {
         $attributes = [
-            'description' => $transaction['name'],
             'amount_in_cents' => -1 * $transaction['amount'] * 100, // Negate amount as Plaid uses positive for expenses
             'date' => $transaction['date'],
         ];
 
-        if ($this->categoryIsPlaids($row, $previousPlaidCategory)) {
+        if ($this->descriptionIsPlaids($row, $previousPlaid?->name)) {
+            $attributes['description'] = $transaction['name'];
+        }
+
+        if ($this->categoryIsPlaids($row, $previousPlaid?->category)) {
             $attributes['category'] = $transaction['category'][0] ?? 'Uncategorized';
         }
 
         return $attributes;
+    }
+
+    /**
+     * Whether a row's description is still the one Plaid gave it: blank, or the name
+     * Plaid last reported for it. With no raw Plaid copy to compare against, a
+     * non-blank description is treated as the user's and kept.
+     */
+    private function descriptionIsPlaids(Transaction $row, ?string $plaidName): bool
+    {
+        return in_array($row->description, [null, '', $plaidName], true);
     }
 
     /**

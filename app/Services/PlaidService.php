@@ -1379,8 +1379,10 @@ class PlaidService
 
     /**
      * Before a leftover pending row is deleted in favour of the settled one, move its
-     * attachments to the settled row and carry over a category or description the user
-     * set on it, so nothing the user added is lost with the pending row.
+     * attachments to the settled row and carry over a category, description, notes or
+     * recurring link the user set on it, so nothing the user added is lost with the
+     * pending row. Notes and the recurring link are copied only when the settled row
+     * has none of its own.
      */
     private function carryOverPendingEdits(Transaction $pending, Transaction $settled): void
     {
@@ -1411,6 +1413,15 @@ class PlaidService
 
         if ($pendingPlaid && $pending->description !== $pendingPlaid->name) {
             $edits['description'] = $pending->description;
+        }
+
+        if (filled($pending->notes) && blank($settled->notes)) {
+            $edits['notes'] = $pending->notes;
+        }
+
+        if ($pending->recurring_transaction_template_id && ! $settled->recurring_transaction_template_id) {
+            $edits['recurring_transaction_template_id'] = $pending->recurring_transaction_template_id;
+            $edits['link_source'] = $pending->link_source;
         }
 
         if ($edits) {

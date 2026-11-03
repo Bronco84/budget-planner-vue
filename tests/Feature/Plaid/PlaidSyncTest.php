@@ -278,9 +278,11 @@ test('a posted transaction settles its pending row in place, keeping the user ed
     'matched without a link' => [false],
 ]);
 
-test('a leftover pending row is deleted only after its receipts and user edits move to the settled row', function (bool $linked) {
+test('a leftover pending row is deleted only after its receipts, user edits, notes and recurring link move to the settled row', function (bool $linked) {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
     $account = $plaidAccount->account;
+
+    $template = RecurringTransactionTemplate::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $account->id]);
 
     // Legacy state: the posted transaction was already imported next to its pending row.
     $settled = Transaction::create([
@@ -296,6 +298,8 @@ test('a leftover pending row is deleted only after its receipts and user edits m
         'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'BLUE BOTTLE COFFEE with Sam',
         'category' => 'Coffee', 'amount_in_cents' => -475, 'date' => '2026-03-11',
         'plaid_transaction_id' => 'tx-pending', 'is_plaid_imported' => true,
+        'notes' => 'team offsite', 'recurring_transaction_template_id' => $template->id,
+        'link_source' => Transaction::LINK_SOURCE_MANUAL,
     ]);
     PlaidTransaction::create([
         'plaid_transaction_id' => 'tx-pending', 'account_id' => $account->id, 'plaid_account_id' => 'plaid-checking',
@@ -332,6 +336,9 @@ test('a leftover pending row is deleted only after its receipts and user edits m
         ->and($settled->fresh())
         ->category->toBe('Coffee')
         ->description->toBe('BLUE BOTTLE COFFEE with Sam')
+        ->notes->toBe('team offsite')
+        ->recurring_transaction_template_id->toBe($template->id)
+        ->link_source->toBe(Transaction::LINK_SOURCE_MANUAL)
         ->amount_in_cents->toBe(-525)
         ->and($moved->fresh()->attachable_id)->toBe($settled->id)
         ->and($settled->fileAttachments()->pluck('file_id')->sort()->values()->all())->toBe([$receipt->id, $shared->id])
@@ -340,6 +347,40 @@ test('a leftover pending row is deleted only after its receipts and user edits m
     'linked by pending_transaction_id' => [true],
     'matched without a link' => [false],
 ]);
+
+test("a leftover pending row's notes and recurring link never replace the settled row's own", function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');
+    $account = $plaidAccount->account;
+    $kept = RecurringTransactionTemplate::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $account->id]);
+    $other = RecurringTransactionTemplate::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $account->id]);
+
+    $settled = Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'BLUE BOTTLE COFFEE',
+        'amount_in_cents' => -525, 'date' => '2026-03-12', 'plaid_transaction_id' => 'tx-posted', 'is_plaid_imported' => true,
+        'notes' => 'settled note', 'recurring_transaction_template_id' => $kept->id, 'link_source' => Transaction::LINK_SOURCE_RULE,
+    ]);
+    Transaction::create([
+        'budget_id' => $this->budget->id, 'account_id' => $account->id, 'description' => 'BLUE BOTTLE COFFEE',
+        'amount_in_cents' => -475, 'date' => '2026-03-11', 'plaid_transaction_id' => 'tx-pending', 'is_plaid_imported' => true,
+        'notes' => 'pending note', 'recurring_transaction_template_id' => $other->id, 'link_source' => Transaction::LINK_SOURCE_MANUAL,
+    ]);
+
+    $this->plaid
+        ->on('/transactions/get', ['transactions' => [[
+            'transaction_id' => 'tx-posted', 'account_id' => 'plaid-checking', 'amount' => 5.25,
+            'date' => '2026-03-12', 'name' => 'BLUE BOTTLE COFFEE', 'pending' => false, 'category' => ['Food and Drink'],
+            'pending_transaction_id' => 'tx-pending',
+        ]]])
+        ->on('/accounts/get', plaidSyncAccountsResponse('plaid-checking', 100.00));
+
+    $this->actingAs($this->user)->post(route('plaid.sync', [$this->budget, $account]));
+
+    expect(Transaction::where('plaid_transaction_id', 'tx-pending')->exists())->toBeFalse()
+        ->and($settled->fresh())
+        ->notes->toBe('settled note')
+        ->recurring_transaction_template_id->toBe($kept->id)
+        ->link_source->toBe(Transaction::LINK_SOURCE_RULE);
+});
 
 test('a pending transaction with a new Plaid id replaces its pending look-alike but never a posted one', function () {
     $plaidAccount = plaidSyncLinkedAccount($this->budget, 'depository', 'checking', 'checking');

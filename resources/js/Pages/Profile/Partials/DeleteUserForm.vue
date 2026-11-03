@@ -46,8 +46,9 @@ const closeModal = () => {
             </h2>
 
             <p class="mt-1 text-sm text-gray-600">
-                Once your account is deleted, all of its resources and data will
-                be permanently deleted. Before deleting your account, please
+                Budgets you share with others pass to another owner, and files
+                you added to their budgets stay with them. Everything else is
+                permanently deleted. Before deleting your account, please
                 download any data or information that you wish to retain.
             </p>
         </header>
@@ -63,9 +64,10 @@ const closeModal = () => {
                 </h2>
 
                 <p class="mt-1 text-sm text-gray-600">
-                    Once your account is deleted, all of its resources and data
-                    will be permanently deleted. Please type your account email
-                    to confirm you would like to permanently delete your account.
+                    Budgets you share with others pass to another owner, and
+                    files you added to their budgets stay with them. Everything
+                    else is permanently deleted. Please type your account email
+                    to confirm you would like to delete your account.
                 </p>
 
                 <div class="mt-6">

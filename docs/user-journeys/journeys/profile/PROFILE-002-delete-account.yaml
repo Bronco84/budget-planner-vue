@@ -37,7 +37,7 @@ depends_on:
   - path: app/Providers/EventServiceProvider.php
     reason: registers RecordAuthenticationTime for Illuminate\Auth\Events\Login
 steps:
-  - action: click Delete Account and type the account email
+  - action: read the warning (budgets they share pass to another owner, files they added to others' budgets stay there, everything else is permanently deleted), click Delete Account and type the account email
     expected: modal submits DELETE /profile with email
   - action: server checks the email (case-insensitive) and that the session authenticated recently
     expected: if they are the last owner of a shared budget, an email error and nothing changes; otherwise user logged out, shared budgets handed on, unshared budgets destroyed, passkeys and user deleted, session invalidated, redirect to /
@@ -137,8 +137,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a guest cannot delete an account
-known_issues:
-  - The Delete Account copy still says all of the account's resources and data will be permanently deleted, but shared budgets and the user's contributions to others' budgets now live on.
+known_issues: []
 confidence: medium
 evidence:
   - app/Http/Controllers/ProfileController.php destroy()

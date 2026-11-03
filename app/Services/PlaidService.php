@@ -1225,7 +1225,7 @@ class PlaidService
                     if ($pendingTransaction) {
                         // Delete the pending transaction since it's now settled, keeping its
                         // receipts and the user's edits on the settled row
-                        $this->carryOverPendingEdits($pendingTransaction, $current);
+                        $this->carryOverUserEdits($pendingTransaction, $current);
                         $pendingTransaction->delete();
 
                         // Log the deletion for debugging
@@ -1242,7 +1242,7 @@ class PlaidService
 
                     // Delete matching pending transactions (they've been replaced by this settled one)
                     foreach ($matchingPendingTransactions as $matchingPending) {
-                        $this->carryOverPendingEdits($matchingPending, $current);
+                        $this->carryOverUserEdits($matchingPending, $current);
                         $matchingPending->delete();
 
                         Log::info('Deleted pending transaction after settlement (fuzzy match)', [
@@ -1391,54 +1391,58 @@ class PlaidService
     }
 
     /**
-     * Before a leftover pending row is deleted in favour of the settled one, move its
-     * attachments to the settled row and carry over a category, description, notes or
-     * recurring link the user set on it, so nothing the user added is lost with the
-     * pending row. Notes and the recurring link are copied only when the settled row
-     * has none of its own.
+     * Before an imported transaction is deleted in favour of another copy of it (a
+     * leftover pending row replaced by the settled one, or a duplicate removed by
+     * plaid:cleanup-duplicates), move its attachments to the kept row and carry over a
+     * category, description, notes or recurring link the user set on it, so nothing
+     * the user added is lost with the deleted copy. Where both copies have a value,
+     * the kept row's wins: its own category or description (one that is no longer
+     * Plaid's), notes and recurring link are never replaced. A file already attached
+     * to the kept row is not attached twice.
      */
-    private function carryOverPendingEdits(Transaction $pending, Transaction $settled): void
+    public function carryOverUserEdits(Transaction $from, Transaction $kept): void
     {
-        $settledFileIds = $settled->fileAttachments()->pluck('file_id');
+        $keptFileIds = $kept->fileAttachments()->pluck('file_id');
 
-        foreach ($pending->fileAttachments as $attachment) {
-            if ($settledFileIds->contains($attachment->file_id)) {
-                // Already attached to the settled row: the file stays referenced there.
+        foreach ($from->fileAttachments as $attachment) {
+            if ($keptFileIds->contains($attachment->file_id)) {
+                // Already attached to the kept row: the file stays referenced there.
                 $attachment->delete();
             } else {
-                $attachment->update(['attachable_id' => $settled->id]);
+                $attachment->update(['attachable_id' => $kept->id]);
             }
         }
 
-        $pendingPlaid = PlaidTransaction::where('account_id', $pending->account_id)
-            ->where('plaid_transaction_id', $pending->plaid_transaction_id)
-            ->first();
-        $settledPlaidCategory = PlaidTransaction::where('account_id', $settled->account_id)
-            ->where('plaid_transaction_id', $settled->plaid_transaction_id)
-            ->value('category');
+        $fromPlaid = PlaidTransaction::where('account_id', $from->account_id)
+            ->where('plaid_transaction_id', $from->plaid_transaction_id)
+            ->first(['category', 'name']);
+        $keptPlaid = PlaidTransaction::where('account_id', $kept->account_id)
+            ->where('plaid_transaction_id', $kept->plaid_transaction_id)
+            ->first(['category', 'name']);
         $edits = [];
 
-        if (! $this->categoryIsPlaids($pending, $pendingPlaid?->category)
-            && $this->categoryIsPlaids($settled, $settledPlaidCategory)) {
-            $edits['category_id'] = $pending->category_id;
-            $edits['category'] = $pending->category;
+        if (! $this->categoryIsPlaids($from, $fromPlaid?->category)
+            && $this->categoryIsPlaids($kept, $keptPlaid?->category)) {
+            $edits['category_id'] = $from->category_id;
+            $edits['category'] = $from->category;
         }
 
-        if ($pendingPlaid && $pending->description !== $pendingPlaid->name) {
-            $edits['description'] = $pending->description;
+        if ($fromPlaid && $from->description !== $fromPlaid->name
+            && $this->descriptionIsPlaids($kept, $keptPlaid?->name)) {
+            $edits['description'] = $from->description;
         }
 
-        if (filled($pending->notes) && blank($settled->notes)) {
-            $edits['notes'] = $pending->notes;
+        if (filled($from->notes) && blank($kept->notes)) {
+            $edits['notes'] = $from->notes;
         }
 
-        if ($pending->recurring_transaction_template_id && ! $settled->recurring_transaction_template_id) {
-            $edits['recurring_transaction_template_id'] = $pending->recurring_transaction_template_id;
-            $edits['link_source'] = $pending->link_source;
+        if ($from->recurring_transaction_template_id && ! $kept->recurring_transaction_template_id) {
+            $edits['recurring_transaction_template_id'] = $from->recurring_transaction_template_id;
+            $edits['link_source'] = $from->link_source;
         }
 
         if ($edits) {
-            $settled->update($edits);
+            $kept->update($edits);
         }
     }
 

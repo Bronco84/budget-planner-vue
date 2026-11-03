@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\Transaction;
+use App\Services\PlaidService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class CleanupDuplicatePlaidTransactions extends Command
 {
@@ -25,7 +27,7 @@ class CleanupDuplicatePlaidTransactions extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(PlaidService $plaidService)
     {
         $dryRun = $this->option('dry-run');
         $dateTolerance = (int) $this->option('days');
@@ -113,13 +115,13 @@ class CleanupDuplicatePlaidTransactions extends Command
                             if ($duplicate->created_at > $transaction->created_at) {
                                 // The duplicate is newer, so delete the original and keep the duplicate
                                 $this->line("      → Deleting ID {$transaction->id} (keeping newer ID {$duplicate->id})");
-                                $transaction->delete();
+                                $this->mergeInto($plaidService, $transaction, $duplicate);
                                 $processedIds[] = $transaction->id;
                                 $transaction = $duplicate; // Continue with the newer one
                             } else {
                                 // The original is newer, delete the duplicate
                                 $this->line("      → Deleting ID {$duplicate->id} (keeping newer ID {$transaction->id})");
-                                $duplicate->delete();
+                                $this->mergeInto($plaidService, $duplicate, $transaction);
                                 $processedIds[] = $duplicate->id;
                             }
                             $totalMerged++;
@@ -144,5 +146,17 @@ class CleanupDuplicatePlaidTransactions extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * Delete a duplicate copy after moving its attachments, notes, category,
+     * description and recurring link to the kept copy (the kept copy's own values win).
+     */
+    private function mergeInto(PlaidService $plaidService, Transaction $duplicate, Transaction $kept): void
+    {
+        DB::transaction(function () use ($plaidService, $duplicate, $kept) {
+            $plaidService->carryOverUserEdits($duplicate, $kept);
+            $duplicate->delete();
+        });
     }
 }

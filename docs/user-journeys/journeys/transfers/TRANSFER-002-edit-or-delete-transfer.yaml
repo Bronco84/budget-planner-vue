@@ -25,6 +25,8 @@ depends_on:
     reason: edit form and delete confirmation
   - path: app/Services/TransferService.php
     reason: update re-syncs or recreates the paired transactions; delete removes them
+  - path: app/Services/FileService.php
+    reason: delete removes the legs' file attachments and every file nothing else uses
 integrations: []
 steps:
   - action: click the transfer link on a ledger row (GET /budget/{budget}/transfers/{transfer}/edit)
@@ -32,12 +34,13 @@ steps:
   - action: save (PATCH)
     expected: transfer and both legs updated in one DB transaction; redirect to budgets.show
   - action: delete (DELETE)
-    expected: transfer and its transactions deleted; redirect to budgets.show
+    expected: the legs' file attachments are removed (and each file nothing else uses), then the transfer and its transactions are deleted; redirect to budgets.show
 postconditions:
   - transfer legs always mirror the transfer (missing legs are recreated on update)
 business_rules:
   - same validation as create
   - destroy additionally requires BudgetPolicy update (same owner rule)
+  - deleting a transfer first deletes the file attachments on its legs (polymorphic, so no database cascade) and removes each file, and its stored object, that no other attachment uses; a storage failure is logged and does not block the delete
 scenarios:
   - id: edit_page_renders
     kind: happy_path
@@ -57,6 +60,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Services/TransferServiceTest.php::delete removes the transfer and its paired transactions
+  - id: delete_removes_leg_attachments
+    kind: edge
+    description: Deleting a transfer removes the attachments on its legs and every file nothing else uses, while a file still attached to another transaction is kept.
+    coverage: covered
+    tests:
+      - tests/Feature/Transfers/TransferPagesTest.php::deleting a transfer removes its legs attachments and every file nothing else uses
   - id: clear_description
     kind: edge
     description: Saving with an empty description clears it, and both legs fall back to the default description.

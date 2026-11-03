@@ -2,10 +2,14 @@
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\FileAttachment;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Services\FileService;
 use App\Services\TransferService;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 /*
  * TRANSFER-001 / TRANSFER-002: transfers are created from the quick-add modal and
@@ -71,6 +75,29 @@ test('deleting a transfer redirects to the budget dashboard', function () {
 
     expect(Transfer::find($this->transfer->id))->toBeNull()
         ->and(Transaction::where('transfer_id', $this->transfer->id)->count())->toBe(0);
+});
+
+test('deleting a transfer removes its legs attachments and every file nothing else uses', function () {
+    Storage::fake('s3');
+    $files = app(FileService::class);
+    $legs = Transaction::where('transfer_id', $this->transfer->id)->get();
+    $other = Transaction::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $this->checking->id]);
+
+    $onlyOnLeg = $files->uploadAndAttach(UploadedFile::fake()->createWithContent('leg.pdf', "%PDF-1.4\nleg\n%%EOF"), $legs[0], $this->user->id);
+    $shared = $files->uploadAndAttach(UploadedFile::fake()->createWithContent('shared.pdf', "%PDF-1.4\nshared\n%%EOF"), $legs[1], $this->user->id);
+    $kept = $files->uploadAndAttach(UploadedFile::fake()->createWithContent('shared.pdf', "%PDF-1.4\nshared\n%%EOF"), $other, $this->user->id);
+    [$legFile, $sharedFile] = [$onlyOnLeg->file, $shared->file];
+
+    $this->actingAs($this->user)
+        ->delete(route('budget.transfers.destroy', [$this->budget, $this->transfer]))
+        ->assertRedirect(route('budgets.show', $this->budget));
+
+    expect(FileAttachment::whereIn('attachable_id', $legs->modelKeys())->where('attachable_type', Transaction::class)->exists())->toBeFalse()
+        ->and($legFile->fresh())->toBeNull()
+        ->and($kept->fresh())->not->toBeNull()
+        ->and($sharedFile->fresh())->not->toBeNull();
+    Storage::disk('s3')->assertMissing($legFile->hash);
+    Storage::disk('s3')->assertExists($sharedFile->hash);
 });
 
 test('another users transfer urls are forbidden', function () {

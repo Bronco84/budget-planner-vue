@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class TransferService
 {
+    public function __construct(
+        private readonly FileService $files,
+    ) {}
+
     /**
      * Create a new transfer with its paired transactions.
      *
@@ -67,6 +71,9 @@ class TransferService
      */
     public function delete(Transfer $transfer): bool
     {
+        // Attachments are polymorphic, so the query delete below would orphan them.
+        $this->files->deleteTransactionAttachments($transfer->transactions()->pluck('id'));
+
         return DB::transaction(function () use ($transfer) {
             // Delete the paired transactions first
             $transfer->transactions()->delete();

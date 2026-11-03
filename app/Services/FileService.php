@@ -8,6 +8,7 @@ use App\Models\File;
 use App\Models\FileAttachment;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -280,6 +281,41 @@ class FileService
             ->with('file')
             ->get();
 
+        $this->deleteAttachmentsAndUnusedFiles($attachments, 'deleting a budget', ['budget_id' => $budget->id]);
+    }
+
+    /**
+     * Delete every attachment on the given transactions (polymorphic, so not removed
+     * with the transaction rows), then remove each file that is no longer used.
+     * Storage failures are logged so they never block deleting the transactions.
+     *
+     * @param  iterable<int, int>  $transactionIds
+     */
+    public function deleteTransactionAttachments(iterable $transactionIds): void
+    {
+        $ids = collect($transactionIds)->all();
+
+        if ($ids === []) {
+            return;
+        }
+
+        $attachments = FileAttachment::query()
+            ->where('attachable_type', Transaction::class)
+            ->whereIn('attachable_id', $ids)
+            ->with('file')
+            ->get();
+
+        $this->deleteAttachmentsAndUnusedFiles($attachments, 'deleting transactions', ['transaction_ids' => $ids]);
+    }
+
+    /**
+     * Delete the attachment rows, then each of their files that nothing else uses.
+     *
+     * @param  Collection<int, FileAttachment>  $attachments
+     * @param  array<string, mixed>  $logContext
+     */
+    private function deleteAttachmentsAndUnusedFiles(Collection $attachments, string $while, array $logContext): void
+    {
         if ($attachments->isEmpty()) {
             return;
         }
@@ -292,8 +328,7 @@ class FileService
                     $file->delete();
                 }
             } catch (\Throwable $e) {
-                Log::warning('Failed to remove an unused file while deleting a budget', [
-                    'budget_id' => $budget->id,
+                Log::warning("Failed to remove an unused file while {$while}", $logContext + [
                     'file_id' => $file->id,
                     'error' => $e->getMessage(),
                 ]);

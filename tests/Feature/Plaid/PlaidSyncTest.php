@@ -703,6 +703,43 @@ test('syncing an investment account also refreshes its holdings', function () {
         ->and($plaidAccount->account->fresh()->current_balance_cents)->toBe(1075000);
 });
 
+test('a position Plaid no longer returns is removed on the next holdings refresh, but an empty answer keeps them', function () {
+    $plaidAccount = plaidSyncLinkedAccount($this->budget, 'investment', 'brokerage', 'brokerage');
+    $service = app(PlaidService::class);
+
+    $security = fn (string $id, string $ticker) => [
+        'security_id' => $id, 'ticker_symbol' => $ticker, 'name' => $ticker,
+        'type' => 'etf', 'close_price' => 100.00, 'is_cash_equivalent' => false,
+    ];
+    $holding = fn (string $securityId) => [
+        'account_id' => 'plaid-brokerage', 'security_id' => $securityId, 'quantity' => 10,
+        'cost_basis' => 900.00, 'institution_price' => 100.00, 'institution_value' => 1000.00,
+    ];
+    $accounts = [['account_id' => 'plaid-brokerage', 'balances' => ['current' => 2000.00, 'available' => null]]];
+
+    $this->plaid->on('/investments/holdings/get', [
+        'accounts' => $accounts,
+        'securities' => [$security('sec-vti', 'VTI'), $security('sec-bnd', 'BND')],
+        'holdings' => [$holding('sec-vti'), $holding('sec-bnd')],
+    ]);
+    expect($service->updateInvestmentData($plaidAccount))->toBeTrue()
+        ->and($plaidAccount->holdings()->count())->toBe(2);
+
+    // BND was sold: Plaid now returns only VTI.
+    $this->plaid->on('/investments/holdings/get', [
+        'accounts' => $accounts,
+        'securities' => [$security('sec-vti', 'VTI')],
+        'holdings' => [$holding('sec-vti')],
+    ]);
+    expect($service->updateInvestmentData($plaidAccount))->toBeTrue()
+        ->and($plaidAccount->holdings()->with('security')->get()->pluck('security.ticker_symbol')->all())->toBe(['VTI']);
+
+    // An answer with no holdings at all is not taken as "everything was sold".
+    $this->plaid->on('/investments/holdings/get', ['accounts' => $accounts, 'securities' => [], 'holdings' => []]);
+    $service->updateInvestmentData($plaidAccount);
+    expect($plaidAccount->holdings()->count())->toBe(1);
+});
+
 test('sync refuses an account that is not linked to Plaid', function () {
     $account = Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
 

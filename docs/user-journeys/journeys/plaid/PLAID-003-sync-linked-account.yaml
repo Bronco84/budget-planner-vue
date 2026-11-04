@@ -34,6 +34,7 @@ business_rules:
   - plaid.sync is limited to 5 requests/minute
   - balance uses Plaid current, falling back to available; if both are missing the last known balance is kept
   - sync refreshes liabilities only for credit card accounts and holdings only for investment accounts
+  - a holdings refresh deletes stored positions Plaid no longer returns (sold or closed) for each account the response reports, but only when the response carried at least one holding; an empty answer leaves stored positions alone
   - an account with no PlaidAccount gets "Account is not linked to Plaid."
   - Plaid errors during sync reach the controller (PlaidService rethrows, prefixed with the Plaid error code) and are flashed as user-safe errors; raw Plaid text is only logged
   - PRODUCT_NOT_READY yields the "still being processed, try again in 1-3 days" message
@@ -180,6 +181,12 @@ scenarios:
     tests:
       - tests/Feature/Plaid/PlaidSyncTest.php::syncing a credit card also refreshes its statement liability data
       - tests/Feature/Plaid/PlaidSyncTest.php::syncing an investment account also refreshes its holdings
+  - id: sold_holdings_removed
+    kind: edge
+    description: A position Plaid stops returning (sold or closed) is removed on the next holdings refresh, so it no longer counts in market value; an answer with no holdings at all keeps the stored positions.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidSyncTest.php::a position Plaid no longer returns is removed on the next holdings refresh, but an empty answer keeps them
   - id: refresh_endpoints_report_outcome
     kind: recovery
     description: The balance and liabilities refreshes that sync runs store Plaid's data and report failure (false) when Plaid fails or has no data, leaving the stored values unchanged.

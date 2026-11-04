@@ -1932,6 +1932,17 @@ class PlaidService
                 }
             }
 
+            // Positions Plaid no longer returns were sold or closed. Prune them only for
+            // accounts this response reports, and only when it carried holdings at all,
+            // so an empty or partial answer never wipes an account's positions.
+            if (! empty($investmentData['holdings'])) {
+                foreach (collect($investmentData['accounts'] ?? [])->pluck('account_id') as $reportedAccountId) {
+                    if ($reportedAccount = $allConnectionAccounts->get($reportedAccountId)) {
+                        $this->cleanupStaleHoldings($reportedAccount, $investmentData['holdings']);
+                    }
+                }
+            }
+
             // Update account balance from investment data
             foreach ($investmentData['accounts'] as $accountData) {
                 if ($accountData['account_id'] === $plaidAccount->plaid_account_id) {

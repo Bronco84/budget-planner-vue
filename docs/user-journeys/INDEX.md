@@ -382,7 +382,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Transactions/ManualTransactionTest.php`, `tests/Feature/Transactions/QuickAddCategoriesTest.php`, `tests/playwright/budget-basics.spec.js`
 - **TXN-003** Owner edits, reviews history of, or deletes a transaction _(implemented, high)_
   - Routes: `budget.transaction.edit`, `budget.transaction.update`, `budget.transaction.destroy`, `budget.transaction.activity-log`, `budget.transaction.keep`
-  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidRemovedByBankTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Transactions/EditTransactionTest.php`
+  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidRemovedByBankTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Transactions/EditTransactionTest.php`, `tests/Feature/Transactions/TransactionDeletionAttachmentsTest.php`
 
 ### transfers
 

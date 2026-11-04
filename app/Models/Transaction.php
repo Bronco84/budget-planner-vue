@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\SyncsCategoryAssignment;
 use App\Services\BudgetService;
+use App\Services\FileService;
 use App\Services\RecurringTransactionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -73,6 +74,14 @@ class Transaction extends Model
             if ($transaction->recurring_transaction_template_id) {
                 RecurringTransactionService::clearDynamicAmountCache($transaction->recurring_transaction_template_id);
             }
+        });
+
+        // Attachments are polymorphic (no FK cascade): remove them, and each file
+        // nothing else uses, on every model delete (controller, Nova, console). Paths
+        // that merge a row into another move its attachments first. Query deletes
+        // (TransferService) call FileService::deleteTransactionAttachments themselves.
+        static::deleting(function (Transaction $transaction) {
+            app(FileService::class)->deleteTransactionAttachments([$transaction->id]);
         });
 
         static::deleted(function (Transaction $transaction) {

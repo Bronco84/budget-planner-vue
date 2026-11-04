@@ -43,6 +43,7 @@ business_rules:
   - when a re-link leaves the previous connection with no accounts, that connection is deleted and its Item removed at Plaid (/item/remove, best effort, skipped for the Item now in use), as unlinking the last account does; a previous connection still holding other accounts is kept
   - metadata.institution.institution_id and metadata.item.id (or metadata.item_id) are optional, validated and used for connection matching and creation; a missing item id gets a generated plaid-item-<uniqid> on the server (Link.vue sends null rather than inventing one)
   - a failed post-link transaction sync keeps the link and adds a user-safe error flash
+  - Plaid/Link toasts the flashed outcome of plaid.store (the error on a failed link that redirects back, and the success message and any sync error on the dashboard)
   - the selected metadata.account.id must exist in Plaid's /accounts/get response or linking fails
 scenarios:
   - id: link_page_renders

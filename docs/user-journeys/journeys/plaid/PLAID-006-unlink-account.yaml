@@ -26,6 +26,7 @@ postconditions:
 business_rules:
   - "unlinking is owner-only (BudgetPolicy::manageConnections), including owner members; editors and viewers get 403"
   - when the last account is unlinked the connection is (soft) deleted and its item is removed at Plaid (/item/remove) so the access token is revoked; a Plaid failure is logged and does not block the local unlink
+  - Plaid/Link toasts the flashed outcome of plaid.destroy (the unlinked message, or the not-linked error)
 scenarios:
   - id: unlink_account
     kind: happy_path

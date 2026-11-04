@@ -52,6 +52,7 @@ business_rules:
   - an /accounts/get failure is an import error, not a zero-account success
   - a failed initial transaction sync keeps the imported accounts and adds a user-safe error flash
   - the initial sync runs once per Plaid connection (PlaidService::syncConnection), so the Item's transactions and balances are fetched once for all imported accounts
+  - Plaid/Discover and Accounts/CreateOrImport toast the flashed outcome of plaid.import (the error on a failed import that redirects back, and the success message and any sync error on the dashboard)
   - link token failures are logged and render the page with linkToken null (connect button disabled)
 scenarios:
   - id: setup_page_renders

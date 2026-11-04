@@ -410,6 +410,10 @@ const initializePlaid = () => {
         router.post(route('plaid.store', [props.budget.id, props.account.id]), {
           public_token: public_token,
           metadata: enhancedMetadata
+        }, {
+          // A failed link redirects back with a flashed error; show it (and the
+          // outcome on the dashboard, which doesn't render flashes).
+          onSuccess: (visited) => toast.flash(visited),
         });
       }
     },
@@ -549,7 +553,9 @@ const confirmDisconnect = async () => {
   });
   
   if (confirmed) {
-    router.delete(route('plaid.destroy', [props.budget.id, props.account.id]));
+    router.delete(route('plaid.destroy', [props.budget.id, props.account.id]), {
+      onSuccess: (visited) => toast.flash(visited),
+    });
   }
 };
 

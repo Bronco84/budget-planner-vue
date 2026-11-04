@@ -321,6 +321,9 @@ const importSelectedAccounts = () => {
     metadata: currentMetadata,
     selected_accounts: selectedAccounts.value,
   }, {
+    // A failed import redirects back with a flashed error; show it (and the
+    // success/partial-sync outcome on the dashboard, which doesn't render flashes).
+    onSuccess: (visited) => toast.flash(visited),
     onFinish: () => {
       importing.value = false;
     }

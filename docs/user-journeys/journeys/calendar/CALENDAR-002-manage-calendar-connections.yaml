@@ -21,16 +21,16 @@ depends_on:
   - path: app/Policies/CalendarConnectionPolicy.php
     reason: update/delete abilities require connection.user_id to match
   - path: app/Services/GoogleCalendarService.php
-    reason: refreshTokenIfNeeded and syncEvents
+    reason: refreshTokenIfNeeded, syncEvents and revokeAccess
 integrations:
-  - Google Calendar API (events.list), Google OAuth token refresh
+  - Google Calendar API (events.list), Google OAuth token refresh and revocation
 steps:
   - action: click Sync (POST /calendar/connections/{calendarConnection}/sync)
     expected: events re-synced; redirect back with "Synced N events from <calendar>"
   - action: click toggle (POST .../toggle)
     expected: is_active flipped; redirect back
   - action: confirm remove (DELETE /calendar/connections/{calendarConnection})
-    expected: connection deleted; redirect back
+    expected: connection deleted, its Google grant revoked; redirect back
 postconditions:
   - inactive connections' events are excluded from the calendar month view (CALENDAR-003)
 business_rules:
@@ -39,6 +39,7 @@ business_rules:
   - an expired token without a refresh token fails with "No refresh token available"
   - sync reads every events.list page; only after the whole window is listed are the connection's stored events in that window that Google no longer returned (deleted, cancelled or moved out) removed
   - a sync that fails part-way removes nothing
+  - removing a connection revokes its Google grant (refresh token, else access token) after the row is deleted; a refused or failed revocation is logged without the token and never blocks the removal; a grant another of the user's connections still uses is not revoked
   - events are keyed per connection (calendar_connection_id, google_event_id), so an event shared by several app users is stored once for each of their connections
 scenarios:
   - id: sync_connection
@@ -78,6 +79,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Calendar/CalendarConnectionTest.php::the owner can remove a calendar connection
+  - id: remove_revokes_google_grant
+    kind: integration
+    description: Removing a connection revokes its Google grant; a refused or unreachable revocation still removes the connection and is logged; a grant shared with another connection is left in place.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarGrantRevocationTest.php::removing a calendar connection revokes its google grant
+      - tests/Feature/Calendar/CalendarGrantRevocationTest.php::a failed google revocation still removes the calendar connection and is logged
+      - tests/Feature/Calendar/CalendarGrantRevocationTest.php::removing one of two connections that share a google grant leaves the grant in place
   - id: unknown_connection
     kind: edge
     description: A non-existent connection id returns 404.

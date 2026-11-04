@@ -118,6 +118,49 @@ class GoogleCalendarService
     }
 
     /**
+     * Revoke the Google grant behind a connection that has just been deleted,
+     * so it no longer works at Google. Never throws: a failure is logged and
+     * must not stop the deletion. A grant still used by another of the user's
+     * connections is left alone.
+     */
+    public function revokeAccess(CalendarConnection $connection): bool
+    {
+        try {
+            $token = $connection->refresh_token ?: $connection->access_token;
+
+            if (! $token) {
+                return false;
+            }
+
+            $sharedGrant = CalendarConnection::query()
+                ->where('user_id', $connection->user_id)
+                ->whereKeyNot($connection->getKey())
+                ->get()
+                ->contains(fn (CalendarConnection $other) => in_array($token, [$other->refresh_token, $other->access_token], true));
+
+            if ($sharedGrant) {
+                return false;
+            }
+
+            if ($this->client->revokeToken($token)) {
+                return true;
+            }
+
+            Log::warning('Google Calendar grant revocation was refused', [
+                'connection_id' => $connection->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Google Calendar grant revocation failed', [
+                'connection_id' => $connection->id,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return false;
+    }
+
+    /**
      * Sync events from Google Calendar.
      */
     public function syncEvents(CalendarConnection $connection, ?Carbon $startDate = null, ?Carbon $endDate = null): int

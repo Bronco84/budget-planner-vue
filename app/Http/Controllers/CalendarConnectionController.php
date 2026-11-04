@@ -155,6 +155,9 @@ class CalendarConnectionController extends Controller
 
         $calendarConnection->delete();
 
+        // Logged and non-blocking: the connection is gone here either way.
+        $this->googleCalendarService->revokeAccess($calendarConnection);
+
         return redirect()->back()
             ->with('message', 'Calendar connection removed');
     }

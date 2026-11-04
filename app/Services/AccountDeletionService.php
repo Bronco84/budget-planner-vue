@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Budget;
+use App\Models\CalendarConnection;
 use App\Models\File;
 use App\Models\FileAttachment;
 use App\Models\Scenario;
@@ -31,6 +32,7 @@ class AccountDeletionService
         private readonly BudgetSharingService $sharing,
         private readonly BudgetDeletionService $budgets,
         private readonly FileService $files,
+        private readonly GoogleCalendarService $calendar,
     ) {}
 
     /**
@@ -65,6 +67,9 @@ class AccountDeletionService
 
         $unshared->each(fn (Budget $budget) => $this->budgets->destroy($budget));
 
+        // Calendar connections cascade with the user; keep their tokens to revoke the grants after.
+        $calendarConnections = $user->calendarConnections()->get();
+
         DB::transaction(function () use ($user, $shared, $surviving) {
             $shared->each(fn (Budget $budget) => $this->sharing->leave($budget, $user));
 
@@ -78,6 +83,9 @@ class AccountDeletionService
             $user->webAuthnCredentials()->delete();
             $user->delete();
         });
+
+        // Logged and non-blocking, like the Plaid item removal.
+        $calendarConnections->each(fn (CalendarConnection $connection) => $this->calendar->revokeAccess($connection));
     }
 
     /**

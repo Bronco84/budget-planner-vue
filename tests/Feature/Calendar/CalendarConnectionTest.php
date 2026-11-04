@@ -52,6 +52,11 @@ test('the owner can toggle a calendar connection', function () {
 });
 
 test('the owner can remove a calendar connection', function () {
+    $this->google->shouldReceive('revokeAccess')
+        ->once()
+        ->withArgs(fn ($connection) => $connection->is($this->connection))
+        ->andReturn(true);
+
     $this->actingAs($this->user)
         ->from(route('calendar.connections.index'))
         ->delete(route('calendar.connections.destroy', $this->connection))
@@ -62,6 +67,7 @@ test('the owner can remove a calendar connection', function () {
 
 test('another user cannot sync toggle or remove a calendar connection', function () {
     $this->google->shouldNotReceive('syncEvents');
+    $this->google->shouldNotReceive('revokeAccess');
     $other = User::factory()->create();
 
     $this->actingAs($other)->post(route('calendar.connections.sync', $this->connection))->assertForbidden();

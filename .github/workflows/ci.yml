@@ -62,7 +62,11 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      # Production dependencies only: what ships in the browser bundle.
+      # Production dependencies only: what ships in the browser bundle. Every
+      # package imported by resources/js belongs in "dependencies" so this sees
+      # it; build tooling (vite, plugins, eslint, tailwind) stays in devDependencies.
+      # laravel-vite-plugin is the one dev package with a bundled import (the
+      # dependency-free inertia-helpers resolvePageComponent).
       - name: Audit npm dependencies
         run: npm audit --omit=dev
 

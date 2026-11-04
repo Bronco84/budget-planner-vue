@@ -61,6 +61,7 @@ business_rules:
   - a regex pattern is never lowercased; a case-insensitive regex rule runs the pattern as written with the i modifier appended, so escapes like \S, \D and \W keep their meaning (other string operators lowercase both sides)
   - every link records transactions.link_source - manual (Make Recurring, the transaction form, bulk-linking chosen suggestions), rule (apply, re-evaluation, inline rules, Plaid auto-link by rules), entity (Plaid entity id), description (description match) or analysis (pattern confirmation); unlinking clears it; links made before the column existed are null (unknown)
   - re-evaluation after a rule update or delete only unlinks links whose link_source is rule; manual, entity, description, analysis and null links are never removed; newly matching unlinked transactions are linked with link_source rule; with no active rules left nothing is re-evaluated
+  - service-side rule matching (RecurringTransactionService::findTransactionsMatchingAllRules, behind dynamic amounts, re-evaluation and inline/Plaid rule linking) only considers transactions on the template's account (the whole budget when it has none) dated within the last RULE_MATCH_LOOKBACK_MONTHS (12) months, loaded without the raw Plaid rows; re-evaluation keeps rule links outside that window instead of unlinking them
 scenarios:
   - id: add_rule_and_apply
     kind: happy_path
@@ -163,6 +164,15 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringRuleRoutesTest.php::testing and previewing rules for a template without an account returns empty results
+  - id: rule_matching_bounded
+    kind: edge
+    description: Dynamic amounts and rule linking ignore matches older than 12 months or on another account, average in-window matches as before, never load raw Plaid rows, and re-evaluation keeps out-of-window rule links.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRuleMatchWindowTest.php::dynamic amounts average only in-window matches on the template account
+      - tests/Feature/Recurring/RecurringRuleMatchWindowTest.php::rule matching does not load raw plaid transactions
+      - tests/Feature/Recurring/RecurringRuleMatchWindowTest.php::applying rules links only in-window matches on the template account
+      - tests/Feature/Recurring/RecurringRuleMatchWindowTest.php::re-evaluation keeps rule links outside the window and still unlinks in-window non-matches
 known_issues:
   - Rule-made links stay linked after the last active rule is deleted (with no rules there is nothing to re-evaluate against).
 confidence: high

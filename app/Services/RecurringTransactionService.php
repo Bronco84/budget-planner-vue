@@ -16,6 +16,34 @@ use Illuminate\Support\Facades\Log;
 
 class RecurringTransactionService
 {
+    /**
+     * How far back rule-based matching looks, as findMatchingTransactionsForTemplates
+     * does, so the scan stays bounded as Plaid history grows.
+     */
+    public const RULE_MATCH_LOOKBACK_MONTHS = 12;
+
+    /**
+     * The transaction columns rule matching and its callers read (rules read
+     * description, amount_in_cents and category; callers link, average and date
+     * the matches; the rest keep activity logging and category sync correct on save).
+     */
+    protected const RULE_MATCH_COLUMNS = [
+        'id', 'budget_id', 'account_id', 'description', 'category', 'category_id',
+        'amount_in_cents', 'date', 'recurring_transaction_template_id', 'link_source',
+        'plaid_transaction_id', 'notes', 'is_reconciled',
+    ];
+
+    /**
+     * Limit a transaction query to what a template's rules can match: the
+     * template's account (when it has one) within the lookback window.
+     */
+    protected function scopeToRuleMatchWindow($query, RecurringTransactionTemplate $template)
+    {
+        return $query
+            ->when($template->account_id, fn ($q) => $q->where('account_id', $template->account_id))
+            ->where('date', '>=', now()->subMonthsNoOverflow(self::RULE_MATCH_LOOKBACK_MONTHS)->toDateString());
+    }
+
     public function projectTransactions(Account $account, Carbon $startDate, Carbon $endDate)
     {
         $projectedTransactions = collect();
@@ -542,8 +570,13 @@ class RecurringTransactionService
             'rules_count' => $rules->count(),
         ]);
 
-        // Use preloaded transactions if available, otherwise query
-        $transactions = $preloadedTransactions ?? Transaction::where('budget_id', $budgetId)->with('plaidTransaction')->get();
+        // Use preloaded transactions if available, otherwise load the candidates
+        // rules can match: the template's account within the lookback window,
+        // with only the columns rules and callers read (no Plaid payload).
+        $transactions = $preloadedTransactions ?? $this->scopeToRuleMatchWindow(
+            Transaction::where('budget_id', $budgetId),
+            $template
+        )->get(self::RULE_MATCH_COLUMNS);
 
         // Filter transactions that match all rules
         $matchingTransactions = $transactions->filter(function (Transaction $transaction) use ($rules) {
@@ -802,9 +835,13 @@ class RecurringTransactionService
 
         // Only links the rules made are re-evaluated; manual, Plaid entity,
         // description, analysis and unknown (null) links are never removed.
-        $ruleLinked = Transaction::where('recurring_transaction_template_id', $template->id)
-            ->where('link_source', Transaction::LINK_SOURCE_RULE)
-            ->get();
+        // Rule links outside the matching window (older, or on another account)
+        // were never candidates, so they are kept rather than unlinked.
+        $ruleLinked = $this->scopeToRuleMatchWindow(
+            Transaction::where('recurring_transaction_template_id', $template->id)
+                ->where('link_source', Transaction::LINK_SOURCE_RULE),
+            $template
+        )->get();
 
         // Unlink rule links that no longer match
         $unlinkedCount = 0;

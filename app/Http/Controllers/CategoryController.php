@@ -25,17 +25,32 @@ class CategoryController extends Controller
         // Calculate total allocated
         $totalAllocated = $categories->sum('amount');
 
-        // Get all transactions for the budget to calculate spent amounts
-        $transactions = $budget->transactions()
-            ->where('amount_in_cents', '<', 0) // Only expenses
-            ->get();
+        // Spent per category, summed in SQL over the budget's expenses (all
+        // time). Rows linked by category_id are grouped by id; unlinked legacy
+        // rows fall back to their category string (see
+        // Transaction::scopeInCategory). Pending rows the bank dropped do not
+        // count, as in every other total.
+        $expenses = fn () => $budget->transactions()
+            ->countedInTotals()
+            ->where('amount_in_cents', '<', 0)
+            ->toBase();
 
-        // Calculate spent for each category based on transactions
-        $categoriesWithSpent = $categories->map(function ($category) use ($transactions) {
-            $spent = $transactions->filter(fn ($transaction) => $transaction->isInCategory($category))
-                ->sum(function ($transaction) {
-                    return abs($transaction->amount_in_cents);
-                });
+        $spentById = $expenses()
+            ->whereNotNull('category_id')
+            ->groupBy('category_id')
+            ->selectRaw('category_id, SUM(amount_in_cents) as total')
+            ->pluck('total', 'category_id');
+
+        $spentByLegacyName = $expenses()
+            ->whereNull('category_id')
+            ->whereIn('category', $categories->pluck('name'))
+            ->groupBy('category')
+            ->selectRaw('category, SUM(amount_in_cents) as total')
+            ->pluck('total', 'category');
+
+        $categoriesWithSpent = $categories->map(function ($category) use ($spentById, $spentByLegacyName) {
+            $spent = abs((int) ($spentById[$category->id] ?? 0))
+                + abs((int) ($spentByLegacyName[$category->name] ?? 0));
 
             return [
                 'id' => $category->id,

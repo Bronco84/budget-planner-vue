@@ -5,6 +5,7 @@ use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /*
@@ -43,6 +44,41 @@ test('index renders categories with spent and remaining computed from matching e
             ->where('categories.1.percent_used', 0)
             ->where('summary.total_spent_cents', 7800)
             ->where('summary.category_count', 2)
+        );
+});
+
+test('spent counts all time expenses by category id and legacy name but not bank removed rows or other budgets', function () {
+    $account = Account::factory()->checking()->create(['budget_id' => $this->budget->id]);
+    $groceries = Category::create(['budget_id' => $this->budget->id, 'name' => 'Groceries', 'amount' => 100, 'order' => 1]);
+    Category::create(['budget_id' => $this->budget->id, 'name' => 'Fun', 'amount' => 50, 'order' => 2]);
+
+    $tx = ['budget_id' => $this->budget->id, 'account_id' => $account->id];
+    // Linked by id, years apart: the figure is all time, not this month.
+    Transaction::factory()->create($tx + ['category_id' => $groceries->id, 'amount_in_cents' => -4000, 'date' => now()->subYears(3)->toDateString()]);
+    Transaction::factory()->create($tx + ['category_id' => $groceries->id, 'amount_in_cents' => -1500, 'date' => now()->toDateString()]);
+    // A pending row the bank dropped does not count.
+    Transaction::factory()->create($tx + ['category_id' => $groceries->id, 'amount_in_cents' => -9900, 'removed_by_bank_at' => now()]);
+    // Unlinked legacy row matched by name.
+    $legacy = Transaction::factory()->create($tx + ['category' => 'Fun', 'amount_in_cents' => -250]);
+    DB::table('transactions')->where('id', $legacy->id)->update(['category_id' => null, 'category' => 'Fun']);
+
+    // Another budget's expenses never count.
+    $other = Budget::factory()->create();
+    $otherAccount = Account::factory()->checking()->create(['budget_id' => $other->id]);
+    $foreign = Transaction::factory()->create(['budget_id' => $other->id, 'account_id' => $otherAccount->id, 'category' => 'Fun', 'amount_in_cents' => -7000]);
+    DB::table('transactions')->where('id', $foreign->id)->update(['category_id' => null]);
+
+    $this->actingAs($this->user)
+        ->get(route('budgets.categories.index', $this->budget))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('categories.0.name', 'Groceries')
+            ->where('categories.0.spent_cents', 5500)
+            ->where('categories.0.remaining_cents', 4500)
+            ->where('categories.1.name', 'Fun')
+            ->where('categories.1.spent_cents', 250)
+            ->where('summary.total_spent_cents', 5750)
+            ->where('summary.total_remaining_cents', 9250)
         );
 });
 

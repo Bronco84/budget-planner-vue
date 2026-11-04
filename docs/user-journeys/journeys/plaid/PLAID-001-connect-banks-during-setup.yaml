@@ -51,6 +51,7 @@ business_rules:
   - local account creation and linking run in one DB transaction; any failure rolls back every local write, and the just-exchanged Item is removed at Plaid (/item/remove, best effort) unless a stored connection holds it
   - an /accounts/get failure is an import error, not a zero-account success
   - a failed initial transaction sync keeps the imported accounts and adds a user-safe error flash
+  - the initial sync runs once per Plaid connection (PlaidService::syncConnection), so the Item's transactions and balances are fetched once for all imported accounts
   - link token failures are logged and render the page with linkToken null (connect button disabled)
 scenarios:
   - id: setup_page_renders
@@ -137,6 +138,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Plaid/PlaidImportTest.php::import keeps the accounts but reports when the initial transaction sync fails
+  - id: initial_sync_fetches_item_once
+    kind: integration
+    description: Importing several accounts from one Item runs the initial sync as one connection sync, calling /transactions/get once rather than once per account.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidImportTest.php::the initial sync after an import fetches the Item transactions and balances once, not once per account
   - id: import_failure_message_is_user_safe
     kind: recovery
     description: An import failure flashes "Failed to import accounts. Please try again." (or the could-not-reach message for a connect timeout); the raw Plaid/Guzzle text is only logged.

@@ -384,3 +384,20 @@ test('import keeps the accounts but reports when the initial transaction sync fa
     expect($this->budget->accounts()->count())->toBe(2)
         ->and(PlaidConnection::where('budget_id', $this->budget->id)->sole()->plaidAccounts()->count())->toBe(2);
 });
+
+test('the initial sync after an import fetches the Item transactions and balances once, not once per account', function () {
+    stubSuccessfulPlaidImport($this->plaid);
+
+    $this->actingAs($this->user)
+        ->post(route('plaid.import', $this->budget), plaidImportPayload([
+            'selected_accounts' => ['acc-checking', 'acc-savings', 'acc-card'],
+        ]))
+        ->assertRedirect(route('budgets.show', $this->budget))
+        ->assertSessionHas('message', 'Successfully imported 3 accounts from Plaid.')
+        ->assertSessionMissing('error');
+
+    // /accounts/get runs once for the import itself and once for the shared sync.
+    expect($this->plaid->bodiesFor('/transactions/get'))->toHaveCount(1)
+        ->and($this->plaid->bodiesFor('/accounts/get'))->toHaveCount(2)
+        ->and(Transaction::whereIn('plaid_transaction_id', ['tx-coffee', 'tx-interest', 'tx-card'])->count())->toBe(3);
+});

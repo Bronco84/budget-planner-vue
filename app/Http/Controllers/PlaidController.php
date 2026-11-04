@@ -698,6 +698,8 @@ class PlaidController extends Controller
     /**
      * Run the initial sync for freshly linked accounts. Linking has already
      * succeeded, so a sync failure is reported rather than undoing the link.
+     * Accounts of one Plaid connection are synced together, so the Item's
+     * transactions and balances are fetched once rather than once per account.
      *
      * @param  iterable<PlaidAccount>  $plaidAccounts
      * @return string|null a user-safe message for the first failure, or null
@@ -706,16 +708,27 @@ class PlaidController extends Controller
     {
         $error = null;
 
-        foreach ($plaidAccounts as $plaidAccount) {
+        foreach (collect($plaidAccounts)->groupBy('plaid_connection_id') as $connectionAccounts) {
             try {
-                $this->plaidService->syncTransactions($plaidAccount);
+                $results = $this->plaidService->syncConnection($connectionAccounts);
             } catch (\Exception $e) {
+                // The connection could not be synced at all (another sync held its lock).
+                $results = $connectionAccounts->mapWithKeys(fn (PlaidAccount $pa) => [$pa->id => $e])->all();
+            }
+
+            foreach ($connectionAccounts as $plaidAccount) {
+                $result = $results[$plaidAccount->id] ?? null;
+
+                if (! $result instanceof \Exception) {
+                    continue;
+                }
+
                 Log::warning('Initial sync after linking failed', [
                     'plaid_account_id' => $plaidAccount->id,
-                    'error' => $e->getMessage(),
+                    'error' => $result->getMessage(),
                 ]);
 
-                $error ??= $this->syncFailureMessage($e);
+                $error ??= $this->syncFailureMessage($result);
             }
         }
 

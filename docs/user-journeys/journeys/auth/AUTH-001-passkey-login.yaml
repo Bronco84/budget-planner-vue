@@ -18,10 +18,12 @@ routes:
   - webauthn.login.options
   - webauthn.login
 depends_on:
-  - path: resources/js/vendor/webauthn/**
-    reason: browser-side WebAuthn helper loaded by the login page
+  - path: config/passkeys.php
+    reason: relying party ID and allowed origins the assertion is verified against (WEBAUTHN_ID / WEBAUTHN_ORIGINS)
+  - path: database/migrations/2026_11_04_000049_move_webauthn_credentials_to_passkeys.php
+    reason: copies passkeys registered under laragear/webauthn into the passkeys table so they keep signing in
 integrations:
-  - WebAuthn (laragear/webauthn), browser credential API
+  - WebAuthn (laravel/passkeys on web-auth/webauthn-lib), browser credential API
 steps:
   - action: visit / or /login
     expected: PasskeyLogin page rendered (/ redirects to login)
@@ -38,7 +40,9 @@ business_rules:
   - a failed assertion returns 422 without creating a session
   - challenges are single use (pulled from the session on the first attempt)
   - the trusted device is recognised by the device_token cookie the browser already holds, not by fingerprint (browser family + OS is shared by other machines); a browser without a cookie gets a new device row and a NewDeviceLogin email
-  - an assertion whose signature counter does not advance past the stored one is treated as a cloned authenticator and the credential is disabled; authenticators that always report 0 (synced passkeys) are allowed
+  - an assertion whose signature counter does not advance past the stored one is treated as a cloned authenticator and rejected (the passkey itself stays usable by the genuine authenticator, whose counter advances; laravel/passkeys has no disabled state); authenticators that always report 0 (synced passkeys) are allowed
+  - user verification is "preferred", not required, as it was under laragear/webauthn
+  - passkeys registered under laragear/webauthn were copied into passkeys by migration 2026_11_04_000049 (public key PEM re-encoded as COSE, same credential id, user handle, counter and name), so they sign in unchanged; the old webauthn_credentials table is kept only so that migration can roll back, and is pruned when a passkey or account is deleted
   - the first sign-in from a new device emails a NewDeviceLogin alert, sent during the request unless auth.magic_link_queue is on (the same switch as magic links, off until production runs a queue worker); a mail failure is reported and never fails the sign-in
 scenarios:
   - id: login_page_renders
@@ -82,12 +86,12 @@ scenarios:
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a tampered or mismatched passkey assertion is rejected with 422 and no session'
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::an assertion without a prior challenge is rejected'
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a replayed assertion is rejected because the challenge is single use'
-  - id: cloned_authenticator_disabled
+  - id: cloned_authenticator_rejected
     kind: edge
-    description: An assertion whose signature counter does not advance (cloned authenticator) is rejected with 422 and the credential is disabled so it can no longer sign in.
+    description: An assertion whose signature counter does not advance (cloned authenticator) is rejected with 422 and leaves the stored counter alone; the genuine authenticator still signs in.
     coverage: covered
     tests:
-      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a cloned authenticator whose counter does not advance is rejected and the credential disabled'
+      - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a cloned authenticator whose counter does not advance is rejected'
   - id: counterless_authenticator_signs_in
     kind: alternate
     description: An authenticator that always reports a zero signature counter (e.g. synced passkeys) can sign in repeatedly.
@@ -118,6 +122,17 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Auth/TrustedDeviceFingerprintTest.php::a second machine with the same browser and os is a new device and sends an alert
+  - id: legacy_laragear_passkey_signs_in
+    kind: edge
+    description: A passkey stored by laragear/webauthn (encrypted PEM, UUID user handle) is copied by the migration and completes a real usernameless assertion afterwards; a different key, a lower counter, and disabled, orphaned or undecryptable rows are not carried over or rejected; rollback drops passkeys and leaves the old rows.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/PasskeyLegacyMigrationTest.php::a passkey stored by laragear still signs the user in after the migration'
+      - 'tests/Feature/Auth/PasskeyLegacyMigrationTest.php::a migrated passkey still rejects a signature from a different key'
+      - 'tests/Feature/Auth/PasskeyLegacyMigrationTest.php::the migration carries the sign counter so a replayed lower counter is still refused'
+      - 'tests/Feature/Auth/PasskeyLegacyMigrationTest.php::disabled, orphaned and unreadable laragear rows are skipped and the rest are copied'
+      - 'tests/Feature/Auth/PasskeyLegacyMigrationTest.php::rolling the migration back drops passkeys and leaves the laragear rows intact'
+      - 'tests/Feature/Auth/PasskeyLegacyMigrationTest.php::rsa and ed25519 public keys convert to equivalent cose keys'
   - id: options_rate_limited
     kind: edge
     description: Login option requests beyond 10 per minute are throttled.
@@ -134,4 +149,5 @@ confidence: high
 evidence:
   - routes/web.php webauthn group and routes/auth.php guest group
   - app/Http/Controllers/WebAuthn/WebAuthnLoginController.php
+  - database/migrations/2026_11_04_000049_move_webauthn_credentials_to_passkeys.php
 last_verified: null

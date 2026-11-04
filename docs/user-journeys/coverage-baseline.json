@@ -59,7 +59,8 @@
             "authenticated_options_stay_json": "covered",
             "successful_assertion_signs_in": "covered",
             "invalid_assertion_rejected": "covered",
-            "cloned_authenticator_disabled": "covered",
+            "cloned_authenticator_rejected": "covered",
+            "legacy_laragear_passkey_signs_in": "covered",
             "counterless_authenticator_signs_in": "covered",
             "options_rate_limited": "covered",
             "authorization": "not_applicable"

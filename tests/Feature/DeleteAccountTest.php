@@ -12,9 +12,10 @@ use App\Models\TrustedDevice;
 use App\Models\User;
 use App\Services\BudgetSharingService;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Laravel\Passkeys\Passkey;
 use Spatie\Activitylog\Models\Activity;
 use Tests\Support\FakePlaidApi;
 
@@ -59,9 +60,24 @@ test('a passkey only user can delete their account by typing their email in a fr
 
     $this->assertGuest();
     expect(User::find($user->id))->toBeNull()
-        ->and(WebAuthnCredential::where('authenticatable_id', $user->id)->count())->toBe(0)
+        ->and(Passkey::where('user_id', $user->id)->count())->toBe(0)
         ->and(TrustedDevice::where('user_id', $user->id)->count())->toBe(0)
         ->and(MagicLinkToken::where('user_id', $user->id)->count())->toBe(0);
+});
+
+test('deleting an account also removes the users legacy laragear credentials', function () {
+    $user = passkeyOnlyUser();
+    $other = passkeyOnlyUser();
+    legacyWebAuthnRow($user, 'legacy-mine');
+    legacyWebAuthnRow($other, 'legacy-theirs');
+
+    $this->actingAs($user)
+        ->withSession(freshlyAuthenticated())
+        ->delete(route('profile.destroy'), ['email' => $user->email])
+        ->assertRedirect('/');
+
+    expect(DB::table('webauthn_credentials')->pluck('id')->all())->toBe(['legacy-theirs'])
+        ->and(Passkey::where('user_id', $other->id)->count())->toBe(1);
 });
 
 test('deleting an account clears the trusted device cookie', function () {
@@ -87,7 +103,7 @@ test('account deletion is rejected when the typed email does not match', functio
 
     $this->assertAuthenticatedAs($user);
     expect(User::find($user->id))->not->toBeNull()
-        ->and($user->webAuthnCredentials()->count())->toBe(1);
+        ->and($user->passkeys()->count())->toBe(1);
 });
 
 test('account deletion is rejected when the session authenticated more than the reauth window ago', function () {

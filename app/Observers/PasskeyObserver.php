@@ -2,27 +2,37 @@
 
 namespace App\Observers;
 
+use App\Services\LegacyWebAuthnCredentials;
 use Illuminate\Support\Str;
-use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Laravel\Passkeys\Passkey;
 
-class WebAuthnCredentialObserver
+class PasskeyObserver
 {
     /**
-     * Handle the WebAuthnCredential "creating" event.
-     * Automatically set a friendly alias based on device information.
+     * Handle the Passkey "creating" event.
+     * Automatically set a friendly name based on device information.
      */
-    public function creating(WebAuthnCredential $credential): void
+    public function creating(Passkey $passkey): void
     {
-        // Only set alias if it's not already set
-        if (empty($credential->alias)) {
-            $credential->alias = $this->generateDeviceName($credential);
+        // Only set a name if the user did not type one
+        if (blank($passkey->name)) {
+            $passkey->name = $this->generateDeviceName($passkey);
         }
+    }
+
+    /**
+     * Drop the laragear copy of a removed passkey, so rolling back the move to
+     * laravel/passkeys cannot bring it back.
+     */
+    public function deleted(Passkey $passkey): void
+    {
+        LegacyWebAuthnCredentials::deleteByCredentialId($passkey->credential_id);
     }
 
     /**
      * Generate a friendly device name based on available information.
      */
-    protected function generateDeviceName(WebAuthnCredential $credential): string
+    protected function generateDeviceName(Passkey $passkey): string
     {
         $request = request();
 
@@ -39,9 +49,8 @@ class WebAuthnCredentialObserver
         $baseName = implode(' - ', $parts) ?: 'Passkey';
 
         // Check if user already has a passkey with this name
-        $existingCount = WebAuthnCredential::where('authenticatable_id', $credential->authenticatable_id)
-            ->where('authenticatable_type', $credential->authenticatable_type)
-            ->where('alias', 'LIKE', $baseName.'%')
+        $existingCount = Passkey::where('user_id', $passkey->user_id)
+            ->where('name', 'LIKE', $baseName.'%')
             ->count();
 
         if ($existingCount > 0) {

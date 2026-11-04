@@ -33,7 +33,7 @@ depends_on:
   - path: app/Services/DeviceFingerprintService.php
     reason: fingerprints the browser for the trusted device
 integrations:
-  - WebAuthn (laragear/webauthn), browser credential API
+  - WebAuthn (laravel/passkeys on web-auth/webauthn-lib), browser credential API
   - Mail (NewDeviceLogin notification on first trust of a device; sent synchronously unless auth.magic_link_queue is on, and a send failure is reported without failing the registration)
 steps:
   - action: visit /register
@@ -45,7 +45,7 @@ steps:
   - action: submit attestation (POST webauthn/register)
     expected: 204, credential saved, trusted-device cookie queued; page navigates to /budgets
 postconditions:
-  - user exists and has one WebAuthn credential
+  - user exists and has one passkey
   - a TrustedDevice record exists for this browser (auth_method passkey)
 business_rules:
   - "GET /register?invitation=<token> pre-fills (read-only) the invited email and shows the budget; an invalid token shows invitationError"

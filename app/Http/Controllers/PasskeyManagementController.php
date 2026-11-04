@@ -4,17 +4,17 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Laravel\Passkeys\Passkey;
 
 class PasskeyManagementController extends Controller
 {
     /**
      * Update a passkey's name/alias.
      */
-    public function update(Request $request, WebAuthnCredential $credential): RedirectResponse
+    public function update(Request $request, Passkey $credential): RedirectResponse
     {
         // Verify the credential belongs to the authenticated user
-        if ($credential->authenticatable_id !== $request->user()->id) {
+        if ((string) $credential->user_id !== (string) $request->user()->id) {
             abort(403, 'Unauthorized');
         }
 
@@ -22,10 +22,7 @@ class PasskeyManagementController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        // Use forceFill since alias is not in the model's fillable array
-        $credential->forceFill([
-            'alias' => $validated['name'],
-        ])->save();
+        $credential->update(['name' => $validated['name']]);
 
         return back()->with('status', 'Passkey name updated successfully.');
     }
@@ -33,17 +30,17 @@ class PasskeyManagementController extends Controller
     /**
      * Delete a passkey.
      */
-    public function destroy(Request $request, WebAuthnCredential $credential): RedirectResponse
+    public function destroy(Request $request, Passkey $credential): RedirectResponse
     {
         $user = $request->user();
 
         // Verify the credential belongs to the authenticated user
-        if ($credential->authenticatable_id !== $user->id) {
+        if ((string) $credential->user_id !== (string) $user->id) {
             abort(403, 'Unauthorized');
         }
 
         // Check if this is the user's last passkey
-        $passkeyCount = $user->webAuthnCredentials()->count();
+        $passkeyCount = $user->passkeys()->count();
 
         if ($passkeyCount <= 1) {
             return back()->withErrors([
@@ -51,6 +48,7 @@ class PasskeyManagementController extends Controller
             ]);
         }
 
+        // Deleted as a model so PasskeyObserver also drops the legacy laragear copy.
         $credential->delete();
 
         return back()->with('status', 'Passkey deleted successfully. Remember to remove it from your device\'s password manager if needed.');

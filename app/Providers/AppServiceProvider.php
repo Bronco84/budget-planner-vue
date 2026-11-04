@@ -2,13 +2,13 @@
 
 namespace App\Providers;
 
-use App\Observers\WebAuthnCredentialObserver;
+use App\Observers\PasskeyObserver;
 use App\Services\RecurringTransactionService;
 use Illuminate\Mail\Markdown;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
-use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Laravel\Passkeys\Passkey;
+use Laravel\Passkeys\Passkeys;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,6 +20,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(RecurringTransactionService::class, function ($app) {
             return new RecurringTransactionService;
         });
+
+        // Passkey ceremonies run through the app's WebAuthn controllers
+        // (routes/web.php), which keep the front end's /webauthn/* contract.
+        Passkeys::ignoreRoutes();
     }
 
     /**
@@ -28,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Register observers
-        WebAuthnCredential::observe(WebAuthnCredentialObserver::class);
+        Passkey::observe(PasskeyObserver::class);
 
         // Force HTTPS in production
         if ($this->app->environment('production')) {
@@ -39,15 +43,5 @@ class AppServiceProvider extends ServiceProvider
         // user-authored budget or profile name like "[Verify](https://...)"
         // renders as text instead of a link sent from our domain.
         Markdown::withSecuredEncoding();
-
-        // Allow all authenticated users to register WebAuthn credentials
-        Gate::define('webauthn.register', function ($user) {
-            return true; // All authenticated users can register passkeys
-        });
-
-        // Allow all authenticated users to use WebAuthn for login
-        Gate::define('webauthn.login', function ($user = null) {
-            return true; // Anyone can attempt to login with passkeys
-        });
     }
 }

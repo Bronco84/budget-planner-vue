@@ -314,7 +314,7 @@ const registerPasskey = async () => {
     const options = await optionsResponse.json();
     console.log('Registration options received:', options);
 
-    // The Laragear package returns data directly, not nested in publicKey
+    // The server returns the options directly, not nested in publicKey
     const publicKey = {
       challenge: base64urlToBuffer(options.challenge),
       rp: {

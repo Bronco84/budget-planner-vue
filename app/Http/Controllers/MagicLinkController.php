@@ -91,7 +91,7 @@ class MagicLinkController extends Controller
             $request->session()->put('auth_method', 'magic_link');
 
             // Check if user has any passkeys registered
-            $hasPasskeys = $user->webAuthnCredentials()->exists();
+            $hasPasskeys = $user->passkeys()->exists();
 
             // Redirect with appropriate message
             if (! $hasPasskeys) {

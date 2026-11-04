@@ -3,18 +3,27 @@
 namespace App\Http\Controllers\WebAuthn;
 
 use App\Services\DeviceTokenService;
-use Illuminate\Contracts\Support\Responsable;
+use App\Services\PasskeyRegistrationOptions;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
-use Laragear\WebAuthn\Http\Requests\AttestationRequest;
-use Laragear\WebAuthn\Http\Requests\AttestedRequest;
+use Illuminate\Validation\ValidationException;
+use Laravel\Passkeys\Actions\StorePasskey;
+use Laravel\Passkeys\Exceptions\InvalidPasskeyException;
+use Laravel\Passkeys\Support\WebAuthn;
+use Throwable;
+use Webauthn\PublicKeyCredentialCreationOptions;
 
 use function response;
 
 class WebAuthnRegisterController
 {
+    use ReadsPublicKeyCredential;
+
+    private const SESSION_KEY = 'passkey.registration_options';
+
     protected $deviceTokenService;
 
     public function __construct(DeviceTokenService $deviceTokenService)
@@ -24,82 +33,56 @@ class WebAuthnRegisterController
 
     /**
      * Returns a challenge to be verified by the user device.
+     *
+     * Login is usernameless (no email lookup), so every passkey must be a
+     * discoverable credential the authenticator can offer on its own.
      */
-    public function options(AttestationRequest $request): Responsable
+    public function options(Request $request, PasskeyRegistrationOptions $generate): JsonResponse
     {
         // Ensure user is authenticated
         if (! Auth::check()) {
             abort(401, 'You must be logged in to register a passkey.');
         }
 
-        // Login is usernameless (no email lookup), so every passkey must be a
-        // discoverable credential the authenticator can offer on its own.
-        return $request
-            ->fastRegistration()
-            ->userless()
-            ->toCreate();
+        $options = $generate($request->user());
+
+        $request->session()->put(self::SESSION_KEY, WebAuthn::toJson($options));
+
+        return response()->json(WebAuthn::toBrowserArray($options));
     }
 
     /**
      * Registers a device for further WebAuthn authentication.
      */
-    public function register(AttestedRequest $request): Response|JsonResponse
+    public function register(Request $request, StorePasskey $store): Response|JsonResponse
     {
+        // Ensure user is authenticated
+        if (! Auth::check()) {
+            \Log::error('Passkey registration attempted without authentication');
+            abort(401, 'You must be logged in to register a passkey.');
+        }
+
         // The optional name typed on the registration page. Blank leaves the
-        // alias to WebAuthnCredentialObserver, which names it from the device.
+        // name to PasskeyObserver, which names it from the device.
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $credential = $this->publicKeyCredential($request, 'attestation');
+        $options = $this->pullCeremonyOptions($request, self::SESSION_KEY, PublicKeyCredentialCreationOptions::class, 'attestation');
+        $user = Auth::user();
+
         try {
-            // Ensure user is authenticated
-            if (! Auth::check()) {
-                \Log::error('Passkey registration attempted without authentication');
-                abort(401, 'You must be logged in to register a passkey.');
+            $passkey = $store($user, $validated['name'] ?? '', $credential, $options);
+        } catch (InvalidPasskeyException) {
+            throw ValidationException::withMessages(['attestation' => 'Unable to register this passkey.']);
+        } catch (Throwable $e) {
+            if ($this->isCeremonyFailure($e)) {
+                throw ValidationException::withMessages(['attestation' => 'The passkey could not be verified.']);
             }
 
-            $user = Auth::user();
-            \Log::info('Starting passkey registration', [
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
-
-            // Save the WebAuthn credential
-            // forceFill: alias is not fillable on Laragear's model.
-            $credential = $request->save(array_filter(['alias' => $validated['name'] ?? null]));
-
-            \Log::info('Passkey credential saved', [
-                'user_id' => $user->id,
-                'credential_id' => $credential?->id ?? 'unknown',
-            ]);
-
-            // Refresh the user to ensure the relationship is loaded
-            $user->refresh();
-
-            // Clear any cached relationship data
-            $user->unsetRelation('webAuthnCredentials');
-
-            // Verify the passkey was actually saved
-            $passkeyCount = $user->webAuthnCredentials()->count();
-            \Log::info('User now has passkeys', [
-                'user_id' => $user->id,
-                'passkey_count' => $passkeyCount,
-            ]);
-
-            // Create trusted device token so user stays logged in
-            $device = $this->deviceTokenService->createTrustedDevice($user, $request, 'passkey');
-            Cookie::queue($this->deviceTokenService->createCookie($device));
-
-            \Log::info('Passkey registered and trusted device created successfully', [
-                'user_id' => $user->id,
-                'device_id' => $device->id,
-                'passkey_count' => $passkeyCount,
-            ]);
-
-            return response()->noContent();
-        } catch (\Exception $e) {
             \Log::error('Passkey registration failed', [
-                'user_id' => Auth::id(),
+                'user_id' => $user->id,
                 'exception' => $e,
             ]);
 
@@ -107,5 +90,17 @@ class WebAuthnRegisterController
                 'message' => 'Failed to register passkey. Please try again.',
             ], 500);
         }
+
+        // Create trusted device token so user stays logged in
+        $device = $this->deviceTokenService->createTrustedDevice($user, $request, 'passkey');
+        Cookie::queue($this->deviceTokenService->createCookie($device));
+
+        \Log::info('Passkey registered and trusted device created', [
+            'user_id' => $user->id,
+            'passkey_id' => $passkey->id,
+            'device_id' => $device->id,
+        ]);
+
+        return response()->noContent();
     }
 }

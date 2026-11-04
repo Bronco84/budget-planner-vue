@@ -8,6 +8,7 @@ use App\Services\DeviceFingerprintService;
 use App\Services\DeviceTokenService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 
@@ -35,7 +36,7 @@ test('a user can rename their passkey', function () {
         ->assertRedirect()
         ->assertSessionHas('status');
 
-    expect($passkey->fresh()->alias)->toBe('Work YubiKey');
+    expect($passkey->fresh()->name)->toBe('Work YubiKey');
 });
 
 test('renaming a passkey requires a name', function () {
@@ -46,7 +47,7 @@ test('renaming a passkey requires a name', function () {
         ->patch(route('passkeys.update', $passkey), ['name' => ''])
         ->assertSessionHasErrors('name');
 
-    expect($passkey->fresh()->alias)->toBe('Test key');
+    expect($passkey->fresh()->name)->toBe('Test key');
 });
 
 test('a user cannot rename another users passkey', function () {
@@ -57,7 +58,7 @@ test('a user cannot rename another users passkey', function () {
         ->patch(route('passkeys.update', $passkey), ['name' => 'Hijacked'])
         ->assertForbidden();
 
-    expect($passkey->fresh()->alias)->toBe('Test key');
+    expect($passkey->fresh()->name)->toBe('Test key');
 });
 
 test('a user cannot delete their last passkey', function () {
@@ -68,7 +69,7 @@ test('a user cannot delete their last passkey', function () {
         ->delete(route('passkeys.destroy', $passkey))
         ->assertSessionHasErrors('passkey');
 
-    expect($user->webAuthnCredentials()->count())->toBe(1);
+    expect($user->passkeys()->count())->toBe(1);
 });
 
 test('a user can delete a passkey when another remains', function () {
@@ -80,8 +81,22 @@ test('a user can delete a passkey when another remains', function () {
         ->delete(route('passkeys.destroy', $passkey))
         ->assertSessionHas('status');
 
-    expect($user->webAuthnCredentials()->pluck('id'))->not->toContain($passkey->id)
-        ->and($user->webAuthnCredentials()->count())->toBe(1);
+    expect($user->passkeys()->pluck('id'))->not->toContain($passkey->id)
+        ->and($user->passkeys()->count())->toBe(1);
+});
+
+test('deleting a passkey also removes its legacy laragear copy so a rollback cannot restore it', function () {
+    $user = User::factory()->create();
+    $passkey = createPasskey($user, 'moved-credential');
+    createPasskey($user, 'other-credential');
+    legacyWebAuthnRow($user, 'moved-credential');
+    legacyWebAuthnRow($user, 'other-credential');
+
+    $this->actingAs($user)
+        ->delete(route('passkeys.destroy', $passkey))
+        ->assertSessionHas('status');
+
+    expect(DB::table('webauthn_credentials')->pluck('id')->all())->toBe(['other-credential']);
 });
 
 test('a user cannot delete another users passkey', function () {
@@ -93,7 +108,7 @@ test('a user cannot delete another users passkey', function () {
         ->delete(route('passkeys.destroy', $passkey))
         ->assertForbidden();
 
-    expect($owner->webAuthnCredentials()->count())->toBe(2);
+    expect($owner->passkeys()->count())->toBe(2);
 });
 
 test('a user can revoke one of their trusted devices', function () {

@@ -13,15 +13,15 @@
         "google/apiclient": "^2.0",
         "guzzlehttp/guzzle": "^7.9",
         "inertiajs/inertia-laravel": "^2.0",
-        "laragear/webauthn": "^4.0",
         "laravel/framework": "^12.0",
         "laravel/nova": "^5.0",
+        "laravel/passkeys": "^0.2",
         "laravel/sanctum": "^4.0",
+        "laravel/telescope": "^5.7",
         "laravel/tinker": "^2.10.1",
         "league/flysystem-aws-s3-v3": "^3.29",
         "spatie/laravel-activitylog": "^4.10",
         "spatie/laravel-login-link": "^1.6",
-        "laravel/telescope": "^5.7",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {

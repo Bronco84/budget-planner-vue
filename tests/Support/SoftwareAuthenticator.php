@@ -2,8 +2,8 @@
 
 namespace Tests\Support;
 
+use CBOR\ByteStringObject;
 use InvalidArgumentException;
-use Laragear\WebAuthn\ByteBuffer;
 use OpenSSLAsymmetricKey;
 use RuntimeException;
 
@@ -12,8 +12,9 @@ use RuntimeException;
  *
  * It holds a real EC P-256 key pair (ES256, COSE alg -7) and produces the same
  * payloads a browser + platform authenticator would hand to the app's
- * PasskeyRegister.vue / PasskeyLogin.vue (base64url fields), so Laragear's real
- * attestation and assertion validation pipelines run against it unmodified.
+ * PasskeyRegister.vue / PasskeyLogin.vue (base64url fields), so the real
+ * laravel/passkeys (web-auth/webauthn-lib) attestation and assertion
+ * validation runs against it unmodified.
  *
  * Like a browser, it takes the RP ID from the ceremony options (rp.id / rpId)
  * and falls back to the origin's host when the server omits it.
@@ -74,7 +75,7 @@ final class SoftwareAuthenticator
     }
 
     /**
-     * The public key in the SPKI PEM form Laragear stores on the credential.
+     * The public key as an SPKI PEM (the form laragear/webauthn stored).
      */
     public function publicKeyPem(): string
     {
@@ -113,7 +114,7 @@ final class SoftwareAuthenticator
         $attestationObject = self::cbor([
             'fmt' => 'none',
             'attStmt' => [],
-            'authData' => new ByteBuffer($authenticatorData),
+            'authData' => ByteStringObject::create($authenticatorData),
         ]);
 
         return [
@@ -169,7 +170,7 @@ final class SoftwareAuthenticator
     /**
      * COSE_Key for the EC2 P-256 public key.
      *
-     * @return array<int, int|ByteBuffer>
+     * @return array<int, int|ByteStringObject>
      */
     private function cosePublicKey(): array
     {
@@ -179,8 +180,8 @@ final class SoftwareAuthenticator
             1 => self::COSE_KTY_EC2,
             3 => self::COSE_ALG_ES256,
             -1 => self::COSE_CRV_P256,
-            -2 => new ByteBuffer(str_pad($ec['x'], 32, "\0", STR_PAD_LEFT)),
-            -3 => new ByteBuffer(str_pad($ec['y'], 32, "\0", STR_PAD_LEFT)),
+            -2 => ByteStringObject::create(str_pad($ec['x'], 32, "\0", STR_PAD_LEFT)),
+            -3 => ByteStringObject::create(str_pad($ec['y'], 32, "\0", STR_PAD_LEFT)),
         ];
     }
 
@@ -197,14 +198,14 @@ final class SoftwareAuthenticator
 
     /**
      * Minimal CBOR (RFC 8949) encoder: unsigned/negative ints, text strings,
-     * byte strings (ByteBuffer) and maps (PHP arrays with int or text keys).
+     * byte strings (ByteStringObject) and maps (PHP arrays with int or text keys).
      */
     public static function cbor(mixed $value): string
     {
         return match (true) {
             is_int($value) && $value >= 0 => self::cborHead(0, $value),
             is_int($value) => self::cborHead(1, -1 - $value),
-            $value instanceof ByteBuffer => self::cborHead(2, $value->getDataLength()).$value->getBinaryString(),
+            $value instanceof ByteStringObject => self::cborHead(2, strlen($value->getValue())).$value->getValue(),
             is_string($value) => self::cborHead(3, strlen($value)).$value,
             is_array($value) => self::cborHead(5, count($value)).implode('', array_map(
                 static fn ($key, $item): string => self::cbor($key).self::cbor($item),

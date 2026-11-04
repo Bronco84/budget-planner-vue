@@ -72,7 +72,7 @@ class PasskeyAuthController extends Controller
     public function registerCreate(Request $request): Response
     {
         $user = Auth::user();
-        $hasExistingPasskeys = $user ? $user->webAuthnCredentials()->exists() : false;
+        $hasExistingPasskeys = $user ? $user->passkeys()->exists() : false;
         // Check if this is a new user from query param or if they have no passkeys
         $isNewUser = $request->query('new_user', false) || ($user && ! $hasExistingPasskeys);
 

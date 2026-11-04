@@ -24,8 +24,8 @@ class EnsureUserHasPasskey
             // Refresh the user to ensure we have the latest data
             $user->refresh();
 
-            // Check if user has any WebAuthn credentials
-            $hasPasskeys = $user->webAuthnCredentials()->exists();
+            // Check if user has any passkeys
+            $hasPasskeys = $user->passkeys()->exists();
 
             if (! $hasPasskeys) {
                 // Allow access to passkey registration, sign-out and email verification

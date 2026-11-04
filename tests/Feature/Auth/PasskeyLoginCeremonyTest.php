@@ -8,13 +8,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
-use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Laravel\Passkeys\Passkey;
 use Tests\Support\SoftwareAuthenticator;
 
 /*
  * AUTH-001 / PROFILE-002. The WebAuthn assertion ceremony end to end against a
- * real software authenticator: Laragear's assertion pipeline and the
- * eloquent-webauthn user provider run unmodified.
+ * real software authenticator: laravel/passkeys' VerifyPasskey and
+ * web-auth/webauthn-lib's assertion validation run unmodified.
  */
 
 beforeEach(fn () => useWebAuthnTestRelyingParty());
@@ -67,7 +67,8 @@ test('a valid passkey assertion signs the user in and issues a trusted device co
     $response->assertCookie('device_token', Crypt::decryptString($device->device_token));
 
     // The authenticator's signature counter is persisted for clone detection.
-    expect(WebAuthnCredential::sole()->counter)->toBe(1);
+    expect(Passkey::sole()->credential['counter'])->toBe(1)
+        ->and(Passkey::sole()->last_used_at)->not->toBeNull();
 })->with([
     'with an email, which is ignored' => [true],
     'usernameless (discoverable credential)' => [false],
@@ -105,7 +106,7 @@ test('a tampered or mismatched passkey assertion is rejected with 422 and no ses
     $this->assertGuest();
     expect(TrustedDevice::count())->toBe(0)
         ->and(session('auth.authenticated_at'))->toBeNull()
-        ->and(WebAuthnCredential::sole()->counter)->toBe(0);
+        ->and(Passkey::sole()->credential['counter'])->toBe(0);
 })->with([
     'tampered signature' => [function (SoftwareAuthenticator $authenticator, array $options): array {
         $payload = $authenticator->assert($options, WEBAUTHN_TEST_ORIGIN);
@@ -138,7 +139,7 @@ test('an assertion without a prior challenge is rejected', function () {
     enrolledPasskeyUser($authenticator);
 
     $options = $this->postJson(route('webauthn.login.options'))->json();
-    session()->forget(config('webauthn.challenge.key'));
+    session()->forget('passkey.verification_options');
 
     $this->postJson(route('webauthn.login'), $authenticator->assert($options, WEBAUTHN_TEST_ORIGIN))
         ->assertStatus(422);
@@ -161,7 +162,7 @@ test('a replayed assertion is rejected because the challenge is single use', fun
     $this->assertGuest();
 });
 
-test('a cloned authenticator whose counter does not advance is rejected and the credential disabled', function () {
+test('a cloned authenticator whose counter does not advance is rejected', function () {
     $authenticator = new SoftwareAuthenticator;
     $user = enrolledPasskeyUser($authenticator);
     $clone = clone $authenticator;
@@ -176,12 +177,13 @@ test('a cloned authenticator whose counter does not advance is rejected and the 
     $this->postJson(route('webauthn.login'), passkeyAssertion($clone))->assertStatus(422);
     $this->assertGuest();
 
-    $credential = WebAuthnCredential::sole();
-    expect($credential->isDisabled())->toBeTrue();
+    // The rejected clone did not move the stored counter (laravel/passkeys
+    // rejects the assertion but, unlike laragear, does not disable the passkey).
+    expect(Passkey::sole()->credential['counter'])->toBe(1);
 
-    // The disabled credential can no longer sign in, even from the genuine authenticator.
-    $this->postJson(route('webauthn.login'), passkeyAssertion($authenticator))->assertStatus(422);
-    $this->assertGuest();
+    // The genuine authenticator, whose counter advances, still signs in.
+    $this->postJson(route('webauthn.login'), passkeyAssertion($authenticator))->assertNoContent();
+    $this->assertAuthenticatedAs($user);
 });
 
 test('authenticators that do not implement a signature counter can sign in repeatedly', function () {
@@ -197,7 +199,7 @@ test('authenticators that do not implement a signature counter can sign in repea
         session()->flush();
     }
 
-    expect(WebAuthnCredential::sole()->counter)->toBe(0);
+    expect(Passkey::sole()->credential['counter'])->toBe(0);
 });
 
 test('signing in on a new device sends the alert immediately unless the queue switch is on', function (bool $queue) {

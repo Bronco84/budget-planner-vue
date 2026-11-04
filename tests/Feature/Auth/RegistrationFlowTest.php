@@ -110,7 +110,7 @@ test('a failed passkey attestation returns an error and stores no credential or 
     ]);
 
     expect($response->status())->toBeGreaterThanOrEqual(400)
-        ->and($user->webAuthnCredentials()->count())->toBe(0)
+        ->and($user->passkeys()->count())->toBe(0)
         ->and(TrustedDevice::count())->toBe(0);
     $response->assertCookieMissing('device_token');
 });

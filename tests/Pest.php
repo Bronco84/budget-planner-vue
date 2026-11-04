@@ -1,10 +1,14 @@
 <?php
 
 use App\Models\User;
+use CBOR\Decoder;
+use CBOR\StringStream;
+use Cose\Key\Ec2Key;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Laragear\WebAuthn\Models\WebAuthnCredential;
+use Laravel\Passkeys\Passkey;
 use Tests\Support\SoftwareAuthenticator;
 use Tests\TestCase;
 
@@ -48,19 +52,34 @@ expect()->extend('toBeOne', function () {
 */
 
 /**
- * Persist a WebAuthn credential for the user without running a real ceremony.
+ * Persist a passkey for the user without running a real ceremony (its
+ * credential holds no usable key, so it cannot complete an assertion).
  */
-function createPasskey(User $user, ?string $id = null): WebAuthnCredential
+function createPasskey(User $user, ?string $id = null): Passkey
 {
-    return $user->webAuthnCredentials()->forceCreate([
-        'id' => $id ?? Str::random(32),
+    return $user->passkeys()->create([
+        'name' => 'Test key',
+        'credential_id' => $id ?? Str::random(32),
+        'credential' => ['counter' => 0],
+    ]);
+}
+
+/**
+ * A row in the legacy laragear `webauthn_credentials` table (kept after the
+ * move to laravel/passkeys), standing for the copy a passkey came from.
+ */
+function legacyWebAuthnRow(User $user, string $id): void
+{
+    DB::table('webauthn_credentials')->insert([
+        'id' => $id,
+        'authenticatable_type' => User::class,
+        'authenticatable_id' => $user->id,
         'user_id' => (string) Str::uuid(),
-        'alias' => 'Test key',
-        'counter' => 0,
         'rp_id' => 'localhost',
-        'origin' => 'http://localhost',
-        'public_key' => 'test-public-key',
-        'attestation_format' => 'none',
+        'origin' => 'https://localhost',
+        'public_key' => 'legacy-public-key',
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 }
 
@@ -75,8 +94,8 @@ const WEBAUTHN_TEST_ORIGIN = 'https://budget-planner-vue.test';
 function useWebAuthnTestRelyingParty(): void
 {
     config([
-        'webauthn.relying_party.id' => WEBAUTHN_TEST_RP_ID,
-        'webauthn.origins' => null,
+        'passkeys.relying_party_id' => WEBAUTHN_TEST_RP_ID,
+        'passkeys.allowed_origins' => [WEBAUTHN_TEST_ORIGIN],
     ]);
 }
 
@@ -84,7 +103,7 @@ function useWebAuthnTestRelyingParty(): void
  * Run the full attestation ceremony (register options -> authenticator ->
  * webauthn.register) for the user and return the stored credential.
  */
-function enrolPasskey(User $user, SoftwareAuthenticator $authenticator): WebAuthnCredential
+function enrolPasskey(User $user, SoftwareAuthenticator $authenticator): Passkey
 {
     $options = test()->actingAs($user)
         ->postJson(route('webauthn.register.options'))
@@ -95,7 +114,20 @@ function enrolPasskey(User $user, SoftwareAuthenticator $authenticator): WebAuth
         ->postJson(route('webauthn.register'), $authenticator->attest($options, WEBAUTHN_TEST_ORIGIN))
         ->assertNoContent();
 
-    return WebAuthnCredential::findOrFail($authenticator->credentialId());
+    return Passkey::where('credential_id', $authenticator->credentialId())->firstOrFail();
+}
+
+/**
+ * The passkey's stored COSE public key as an SPKI PEM, to compare with
+ * SoftwareAuthenticator::publicKeyPem().
+ */
+function passkeyPublicKeyPem(Passkey $passkey): string
+{
+    $cose = Decoder::create()
+        ->decode(StringStream::create(SoftwareAuthenticator::b64urlDecode($passkey->credential['credentialPublicKey'])))
+        ->normalize();
+
+    return Ec2Key::create($cose)->asPEM();
 }
 
 /**

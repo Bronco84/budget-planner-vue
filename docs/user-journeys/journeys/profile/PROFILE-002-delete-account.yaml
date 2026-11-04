@@ -46,13 +46,13 @@ steps:
   - action: server checks the email (case-insensitive) and that the session authenticated recently
     expected: if they are the last owner of a shared budget, an email error and nothing changes; otherwise user logged out, shared budgets handed on, unshared budgets destroyed, passkeys and user deleted, session invalidated, redirect to /
 postconditions:
-  - the user record, its WebAuthn credentials, trusted devices, magic-link tokens and calendar connections no longer exist, and each calendar connection's Google grant is revoked
+  - the user record, its passkeys (and any legacy laragear webauthn_credentials rows), trusted devices, magic-link tokens and calendar connections no longer exist, and each calendar connection's Google grant is revoked
   - budgets only the user had access to no longer exist, nor do their attachments, unused S3 objects or Plaid items
   - shared budgets the user primarily owned now belong to the longest-standing other owner (owner or legacy admin member) and keep everything the user added
 business_rules:
   - email is required and must equal the account email, ignoring case
   - "session auth.authenticated_at must be within auth.delete_account_reauth_minutes; otherwise the email error is \"For your security, sign in again before deleting your account.\""
-  - WebAuthn credentials are deleted explicitly (polymorphic, no FK); trusted devices, magic-link tokens, memberships and preferences cascade via FKs
+  - passkeys are deleted explicitly (they also cascade via FK) and the legacy laragear webauthn_credentials rows, kept after the move to laravel/passkeys, are deleted explicitly (polymorphic, no FK); trusted devices, magic-link tokens, memberships and preferences cascade via FKs
   - calendar connections cascade with the user; their Google grants are revoked after the deletion commits, logged and non-blocking (a Google failure never stops the deletion)
   - a shared budget the user primarily owns passes to the longest-standing owner member (budget_user created_at, then id), as leaving would; with no owner member deletion is blocked with "You are the last owner of \"<name>\". Make another member an owner, or delete the budget, before deleting your account." and nothing is changed or logged out
   - an unshared budget is destroyed like BUDGET-005 (attachments, unused S3 objects, Plaid items, activity-log history); activity on shared budgets that live on is kept, as is the user's causer reference in it
@@ -98,10 +98,11 @@ scenarios:
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::signing in with a passkey records the authentication time used by account deletion'
   - id: related_data_cleanup
     kind: integration
-    description: Deleting the user removes their passkeys, trusted devices and magic-link tokens.
+    description: Deleting the user removes their passkeys (and legacy laragear credential rows), trusted devices and magic-link tokens.
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a passkey only user can delete their account by typing their email in a fresh session
+      - tests/Feature/DeleteAccountTest.php::deleting an account also removes the users legacy laragear credentials
   - id: unshared_budgets_destroyed_with_cleanup
     kind: integration
     description: Budgets nobody else shares are destroyed with their attachments, S3 objects and Plaid items.

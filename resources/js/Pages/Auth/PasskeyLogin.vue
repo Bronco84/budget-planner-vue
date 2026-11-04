@@ -200,7 +200,7 @@ const loginWithPasskey = async () => {
       throw new Error('Invalid response from server. Please try again or use the magic link option.');
     }
 
-    // The Laragear package returns the data directly, not nested in publicKey
+    // The server returns the options directly, not nested in publicKey
     // Convert base64url strings to ArrayBuffers
     const publicKey = {
       challenge: base64urlToBuffer(options.challenge),
@@ -221,7 +221,7 @@ const loginWithPasskey = async () => {
 
     console.log('Credential received:', credential);
 
-    // Prepare credential for server (Laragear expects this format)
+    // Prepare credential for server (base64url fields, as WebAuthnLoginController reads them)
     const credentialData = {
       id: credential.id,
       rawId: bufferToBase64url(credential.rawId),

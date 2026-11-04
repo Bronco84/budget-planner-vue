@@ -3,13 +3,13 @@
 use App\Models\TrustedDevice;
 use App\Models\User;
 use Illuminate\Support\Facades\Crypt;
-use Laragear\WebAuthn\Models\WebAuthnCredential;
-use Ramsey\Uuid\Uuid;
+use Laravel\Passkeys\Passkey;
 use Tests\Support\SoftwareAuthenticator;
 
 /*
  * AUTH-002 / AUTH-011. The WebAuthn attestation ceremony end to end against a
- * real software authenticator: Laragear's attestation pipeline is not mocked.
+ * real software authenticator: laravel/passkeys' StorePasskey and
+ * web-auth/webauthn-lib's attestation validation are not mocked.
  */
 
 beforeEach(fn () => useWebAuthnTestRelyingParty());
@@ -31,15 +31,14 @@ test('a new account enrols its first passkey through a real attestation ceremony
     $response = $this->postJson(route('webauthn.register'), $authenticator->attest($options, WEBAUTHN_TEST_ORIGIN))
         ->assertNoContent();
 
-    $credential = WebAuthnCredential::sole();
-    expect($credential->getKey())->toBe($authenticator->credentialId())
-        ->and($credential->authenticatable->is($user))->toBeTrue()
-        ->and($credential->public_key)->toBe($authenticator->publicKeyPem())
-        ->and($credential->rp_id)->toBe(WEBAUTHN_TEST_RP_ID)
-        ->and($credential->origin)->toBe(WEBAUTHN_TEST_ORIGIN)
-        ->and($credential->attestation_format)->toBe('none')
-        ->and($credential->counter)->toBe(0)
-        ->and(Uuid::fromString($credential->user_id)->getHex()->toString())->toBe($options['user']['id']);
+    $passkey = Passkey::sole();
+    expect($passkey->credential_id)->toBe($authenticator->credentialId())
+        ->and($passkey->user->is($user))->toBeTrue()
+        ->and(passkeyPublicKeyPem($passkey))->toBe($authenticator->publicKeyPem())
+        ->and($passkey->credential['attestationType'])->toBe('none')
+        ->and($passkey->credential['counter'])->toBe(0)
+        ->and($passkey->credential['userHandle'])->toBe($options['user']['id'])
+        ->and($options['authenticatorSelection']['residentKey'])->toBe('required');
 
     $device = TrustedDevice::sole();
     expect($device->user_id)->toBe($user->id)
@@ -56,19 +55,19 @@ test('a user who already has a passkey can add a second one', function () {
     $options = $this->actingAs($user)->postJson(route('webauthn.register.options'))->assertOk()->json();
 
     // The existing credential is excluded so the same authenticator can't enrol twice.
-    expect(array_column($options['excludeCredentials'], 'id'))->toBe([$first->getKey()]);
+    expect(array_column($options['excludeCredentials'], 'id'))->toBe([$first->credential_id]);
 
     $second = new SoftwareAuthenticator;
     $this->actingAs($user)
         ->postJson(route('webauthn.register'), $second->attest($options, WEBAUTHN_TEST_ORIGIN))
         ->assertNoContent();
 
-    $credentials = $user->webAuthnCredentials()->get();
-    expect($credentials)->toHaveCount(2)
-        ->and($credentials->modelKeys())->toEqualCanonicalizing([$first->getKey(), $second->credentialId()])
-        ->and($credentials->firstWhere('id', $second->credentialId())->public_key)->toBe($second->publicKeyPem())
-        // Both credentials share the user's WebAuthn user handle.
-        ->and($credentials->pluck('user_id')->unique())->toHaveCount(1);
+    $passkeys = $user->passkeys()->get();
+    expect($passkeys)->toHaveCount(2)
+        ->and($passkeys->pluck('credential_id')->all())->toEqualCanonicalizing([$first->credential_id, $second->credentialId()])
+        ->and(passkeyPublicKeyPem($passkeys->firstWhere('credential_id', $second->credentialId())))->toBe($second->publicKeyPem())
+        // Both passkeys share the user's WebAuthn user handle.
+        ->and($passkeys->pluck('credential.userHandle')->unique())->toHaveCount(1);
 });
 
 test('replaying an attestation for an already registered credential is rejected', function () {
@@ -85,7 +84,7 @@ test('replaying an attestation for an already registered credential is rejected'
         ->assertStatus(422)
         ->assertJsonValidationErrors('attestation');
 
-    expect($user->webAuthnCredentials()->count())->toBe(1);
+    expect($user->passkeys()->count())->toBe(1);
 });
 
 test('an attestation for a different origin or challenge is rejected and stores nothing', function (string $origin, bool $swapChallenge) {
@@ -102,7 +101,7 @@ test('an attestation for a different origin or challenge is rejected and stores 
         ->assertJsonValidationErrors('attestation')
         ->assertCookieMissing('device_token');
 
-    expect(WebAuthnCredential::count())->toBe(0)
+    expect(Passkey::count())->toBe(0)
         ->and(TrustedDevice::count())->toBe(0);
 })->with([
     'foreign origin' => ['https://evil.example', false],
@@ -110,7 +109,7 @@ test('an attestation for a different origin or challenge is rejected and stores 
     'wrong challenge' => [WEBAUTHN_TEST_ORIGIN, true],
 ]);
 
-test('the passkey name typed at registration is saved as its alias', function () {
+test('the passkey name typed at registration is saved as its name', function () {
     $user = User::factory()->create();
     $options = $this->actingAs($user)->postJson(route('webauthn.register.options'))->assertOk()->json();
     $authenticator = new SoftwareAuthenticator;
@@ -122,7 +121,7 @@ test('the passkey name typed at registration is saved as its alias', function ()
         ])
         ->assertNoContent();
 
-    expect(WebAuthnCredential::findOrFail($authenticator->credentialId())->alias)->toBe('Work laptop');
+    expect(Passkey::where('credential_id', $authenticator->credentialId())->sole()->name)->toBe('Work laptop');
 });
 
 test('a blank passkey name falls back to the device name', function () {
@@ -138,7 +137,7 @@ test('a blank passkey name falls back to the device name', function () {
         ])
         ->assertNoContent();
 
-    expect(WebAuthnCredential::findOrFail($authenticator->credentialId())->alias)->toBe('Computer - macOS - Chrome');
+    expect(Passkey::where('credential_id', $authenticator->credentialId())->sole()->name)->toBe('Computer - macOS - Chrome');
 });
 
 test('an over-long passkey name is rejected and nothing is saved', function () {
@@ -154,5 +153,5 @@ test('an over-long passkey name is rejected and nothing is saved', function () {
         ->assertUnprocessable()
         ->assertJsonValidationErrors('name');
 
-    expect(WebAuthnCredential::count())->toBe(0);
+    expect(Passkey::count())->toBe(0);
 });

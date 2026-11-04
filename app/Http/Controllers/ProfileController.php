@@ -29,14 +29,15 @@ class ProfileController extends Controller
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
-            'passkeys' => $user->webAuthnCredentials()
+            'passkeys' => $user->passkeys()
                 ->orderBy('updated_at', 'desc')
                 ->get()
-                ->map(fn ($credential) => [
-                    'id' => $credential->id,
-                    'name' => $credential->alias ?? 'Passkey',
-                    'created_at' => $credential->created_at,
-                    'last_used' => $credential->updated_at,
+                ->map(fn ($passkey) => [
+                    'id' => $passkey->id,
+                    'name' => $passkey->name ?: 'Passkey',
+                    'created_at' => $passkey->created_at,
+                    // Passkeys moved from laragear keep its "last updated" until next used.
+                    'last_used' => $passkey->last_used_at ?? $passkey->updated_at,
                 ]),
             'trustedDevices' => $user->trustedDevices()
                 ->valid()

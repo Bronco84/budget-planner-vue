@@ -7,7 +7,7 @@ priority: high
 summary: >
   From the Passkeys section of the profile page a user can add another passkey
   (PasskeyRegister in AuthenticatedLayout plus the WebAuthn attestation
-  ceremony), rename a passkey's alias, or delete one. Deleting the last remaining
+  ceremony), rename a passkey, or delete one. Deleting the last remaining
   passkey is refused so the account cannot be locked out.
 actors:
   - authenticated user
@@ -24,24 +24,25 @@ depends_on:
   - path: resources/js/Pages/Profile/Partials/ManagePasskeysForm.vue
     reason: list, rename and delete UI
 integrations:
-  - WebAuthn (laragear/webauthn), browser credential API
+  - WebAuthn (laravel/passkeys on web-auth/webauthn-lib), browser credential API
 steps:
   - action: open /profile
-    expected: passkeys listed (alias or "Passkey", created_at, last_used)
+    expected: passkeys listed (name or "Passkey", created_at, last_used = last_used_at, else updated_at for passkeys moved from laragear and not used since)
   - action: add a passkey (link to /passkey/register, then webauthn/register/options + webauthn/register)
     expected: new credential saved, trusted device refreshed, redirect to /budgets
   - action: rename (PATCH /settings/passkeys/{credential} with name)
-    expected: alias updated, back with status
+    expected: name updated, back with status
   - action: delete (DELETE /settings/passkeys/{credential})
-    expected: credential removed, back with status reminding to remove it from the device
+    expected: passkey removed (and its legacy laragear copy, if any), back with status reminding to remove it from the device
 postconditions:
   - the user's credential set reflects the change and at least one passkey remains
 business_rules:
-  - name required, string, max 255; stored with forceFill on alias
+  - name required, string, max 255; stored on passkeys.name
   - a user may not delete their last passkey (errors.passkey)
-  - both mutations abort 403 when the credential's authenticatable_id is not the current user
+  - both mutations abort 403 when the passkey's user_id is not the current user
+  - deleting a passkey also deletes its row in the legacy webauthn_credentials table (PasskeyObserver), so rolling back migration 2026_11_04_000049 cannot bring it back
   - deleting a passkey does not revoke trusted devices
-  - additional passkeys reuse the user's existing WebAuthn user handle (user_id) and the register options list existing credentials in excludeCredentials; a credential id that already exists is rejected
+  - additional passkeys reuse the user's WebAuthn user handle (an HMAC of the user id; passkeys moved from laragear keep the handle they were registered with) and the register options list existing credentials in excludeCredentials; a credential id that already exists is rejected
   - the profile's "Add New Passkey" links pass return=profile; PasskeyRegister then returns to profile.edit (only when the user already has a passkey), otherwise to budgets.index
 scenarios:
   - id: profile_lists_passkeys
@@ -75,10 +76,10 @@ scenarios:
     note: The browser specs run real ceremonies against Chrome's virtual WebAuthn authenticator (local-only E2E).
   - id: registration_name_saved
     kind: happy_path
-    description: The optional name typed on the registration page is sent with the attestation and saved as the credential's alias (nullable string, max 255); blank falls back to the device-derived alias from WebAuthnCredentialObserver.
+    description: The optional name typed on the registration page is sent with the attestation and saved as the passkey's name (nullable string, max 255); blank falls back to the device-derived name from PasskeyObserver.
     coverage: covered
     tests:
-      - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::the passkey name typed at registration is saved as its alias'
+      - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::the passkey name typed at registration is saved as its name'
       - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::a blank passkey name falls back to the device name'
       - 'tests/playwright/passkeys.spec.js::a passkey added from the profile returns to the profile'
       - 'tests/playwright/passkeys.spec.js::a new account must enrol a passkey and then continues to its budgets'
@@ -90,7 +91,7 @@ scenarios:
       - 'tests/Feature/Auth/PasskeyRegistrationCeremonyTest.php::an over-long passkey name is rejected and nothing is saved'
   - id: rename_passkey
     kind: happy_path
-    description: Renaming updates the alias and flashes a status.
+    description: Renaming updates the name and flashes a status.
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can rename their passkey'
@@ -100,6 +101,7 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::a user can delete a passkey when another remains'
+      - 'tests/Feature/Auth/PasskeyAndDeviceManagementTest.php::deleting a passkey also removes its legacy laragear copy so a rollback cannot restore it'
   - id: rename_requires_name
     kind: validation
     description: An empty or over-long name is rejected.

@@ -83,9 +83,12 @@ class AccountDeletionService
             // the scheduled files:cleanup-orphans can retry and reclaim the object.
             File::where('uploaded_by', $user->id)->update(['uploaded_by' => null]);
 
-            // Trusted devices, magic-link tokens, preferences and memberships cascade
-            // via foreign keys; WebAuthn credentials are polymorphic so are removed here.
-            $user->webAuthnCredentials()->delete();
+            // Trusted devices, magic-link tokens, preferences, memberships and
+            // passkeys cascade via foreign keys. The legacy laragear credentials
+            // (kept for the passkeys migration's rollback) are polymorphic, so
+            // their copies of the user's public keys are removed here.
+            $user->passkeys()->delete();
+            LegacyWebAuthnCredentials::deleteForUser($user);
             $user->delete();
         });
 

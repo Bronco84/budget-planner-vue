@@ -64,6 +64,7 @@ business_rules:
   - provider rate-limit/overload/too-large errors map to specific safe messages; anything else to a generic message; raw provider text is never returned
   - when the provider fails or the reply fails validation, the persisted user message is deleted (and a conversation created by that request, if nothing else references it), matching the panel, which drops the turn
   - ChatPanel shows the in-band SSE error message (event.data) when present, otherwise a generic connection error, and falls back to the conversation id it started from
+  - assistant replies render as sanitised markdown that never fetches anything on its own (resources/js/utils/assistantMarkdown.js) - markdown images show only their alt text, raw img/media/style markup is stripped, and links (http, https, mailto only) open in a new tab with rel="noopener noreferrer nofollow" - because the reply can echo prompt-injected transaction text
 scenarios:
   - id: send_returns_reply
     kind: happy_path
@@ -197,6 +198,13 @@ scenarios:
       - 'tests/playwright/chat.spec.js::a stream error event shows the server message, drops the pending turn and restores the input'
       - 'tests/playwright/chat.spec.js::a dropped stream connection shows a generic connection error and restores the input'
     note: Local-only E2E; the stream start and the SSE stream are answered in the browser (in-band error event, and a 503), so no provider is called. The server's safe error events are feature-tested.
+  - id: reply_no_remote_resources
+    kind: authorization
+    description: A reply containing markdown or raw HTML images renders no img element and requests no remote URL; its links open in a new tab with rel noopener noreferrer nofollow.
+    coverage: covered
+    tests:
+      - 'tests/playwright/chat.spec.js::an assistant reply never loads remote images and its links open safely in a new tab'
+    note: Local-only E2E; the stream is answered in the browser, so no provider is called.
   - id: other_users_conversation
     kind: authorization
     description: Sending, streaming or completing into another user's conversation_id returns 404 and does not append to it.

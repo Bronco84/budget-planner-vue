@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { renderAssistantMarkdown } from '@/utils/assistantMarkdown';
 
 const props = defineProps({
     message: {
@@ -14,17 +13,10 @@ const isUser = computed(() => props.message.role === 'user');
 const isAssistant = computed(() => props.message.role === 'assistant');
 const isStreaming = computed(() => props.message.streaming === true);
 
-// Configure marked for better formatting
-marked.setOptions({
-    breaks: true, // Convert \n to <br>
-    gfm: true, // GitHub Flavored Markdown
-});
-
-// Render markdown safely
+// Render markdown safely (no remote images, constrained links)
 const renderedContent = computed(() => {
     if (isAssistant.value) {
-        const html = marked(props.message.content || '');
-        return DOMPurify.sanitize(html);
+        return renderAssistantMarkdown(props.message.content);
     }
     return props.message.content;
 });

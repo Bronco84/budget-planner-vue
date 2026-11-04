@@ -203,7 +203,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **CALENDAR-001** User connects a Google Calendar via OAuth _(implemented, high)_
   - Routes: `calendar.connections.index`, `calendar.connect.google`, `calendar.google.callback`
-  - Tests: `tests/Feature/Calendar/CalendarConnectionTest.php`, `tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php`
+  - Tests: `tests/Feature/Calendar/CalendarConnectionTest.php`, `tests/Feature/Calendar/CalendarTokenEncryptionTest.php`, `tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php`
 - **CALENDAR-002** User syncs, enables/disables or removes a calendar connection _(implemented, medium)_
   - Routes: `calendar.connections.sync`, `calendar.connections.toggle`, `calendar.connections.destroy`
   - Tests: `tests/Feature/Calendar/CalendarConnectionTest.php`, `tests/Feature/Calendar/CalendarSyncTokenRefreshTest.php`, `tests/Feature/Calendar/GoogleCalendarSyncTest.php`

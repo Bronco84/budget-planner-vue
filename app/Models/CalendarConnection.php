@@ -25,6 +25,8 @@ class CalendarConnection extends Model
     ];
 
     protected $casts = [
+        'access_token' => 'encrypted',
+        'refresh_token' => 'encrypted',
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
         'is_active' => 'boolean',

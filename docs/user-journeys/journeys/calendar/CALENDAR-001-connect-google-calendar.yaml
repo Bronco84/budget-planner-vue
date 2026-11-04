@@ -21,6 +21,8 @@ routes:
 depends_on:
   - path: app/Services/GoogleCalendarService.php
     reason: authorization URL, code exchange, calendar lookup, initial syncEvents
+  - path: database/migrations/2026_11_04_000060_encrypt_calendar_connection_tokens.php
+    reason: encrypts Google tokens stored before the encrypted casts
 integrations:
   - Google OAuth 2.0
   - Google Calendar API (calendars.get, events.list)
@@ -39,6 +41,7 @@ business_rules:
   - the callback is behind auth, so the user must still be logged in when Google redirects back
   - the callback is rejected without a token exchange unless its state matches the nonce stored at connect; the nonce is cleared after any callback
   - Google client errors are logged; the user only sees a generic failure message
+  - access and refresh tokens are encrypted at rest (encrypted casts) and hidden from serialization
 scenarios:
   - id: connections_page_renders
     kind: happy_path
@@ -98,6 +101,13 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Calendar/GoogleCalendarConnectFlowTest.php::reconnecting when google omits the refresh token keeps the stored one'
+  - id: tokens_encrypted_at_rest
+    kind: edge
+    description: Stored access and refresh tokens are ciphertext in the database and plaintext through the model; the data migration encrypts older plaintext rows and its rollback restores them.
+    coverage: covered
+    tests:
+      - tests/Feature/Calendar/CalendarTokenEncryptionTest.php::google calendar tokens are encrypted at rest and read back as plaintext
+      - tests/Feature/Calendar/CalendarTokenEncryptionTest.php::the token encryption migration encrypts existing plaintext rows and its rollback restores them
 known_issues: []
 confidence: high
 evidence:

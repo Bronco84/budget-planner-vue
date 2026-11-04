@@ -91,6 +91,24 @@ test('the invitation email tells an existing user to sign in and an unknown emai
         && str_contains($mail->render(), 'Create your account'));
 });
 
+test('markdown in a budget or inviter name is shown as text in the invitation email, not as a link', function () {
+    $this->owner->update(['name' => 'Olive [Reset your password](https://evil.example/reset)']);
+    $this->budget->update(['name' => 'Family [Verify your bank login](https://evil.example/login)']);
+
+    inviteToBudget($this->budget, $this->owner, 'erin@example.com', 'viewer');
+
+    Mail::assertSent(BudgetInvitationMail::class, function (BudgetInvitationMail $mail) {
+        $html = $mail->render();
+
+        expect($html)
+            ->not->toContain('href="https://evil.example')
+            ->toContain('Family [Verify your bank login](https://evil.example/login)')
+            ->toContain('Olive [Reset your password](https://evil.example/reset)');
+
+        return true;
+    });
+});
+
 test('accepting while signed in as a different email is rejected', function () {
     $token = inviteToBudget($this->budget, $this->owner, 'erin@example.com');
     $intruder = User::factory()->create(['email' => 'mallory@example.com']);

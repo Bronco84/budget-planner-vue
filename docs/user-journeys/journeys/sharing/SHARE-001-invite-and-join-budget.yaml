@@ -63,6 +63,7 @@ business_rules:
   - an invitation is void once its inviter no longer owns the budget (removed, demoted, left or deleted); accept rejects it with a validation error on invitation
   - POST invitations is throttled to 10/min (budgets.invitations.store), accept to 10/min, the landing page to 30/min
   - a mail failure keeps the invitation and flashes an error
+  - user-authored names echoed into Markdown mail are Markdown-escaped, so they cannot inject links
 scenarios:
   - id: existing_user_invited_and_accepts
     kind: happy_path
@@ -82,6 +83,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Sharing/BudgetInvitationTest.php::the invitation email tells an existing user to sign in and an unknown email to create an account
+  - id: markdown_in_names_not_rendered
+    kind: edge
+    description: Markdown in a budget or inviter name (e.g. "[Verify](https://evil.example)") appears as text in the invitation email, never as a link (Markdown::withSecuredEncoding in AppServiceProvider).
+    coverage: covered
+    tests:
+      - tests/Feature/Sharing/BudgetInvitationTest.php::markdown in a budget or inviter name is shown as text in the invitation email, not as a link
   - id: guest_returned_to_invitation_after_sign_in
     kind: alternate
     description: A guest opening the link is offered sign in or registration, and budgets.index returns them to the invitation after signing in.

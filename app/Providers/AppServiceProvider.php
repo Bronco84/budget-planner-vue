@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Observers\WebAuthnCredentialObserver;
 use App\Services\RecurringTransactionService;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +34,11 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
+
+        // Escape Markdown in values echoed into Markdown mail ({{ }}), so a
+        // user-authored budget or profile name like "[Verify](https://...)"
+        // renders as text instead of a link sent from our domain.
+        Markdown::withSecuredEncoding();
 
         // Allow all authenticated users to register WebAuthn credentials
         Gate::define('webauthn.register', function ($user) {

@@ -10,6 +10,7 @@ use App\Models\Scenario;
 use App\Models\Transaction;
 use App\Models\TrustedDevice;
 use App\Models\User;
+use App\Services\BudgetSharingService;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -316,6 +317,32 @@ test('a member deleting their account leaves their receipts and scenarios on the
     Storage::disk('s3')->assertExists('hash-carol-receipt');
     Storage::disk('s3')->assertExists('hash-same');
     Storage::disk('s3')->assertMissing('hash-unattached');
+});
+
+test('a removed member deleting their account leaves their receipts and scenarios on the owners budget', function () {
+    Storage::fake('s3');
+    FakePlaidApi::install();
+    $alice = User::factory()->create();
+    $carol = passkeyOnlyUser();
+    $budget = Budget::factory()->create(['user_id' => $alice->id]);
+    $budget->connected_users()->attach($carol->id, ['access_level' => 'editor']);
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    $transaction = Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id]);
+    $receipt = deleteAccountStoredFile($carol, 'hash-carol-receipt');
+    $receiptAttachment = deleteAccountAttach($receipt, $transaction, $carol);
+    $budgetAttachment = deleteAccountAttach($receipt, $budget, $carol);
+    $scenario = Scenario::create(['budget_id' => $budget->id, 'user_id' => $carol->id, 'name' => 'Trip']);
+
+    app(BudgetSharingService::class)->removeMember($budget, $carol);
+
+    deleteAccountFor($carol)->assertSessionHasNoErrors()->assertRedirect('/');
+
+    expect(User::find($carol->id))->toBeNull()
+        ->and($receipt->fresh()->uploaded_by)->toBe($alice->id)
+        ->and($receiptAttachment->fresh()?->attached_by)->toBe($alice->id)
+        ->and($budgetAttachment->fresh()?->attached_by)->toBe($alice->id)
+        ->and($scenario->fresh()?->user_id)->toBe($alice->id);
+    Storage::disk('s3')->assertExists('hash-carol-receipt');
 });
 
 test('deleting an account erases the activity history of its destroyed budgets and keeps that of shared ones', function () {

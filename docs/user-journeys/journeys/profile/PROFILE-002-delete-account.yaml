@@ -51,6 +51,7 @@ business_rules:
   - WebAuthn credentials are deleted explicitly (polymorphic, no FK); trusted devices, magic-link tokens, memberships and preferences cascade via FKs
   - a shared budget the user primarily owns passes to the longest-standing owner member (budget_user created_at, then id), as leaving would; with no owner member deletion is blocked with "You are the last owner of \"<name>\". Make another member an owner, or delete the budget, before deleting your account." and nothing is changed or logged out
   - an unshared budget is destroyed like BUDGET-005 (attachments, unused S3 objects, Plaid items, activity-log history); activity on shared budgets that live on is kept, as is the user's causer reference in it
+  - budgets that live on include any budget holding the user's scenarios or attachments, even one they were removed from or left, not only current memberships
   - on budgets that live on, the user's scenarios (scenarios.user_id), attachments (file_attachments.attached_by) and files (files.uploaded_by) pass to the budget's primary owner; a file whose content the owner already has a record for merges into that record (a duplicate attachment on the same item is dropped); a file attached nowhere is removed with its S3 object when unused
 scenarios:
   - id: account_deleted
@@ -125,6 +126,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a member deleting their account leaves their receipts and scenarios on the owners budget
+  - id: former_member_contributions_kept
+    kind: edge
+    description: A member who was removed from (or left) a budget and later deletes their account still leaves their receipts and scenarios there, reassigned to the owner.
+    coverage: covered
+    tests:
+      - tests/Feature/DeleteAccountTest.php::a removed member deleting their account leaves their receipts and scenarios on the owners budget
   - id: device_cookie_cleared
     kind: integration
     description: The device_token cookie is expired on the deletion response.

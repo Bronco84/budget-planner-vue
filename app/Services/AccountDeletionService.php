@@ -54,8 +54,14 @@ class AccountDeletionService
 
         $this->assertEachSharedBudgetHasAnotherOwner($shared);
 
-        // Budgets that survive the user and keep what they added.
-        $surviving = $shared->pluck('id')->merge($user->linked_budgets()->pluck('budgets.id'))->unique();
+        // Budgets that survive the user and keep what they added: shared ones they
+        // own, ones they are a member of, and any other budget holding their
+        // scenarios or attachments (e.g. one they were removed from or left).
+        $surviving = $shared->pluck('id')
+            ->merge($user->linked_budgets()->pluck('budgets.id'))
+            ->merge($this->budgetsHoldingContributions($user))
+            ->unique()
+            ->diff($unshared->pluck('id'));
 
         $unshared->each(fn (Budget $budget) => $this->budgets->destroy($budget));
 
@@ -85,6 +91,26 @@ class AccountDeletionService
             ->partition(fn (Budget $budget) => $budget->connected_users_count > 0);
 
         return [$shared->values(), $unshared->values()];
+    }
+
+    /**
+     * Ids of every budget holding a scenario or an attachment the user authored,
+     * whatever their current membership.
+     *
+     * @return Collection<int, int>
+     */
+    private function budgetsHoldingContributions(User $user): Collection
+    {
+        $attachments = FileAttachment::where('attached_by', $user->id);
+
+        return Scenario::where('user_id', $user->id)->pluck('budget_id')
+            ->merge((clone $attachments)->where('attachable_type', Budget::class)->pluck('attachable_id'))
+            ->merge(Transaction::whereIn('id', (clone $attachments)
+                ->where('attachable_type', Transaction::class)
+                ->select('attachable_id'))->pluck('budget_id'))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
     }
 
     /**

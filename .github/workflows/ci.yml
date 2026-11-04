@@ -1,5 +1,8 @@
 name: CI
 
+# Runs on the same push to main that Forge quick-deploys, in parallel with the
+# deploy: a red run here reports a problem, it does not stop a release. The
+# gate is the pre-push hook (.githooks/pre-push).
 on:
   push:
     branches: [main]
@@ -26,7 +29,10 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      # A push to main deploys, so a known advisory against composer.lock blocks it.
+      # A known advisory against composer.lock fails this job. CI runs alongside
+      # the Forge deploy that the same push to main triggers and does not gate
+      # it; the pre-push hook (.githooks/pre-push) runs the same audits, Pint,
+      # ESLint and the build before a push to main leaves the machine.
       - name: Audit Composer dependencies
         run: composer audit --locked
 

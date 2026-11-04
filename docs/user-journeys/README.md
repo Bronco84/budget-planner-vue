@@ -197,13 +197,24 @@ already use a custom hooks path. Install manually with
 | Hook | Blocks on | Warns on |
 |---|---|---|
 | `pre-commit` | invalid journey YAML, broken route/test references, stale `INDEX.md`, coverage regression vs baseline, failing affected tests | coverage gaps and stale mappings for affected journeys, unstaged edits that make test results differ from the staged snapshot |
-| `pre-push` | all of the above in `--strict` mode (unmapped routes are errors), new routes without a journey, coverage regressions in the outgoing range, failing affected tests | affected E2E specs not run, dirty working tree |
+| `pre-push` | all of the above in `--strict` mode (unmapped routes are errors), new routes without a journey, coverage regressions in the outgoing range, failing affected tests; on a push to `main`, failing release checks (audits, Pint, ESLint, build) | affected E2E specs not run, dirty working tree |
 
 Pre-commit analyses the **staged index**, not the working tree. Tests,
 however, execute against the working tree; the hook says so when that
-matters. Hooks never modify files or the index.
+matters. Hooks never modify tracked files or the index.
 
-Switches: `git commit --no-verify` (or `JOURNEYS_SKIP=1`) bypasses a hook;
+A push that updates `main` also runs the release checks, because that push
+deploys production (Forge quick-deploy with migrations) and CI runs alongside
+the deploy rather than before it, so CI cannot stop a release:
+`composer audit --locked`, `npm audit --omit=dev` (needs network),
+`vendor/bin/pint --test`, ESLint on `resources/js` (check only, no `--fix`)
+and `npm run build` (writes the git-ignored `public/build`). Every check runs
+and the push is blocked if any fails, listing the failures. They run against
+the working tree, so commit or stash first.
+
+Switches: `git push --no-verify` / `git commit --no-verify` bypasses a hook
+entirely; `JOURNEYS_SKIP=1` skips the journey checks;
+`RELEASE_CHECKS_SKIP=1` skips the pre-push release checks;
 `JOURNEYS_SKIP_TESTS=1` validates and analyses but runs no tests;
 `JOURNEYS_E2E=1` makes pre-push run the affected Playwright specs (they need the
 local Herd site).

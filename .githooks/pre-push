@@ -1,9 +1,15 @@
 #!/bin/sh
-# User journey checks (docs/user-journeys/README.md).
-# Installed by `composer install` via core.hooksPath. Bypass: --no-verify or JOURNEYS_SKIP=1.
+# Pre-push gate: user journey checks (docs/user-journeys/README.md) and, for a
+# push to main, the release checks below.
+# Installed by `composer install` via core.hooksPath.
+# Bypass: --no-verify skips everything; JOURNEYS_SKIP=1 skips the journey checks;
+# RELEASE_CHECKS_SKIP=1 skips the release checks.
+#
+# A push to main deploys production (Forge quick-deploy, with migrations), and
+# CI runs alongside that deploy rather than before it, so this hook is the gate.
 
 # git passes the refs being pushed on stdin; buffer them so both the legacy
-# hook (if any) and the journey checks can read them.
+# hook (if any) and the checks can read them.
 refs="$(cat)"
 
 # Keep any hook that existed in .git/hooks before core.hooksPath was set.
@@ -12,11 +18,61 @@ if [ -x "$legacy" ]; then
     printf '%s\n' "$refs" | "$legacy" "$@" || exit $?
 fi
 
-[ "$JOURNEYS_SKIP" = "1" ] && exit 0
-
-if ! command -v php >/dev/null 2>&1; then
-    echo "journeys: php not found; skipping pre-push checks" >&2
-    exit 0
+if [ "$JOURNEYS_SKIP" != "1" ]; then
+    if command -v php >/dev/null 2>&1; then
+        printf '%s\n' "$refs" | php bin/journeys hook pre-push "$@" || exit $?
+    else
+        echo "journeys: php not found; skipping journey checks" >&2
+    fi
 fi
 
-printf '%s\n' "$refs" | php bin/journeys hook pre-push "$@"
+[ "$RELEASE_CHECKS_SKIP" = "1" ] && exit 0
+
+# Release checks only gate pushes that update main (the deploy branch);
+# deleting a remote branch sends an all-zero local sha.
+deploys=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$remote_ref" = "refs/heads/main" ] || continue
+    case "$local_sha" in
+        ''|*[!0]*) [ -n "$local_sha" ] && deploys=1 ;;
+    esac
+done <<EOF
+$refs
+EOF
+[ "$deploys" = "1" ] || exit 0
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "release: ! uncommitted changes; checks run against the working tree, not the pushed commit" >&2
+fi
+
+failed=""
+check() {
+    name="$1"
+    shift
+    echo "release: $name ($*)"
+    started=$(date +%s)
+    if ! "$@"; then
+        failed="$failed
+  - $name: $*"
+    fi
+    echo ""
+    echo "release: $name took $(( $(date +%s) - started ))s"
+}
+
+check "Composer audit" composer audit --locked --no-interaction
+check "npm audit" npm audit --omit=dev
+check "Pint" vendor/bin/pint --test
+# Check only, never --fix (same target as `npm run lint`); --quiet prints errors only.
+check "ESLint" npx --no-install eslint --quiet resources/js
+check "Vite build" npx --no-install vite build --logLevel warn
+
+if [ -n "$failed" ]; then
+    echo "" >&2
+    echo "Push blocked: release checks failed:$failed" >&2
+    echo "A push to main deploys production. Fix the above (or bypass with RELEASE_CHECKS_SKIP=1 / --no-verify)." >&2
+    exit 1
+fi
+
+echo "release: all checks passed"

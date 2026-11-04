@@ -14,6 +14,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
 
+use function Illuminate\Support\defer;
+
 class MagicLinkController extends Controller
 {
     public function __construct(
@@ -35,7 +37,9 @@ class MagicLinkController extends Controller
     /**
      * Send a magic link to the user's email. The response is identical whether
      * or not the address has an account, so the form cannot be used to
-     * enumerate registered emails.
+     * enumerate registered emails. The lookup and the send run after the
+     * response is sent, so a registered address does not answer slower (by the
+     * token insert and mail-provider round trip) than an unknown one.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -43,20 +47,25 @@ class MagicLinkController extends Controller
             'email' => 'required|email',
         ]);
 
-        $user = User::where('email', $validated['email'])->first();
+        $email = $validated['email'];
 
-        if ($user) {
+        defer(static function () use ($email) {
+            $user = User::where('email', $email)->first();
+
+            if (! $user) {
+                return;
+            }
+
             try {
-                $this->magicLinkService->sendMagicLink($user);
+                app(MagicLinkService::class)->sendMagicLink($user);
             } catch (Throwable $e) {
-                // Respond exactly as on success so a mail outage cannot be used
-                // to tell registered addresses apart from unknown ones.
+                // A mail outage must not change the (already sent) response.
                 Log::error('Magic link email could not be sent', [
                     'user_id' => $user->id,
                     'exception' => $e,
                 ]);
             }
-        }
+        });
 
         return back()->with('status', 'If an account exists for that email, a sign-in link is on its way.');
     }

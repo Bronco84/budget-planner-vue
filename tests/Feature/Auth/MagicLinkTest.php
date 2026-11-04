@@ -3,6 +3,8 @@
 use App\Mail\MagicLinkEmail;
 use App\Models\MagicLinkToken;
 use App\Models\User;
+use Illuminate\Foundation\Http\Events\RequestHandled;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -180,6 +182,26 @@ test('an unknown email gets the same response as a known one and no mail is sent
 
     Mail::assertSent(MagicLinkEmail::class, 1);
     Mail::assertSent(MagicLinkEmail::class, fn ($mail) => $mail->hasTo($user->email));
+});
+
+test('the magic link lookup and send run after the response, so a known email answers no slower', function () {
+    Mail::fake();
+    $user = User::factory()->create();
+
+    // RequestHandled fires once the response is built, before the kernel
+    // terminates; work deferred with afterResponse() runs only after it.
+    $atResponse = null;
+    Event::listen(RequestHandled::class, function () use (&$atResponse) {
+        $atResponse = ['mails' => count(Mail::sent(MagicLinkEmail::class)), 'tokens' => MagicLinkToken::count()];
+    });
+
+    $this->from(route('magic-link.request'))
+        ->post(route('magic-link.store'), ['email' => $user->email])
+        ->assertRedirect(route('magic-link.request'));
+
+    expect($atResponse)->toBe(['mails' => 0, 'tokens' => 0]);
+    Mail::assertSent(MagicLinkEmail::class, 1);
+    expect(MagicLinkToken::count())->toBe(1);
 });
 
 test('the login page receives the invalid magic link error so it can be shown', function () {

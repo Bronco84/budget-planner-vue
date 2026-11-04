@@ -26,12 +26,12 @@ depends_on:
   - path: config/auth.php
     reason: magic_link_expiry_minutes and magic_link_queue (env MAGIC_LINK_QUEUE, default false)
 integrations:
-  - Mail (MagicLinkEmail sent synchronously, or queued when auth.magic_link_queue is on)
+  - Mail (MagicLinkEmail sent in-process after the response, or queued when auth.magic_link_queue is on)
 steps:
   - action: follow "Send me a magic link" from the login page (GET /magic-link)
     expected: Auth/MagicLinkRequest page rendered
   - action: submit email (POST /magic-link)
-    expected: 64-char token generated, sha256 hash stored with 15 min expiry, email sent, back with status "If an account exists for that email, a sign-in link is on its way."
+    expected: back with status "If an account exists for that email, a sign-in link is on its way."; after the response is sent (Laravel defer()), the user is looked up and, if found, a 64-char token is generated, its sha256 hash stored with 15 min expiry and the email sent
   - action: open the link (GET /magic-link/authenticate?token=..&email=..)
     expected: token marked used, user logged in, session regenerated, auth_method=magic_link stored in session
   - action: post-login redirect
@@ -41,6 +41,7 @@ postconditions:
   - the magic link token has used_at set
 business_rules:
   - email is validated for format only; the response is identical whether or not an account exists, and a link is only generated and mailed for an existing user
+  - the user lookup, token insert and mail send run after the response (defer()), so a registered email does not answer slower than an unknown one
   - POST /magic-link throttled 6/min; GET /magic-link/authenticate throttled 10/min
   - expiry configurable via auth.magic_link_expiry_minutes (default 15)
   - auth.magic_link_queue (env MAGIC_LINK_QUEUE, default false) queues the email instead of sending it synchronously; enable only once a queue worker is running, since magic links are the fallback sign-in
@@ -84,9 +85,15 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/MagicLinkTest.php::a mail transport failure still returns the neutral status and is logged'
+  - id: send_deferred_until_after_response
+    kind: edge
+    description: No token is stored and no mail sent before the response is built; both happen when the request terminates, so response time does not reveal registered emails.
+    coverage: covered
+    tests:
+      - 'tests/Feature/Auth/MagicLinkTest.php::the magic link lookup and send run after the response, so a known email answers no slower'
   - id: mail_sent_synchronously_by_default
     kind: alternate
-    description: With the queue flag off the email is sent during the request and nothing is queued.
+    description: With the queue flag off the email is sent in-process (after the response) and nothing is queued.
     coverage: covered
     tests:
       - 'tests/Feature/Auth/MagicLinkTest.php::the magic link email is sent synchronously when the queue flag is off'
@@ -120,8 +127,7 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/MagicLinkFlowTest.php::magic link routes redirect an authenticated user to the dashboard'
-known_issues:
-  - while auth.magic_link_queue is off (the default until production runs a queue worker) the mail is sent synchronously only for existing accounts, so response timing can still hint whether an email is registered; enabling the flag resolves this.
+known_issues: []
 confidence: high
 evidence:
   - routes/auth.php guest group

@@ -53,6 +53,17 @@ This project uses **Laravel Herd** for local development:
 - **Herd and Vite are assumed to be running** - They provide the web server and hot module replacement for instant page updates
 - **Always use the .test domain** for all local development and testing
 
+## Production Deploy Requirements
+
+- **Laravel scheduler cron**: production must run `* * * * * php artisan schedule:run`
+  (a Forge "Scheduler" job on the site, run as the site user from the release directory).
+  `routes/console.php` schedules `telescope:prune --hours=48` daily; without the cron
+  it never runs and `telescope_entries` grows without bound. Nothing in the repo
+  provisions this cron, so check it exists in Forge after any server or site rebuild.
+- Still owner steps outside the repo (not done by any commit): confirm or add that Forge
+  scheduler, and run `php artisan telescope:prune --hours=48` once after the deploy that
+  narrowed Telescope recording, to clear the backlog recorded before it.
+
 ## Development Commands
 ```bash
 # Clear Laravel caches (when needed)

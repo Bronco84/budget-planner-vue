@@ -44,7 +44,7 @@ steps:
   - action: preview active rules (GET .../rules/preview)
     expected: RecurringTransactions/Rules/Preview lists unlinked last-90-day transactions matching ALL active rules; hasActiveRules false when none
   - action: apply rules (POST .../rules/apply)
-    expected: matching unlinked transactions linked; flash "Successfully linked N transactions..." or "No matching transactions found."
+    expected: matching unlinked transactions linked; flash (message) "Successfully linked N transactions..." or "No matching transactions found.", toasted by the rules index and preview pages
   - action: edit or delete a rule (PATCH/DELETE .../rules/{rule})
     expected: links re-evaluated with RecurringTransactionRule::matchesTransaction; redirect to the rules index (like store and apply) with linked/unlinked counts. Deleting the last rule leaves existing links untouched
 postconditions:
@@ -54,6 +54,7 @@ business_rules:
   - preview and apply only consider unlinked transactions on the template's account dated within the last 90 days
   - a template whose account was deleted (account_id null) has nothing to test, preview or apply against; those actions return empty results instead of erroring
   - store, update, destroy and apply all redirect to the rules index
+  - apply's outcome (including "No active rules to apply.") is flashed under the shared message key; Rules/Index and Rules/Preview toast it with toast.flash in onSuccess
   - field must be description, amount or category; operator must be one of the seven supported operators
   - "{rule} is scoped to the template and the template to the budget, so foreign ids return 404"
   - index, test and preview need budget view; store, update, destroy and apply need budget update
@@ -95,7 +96,7 @@ scenarios:
       - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::a stored regex rule that does not compile matches nothing instead of erroring
   - id: preview_without_active_rules
     kind: empty_state
-    description: Preview with no active rules renders hasActiveRules false; apply redirects with "No active rules to apply".
+    description: Preview with no active rules renders hasActiveRules false; apply redirects with the message "No active rules to apply." (flashed under the shared message key so it is toasted).
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringRuleManagementTest.php::with no active rules preview reports none and apply links nothing

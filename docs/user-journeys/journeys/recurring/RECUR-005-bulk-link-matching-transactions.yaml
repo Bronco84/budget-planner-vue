@@ -28,7 +28,7 @@ steps:
   - action: pick an older range in the selector, or "Show older transactions" from the empty state (GET ...?months=24|36|all)
     expected: the page reloads with suggestions from that range; selections start over
   - action: select transactions and submit (POST .../link-transactions)
-    expected: selected, still-unlinked transactions linked; redirect to index with "Successfully linked N transaction(s)..." or info "No transactions were linked."
+    expected: selected, still-unlinked transactions linked; redirect to index flashing (under message) "Successfully linked N transaction(s)..." or "No transactions were linked.", which the page toasts
 postconditions:
   - chosen transactions carry the template id
 business_rules:
@@ -38,6 +38,7 @@ business_rules:
   - already-linked transactions are skipped, never re-linked
   - selected suggestions are linked with link_source manual (the user chose them), so rule re-evaluation never removes them
   - find-matching needs budget view; link-transactions needs budget update
+  - the outcome is flashed under the shared message key and toasted by FindMatchingTransactions (toast.flash in onSuccess), because the recurring index doesn't render flashes
 scenarios:
   - id: review_and_link
     kind: happy_path

@@ -133,7 +133,7 @@ test('with no active rules preview reports none and apply links nothing', functi
     $this->actingAs($this->user)
         ->post(route('recurring-transactions.rules.apply', $params))
         ->assertRedirect(route('recurring-transactions.rules.index', $params))
-        ->assertSessionHas('warning', 'No active rules to apply');
+        ->assertSessionHas('message', 'No active rules to apply.');
 
     expect($transaction->fresh()->recurring_transaction_template_id)->toBeNull();
 });

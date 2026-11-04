@@ -68,7 +68,7 @@ test('an owner reviews suggested matches and links a selection', function () {
             'selections' => [['template_id' => $template->id, 'transaction_ids' => [$first->id]]],
         ])
         ->assertRedirect(route('recurring-transactions.index', $this->budget->id))
-        ->assertSessionHas('success', 'Successfully linked 1 transaction to recurring templates.');
+        ->assertSessionHas('message', 'Successfully linked 1 transaction to recurring templates.');
 
     expect($first->fresh()->recurring_transaction_template_id)->toBe($template->id)
         ->and($second->fresh()->recurring_transaction_template_id)->toBeNull();
@@ -193,7 +193,7 @@ test('an already linked transaction is not re-linked and nothing is reported as 
         ])
         ->assertRedirect(route('recurring-transactions.index', $this->budget->id))
         ->assertSessionMissing('success')
-        ->assertSessionHas('info', 'No transactions were linked.');
+        ->assertSessionHas('message', 'No transactions were linked.');
 
     expect($linked->fresh()->recurring_transaction_template_id)->toBe($original->id);
 });

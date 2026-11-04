@@ -139,6 +139,9 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ArrowLeftIcon, CheckIcon, ExclamationTriangleIcon as ExclamationIcon, InformationCircleIcon } from '@heroicons/vue/24/solid';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 const props = defineProps({
     budget: Object,
@@ -162,6 +165,8 @@ const applyRules = () => {
         budget: props.budget.id,
         recurring_transaction: props.recurringTransaction.id
     }), {
+        // The outcome (linked count, or nothing to apply) is flashed; show it.
+        onSuccess: (visited) => toast.flash(visited),
         onFinish: () => {
             isApplying.value = false;
         }

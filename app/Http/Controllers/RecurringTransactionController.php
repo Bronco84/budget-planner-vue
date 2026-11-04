@@ -733,11 +733,11 @@ class RecurringTransactionController extends Controller
 
             return redirect()
                 ->route('recurring-transactions.index', $budget->id)
-                ->with('success', $message);
+                ->with('message', $message);
         }
 
         return redirect()
             ->route('recurring-transactions.index', $budget->id)
-            ->with('info', 'No transactions were linked.');
+            ->with('message', 'No transactions were linked.');
     }
 }

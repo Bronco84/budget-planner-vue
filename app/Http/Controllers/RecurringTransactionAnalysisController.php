@@ -174,14 +174,12 @@ class RecurringTransactionAnalysisController extends Controller
                     count($result['errors'])
                 );
 
-                return $redirect->with('error', $response['message'])
-                    ->with('template_creation_result', $response);
+                return $redirect->with('error', $response['message']);
             }
 
             $response['message'] = 'Successfully created '.$result['created_templates'].' recurring transaction templates.';
 
-            return $redirect->with('message', $response['message'])
-                ->with('template_creation_result', $response);
+            return $redirect->with('message', $response['message']);
 
         } catch (\Exception $e) {
             Log::error('Template creation failed', [

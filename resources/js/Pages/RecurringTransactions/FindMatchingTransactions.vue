@@ -179,6 +179,9 @@ import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, computed, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCurrency } from '@/utils/format.js';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 const props = defineProps({
   budget: Object,
@@ -269,6 +272,8 @@ const linkSelected = () => {
     route('recurring-transactions.link-transactions', props.budget.id),
     { selections },
     {
+      // The outcome is flashed onto the recurring index, which doesn't render flashes.
+      onSuccess: (visited) => toast.flash(visited),
       onFinish: () => {
         isLinking.value = false;
       },

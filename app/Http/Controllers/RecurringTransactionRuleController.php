@@ -239,7 +239,7 @@ class RecurringTransactionRuleController extends Controller
 
         if ($rules->isEmpty()) {
             return redirect()->route('recurring-transactions.rules.index', ['budget' => $budget, 'recurring_transaction' => $recurring_transaction])
-                ->with('warning', 'No active rules to apply');
+                ->with('message', 'No active rules to apply.');
         }
 
         $transactions = $this->recentUnlinkedAccountTransactions($recurring_transaction);

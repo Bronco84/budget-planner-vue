@@ -275,6 +275,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } fro
 import { ArrowLeftIcon, CheckIcon, ExclamationTriangleIcon as ExclamationIcon } from '@heroicons/vue/24/solid';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import RecurringTransactionRuleForm from '../Partials/RecurringTransactionRuleForm.vue';
+import { useToast } from '@/composables/useToast';
 
 export default {
     components: {
@@ -301,6 +302,8 @@ export default {
     },
     
     setup(props) {
+        const toast = useToast();
+
         // Edit mode
         const isEditing = ref(false);
         const selectedRule = ref(null);
@@ -392,7 +395,9 @@ export default {
             useForm().post(route('recurring-transactions.rules.apply', {
                 budget: props.budget.id,
                 recurring_transaction: props.recurringTransaction.id
-            }), {}, {
+            }), {
+                // The outcome (linked count, or nothing to apply) is flashed; show it.
+                onSuccess: (visited) => toast.flash(visited),
                 onFinish: () => {
                     isApplying.value = false;
                     showApplyRulesModal.value = false;

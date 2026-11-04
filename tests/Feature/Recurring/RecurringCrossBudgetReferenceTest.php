@@ -135,7 +135,7 @@ test('bulk linking links the selected transactions of the budget', function () {
             ],
         ])
         ->assertSessionHasNoErrors()
-        ->assertSessionHas('success', 'Successfully linked 1 transaction to recurring templates.');
+        ->assertSessionHas('message', 'Successfully linked 1 transaction to recurring templates.');
 
     expect($own->fresh()->recurring_transaction_template_id)->toBe($template->id);
 });

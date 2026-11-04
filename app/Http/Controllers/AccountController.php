@@ -226,7 +226,7 @@ class AccountController extends Controller
     /**
      * Remove the specified account from storage.
      */
-    public function destroy(Budget $budget, Account $account): RedirectResponse
+    public function destroy(Request $request, Budget $budget, Account $account, PlaidService $plaidService): RedirectResponse
     {
         $this->authorize('delete', $account);
 
@@ -244,8 +244,18 @@ class AccountController extends Controller
             return back()->with('error', 'Cannot delete account with existing transactions.');
         }
 
-        // Delete the account
+        // The plaid_accounts row cascades with the account; the connection and
+        // its Item at Plaid do not, so clean them up when this was their last
+        // account, as unlinking does. Bank connections are owner-only
+        // (manageConnections): when an editor deletes the account, the empty
+        // connection is left for the owner to remove.
+        $plaidConnection = $account->plaidAccount?->plaidConnection;
+
         $account->delete();
+
+        if ($plaidConnection && $request->user()->can('manageConnections', $budget)) {
+            $plaidService->deleteConnectionIfEmpty($plaidConnection);
+        }
 
         return redirect()->route('budgets.show', $budget)
             ->with('message', 'Account deleted successfully');

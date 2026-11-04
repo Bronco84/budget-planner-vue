@@ -26,6 +26,7 @@ depends_on:
     reason: maps institution names to domains for the favicon logo
 integrations:
   - Google S2 favicon service (logo URL only; not fetched server-side)
+  - Plaid /item/remove (best effort) when a deleted account was its connection's last account
 steps:
   - action: visit /budgets/{budget}/accounts/{account}/edit
     expected: Accounts/Edit rendered with the account and its Plaid connection
@@ -42,6 +43,7 @@ business_rules:
   - logo_url must be a URL (max 500, matching the VARCHAR(500) column)
   - custom_logo is optional; when present it must be a base64 data:image/(png|jpeg|gif|webp|svg+xml) URL or an https URL, at most 65535 characters (the TEXT column size)
   - accounts with any transactions cannot be deleted; an account that is part of a transfer is refused with "This account has transfers. Delete its transfers first, then delete the account."
+  - deleting a Plaid-linked account deletes its plaid_accounts row (FK cascade); when that leaves its PlaidConnection with no accounts, the connection is deleted and its Item removed at Plaid (PlaidService::deleteConnectionIfEmpty, the same path as unlinking), but only when the deleting user may manage bank connections (owner, BudgetPolicy::manageConnections); an editor's delete leaves the empty connection and its Item for the owner; a Plaid failure is logged and the local delete still succeeds
   - fetch-logo falls back to the account name when there is no Plaid institution, and flashes an error when no domain mapping exists
 scenarios:
   - id: edit_form_renders
@@ -94,6 +96,16 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Accounts/AccountManagementTest.php::an account with no transactions is deleted and the owner returns to the dashboard
+  - id: delete_plaid_linked_account_cleans_connection
+    kind: integration
+    description: Deleting the last account of a Plaid connection removes the connection and its Item at Plaid; a connection with other accounts is kept with no Plaid call; a Plaid failure still deletes locally; an editor's delete leaves the connection and Item for the owner; a manual account makes no Plaid call.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountDeletePlaidCleanupTest.php::deleting the last account of a Plaid connection removes the connection and its Plaid item
+      - tests/Feature/Accounts/AccountDeletePlaidCleanupTest.php::deleting one of several accounts on a Plaid connection keeps the connection and its Plaid item
+      - tests/Feature/Accounts/AccountDeletePlaidCleanupTest.php::a Plaid failure removing the item still deletes the account and its connection locally
+      - tests/Feature/Accounts/AccountDeletePlaidCleanupTest.php::an editor deleting the last account of a Plaid connection leaves the connection and its Plaid item for the owner
+      - tests/Feature/Accounts/AccountDeletePlaidCleanupTest.php::deleting a manual account makes no Plaid call
   - id: delete_blocked_with_transactions
     kind: edge
     description: Deleting an account that has transactions is refused with an error flash.

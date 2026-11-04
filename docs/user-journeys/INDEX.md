@@ -41,7 +41,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | Journey | Name | Priority | Happy | Negative | Authz | Alternate | Integration | E2E | Status |
 |---|---|---|---|---|---|---|---|---|---|
 | [ACCOUNT-001](journeys/accounts/ACCOUNT-001-add-manual-account.yaml) | Owner adds a manual account to a budget | critical | yes | yes | yes | yes | yes | no | **covered** |
-| [ACCOUNT-002](journeys/accounts/ACCOUNT-002-edit-or-remove-account.yaml) | Owner edits account details, logo, or removes the account | high | yes | yes | yes | yes | missing | no | **covered** |
+| [ACCOUNT-002](journeys/accounts/ACCOUNT-002-edit-or-remove-account.yaml) | Owner edits account details, logo, or removes the account | high | yes | yes | yes | yes | yes | no | **covered** |
 | [ACCOUNT-003](journeys/accounts/ACCOUNT-003-configure-autopay.yaml) | Owner configures credit-card autopay from a checking or savings account | medium | yes | yes | yes | yes | missing | no | **covered** |
 | [ADMIN-001](journeys/admin/ADMIN-001-nova-admin-panel.yaml) | Administrator manages application data in the Nova panel | medium | yes | yes | yes | missing | yes | no | **covered** |
 | [ADMIN-002](journeys/admin/ADMIN-002-review-flagged-chat-messages.yaml) | Administrator reviews flagged chat messages in Nova | low | yes | yes | yes | missing | yes | no | **covered** |
@@ -130,7 +130,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Accounts/ManualAccountTest.php`
 - **ACCOUNT-002** Owner edits account details, logo, or removes the account _(implemented, high)_
   - Routes: `budgets.accounts.edit`, `budgets.accounts.update`, `accounts.fetchLogo`, `accounts.clearLogo`, `budgets.accounts.destroy`
-  - Tests: `tests/Feature/Accounts/AccountEditTest.php`, `tests/Feature/Accounts/AccountManagementTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`
+  - Tests: `tests/Feature/Accounts/AccountDeletePlaidCleanupTest.php`, `tests/Feature/Accounts/AccountEditTest.php`, `tests/Feature/Accounts/AccountManagementTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`
 - **ACCOUNT-003** Owner configures credit-card autopay from a checking or savings account _(implemented, medium)_
   - Routes: `accounts.updateAutopay`
   - Tests: `tests/Feature/Accounts/AutopayCrossBudgetTest.php`, `tests/Feature/Accounts/AutopayValidationTest.php`

@@ -336,6 +336,30 @@ class PlaidService
     }
 
     /**
+     * Delete a connection that no longer has any accounts and remove its Item at
+     * Plaid, so the Item stops being billed. Returns whether it was deleted.
+     */
+    public function deleteConnectionIfEmpty(PlaidConnection $connection): bool
+    {
+        if ($connection->hasAccounts()) {
+            return false;
+        }
+
+        Log::info('Cleaning up orphaned PlaidConnection', [
+            'connection_id' => $connection->id,
+            'institution_name' => $connection->institution_name,
+            'budget_id' => $connection->budget_id,
+        ]);
+
+        $connection->delete();
+
+        // Revoke the access token at Plaid; a failure is logged, not shown.
+        $this->removeConnectionItem($connection);
+
+        return true;
+    }
+
+    /**
      * Best-effort removal of a connection's item at Plaid. A failure is logged and
      * never thrown, so it cannot block the local delete that triggered it.
      */

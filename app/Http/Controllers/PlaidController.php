@@ -849,18 +849,7 @@ class PlaidController extends Controller
         $plaidAccount->delete();
 
         // Check if the connection has no remaining accounts and clean it up
-        if ($plaidConnection && ! $plaidConnection->hasAccounts()) {
-            Log::info('Cleaning up orphaned PlaidConnection', [
-                'connection_id' => $plaidConnection->id,
-                'institution_name' => $plaidConnection->institution_name,
-                'budget_id' => $budget->id,
-            ]);
-
-            $plaidConnection->delete();
-
-            // Revoke the access token at Plaid; a failure is logged, not shown.
-            $this->plaidService->removeConnectionItem($plaidConnection);
-
+        if ($plaidConnection && $this->plaidService->deleteConnectionIfEmpty($plaidConnection)) {
             return redirect()->back()->with('message',
                 'Account unlinked from Plaid. Connection to '.$plaidConnection->institution_name.' was also removed as it had no remaining accounts.');
         }

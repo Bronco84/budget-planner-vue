@@ -105,6 +105,13 @@ scenarios:
     tests:
       - tests/playwright/payoff.spec.js::pressing Enter on the strategy step advances to Goals instead of creating the plan
     note: Local-only E2E against the Herd site with a throwaway user and budget.
+  - id: remove_goal_keeps_amounts
+    kind: edge
+    description: Removing a goal leaves the remaining goals' target and monthly contribution with their own values, and the plan is stored with them (priorities renumbered).
+    coverage: covered
+    tests:
+      - tests/playwright/payoff.spec.js::removing a goal keeps the other goals' target and contribution amounts
+    note: Local-only E2E against the Herd site with a throwaway user and budget.
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot list, open the wizard for or store plans in a budget they do not own (403).

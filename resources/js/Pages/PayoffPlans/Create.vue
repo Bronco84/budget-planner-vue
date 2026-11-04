@@ -438,7 +438,7 @@
                             <span class="text-gray-500 sm:text-sm">$</span>
                           </div>
                           <input
-                            v-model.number="goalTargetDollars[index]"
+                            v-model.number="goal.target_dollars"
                             type="number"
                             step="0.01"
                             min="0"
@@ -456,7 +456,7 @@
                             <span class="text-gray-500 sm:text-sm">$</span>
                           </div>
                           <input
-                            v-model.number="goalContributionDollars[index]"
+                            v-model.number="goal.contribution_dollars"
                             type="number"
                             step="0.01"
                             min="0"
@@ -630,8 +630,7 @@ const form = useForm({
 // Helper refs for dollar amounts (easier for users)
 const extraPaymentDollars = ref(0);
 const minimumPaymentDollars = ref({});
-const goalTargetDollars = ref({});
-const goalContributionDollars = ref({});
+const toCents = (dollars) => Math.round((dollars || 0) * 100);
 
 // Watch dollar amounts and convert to cents
 watch(extraPaymentDollars, (value) => {
@@ -646,19 +645,12 @@ watch(minimumPaymentDollars, (values) => {
   });
 }, { deep: true });
 
-watch(goalTargetDollars, (values) => {
-  form.goals.forEach((goal, index) => {
-    if (values[index] !== undefined) {
-      goal.target_amount_cents = Math.round((values[index] || 0) * 100);
-    }
-  });
-}, { deep: true });
-
-watch(goalContributionDollars, (values) => {
-  form.goals.forEach((goal, index) => {
-    if (values[index] !== undefined) {
-      goal.monthly_contribution_cents = Math.round((values[index] || 0) * 100);
-    }
+// Goal dollar inputs live on each goal (as on Edit.vue), so removing a goal
+// can't shift another goal's amounts.
+watch(() => form.goals, (goals) => {
+  goals.forEach((goal) => {
+    goal.target_amount_cents = toCents(goal.target_dollars);
+    goal.monthly_contribution_cents = toCents(goal.contribution_dollars);
   });
 }, { deep: true });
 
@@ -711,14 +703,14 @@ const addGoal = () => {
   form.goals.push({
     name: '',
     description: '',
+    target_dollars: 0,
+    contribution_dollars: 0,
     target_amount_cents: 0,
     monthly_contribution_cents: 0,
     target_date: null,
     goal_type: 'savings',
     priority: index + 1,
   });
-  goalTargetDollars.value[index] = 0;
-  goalContributionDollars.value[index] = 0;
 };
 
 const removeGoal = (index) => {
@@ -726,8 +718,6 @@ const removeGoal = (index) => {
   form.goals.forEach((goal, position) => {
     goal.priority = position + 1;
   });
-  delete goalTargetDollars.value[index];
-  delete goalContributionDollars.value[index];
 };
 
 const getAccountName = (accountId) => {
@@ -777,7 +767,11 @@ const handleSubmit = () => {
     return;
   }
 
-  form.post(route('payoff-plans.store', props.budget.id), {
+  form.transform((data) => ({
+    ...data,
+    // eslint-disable-next-line no-unused-vars
+    goals: data.goals.map(({ target_dollars, contribution_dollars, ...goal }) => goal),
+  })).post(route('payoff-plans.store', props.budget.id), {
     onError: (errors) => {
       const fields = Object.keys(errors);
       if (fields.length > 0) {

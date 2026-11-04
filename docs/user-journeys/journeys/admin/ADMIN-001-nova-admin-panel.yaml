@@ -28,6 +28,10 @@ depends_on:
     reason: path (/nova), guard and middleware stack
   - path: database/migrations/2026_10_31_250000_grant_admin_to_owner_account.php
     reason: grants is_admin to the previously allowlisted owner email so the gate change cannot lock the owner out
+  - path: app/Services/BudgetDeletionService.php
+    reason: the Budget resource's beforeDelete deletes through it (attachments, unused S3 objects, activity, Plaid items)
+  - path: app/Services/FileService.php
+    reason: the FileAttachment resource's beforeDelete detaches through it (unused file and S3 object removed)
   - path: app/Nova/Actions/LiftChatBan.php
     reason: User resource action to lift a chat ban (see ADMIN-002)
 integrations:
@@ -45,6 +49,8 @@ business_rules:
   - the Nova User resource has no Password field (accounts are passwordless)
   - a one-off data migration set is_admin for the previously allowlisted owner email; its down() is a no-op so a rollback cannot lock the owner out
   - is_admin is not mass-assignable
+  - deleting a budget from Nova runs BudgetDeletionService, the same cleanup as deleting it in the app (BUDGET-005); BudgetPolicy still limits it to the budget's owner
+  - deleting a file attachment from Nova detaches it through FileService, removing a file and S3 object nothing else uses
   - users cannot be deleted from Nova (single, bulk or force delete); a bare row delete would skip AccountDeletionService, so users delete their own accounts from Profile (PROFILE-002)
 scenarios:
   - id: admin_gate_allows
@@ -122,7 +128,20 @@ scenarios:
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a user through nova
       - tests/Feature/Admin/NovaDeletionTest.php::nova does not offer deleting a user
-known_issues: []
+  - id: nova_budget_delete_cleans_up
+    kind: happy_path
+    description: Deleting a budget through Nova's API removes its budget and transaction attachments, unused files and S3 objects, its activity history and its Plaid items at Plaid, and keeps a file another budget still uses.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::deleting a budget from nova cleans up like deleting it in the app
+  - id: nova_file_attachment_delete_cleans_up
+    kind: happy_path
+    description: Deleting file attachments through Nova's API removes a file nothing else uses from S3 and keeps one still attached elsewhere.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::deleting a file attachment from nova removes a file nothing else uses from S3
+known_issues:
+  - Deleting an Account, File or Plaid Connection from Nova is still a bare row delete (Plaid items, S3 objects, the app's transfer/transaction guard are skipped); reported to the owner, not yet decided
 confidence: medium
 evidence:
   - app/Providers/NovaServiceProvider.php gate(), routes()

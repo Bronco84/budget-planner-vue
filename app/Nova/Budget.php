@@ -2,6 +2,8 @@
 
 namespace App\Nova;
 
+use App\Services\BudgetDeletionService;
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
@@ -39,6 +41,18 @@ class Budget extends Resource
     public static $search = [
         'id', 'name', 'description',
     ];
+
+    /**
+     * Delete through BudgetDeletionService, as the app does, so attachments, unused
+     * S3 objects, activity history and Plaid items go too. Nova's own delete() that
+     * follows is then a no-op on the already-deleted model.
+     *
+     * @param  \App\Models\Budget  $model
+     */
+    public static function beforeDelete(NovaRequest $request, Model $model): void
+    {
+        app(BudgetDeletionService::class)->destroy($model);
+    }
 
     /**
      * Get the fields displayed by the resource.

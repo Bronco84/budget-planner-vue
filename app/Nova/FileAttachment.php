@@ -2,6 +2,8 @@
 
 namespace App\Nova;
 
+use App\Services\FileService;
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\MorphTo;
@@ -15,6 +17,17 @@ class FileAttachment extends Resource
     public static $title = 'id';
 
     public static $search = ['id'];
+
+    /**
+     * Detach through FileService, as the app does, so a file nothing else uses is
+     * removed from S3 and the database. Nova's own delete() that follows is a no-op.
+     *
+     * @param  \App\Models\FileAttachment  $model
+     */
+    public static function beforeDelete(NovaRequest $request, Model $model): void
+    {
+        app(FileService::class)->detachFile($model, $request->user()->id);
+    }
 
     public function fields(NovaRequest $request): array
     {

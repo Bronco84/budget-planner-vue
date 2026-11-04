@@ -523,6 +523,7 @@ class ProjectionsController extends Controller
     protected function getFutureManualTransactions(Account $account, Carbon $startDate, Carbon $endDate): Collection
     {
         return Transaction::where('account_id', $account->id)
+            ->countedInTotals()
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'))
             ->whereNull('recurring_transaction_template_id') // Exclude recurring transactions

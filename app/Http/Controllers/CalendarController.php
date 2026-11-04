@@ -88,6 +88,7 @@ class CalendarController extends Controller
 
         // Get historical transactions for this month
         $historicalTransactions = Transaction::where('budget_id', $budget->id)
+            ->countedInTotals()
             ->whereDate('date', '>=', $startOfMonth)
             ->whereDate('date', '<=', $endOfMonth)
             ->with('account')

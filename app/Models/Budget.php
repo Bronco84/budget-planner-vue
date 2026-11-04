@@ -263,6 +263,7 @@ class Budget extends Model
         // Get all transactions for the current month
         /** @var Collection<int, Transaction> $matchingTransactions */
         $matchingTransactions = $this->transactions()
+            ->countedInTotals()
             ->with('budgetCategory')
             ->whereDate('date', '>=', $start)
             ->whereDate('date', '<=', $end)
@@ -291,6 +292,7 @@ class Budget extends Model
         $prevMonth = $start->copy()->subMonth();
         /** @var Collection<int, Transaction> $prevMonthTransactions */
         $prevMonthTransactions = $this->transactions()
+            ->countedInTotals()
             ->with('budgetCategory')
             ->whereDate('date', '>=', $prevMonth->startOfMonth())
             ->whereDate('date', '<=', $prevMonth->endOfMonth())
@@ -404,6 +406,7 @@ class Budget extends Model
         $totals = [];
 
         $this->transactions()
+            ->countedInTotals()
             ->whereDate('date', '>=', Carbon::create($fromYear, 1, 1)->format('Y-m-d'))
             ->whereDate('date', '<=', Carbon::create($toYear, 12, 31)->format('Y-m-d'))
             ->where('amount_in_cents', '!=', 0)
@@ -443,6 +446,7 @@ class Budget extends Model
         $totalSpent = 0;
         foreach ($this->categories as $category) {
             $spent = $this->transactions()
+                ->countedInTotals()
                 ->inCategory($category)
                 ->where('amount_in_cents', '<', 0)
                 ->sum('amount_in_cents');
@@ -467,6 +471,7 @@ class Budget extends Model
         $totalSpent = 0;
         foreach ($this->categories as $category) {
             $spent = $this->transactions()
+                ->countedInTotals()
                 ->inCategory($category)
                 ->where('amount_in_cents', '<', 0)
                 ->sum('amount_in_cents');

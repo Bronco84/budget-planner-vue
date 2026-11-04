@@ -57,6 +57,7 @@ class TransactionQueryContextBuilder implements ContextBuilderInterface
         $limit = max(1, min($limit, self::MAX_LIMIT));
 
         $query = $budget->transactions()
+            ->countedInTotals()
             ->with('account')
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()]);
 

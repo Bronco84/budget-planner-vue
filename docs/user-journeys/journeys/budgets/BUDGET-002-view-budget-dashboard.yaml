@@ -34,6 +34,7 @@ postconditions:
 business_rules:
   - "any member can view the dashboard; budgetAccess (role, can.edit/manage/manage_connections) hides edit, sync, add, connect and settings controls from viewers, and owner controls from editors (server policies still enforce)"
   - per_page is clamped to 10..200 (default 100)
+  - a pending Plaid transaction marked removed by the bank (PLAID-003) is still listed in the ledger, with a "Removed by bank" badge, a struck-through amount and no running balance, and does not move the running balance of any other row
   - default date range is 90 days; default projection horizon is the saved preference or 1 month
   - projection_months must be an integer 0..12 (the range BudgetProjectionModal offers); invalid values are ignored and never saved, and a saved preference is clamped to 0..12 when read
   - date_range must be one of 7, 30, 90 or custom and start_date a Y-m-d date; invalid values fall back to the defaults instead of erroring

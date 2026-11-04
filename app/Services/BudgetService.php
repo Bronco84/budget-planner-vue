@@ -310,11 +310,17 @@ class BudgetService
         $currentBalanceCents = $account->current_balance_cents;
         $isLiability = $account->isLiability();
 
+        // Transactions the bank dropped stay listed but never move the balance: they
+        // get no running balance and are left out of every running total below.
+        $removedByBank = fn ($transaction) => data_get($transaction, 'removed_by_bank_at') !== null;
+        $allTransactions->filter($removedByBank)->each(fn ($transaction) => $transaction->running_balance = null);
+        $countedTransactions = $allTransactions->reject($removedByBank);
+
         // Split transactions into actual, pending, and projected for this account
-        $accountTransactions = $allTransactions->where('account_id', $accountId);
+        $accountTransactions = $countedTransactions->where('account_id', $accountId);
 
         // Get actual (non-pending) transactions
-        $actualTransactions = $allTransactions
+        $actualTransactions = $countedTransactions
             ->where('is_projected', false)
             ->filter(function ($transaction) {
                 return ! $transaction->pending;

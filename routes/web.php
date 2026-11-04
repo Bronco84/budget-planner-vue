@@ -191,6 +191,8 @@ Route::middleware(['auth', AuthorizeBudgetAccess::class])->scopeBindings()->grou
         ->name('budget.transaction.update');
     Route::delete('budget/{budget}/transactions/{transaction}', [TransactionController::class, 'destroy'])
         ->name('budget.transaction.destroy');
+    Route::patch('budget/{budget}/transactions/{transaction}/keep', [TransactionController::class, 'keepRemovedByBank'])
+        ->name('budget.transaction.keep');
     Route::get('budget/{budget}/transactions/{transaction}/activity-log', [TransactionController::class, 'getActivityLog'])
         ->name('budget.transaction.activity-log');
 

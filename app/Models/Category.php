@@ -180,6 +180,7 @@ class Category extends Model
         if ($this->amount > 0) {
             // Calculate spent from transactions (negative amounts are expenses)
             $spent = $this->budget->transactions()
+                ->countedInTotals()
                 ->inCategory($this)
                 ->where('amount_in_cents', '<', 0)
                 ->sum('amount_in_cents');
@@ -198,6 +199,7 @@ class Category extends Model
     {
         // Calculate spent from transactions (negative amounts are expenses)
         $spent = $this->budget->transactions()
+            ->countedInTotals()
             ->inCategory($this)
             ->where('amount_in_cents', '<', 0)
             ->sum('amount_in_cents');

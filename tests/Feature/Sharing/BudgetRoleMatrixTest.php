@@ -95,6 +95,7 @@ const ROLE_MATRIX_ROUTES = [
     'budget.transaction.store' => 'edit',
     'budget.transaction.update' => 'edit',
     'budget.transaction.destroy' => 'edit',
+    'budget.transaction.keep' => 'edit',
     // Transfers
     'budget.transfers.index' => 'view',
     'budget.transfers.create' => 'edit',

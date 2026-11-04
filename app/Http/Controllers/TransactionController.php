@@ -275,6 +275,22 @@ class TransactionController extends Controller
     }
 
     /**
+     * Keep a transaction that sync marked as removed by the bank: it counts in totals
+     * again, and later syncs never mark it again.
+     */
+    public function keepRemovedByBank(Budget $budget, Transaction $transaction): RedirectResponse
+    {
+        $this->authorize('update', $transaction);
+
+        $transaction->update([
+            'removed_by_bank_at' => null,
+            'bank_removal_kept_at' => now(),
+        ]);
+
+        return redirect()->back()->with('message', 'Transaction kept. It counts in your totals again.');
+    }
+
+    /**
      * Transfer legs are kept in sync by TransferService, so they can only be
      * changed through their transfer.
      */

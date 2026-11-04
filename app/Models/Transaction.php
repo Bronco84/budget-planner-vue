@@ -107,6 +107,8 @@ class Transaction extends Model
         'bank_feed_transaction_id',
         'import_source',
         'notes',
+        'removed_by_bank_at',
+        'bank_removal_kept_at',
     ];
 
     /**
@@ -119,7 +121,27 @@ class Transaction extends Model
         'date' => 'date:Y-m-d',
         'is_plaid_imported' => 'boolean',
         'is_reconciled' => 'boolean',
+        'removed_by_bank_at' => 'datetime',
+        'bank_removal_kept_at' => 'datetime',
     ];
+
+    /**
+     * Scope to transactions that count towards balances, totals and projections:
+     * everything except pending Plaid rows the bank has dropped (removed_by_bank_at),
+     * which stay listed until the user deletes or keeps them.
+     */
+    public function scopeCountedInTotals(Builder $query): Builder
+    {
+        return $query->whereNull($query->qualifyColumn('removed_by_bank_at'));
+    }
+
+    /**
+     * Whether the bank dropped this pending transaction (see scopeCountedInTotals).
+     */
+    public function isRemovedByBank(): bool
+    {
+        return $this->removed_by_bank_at !== null;
+    }
 
     /**
      * Link this transaction to a recurring template, recording how, and save.

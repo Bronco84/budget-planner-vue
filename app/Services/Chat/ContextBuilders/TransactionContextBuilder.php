@@ -37,6 +37,7 @@ class TransactionContextBuilder implements ContextBuilderInterface
         $startDate = Carbon::now()->subDays(30);
 
         $transactions = $budget->transactions()
+            ->countedInTotals()
             ->with('account')
             ->where('date', '>=', $startDate)
             ->orderBy('date', 'desc')
@@ -69,6 +70,7 @@ class TransactionContextBuilder implements ContextBuilderInterface
         $endOfMonth = Carbon::now()->endOfMonth();
 
         $transactions = $budget->transactions()
+            ->countedInTotals()
             ->with('account')
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->orderBy('date', 'desc')
@@ -102,6 +104,7 @@ class TransactionContextBuilder implements ContextBuilderInterface
         $endOfMonth = $anchor->copy()->endOfMonth();
 
         $transactions = $budget->transactions()
+            ->countedInTotals()
             ->with('budgetCategory')
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->get();

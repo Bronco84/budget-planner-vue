@@ -17,11 +17,14 @@ routes:
   - budget.transaction.update
   - budget.transaction.destroy
   - budget.transaction.activity-log
+  - budget.transaction.keep
 depends_on:
   - path: resources/js/Pages/Transactions/Edit.vue
     reason: edit page; loads activity log and attachments via fetch
   - path: app/Services/FileService.php
     reason: destroy removes the transaction's attachments and unused files (deleteTransactionAttachments)
+  - path: resources/js/Components/RemovedByBankNotice.vue
+    reason: Keep and Delete actions for a transaction the bank dropped, on the dashboard ledger and the transactions list
 integrations: []
 steps:
   - action: visit /budget/{budget}/transactions/{transaction}/edit
@@ -35,6 +38,7 @@ postconditions:
 business_rules:
   - same validation as create, scoped to the budget (category_id must belong to the budget)
   - a legacy unlinked category string is offered as its own option and kept when saved unchanged
+  - a Plaid transaction marked removed by the bank (see PLAID-003) shows a "Removed by bank" badge with Keep (PATCH budget.transaction.keep, editor role, redirects back) and Delete (budget.transaction.destroy) on the dashboard ledger and the transactions list; keeping it counts it in totals again and sync never marks it again
   - transfer legs (transfer_id set) cannot be updated or deleted here; the request redirects to the transfer's edit page with an error flash (toasted by Transactions/Edit on the visit's success) and nothing changes
   - deleting a transaction deletes its file attachments and every attached file nothing else uses (File row and S3 object)
 scenarios:
@@ -122,6 +126,18 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Categories/CategoryLinkingTest.php::updating a legacy transaction without choosing a category keeps its legacy name
+  - id: keep_transaction_removed_by_bank
+    kind: alternate
+    description: Keeping a transaction the bank dropped clears the mark, records the choice and redirects back; a viewer gets 403 and another budget's URL 404.
+    coverage: covered
+    tests:
+      - tests/Feature/Plaid/PlaidRemovedByBankTest.php::keeping a transaction counts it again and later syncs never mark it again
+      - tests/Feature/Plaid/PlaidRemovedByBankTest.php::a viewer cannot keep a transaction removed by the bank, and another budget cannot reach it
+  - id: removed_by_bank_badge_ui
+    kind: alternate
+    description: The dashboard ledger and the transactions list show the Removed by bank badge, a struck-through amount and Keep/Delete buttons for editors.
+    coverage: uncovered
+    note: front-end only; build and lint pass, not browser tested yet.
 known_issues: []
 confidence: high
 evidence:

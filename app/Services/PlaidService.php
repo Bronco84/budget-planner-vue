@@ -476,6 +476,17 @@ class PlaidService
      */
     public function getTransactions($accessToken, $startDate, $endDate)
     {
+        return $this->fetchTransactions($accessToken, $startDate, $endDate)['transactions'];
+    }
+
+    /**
+     * Page through /transactions/get for the window. `complete` is false when Plaid
+     * stopped returning pages before reaching its own total_transactions.
+     *
+     * @return array{transactions: list<array<string, mixed>>, complete: bool}
+     */
+    private function fetchTransactions($accessToken, $startDate, $endDate): array
+    {
         if (! $this->isConfigured) {
             throw new \Exception('Plaid service is not properly configured');
         }
@@ -502,7 +513,7 @@ class PlaidService
                 $total = (int) ($result['total_transactions'] ?? count($transactions));
             } while ($page !== [] && count($transactions) < $total);
 
-            return $transactions;
+            return ['transactions' => $transactions, 'complete' => count($transactions) >= $total];
         } catch (RequestException $e) {
             $response = null;
             $errorDetails = null;
@@ -1050,11 +1061,14 @@ class PlaidService
         try {
             // Fetch transactions - may return empty for investment-only accounts
             $transactions = [];
+            $fetchComplete = false;
             try {
-                $transactions = $this->sharedFetch(
+                $fetched = $this->sharedFetch(
                     "transactions:{$accessToken}:{$startDate->toDateString()}:{$endDate->toDateString()}",
-                    fn () => $this->getTransactions($accessToken, $startDate, $endDate)
+                    fn () => $this->fetchTransactions($accessToken, $startDate, $endDate)
                 );
+                $transactions = $fetched['transactions'];
+                $fetchComplete = $fetched['complete'];
             } catch (\Exception $txError) {
                 // For investment accounts, transaction fetch failures are expected
                 // (e.g., PRODUCT_NOT_READY). Log but continue to balance/investment updates.
@@ -1214,6 +1228,12 @@ class PlaidService
                     }
                 }
 
+                // Plaid reports this transaction again (or it settled a row), so the bank
+                // has not dropped it after all.
+                if ($current->removed_by_bank_at !== null) {
+                    $current->update(['removed_by_bank_at' => null]);
+                }
+
                 // Check if this transaction was previously pending and handle accordingly
                 if (isset($transaction['pending_transaction_id']) && ! empty($transaction['pending_transaction_id'])) {
                     // This is a settled transaction that was previously pending
@@ -1257,6 +1277,10 @@ class PlaidService
                         ]);
                     }
                 }
+            }
+
+            if ($fetchComplete && $transactions !== []) {
+                $this->flagTransactionsRemovedByBank($plaidAccount, $transactions, $startDate, $endDate);
             }
 
             // Update last sync timestamp
@@ -1462,6 +1486,47 @@ class PlaidService
         }
 
         return $this->pendingLookalikes($plaidAccount, $transaction)->first();
+    }
+
+    /**
+     * Mark imported transactions the bank has dropped: /transactions/get never reports
+     * removals, so a pending row (voided hold, cancelled order) whose Plaid id is no
+     * longer returned would otherwise count in balances and projections forever.
+     *
+     * Call only after a complete fetch of the window. Only rows dated inside the window
+     * whose raw Plaid copy is still pending are marked (a posted transaction is never
+     * marked), and never one the user chose to keep (bank_removal_kept_at).
+     *
+     * @param  list<array<string, mixed>>  $fetchedTransactions  every transaction Plaid returned for the Item
+     */
+    private function flagTransactionsRemovedByBank(PlaidAccount $plaidAccount, array $fetchedTransactions, Carbon $startDate, Carbon $endDate): void
+    {
+        $returnedIds = collect($fetchedTransactions)
+            ->where('account_id', $plaidAccount->plaid_account_id)
+            ->pluck('transaction_id')
+            ->all();
+
+        Transaction::where('account_id', $plaidAccount->account_id)
+            ->where('is_plaid_imported', true)
+            ->whereNotNull('plaid_transaction_id')
+            ->whereNotIn('plaid_transaction_id', $returnedIds)
+            ->whereIn('plaid_transaction_id', PlaidTransaction::select('plaid_transaction_id')
+                ->where('account_id', $plaidAccount->account_id)
+                ->where('pending', true))
+            ->whereNull('removed_by_bank_at')
+            ->whereNull('bank_removal_kept_at')
+            ->whereDate('date', '>=', $startDate->toDateString())
+            ->whereDate('date', '<=', $endDate->toDateString())
+            ->get()
+            // One by one, so each update clears the account's projection caches.
+            ->each(function (Transaction $transaction) {
+                $transaction->update(['removed_by_bank_at' => now()]);
+
+                Log::info('Marked pending transaction as removed by the bank', [
+                    'transaction_id' => $transaction->id,
+                    'plaid_transaction_id' => $transaction->plaid_transaction_id,
+                ]);
+            });
     }
 
     /**

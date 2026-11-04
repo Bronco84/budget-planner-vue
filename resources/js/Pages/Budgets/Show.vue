@@ -558,6 +558,12 @@
                                   </template>
                                   <span class="text-sm font-medium text-gray-900">{{ transaction.description }}</span>
                                   <div v-if="transaction.plaid_transaction?.pending" class="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded-full inline-block ml-4">Pending</div>
+                                  <RemovedByBankNotice
+                                    v-if="transaction.removed_by_bank_at"
+                                    class="ml-2"
+                                    :budget-id="budget.id"
+                                    :transaction="transaction"
+                                  />
                                   <template v-if="transaction.recurring_transaction_template_id">
                                       <!-- Show "Matched" indicator for historical (non-projected) transactions linked to recurring -->
                                       <template v-if="!transaction.is_projected">
@@ -620,12 +626,17 @@
                             </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
+                            <!-- A transaction the bank dropped is shown struck through: it is not counted -->
+                            <div
+                              class="text-sm font-medium"
+                              :class="transaction.removed_by_bank_at ? 'text-gray-400 line-through' : (transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600')"
+                            >
                               {{ formatCurrency(transaction.amount_in_cents) }}
                             </div>
                           </td>
                           <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium" :class="transaction.running_balance >= 0 ? 'text-green-600' : 'text-red-600'">
+                            <div v-if="transaction.removed_by_bank_at" class="text-sm text-gray-400" title="Not counted in the balance">&mdash;</div>
+                            <div v-else class="text-sm font-medium" :class="transaction.running_balance >= 0 ? 'text-green-600' : 'text-red-600'">
                               {{ formatCurrency(transaction.running_balance) }}
                             </div>
                           </td>
@@ -1025,6 +1036,7 @@ import CreditCardDetails from '@/Components/CreditCardDetails.vue';
 import InvestmentHoldings from '@/Components/InvestmentHoldings.vue';
 import InstitutionLogo from '@/Components/InstitutionLogo.vue';
 import BudgetProjectionModal from '@/Components/BudgetProjectionModal.vue';
+import RemovedByBankNotice from '@/Components/RemovedByBankNotice.vue';
 import { formatCurrency } from '@/utils/format.js';
 import draggable from 'vuedraggable';
 import { useToast } from '@/composables/useToast';

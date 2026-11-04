@@ -9,7 +9,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 | Journeys | Covered | Deprecated | Partial |
 |---|---|---|---|
-| 72 | 66 | 2 | 4 |
+| 72 | 65 | 2 | 5 |
 
 | Domain | Critical | High | Medium | Low |
 |---|---|---|---|---|
@@ -78,7 +78,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [PAYOFF-003](journeys/payoff/PAYOFF-003-edit-delete-payoff-plan.yaml) | User edits or deletes a payoff plan | medium | yes | yes | yes | yes | missing | no | **covered** |
 | [PLAID-001](journeys/plaid/PLAID-001-connect-banks-during-setup.yaml) | User connects bank accounts via Plaid and imports them into a budget | critical | yes | yes | yes | yes | partial | no | **partial** |
 | [PLAID-002](journeys/plaid/PLAID-002-link-existing-account.yaml) | User links an existing budget account to Plaid | high | yes | yes | yes | yes | yes | no | **covered** |
-| [PLAID-003](journeys/plaid/PLAID-003-sync-linked-account.yaml) | User refreshes transactions, balance, liabilities or holdings for a Plaid-linked account | critical | yes | yes | yes | missing | yes | no | **covered** |
+| [PLAID-003](journeys/plaid/PLAID-003-sync-linked-account.yaml) | User refreshes transactions, balance, liabilities or holdings for a Plaid-linked account | critical | yes | yes | yes | yes | yes | no | **covered** |
 | [PLAID-004](journeys/plaid/PLAID-004-sync-all-budget-accounts.yaml) | User syncs all Plaid-linked accounts in a budget at once | high | yes | yes | yes | missing | yes | no | **covered** |
 | [PLAID-005](journeys/plaid/PLAID-005-reauthenticate-connection.yaml) | User re-authenticates a Plaid connection that needs a new login | high | yes | yes | yes | partial | partial | no | **partial** |
 | [PLAID-006](journeys/plaid/PLAID-006-unlink-account.yaml) | User disconnects an account from Plaid | medium | yes | yes | yes | yes | yes | no | **covered** |
@@ -111,7 +111,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [TRANSFER-002](journeys/transfers/TRANSFER-002-edit-or-delete-transfer.yaml) | Owner edits or deletes a transfer | high | yes | yes | yes | missing | yes | no | **covered** |
 | [TXN-001](journeys/transactions/TXN-001-browse-and-filter-transactions.yaml) | Owner browses and filters a budget's transactions | high | yes | yes | yes | yes | missing | no | **covered** |
 | [TXN-002](journeys/transactions/TXN-002-record-manual-transaction.yaml) | Owner records a manual transaction | critical | yes | yes | yes | yes | missing | yes | **covered** |
-| [TXN-003](journeys/transactions/TXN-003-edit-or-delete-transaction.yaml) | Owner edits, reviews history of, or deletes a transaction | high | yes | yes | yes | yes | missing | no | **covered** |
+| [TXN-003](journeys/transactions/TXN-003-edit-or-delete-transaction.yaml) | Owner edits, reviews history of, or deletes a transaction | high | yes | yes | yes | partial | missing | no | **partial** |
 
 ## Open gaps (critical and high priority)
 
@@ -119,6 +119,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 - **PLAID-005** — reauth_prompt_on_error (alternate) is partial: the page prop is asserted; the rendered warning is frontend behaviour. Not browser tested: the warning is on the Plaid link page, which creates a Plaid Link token while rendering and needs an existing connection, so the local-only E2E specs (which never call Plaid and create data only through the UI) cannot reach it.; upgrade_token_plaid_failure (integration) is partial: the JSON 500 and its safe message are covered; the UI toast is frontend behaviour with no test.
 - **PLAID-010** — link_timeout (integration) is partial: server side covered (friendly log message, linkToken null, 5s/30s client timeouts); the disabled connect button is frontend behaviour. Not browser tested: every page that shows it (budget setup, account create, Plaid discover/link) creates a Plaid Link token while rendering, and the local environment points at a real Plaid environment, so the E2E specs block those pages (tests/playwright/support/plaid.js) rather than call Plaid.
 - **RECUR-002** — delete_confirmation_link_count (edge) is partial: the count prop is asserted; the confirmation dialog text in Index.vue / RecurringTransactionOverview.vue has no browser test.
+- **TXN-003** — removed_by_bank_badge_ui (alternate) is uncovered: front-end only; build and lint pass, not browser tested yet.
 
 ## Journeys by domain
 
@@ -263,7 +264,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidLinkAccountPageTest.php`, `tests/Feature/Plaid/PlaidLinkTest.php`, `tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`
 - **PLAID-003** User refreshes transactions, balance, liabilities or holdings for a Plaid-linked account _(implemented, critical)_
   - Routes: `plaid.sync`
-  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/CleanupDuplicatePlaidTransactionsTest.php`, `tests/Feature/Plaid/PlaidSyncTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`, `tests/Feature/SecurityRateLimitingTest.php`, `tests/Feature/Services/PlaidBalanceSyncTest.php`
+  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/CleanupDuplicatePlaidTransactionsTest.php`, `tests/Feature/Plaid/PlaidRemovedByBankTest.php`, `tests/Feature/Plaid/PlaidSyncTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`, `tests/Feature/SecurityRateLimitingTest.php`, `tests/Feature/Services/PlaidBalanceSyncTest.php`
 - **PLAID-004** User syncs all Plaid-linked accounts in a budget at once _(implemented, high)_
   - Routes: `plaid.sync-all`
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidSyncAllTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`, `tests/Feature/Security/RouteThrottleIsolationTest.php`, `tests/Feature/SecurityRateLimitingTest.php`
@@ -380,8 +381,8 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Routes: `budget.transaction.create`, `budget.transaction.store`, `budget.transaction.edit`
   - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Transactions/ManualTransactionTest.php`, `tests/Feature/Transactions/QuickAddCategoriesTest.php`, `tests/playwright/budget-basics.spec.js`
 - **TXN-003** Owner edits, reviews history of, or deletes a transaction _(implemented, high)_
-  - Routes: `budget.transaction.edit`, `budget.transaction.update`, `budget.transaction.destroy`, `budget.transaction.activity-log`
-  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Transactions/EditTransactionTest.php`
+  - Routes: `budget.transaction.edit`, `budget.transaction.update`, `budget.transaction.destroy`, `budget.transaction.activity-log`, `budget.transaction.keep`
+  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidRemovedByBankTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Transactions/EditTransactionTest.php`
 
 ### transfers
 

@@ -220,6 +220,7 @@ class ReportsController extends Controller
         $totals = [];
 
         Transaction::query()
+            ->countedInTotals()
             ->whereIn('account_id', $accountIds)
             ->whereNotNull('date')
             ->groupBy('account_id', 'date')
@@ -263,6 +264,7 @@ class ReportsController extends Controller
 
         // Get all transactions after the target date
         $transactionsAfterDate ??= (int) $account->transactions()
+            ->countedInTotals()
             ->where('date', '>', $date->format('Y-m-d'))
             ->sum('amount_in_cents');
 
@@ -280,6 +282,7 @@ class ReportsController extends Controller
     {
         // Get monthly cash flow
         $transactionsQuery = $budget->transactions()
+            ->countedInTotals()
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'));
 
@@ -338,6 +341,7 @@ class ReportsController extends Controller
     {
         $categories = $budget->categories;
         $transactionsQuery = $budget->transactions()
+            ->countedInTotals()
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'));
 
@@ -409,6 +413,7 @@ class ReportsController extends Controller
     private function getSpendingPatternsData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
         $transactionsQuery = $budget->transactions()
+            ->countedInTotals()
             ->where('date', '>=', $startDate->format('Y-m-d'))
             ->where('date', '<=', $endDate->format('Y-m-d'))
             ->where('amount_in_cents', '<', 0)

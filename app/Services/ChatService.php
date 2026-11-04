@@ -527,6 +527,7 @@ class ChatService
                 'institution' => $a->institution_name,
             ])->toArray(),
             'recent_transactions' => $activeBudget->transactions()
+                ->countedInTotals()
                 ->latest('date')
                 ->limit(20)
                 ->get()

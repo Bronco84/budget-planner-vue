@@ -119,6 +119,12 @@
                               {{ transaction.file_attachments_count }}
                             </button>
                           </div>
+                          <RemovedByBankNotice
+                            v-if="transaction.removed_by_bank_at"
+                            class="mt-1"
+                            :budget-id="budget.id"
+                            :transaction="transaction"
+                          />
                           <div v-if="transaction.notes" class="text-xs text-gray-500 mt-1 max-w-xs truncate">
                             {{ transaction.notes }}
                           </div>
@@ -151,7 +157,10 @@
                       <div class="text-sm text-gray-900">{{ transaction.account?.name || 'N/A' }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                      <div class="text-sm font-medium" :class="transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600'">
+                      <div
+                        class="text-sm font-medium"
+                        :class="transaction.removed_by_bank_at ? 'text-gray-400 line-through' : (transaction.amount_in_cents >= 0 ? 'text-green-600' : 'text-red-600')"
+                      >
                         {{ formatCurrency(transaction.amount_in_cents) }}
                       </div>
                     </td>
@@ -276,6 +285,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, ref, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import TransactionAttachmentsModal from '@/Components/TransactionAttachmentsModal.vue';
+import RemovedByBankNotice from '@/Components/RemovedByBankNotice.vue';
 import { useBudgetAccess } from '@/composables/useBudgetAccess.js';
 import { formatCurrency } from '@/utils/format.js';
 

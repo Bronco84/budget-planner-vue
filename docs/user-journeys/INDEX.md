@@ -58,7 +58,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 | [AUTH-011](journeys/auth/AUTH-011-manage-passkeys.yaml) | User adds, renames and removes passkeys | high | yes | yes | yes | yes | missing | yes | **covered** |
 | [AUTH-012](journeys/auth/AUTH-012-manage-trusted-devices.yaml) | User reviews and revokes trusted devices | high | yes | yes | yes | missing | yes | no | **covered** |
 | [BUDGET-001](journeys/budgets/BUDGET-001-create-budget.yaml) | User creates a budget and is routed into connection-first setup | critical | yes | yes | yes | yes | yes | no | **covered** |
-| [BUDGET-002](journeys/budgets/BUDGET-002-view-budget-dashboard.yaml) | Owner views the budget dashboard and account ledger | critical | yes | yes | yes | yes | missing | yes | **covered** |
+| [BUDGET-002](journeys/budgets/BUDGET-002-view-budget-dashboard.yaml) | Owner views the budget dashboard and account ledger | critical | yes | yes | yes | yes | yes | yes | **covered** |
 | [BUDGET-003](journeys/budgets/BUDGET-003-active-budget-navigation.yaml) | User lands on, or switches, their active budget | high | yes | yes | yes | yes | missing | no | **covered** |
 | [BUDGET-004](journeys/budgets/BUDGET-004-edit-budget.yaml) | Owner edits budget name, description and colour | medium | yes | yes | yes | missing | missing | no | **covered** |
 | [BUDGET-005](journeys/budgets/BUDGET-005-delete-budget.yaml) | Owner deletes a budget | high | yes | yes | yes | yes | yes | no | **covered** |
@@ -188,7 +188,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Budgets/BudgetLifecycleTest.php`
 - **BUDGET-002** Owner views the budget dashboard and account ledger _(implemented, critical)_
   - Routes: `budgets.show`
-  - Tests: `tests/Feature/Budgets/BudgetDashboardTest.php`, `tests/Feature/Projections/ProjectionCacheInvalidationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Services/BudgetServiceTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/playwright/smoke.spec.js`
+  - Tests: `tests/Feature/Budgets/BudgetDashboardTest.php`, `tests/Feature/Console/PruneExpiredCacheEntriesTest.php`, `tests/Feature/Projections/ProjectionCacheInvalidationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Services/BudgetServiceTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`, `tests/playwright/smoke.spec.js`
 - **BUDGET-003** User lands on, or switches, their active budget _(implemented, high)_
   - Routes: `budgets.index`, `transactions.index`, `preferences.active-budget.set`
   - Tests: `tests/Feature/Budgets/ActiveBudgetNavigationTest.php`, `tests/Feature/Sharing/BudgetMemberManagementTest.php`

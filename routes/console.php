@@ -14,3 +14,7 @@ Schedule::command('telescope:prune --hours=48')->daily();
 // Retry removing files left unattached by a failed S3 delete (account, budget,
 // transaction or attachment deletion), so their S3 objects are not kept forever.
 Schedule::command('files:cleanup-orphans')->daily();
+
+// The database cache store never removes an expired row whose key is not read
+// again (e.g. replaced projection cache versions); sweep them daily.
+Schedule::command('cache:prune-expired')->daily();

@@ -269,8 +269,9 @@ class BudgetService
      * Projections are cached under one key per date range and the database
      * store production uses cannot delete keys by pattern, so the keys carry a
      * per-account version instead. Replacing the version orphans every cached
-     * range at once (including ranges no caller enumerates); the orphans
-     * expire with their TTL.
+     * range at once (including ranges no caller enumerates). The database
+     * store only deletes an expired row when its key is read again, which an
+     * orphaned key never is, so the daily cache:prune-expired removes them.
      */
     public static function clearProjectionCache(int $accountId): void
     {

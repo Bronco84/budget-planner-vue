@@ -273,13 +273,15 @@ class RecurringTransactionService
 
         // If transactions are loaded, use the collection
         if ($template->relationLoaded('transactions')) {
+            // A pending row the bank dropped never happened, so it doesn't stand in for the occurrence.
             return $template->transactions->first(function ($transaction) use ($dateString) {
-                return $transaction->date && $transaction->date->format('Y-m-d') === $dateString;
+                return ! $transaction->isRemovedByBank()
+                    && $transaction->date && $transaction->date->format('Y-m-d') === $dateString;
             });
         }
 
         // Fallback to database query if relationship not loaded
-        return $template->transactions()->where('date', $dateString)->first();
+        return $template->transactions()->countedInTotals()->where('date', $dateString)->first();
     }
 
     /**
@@ -348,10 +350,11 @@ class RecurringTransactionService
 
         // Priority 2: If no rules or no rule matches, check linked transactions
         if ($matchingTransactions->isEmpty()) {
-            // Get linked transactions (those with recurring_transaction_template_id = this template)
+            // Get linked transactions (those with recurring_transaction_template_id = this template),
+            // leaving out pending rows the bank dropped
             $linkedTransactions = $template->relationLoaded('transactions')
-                ? $template->transactions
-                : $template->transactions()->get();
+                ? $template->transactions->reject(fn (Transaction $transaction) => $transaction->isRemovedByBank())->values()
+                : $template->transactions()->countedInTotals()->get();
 
             if ($linkedTransactions->isNotEmpty()) {
                 $matchingTransactions = $linkedTransactions;
@@ -500,6 +503,10 @@ class RecurringTransactionService
         // Get the budget ID from the template
         $budgetId = $template->budget_id;
 
+        // Pending rows the bank dropped never happened: they neither feed
+        // averages nor get linked (see Transaction::scopeCountedInTotals).
+        $preloadedTransactions = $preloadedTransactions?->reject(fn (Transaction $transaction) => $transaction->isRemovedByBank());
+
         // Priority 1: If template has a plaid_entity_id, use entity-based matching
         if ($template->plaid_entity_id) {
             $entityId = $template->plaid_entity_id;
@@ -522,6 +529,7 @@ class RecurringTransactionService
                 });
             } else {
                 $entityMatches = Transaction::where('budget_id', $budgetId)
+                    ->countedInTotals()
                     ->whereHas('plaidTransaction', function ($query) use ($entityId) {
                         // Simple LIKE search - entity_id is unique enough
                         $query->where('counterparties', 'like', '%'.$entityId.'%');
@@ -574,7 +582,7 @@ class RecurringTransactionService
         // rules can match: the template's account within the lookback window,
         // with only the columns rules and callers read (no Plaid payload).
         $transactions = $preloadedTransactions ?? $this->scopeToRuleMatchWindow(
-            Transaction::where('budget_id', $budgetId),
+            Transaction::where('budget_id', $budgetId)->countedInTotals(),
             $template
         )->get(self::RULE_MATCH_COLUMNS);
 
@@ -621,6 +629,7 @@ class RecurringTransactionService
         // Find transactions that match the template but aren't linked yet
         $query = Transaction::where('budget_id', $template->budget_id)
             ->where('recurring_transaction_template_id', null)
+            ->countedInTotals()
             ->with('plaidTransaction');
 
         // Priority 1: Match by Plaid entity_id if available
@@ -690,6 +699,7 @@ class RecurringTransactionService
     {
         return Transaction::where('budget_id', $budgetId)
             ->where('recurring_transaction_template_id', null)
+            ->countedInTotals()
             ->whereHas('plaidTransaction', function ($query) use ($entityId) {
                 // Simple LIKE search - entity_id is unique enough
                 $query->where('counterparties', 'like', '%'.$entityId.'%');
@@ -836,10 +846,12 @@ class RecurringTransactionService
         // Only links the rules made are re-evaluated; manual, Plaid entity,
         // description, analysis and unknown (null) links are never removed.
         // Rule links outside the matching window (older, or on another account)
-        // were never candidates, so they are kept rather than unlinked.
+        // were never candidates, so they are kept rather than unlinked; so are
+        // pending rows the bank dropped (kept for the user to keep or delete).
         $ruleLinked = $this->scopeToRuleMatchWindow(
             Transaction::where('recurring_transaction_template_id', $template->id)
-                ->where('link_source', Transaction::LINK_SOURCE_RULE),
+                ->where('link_source', Transaction::LINK_SOURCE_RULE)
+                ->countedInTotals(),
             $template
         )->get();
 
@@ -889,6 +901,7 @@ class RecurringTransactionService
         // Get unlinked transactions for this account from the specified period
         $unlinkedTransactions = Transaction::where('account_id', $account->id)
             ->whereNull('recurring_transaction_template_id')
+            ->countedInTotals()
             ->where('date', '>=', now()->subDays($daysBack)->toDateString())
             ->with('plaidTransaction')
             ->get();
@@ -1058,6 +1071,7 @@ class RecurringTransactionService
         $unlinkedTransactions = Transaction::where('budget_id', $budget->id)
             ->whereNull('recurring_transaction_template_id')
             ->whereNotNull('plaid_transaction_id')
+            ->countedInTotals()
             ->when($months !== null, fn ($query) => $query->where('date', '>=', now()->subMonthsNoOverflow($months)->toDateString()))
             ->with([
                 'plaidTransaction:id,plaid_transaction_id,name,merchant_name,merchant_entity_id,counterparties',
@@ -1595,7 +1609,7 @@ class RecurringTransactionService
 
         // Priority 2: If no rules or no rule matches, check linked transactions
         if ($matchingTransactions->isEmpty()) {
-            $linkedTransactions = $template->transactions()->get();
+            $linkedTransactions = $template->transactions()->countedInTotals()->get();
 
             if ($linkedTransactions->isNotEmpty()) {
                 $matchingTransactions = $linkedTransactions;

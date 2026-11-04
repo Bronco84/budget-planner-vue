@@ -333,6 +333,7 @@ class RecurringTransactionRuleController extends Controller
 
         return Transaction::where('account_id', $template->account_id)
             ->whereNull('recurring_transaction_template_id')
+            ->countedInTotals()
             ->where('date', '>=', now()->subDays(90)->toDateString())
             ->latest('date')
             ->get();

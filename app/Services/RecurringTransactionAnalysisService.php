@@ -44,6 +44,7 @@ class RecurringTransactionAnalysisService
             ->where('account_id', $account->id)
             ->whereBetween('date', [$startDate, $endDate])
             ->whereNull('recurring_transaction_template_id') // Only unlinked transactions
+            ->countedInTotals() // Not pending rows the bank dropped
             ->with('plaidTransaction')
             ->orderBy('date', 'desc')
             ->get();

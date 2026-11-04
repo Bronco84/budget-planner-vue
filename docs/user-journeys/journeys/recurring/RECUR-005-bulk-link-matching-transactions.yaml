@@ -36,6 +36,7 @@ business_rules:
   - candidates are bounded to transactions dated within the selected range (months query param 12, 24, 36 or all; default 12); any other value, including an array, falls back to 12
   - entity match checks counterparties[].entity_id and merchant_entity_id; fallback is description exact / contains (5+ chars) / fuzzy 70%
   - already-linked transactions are skipped, never re-linked
+  - transactions removed by the bank (removed_by_bank_at) are never suggested, nor auto-linked after a Plaid sync
   - selected suggestions are linked with link_source manual (the user chose them), so rule re-evaluation never removes them
   - find-matching needs budget view; link-transactions needs budget update
   - the outcome is flashed under the shared message key and toasted by FindMatchingTransactions (toast.flash in onSuccess), because the recurring index doesn't render flashes
@@ -72,6 +73,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Recurring/RecurringBulkLinkTest.php::an already linked transaction is not re-linked and nothing is reported as linked
+  - id: removed_by_bank_not_suggested
+    kind: edge
+    description: A transaction the bank dropped is not suggested by find matching and is not auto-linked by description after a sync.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRemovedByBankTest.php::description matching and find matching never offer a transaction removed by the bank
   - id: selections_required
     kind: validation
     description: Missing selections or non-existent template/transaction ids fail validation.

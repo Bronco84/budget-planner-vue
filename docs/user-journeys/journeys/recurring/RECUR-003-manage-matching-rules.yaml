@@ -61,6 +61,7 @@ business_rules:
   - a regex rule value is a full PCRE pattern including delimiters (e.g. /^netflix/); store, update and test (and the template create/edit forms' inline rules, via the shared ValidRegexRulePattern rule) reject patterns preg_match cannot compile, compiled exactly as matchesTransaction runs them
   - a regex pattern is never lowercased; a case-insensitive regex rule runs the pattern as written with the i modifier appended, so escapes like \S, \D and \W keep their meaning (other string operators lowercase both sides)
   - every link records transactions.link_source - manual (Make Recurring, the transaction form, bulk-linking chosen suggestions), rule (apply, re-evaluation, inline rules, Plaid auto-link by rules), entity (Plaid entity id), description (description match) or analysis (pattern confirmation); unlinking clears it; links made before the column existed are null (unknown)
+  - a transaction removed by the bank (removed_by_bank_at) is never a rule candidate - preview, apply, re-evaluation, inline/Plaid rule linking and dynamic-amount averages (rule matches or linked transactions) leave it out; re-evaluation keeps an existing rule link to one rather than unlinking it
   - re-evaluation after a rule update or delete only unlinks links whose link_source is rule; manual, entity, description, analysis and null links are never removed; newly matching unlinked transactions are linked with link_source rule; with no active rules left nothing is re-evaluated
   - service-side rule matching (RecurringTransactionService::findTransactionsMatchingAllRules, behind dynamic amounts, re-evaluation and inline/Plaid rule linking) only considers transactions on the template's account (the whole budget when it has none) dated within the last RULE_MATCH_LOOKBACK_MONTHS (12) months, loaded without the raw Plaid rows; re-evaluation keeps rule links outside that window instead of unlinking them
 scenarios:
@@ -94,6 +95,14 @@ scenarios:
       - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::updating a rule to a delimited regex links matching transactions
       - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::re-evaluation matches amount rules the same way the rule preview does
       - tests/Feature/Recurring/RecurringRuleReevaluationTest.php::a stored regex rule that does not compile matches nothing instead of erroring
+  - id: removed_by_bank_not_matched
+    kind: edge
+    description: A transaction the bank dropped is neither averaged into a dynamic amount (by rules or as a linked transaction) nor linked by applying rules, and re-evaluation keeps its existing rule link.
+    coverage: covered
+    tests:
+      - tests/Feature/Recurring/RecurringRemovedByBankTest.php::a rule-matched transaction removed by the bank is left out of the dynamic amount
+      - tests/Feature/Recurring/RecurringRemovedByBankTest.php::a linked transaction removed by the bank is left out of the dynamic amount
+      - tests/Feature/Recurring/RecurringRemovedByBankTest.php::rules never link a transaction removed by the bank and re-evaluation leaves its link alone
   - id: preview_without_active_rules
     kind: empty_state
     description: Preview with no active rules renders hasActiveRules false; apply redirects with the message "No active rules to apply." (flashed under the shared message key so it is toasted).

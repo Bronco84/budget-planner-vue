@@ -263,7 +263,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidLinkAccountPageTest.php`, `tests/Feature/Plaid/PlaidLinkTest.php`, `tests/Feature/Plaid/PlaidSafeErrorMessagesTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`
 - **PLAID-003** User refreshes transactions, balance, liabilities or holdings for a Plaid-linked account _(implemented, critical)_
   - Routes: `plaid.sync`
-  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidSyncTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`, `tests/Feature/SecurityRateLimitingTest.php`, `tests/Feature/Services/PlaidBalanceSyncTest.php`
+  - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/CleanupDuplicatePlaidTransactionsTest.php`, `tests/Feature/Plaid/PlaidSyncTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`, `tests/Feature/SecurityRateLimitingTest.php`, `tests/Feature/Services/PlaidBalanceSyncTest.php`
 - **PLAID-004** User syncs all Plaid-linked accounts in a budget at once _(implemented, high)_
   - Routes: `plaid.sync-all`
   - Tests: `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidSyncAllTest.php`, `tests/Feature/Plaid/SharedBudgetPlaidAccessTest.php`, `tests/Feature/Security/RouteThrottleIsolationTest.php`, `tests/Feature/SecurityRateLimitingTest.php`

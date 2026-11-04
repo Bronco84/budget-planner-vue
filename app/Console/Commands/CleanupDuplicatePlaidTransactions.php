@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\PlaidTransaction;
 use App\Models\Transaction;
 use App\Services\PlaidService;
 use Carbon\Carbon;
@@ -51,10 +52,18 @@ class CleanupDuplicatePlaidTransactions extends Command
         foreach ($accounts as $accountId) {
             $this->line("\nProcessing account ID: {$accountId}");
 
-            // Get all transactions for this account
+            // Only rows Plaid still reports as pending can be duplicates: posted
+            // transactions with similar amounts and descriptions are real, separate
+            // charges (mirrors PlaidService::pendingLookalikes).
+            $pendingPlaidIds = PlaidTransaction::select('plaid_transaction_id')
+                ->where('account_id', $accountId)
+                ->where('pending', true);
+
+            // Get all pending transactions for this account
             $transactions = Transaction::where('account_id', $accountId)
                 ->where('is_plaid_imported', true)
                 ->whereNotNull('plaid_transaction_id')
+                ->whereIn('plaid_transaction_id', $pendingPlaidIds)
                 ->orderBy('date')
                 ->orderBy('created_at')
                 ->get();
@@ -71,6 +80,7 @@ class CleanupDuplicatePlaidTransactions extends Command
                 $duplicates = Transaction::where('account_id', $accountId)
                     ->where('is_plaid_imported', true)
                     ->whereNotNull('plaid_transaction_id')
+                    ->whereIn('plaid_transaction_id', $pendingPlaidIds)
                     ->where('id', '!=', $transaction->id)
                     ->whereNotIn('id', $processedIds)
                     // Match amount within $1 tolerance

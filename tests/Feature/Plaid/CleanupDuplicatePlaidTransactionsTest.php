@@ -115,3 +115,19 @@ test('a dry run of the duplicate cleanup changes nothing', function () {
         ->and($kept->fresh()->notes)->toBeNull()
         ->and($receipt->fresh()->attachable_id)->toBe($deleted->id);
 });
+
+test('posted look-alikes are separate charges and both survive the duplicate cleanup', function () {
+    $first = ($this->copy)('tx-posted-1', '2026-03-12 09:00', ['amount_in_cents' => -525, 'notes' => 'morning']);
+    $second = ($this->copy)('tx-posted-2', '2026-03-13 09:00', ['amount_in_cents' => -575, 'date' => '2026-03-14']);
+    PlaidTransaction::whereIn('plaid_transaction_id', ['tx-posted-1', 'tx-posted-2'])->update(['pending' => false]);
+
+    // A pending row alongside a posted look-alike is not merged either.
+    $pending = ($this->copy)('tx-pending', '2026-03-14 09:00', ['amount_in_cents' => -550, 'date' => '2026-03-13']);
+
+    $this->artisan('plaid:cleanup-duplicates')->assertSuccessful();
+
+    expect($first->fresh())->not->toBeNull()
+        ->and($first->fresh()->notes)->toBe('morning')
+        ->and($second->fresh())->not->toBeNull()
+        ->and($pending->fresh())->not->toBeNull();
+});

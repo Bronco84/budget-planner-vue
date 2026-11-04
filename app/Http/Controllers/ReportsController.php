@@ -340,24 +340,53 @@ class ReportsController extends Controller
     private function getBudgetPerformanceData(Budget $budget, Carbon $startDate, Carbon $endDate, ?Account $selectedAccount = null): array
     {
         $categories = $budget->categories;
-        $transactionsQuery = $budget->transactions()
-            ->countedInTotals()
-            ->where('date', '>=', $startDate->format('Y-m-d'))
-            ->where('date', '<=', $endDate->format('Y-m-d'));
 
-        // Filter by account if selected
-        if ($selectedAccount) {
-            $transactionsQuery->where('account_id', $selectedAccount->id);
-        }
+        // Spent per category, summed in SQL over the range's expenses rather
+        // than loading every transaction and rescanning it per category. Rows
+        // linked by category_id are grouped by id; unlinked legacy rows fall
+        // back to their category string (see Transaction::isInCategory).
+        $expenses = function () use ($budget, $startDate, $endDate, $selectedAccount) {
+            $query = $budget->transactions()
+                ->countedInTotals()
+                ->where('date', '>=', $startDate->format('Y-m-d'))
+                ->where('date', '<=', $endDate->format('Y-m-d'))
+                ->where('amount_in_cents', '<', 0);
 
-        $transactions = $transactionsQuery->get();
+            if ($selectedAccount) {
+                $query->where('account_id', $selectedAccount->id);
+            }
+
+            return $query->toBase();
+        };
+
+        $spentById = $expenses()
+            ->whereNotNull('category_id')
+            ->groupBy('category_id')
+            ->selectRaw('category_id, SUM(amount_in_cents) as total')
+            ->pluck('total', 'category_id');
+
+        // The legacy match is an exact string comparison, as in isInCategory.
+        // MySQL's default collation compares case- and trailing-space-
+        // insensitively, so group by the binary value there; the names are
+        // then looked up exactly (PHP array keys are case-sensitive).
+        $legacyKey = in_array($budget->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)
+            ? 'CAST(category AS BINARY)'
+            : 'category';
+
+        $spentByLegacyName = $expenses()
+            ->whereNull('category_id')
+            ->whereIn('category', $categories->pluck('name'))
+            ->groupByRaw($legacyKey)
+            ->selectRaw('MIN(category) as name, SUM(amount_in_cents) as total')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->name => (int) $row->total]);
 
         $categoryPerformance = [];
         $monthsInRange = $this->monthsInRange($startDate, $endDate);
 
         foreach ($categories as $category) {
-            $categoryTransactions = $transactions->filter(fn ($transaction) => $transaction->isInCategory($category));
-            $spent = abs($categoryTransactions->where('amount_in_cents', '<', 0)->sum('amount_in_cents'));
+            $spent = abs((int) ($spentById[$category->id] ?? 0))
+                + abs((int) ($spentByLegacyName[$category->name] ?? 0));
             // Category amounts are monthly dollars; prorate them over the selected range.
             $allocated = (int) round($category->amount * 100 * $monthsInRange);
 

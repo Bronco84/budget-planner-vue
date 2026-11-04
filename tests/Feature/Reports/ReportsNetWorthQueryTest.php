@@ -80,7 +80,10 @@ function netWorthBalanceQueries(array $log): array
 {
     return array_values(array_filter(
         $log,
-        fn ($q) => str_contains($q['query'], '"transactions"') && str_contains(strtolower($q['query']), 'sum('),
+        // Balance sums group by account; budget performance's per-category
+        // sums (PR-080) are not part of the net worth series.
+        fn ($q) => str_contains($q['query'], '"transactions"') && str_contains(strtolower($q['query']), 'sum(')
+            && ! str_contains($q['query'], 'category'),
     ));
 }
 

@@ -35,6 +35,7 @@ business_rules:
   - savings rate = avg net cash flow / avg income x 100, 0 when there is no income
   - budget performance allocation = category monthly amount x months in the range, where each partial calendar month counts as days covered / days in that month
   - budget performance and spending-by-category match transactions to categories by category_id, falling back to the legacy category string for unlinked rows (spending patterns group by the linked category's current name)
+  - budget performance spent = abs of the category's expenses (negative amounts) in the range and account filter, excluding rows the bank removed; summed in SQL by category_id plus an exact (case-sensitive) legacy-name match, so refunds, rows linked to another budget's category and other budgets' rows never count; categories are sorted by spent, highest first
   - income vs expenses values each template at its projected amount (RecurringTransactionService::projectedAmount, so dynamic templates use their calculated amount), uses only active templates (started, not ended) and normalises frequencies to monthly (weekly x4.33, biweekly x2.17, bimonthly x2, quarterly /3, yearly /12, daily x30.44)
   - date_range must be one of 30days, 3months, 6months, ytd, year, all, custom; custom start/end dates must fall between 2000-01-01 and 2100-12-31 (invalid input redirects back with validation errors)
   - requires budget view ability
@@ -80,6 +81,14 @@ scenarios:
     tests:
       - tests/Feature/Reports/ReportsCalculationsTest.php::budget performance prorates the monthly category allocation over the selected range
       - tests/Feature/Reports/ReportsCalculationsTest.php::budget performance prorates partial months by the days covered
+  - id: budget_performance_spending
+    kind: happy_path
+    description: Spent per category counts expenses linked by id or by exact legacy name within the range and account filter (refunds, bank-removed rows, out-of-range dates, case-variant names, other budgets' rows and categories excluded), summed in SQL without loading the range's transactions.
+    coverage: covered
+    tests:
+      - tests/Feature/Reports/ReportsBudgetPerformanceTest.php::budget performance for all accounts matches the pinned values
+      - tests/Feature/Reports/ReportsBudgetPerformanceTest.php::budget performance filtered to one account matches the pinned values
+      - tests/Feature/Reports/ReportsBudgetPerformanceTest.php::budget performance sums spending in SQL instead of loading the range
   - id: foreign_account_filter_ignored
     kind: edge
     description: An account_id from another budget is ignored and all accounts are shown.

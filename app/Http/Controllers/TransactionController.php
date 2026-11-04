@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Services\FileService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -255,13 +256,17 @@ class TransactionController extends Controller
     /**
      * Remove the specified transaction from storage.
      */
-    public function destroy(Budget $budget, Transaction $transaction): RedirectResponse
+    public function destroy(Budget $budget, Transaction $transaction, FileService $files): RedirectResponse
     {
         $this->authorize('delete', $transaction);
 
         if ($transaction->transfer_id) {
             return $this->redirectToTransfer($budget, $transaction);
         }
+
+        // Attachments are polymorphic (no FK cascade), so remove them and any
+        // file nothing else uses before the row goes, as TransferService does.
+        $files->deleteTransactionAttachments([$transaction->id]);
 
         $transaction->delete();
 

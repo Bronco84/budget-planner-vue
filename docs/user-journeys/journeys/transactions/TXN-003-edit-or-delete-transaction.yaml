@@ -20,6 +20,8 @@ routes:
 depends_on:
   - path: resources/js/Pages/Transactions/Edit.vue
     reason: edit page; loads activity log and attachments via fetch
+  - path: app/Services/FileService.php
+    reason: destroy removes the transaction's attachments and unused files (deleteTransactionAttachments)
 integrations: []
 steps:
   - action: visit /budget/{budget}/transactions/{transaction}/edit
@@ -34,6 +36,7 @@ business_rules:
   - same validation as create, scoped to the budget (category_id must belong to the budget)
   - a legacy unlinked category string is offered as its own option and kept when saved unchanged
   - transfer legs (transfer_id set) cannot be updated or deleted here; the request redirects to the transfer's edit page with an error flash (toasted by Transactions/Edit on the visit's success) and nothing changes
+  - deleting a transaction deletes its file attachments and every attached file nothing else uses (File row and S3 object)
 scenarios:
   - id: edit_page_renders
     kind: happy_path
@@ -54,6 +57,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Transactions/EditTransactionTest.php::owner can delete their transaction and is redirected to the list
+  - id: delete_removes_attachments
+    kind: edge
+    description: Deleting a transaction removes its file attachments and deletes each attached file (row and S3 object) that nothing else uses; a file also attached elsewhere is kept.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/EditTransactionTest.php::deleting a transaction removes its attachments and every file nothing else uses
   - id: activity_log_json
     kind: alternate
     description: Activity log endpoint returns formatted activities.

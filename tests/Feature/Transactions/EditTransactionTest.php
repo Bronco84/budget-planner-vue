@@ -2,10 +2,14 @@
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\FileAttachment;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\FileService;
 use App\Services\TransferService;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -129,6 +133,28 @@ test('owner can delete their transaction and is redirected to the list', functio
         ->assertRedirect(route('budget.transaction.index', $this->budget));
 
     expect(Transaction::find($this->transaction->id))->toBeNull();
+});
+
+test('deleting a transaction removes its attachments and every file nothing else uses', function () {
+    Storage::fake('s3');
+    $files = app(FileService::class);
+    $other = Transaction::factory()->create(['budget_id' => $this->budget->id, 'account_id' => $this->account->id]);
+
+    $onlyHere = $files->uploadAndAttach(UploadedFile::fake()->createWithContent('receipt.pdf', "%PDF-1.4\nreceipt\n%%EOF"), $this->transaction, $this->user->id);
+    $shared = $files->uploadAndAttach(UploadedFile::fake()->createWithContent('shared.pdf', "%PDF-1.4\nshared\n%%EOF"), $this->transaction, $this->user->id);
+    $kept = $files->uploadAndAttach(UploadedFile::fake()->createWithContent('shared.pdf', "%PDF-1.4\nshared\n%%EOF"), $other, $this->user->id);
+    [$receipt, $sharedFile] = [$onlyHere->file, $shared->file];
+
+    $this->actingAs($this->user)
+        ->delete(route('budget.transaction.destroy', [$this->budget, $this->transaction]))
+        ->assertRedirect(route('budget.transaction.index', $this->budget));
+
+    expect(FileAttachment::where('attachable_type', Transaction::class)->where('attachable_id', $this->transaction->id)->exists())->toBeFalse()
+        ->and($receipt->fresh())->toBeNull()
+        ->and($kept->fresh())->not->toBeNull()
+        ->and($sharedFile->fresh())->not->toBeNull();
+    Storage::disk('s3')->assertMissing($receipt->hash);
+    Storage::disk('s3')->assertExists($sharedFile->hash);
 });
 
 test('activity log returns the transaction history as json', function () {

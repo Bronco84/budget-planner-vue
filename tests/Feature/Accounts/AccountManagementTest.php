@@ -39,6 +39,31 @@ test('a valid update persists name type and budget inclusion and redirects to th
         ->and($account->logo_url)->toBe('https://example.com/logo.png');
 });
 
+test('a logo URL up to the validated 500 characters is stored in full and a longer one is rejected', function () {
+    $long = 'https://cdn.example.com/logo.png?sig='.str_repeat('a', 500 - strlen('https://cdn.example.com/logo.png?sig='));
+    expect(strlen($long))->toBe(500);
+
+    $this->actingAs($this->user)
+        ->patch(route('budgets.accounts.update', [$this->budget, $this->account]), [
+            'name' => 'Chase Checking',
+            'type' => 'checking',
+            'logo_url' => $long,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($this->account->fresh()->logo_url)->toBe($long);
+
+    $this->actingAs($this->user)
+        ->patch(route('budgets.accounts.update', [$this->budget, $this->account]), [
+            'name' => 'Chase Checking',
+            'type' => 'checking',
+            'logo_url' => $long.'a',
+        ])
+        ->assertSessionHasErrors('logo_url');
+
+    expect($this->account->fresh()->logo_url)->toBe($long);
+});
+
 test('an update missing name and type or with a non URL logo is rejected and nothing changes', function () {
     $this->actingAs($this->user)
         ->patch(route('budgets.accounts.update', [$this->budget, $this->account]), [

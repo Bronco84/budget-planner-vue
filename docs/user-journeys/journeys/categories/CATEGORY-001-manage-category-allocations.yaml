@@ -34,7 +34,7 @@ steps:
 postconditions:
   - category list reflects the change
 business_rules:
-  - name required (max 255), amount required numeric >= 0 (stored in dollars), colour max 7 chars, description max 1000
+  - name required (max 255), amount required numeric >= 0 (stored in dollars), colour max 7 chars, description max 1000 (stored in a TEXT column so strict MySQL accepts the full length)
   - spent = sum of |amount_in_cents| of the budget's negative transactions linked to the category by category_id, plus unlinked (category_id null) legacy rows whose category string equals the category name
   - renaming a category keeps its transactions and recurring templates (they reference the id); the denormalized `category` string on them is updated to the new name, and unlinked rows carrying the old name are adopted
   - category_id was backfilled by migration from the category string (trimmed, case-insensitive, same budget); unmatched rows keep category_id null and their string
@@ -70,6 +70,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Categories/CategoryManagementTest.php::a category without a name or with a negative amount is rejected and nothing is saved
+  - id: long_description_stored
+    kind: validation
+    description: A description up to 1000 characters is stored in full on create and update (TEXT column); 1001 characters is rejected.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/CategoryManagementTest.php::a description up to the validated 1000 characters is stored in full on create and update
   - id: other_users_categories_forbidden
     kind: authorization
     description: Index/store/update on another user's budget return 403; a category from another budget returns 404 via scopeBindings.

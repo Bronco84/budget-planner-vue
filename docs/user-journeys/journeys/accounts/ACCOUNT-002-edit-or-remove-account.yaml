@@ -39,7 +39,7 @@ postconditions:
   - account updated, logo changed, or account removed
 business_rules:
   - include_in_budget toggles exclude_from_total_balance to its inverse
-  - logo_url must be a URL (max 500)
+  - logo_url must be a URL (max 500, matching the VARCHAR(500) column)
   - custom_logo is optional; when present it must be a base64 data:image/(png|jpeg|gif|webp|svg+xml) URL or an https URL, at most 65535 characters (the TEXT column size)
   - accounts with any transactions cannot be deleted; an account that is part of a transfer is refused with "This account has transfers. Delete its transfers first, then delete the account."
   - fetch-logo falls back to the account name when there is no Plaid institution, and flashes an error when no domain mapping exists
@@ -82,6 +82,12 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Accounts/AccountManagementTest.php::an update missing name and type or with a non URL logo is rejected and nothing changes
+  - id: long_logo_url_stored
+    kind: validation
+    description: A logo_url of exactly 500 characters (e.g. a signed CDN URL) is stored in full; 501 characters is rejected and the stored logo is unchanged.
+    coverage: covered
+    tests:
+      - tests/Feature/Accounts/AccountManagementTest.php::a logo URL up to the validated 500 characters is stored in full and a longer one is rejected
   - id: owner_deletes_unused_account
     kind: happy_path
     description: An account with no transactions is deleted.

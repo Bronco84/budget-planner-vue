@@ -5,6 +5,7 @@ use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 
 /*
  * CATEGORY-001: review spending by category, create and edit categories.
@@ -96,6 +97,43 @@ test('a valid update changes the category', function () {
     expect($category->name)->toBe('Mortgage')
         ->and((float) $category->amount)->toBe(1500.0)
         ->and($category->color)->toBe('#123456');
+});
+
+test('a description up to the validated 1000 characters is stored in full on create and update', function () {
+    // The SQLite suite ignores VARCHAR lengths, so also assert the column is
+    // TEXT: a VARCHAR(255) column fails these writes on strict MySQL.
+    expect(Schema::getColumnType('categories', 'description'))->toBe('text');
+
+    $long = str_repeat('a', 1000);
+
+    $this->actingAs($this->user)
+        ->post(route('budgets.categories.store', $this->budget), [
+            'name' => 'Groceries',
+            'amount' => 100,
+            'description' => $long,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $category = Category::where('budget_id', $this->budget->id)->where('name', 'Groceries')->firstOrFail();
+    expect($category->description)->toBe($long);
+
+    $this->actingAs($this->user)
+        ->patch(route('budgets.categories.update', [$this->budget, $category]), [
+            'name' => 'Groceries',
+            'amount' => 100,
+            'description' => str_repeat('b', 1000),
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($category->fresh()->description)->toBe(str_repeat('b', 1000));
+
+    $this->actingAs($this->user)
+        ->patch(route('budgets.categories.update', [$this->budget, $category]), [
+            'name' => 'Groceries',
+            'amount' => 100,
+            'description' => str_repeat('c', 1001),
+        ])
+        ->assertSessionHasErrors('description');
 });
 
 test('a category without a name or with a negative amount is rejected and nothing is saved', function () {

@@ -246,7 +246,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **PAYOFF-001** User creates a debt payoff plan with the wizard _(implemented, high)_
   - Routes: `payoff-plans.index`, `payoff-plans.create`, `payoff-plans.store`
-  - Tests: `tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php`, `tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php`, `tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php`, `tests/Feature/Services/PayoffPlanServiceTest.php`, `tests/playwright/smoke.spec.js`
+  - Tests: `tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php`, `tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php`, `tests/Feature/PayoffPlans/PayoffPlanLifecycleTest.php`, `tests/Feature/Services/PayoffPlanServiceTest.php`, `tests/playwright/payoff.spec.js`, `tests/playwright/smoke.spec.js`
 - **PAYOFF-002** User reviews a payoff plan's month-by-month projection _(implemented, critical)_
   - Routes: `payoff-plans.show`
   - Tests: `tests/Feature/PayoffPlans/PayoffPlanAuthorizationTest.php`, `tests/Feature/PayoffPlans/PayoffPlanProjectionTest.php`, `tests/Feature/Services/PayoffPlanServiceTest.php`, `tests/playwright/smoke.spec.js`

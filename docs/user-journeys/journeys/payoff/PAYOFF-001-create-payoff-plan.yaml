@@ -44,6 +44,7 @@ business_rules:
   - goal_type is savings, investment, purchase or other; goals.*.priority is an optional non-negative integer (the wizard sends 1, 2, ... in the order goals were added)
   - there is no strategy-comparison endpoint (the unused payoff-plans.preview route and PayoffPlanService::compareStrategies were removed)
   - index needs budget view; create and store need budget update
+  - the wizard posts only from the Review step; submitting the form earlier (Enter in a step's input) advances one step when the step is complete, never creates the plan
 scenarios:
   - id: create_plan
     kind: happy_path
@@ -97,6 +98,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/PayoffPlans/PayoffPlanCrossBudgetTest.php::a failure while storing a plan rolls back and keeps the existing active plan
+  - id: enter_advances_wizard
+    kind: edge
+    description: Pressing Enter in the Strategy step's extra payment input moves to Goals; nothing is posted until Create Plan on Review.
+    coverage: covered
+    tests:
+      - tests/playwright/payoff.spec.js::pressing Enter on the strategy step advances to Goals instead of creating the plan
+    note: Local-only E2E against the Herd site with a throwaway user and budget.
   - id: cross_user_budget_forbidden
     kind: authorization
     description: Another user cannot list, open the wizard for or store plans in a budget they do not own (403).

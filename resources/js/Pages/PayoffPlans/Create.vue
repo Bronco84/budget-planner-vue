@@ -770,6 +770,13 @@ const stepForField = (field) => {
 };
 
 const handleSubmit = () => {
+  // Enter in a step's input submits the form implicitly; before Review that
+  // means "next", never "create the plan" with the remaining steps skipped.
+  if (currentStep.value < steps.length - 1) {
+    nextStep();
+    return;
+  }
+
   form.post(route('payoff-plans.store', props.budget.id), {
     onError: (errors) => {
       const fields = Object.keys(errors);

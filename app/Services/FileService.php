@@ -331,6 +331,7 @@ class FileService
                 Log::warning("Failed to remove an unused file while {$while}", $logContext + [
                     'file_id' => $file->id,
                     'error' => $e->getMessage(),
+                    'exception' => $e,
                 ]);
             }
         }

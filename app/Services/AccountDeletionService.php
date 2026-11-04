@@ -231,6 +231,7 @@ class AccountDeletionService
             Log::warning('Failed to remove an unused file while deleting an account', [
                 'file_id' => $file->id,
                 'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
         }
     }

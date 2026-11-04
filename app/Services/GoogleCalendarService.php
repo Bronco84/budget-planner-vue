@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CalendarConnection;
 use App\Models\CalendarEvent;
 use App\Models\User;
+use App\Support\ExceptionContext;
 use Carbon\Carbon;
 use Google\Client as GoogleClient;
 use Google\Service\Calendar as GoogleCalendar;
@@ -152,7 +153,7 @@ class GoogleCalendarService
         } catch (\Throwable $e) {
             Log::warning('Google Calendar grant revocation failed', [
                 'connection_id' => $connection->id,
-                ...self::exceptionContext($e),
+                ...ExceptionContext::withoutArguments($e),
             ]);
         }
 
@@ -215,7 +216,7 @@ class GoogleCalendarService
         } catch (\Exception $e) {
             Log::error('Google Calendar sync failed', [
                 'connection_id' => $connection->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             throw $e;
@@ -306,26 +307,5 @@ class GoogleCalendarService
         }
 
         return $calendars;
-    }
-
-    /**
-     * Log context for a Google failure: class, message, origin and a file:line
-     * trace. The throwable itself is not passed to the logger because its
-     * formatted trace includes call arguments (the OAuth code, access and
-     * refresh tokens) when zend.exception_ignore_args is off.
-     *
-     * @return array{exception: class-string, error: string, at: string, trace: list<string>}
-     */
-    public static function exceptionContext(\Throwable $e): array
-    {
-        return [
-            'exception' => $e::class,
-            'error' => $e->getMessage(),
-            'at' => $e->getFile().':'.$e->getLine(),
-            'trace' => array_map(
-                fn (array $frame) => ($frame['file'] ?? '[internal]').':'.($frame['line'] ?? 0),
-                $e->getTrace()
-            ),
-        ];
     }
 }

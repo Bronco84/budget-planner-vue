@@ -35,7 +35,7 @@ postconditions:
   - inactive connections' events are excluded from the calendar month view (CALENDAR-003)
 business_rules:
   - only the owning user may sync, toggle or delete a connection
-  - sync failures flash a generic "Sync failed. Please try again."; the exception is only logged
+  - sync failures flash a generic "Sync failed. Please try again."; the exception is only logged, as an argument-free trace (ExceptionContext::withoutArguments) so token arguments never reach the log
   - an expired token without a refresh token fails with "No refresh token available"
   - sync reads every events.list page; only after the whole window is listed are the connection's stored events in that window that Google no longer returned (deleted, cancelled or moved out) removed
   - a sync that fails part-way removes nothing

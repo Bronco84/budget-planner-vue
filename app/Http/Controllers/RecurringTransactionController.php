@@ -105,6 +105,7 @@ class RecurringTransactionController extends Controller
                 'user_id' => auth()->id(),
                 'budget_id' => $budget->id,
                 'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
             throw $e;
         }
@@ -195,7 +196,7 @@ class RecurringTransactionController extends Controller
             \Log::error('Failed to create recurring transaction:', [
                 'validated_data' => $validated,
                 'error' => $e->getMessage(),
-                'stack_trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
             throw $e;
         }

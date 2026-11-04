@@ -56,6 +56,7 @@ class PayoffContextBuilder implements ContextBuilderInterface
                         'payoff_plan_id' => $plan->id,
                         'budget_id' => $plan->budget_id,
                         'error' => $e->getMessage(),
+                        'exception' => $e,
                     ]);
                 }
 

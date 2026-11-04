@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Services\BudgetDeletionService;
 use App\Services\BudgetService;
 use App\Services\PlaidService;
+use App\Support\ExceptionContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -134,7 +135,7 @@ class BudgetController extends Controller
         } catch (\Exception $e) {
             $linkToken = null;
             \Log::warning('Failed to create Plaid link token for setup', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'budget_id' => $budget->id,
             ]);
         }

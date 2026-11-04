@@ -112,6 +112,7 @@ class SmartContextLoaderService
             } catch (\Exception $e) {
                 Log::error("Failed to build context for type: {$type}", [
                     'error' => $e->getMessage(),
+                    'exception' => $e,
                 ]);
             }
         }

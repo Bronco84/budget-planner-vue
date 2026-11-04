@@ -69,6 +69,7 @@ class ContextNegotiatorService
         } catch (\Exception $e) {
             Log::error('Context negotiation failed, using fallback', [
                 'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             return self::FALLBACK_CONTEXT_TYPES;

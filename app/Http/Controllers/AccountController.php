@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Models\PlaidConnection;
 use App\Models\Transfer;
 use App\Services\PlaidService;
+use App\Support\ExceptionContext;
 use App\Traits\InstitutionDomainMapping;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,7 @@ class AccountController extends Controller
             $plaidService = app(PlaidService::class);
             $linkToken = $plaidService->createLinkToken((string) Auth::id());
         } catch (\Exception $e) {
-            \Log::error('Failed to create Plaid link token: '.$e->getMessage());
+            \Log::error('Failed to create Plaid link token', ExceptionContext::withoutArguments($e));
         }
 
         return Inertia::render('Accounts/CreateOrImport', [

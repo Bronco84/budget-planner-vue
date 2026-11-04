@@ -4,6 +4,7 @@ namespace App\Services\BankFeed;
 
 use App\Models\BankFeed;
 use App\Services\PlaidService;
+use App\Support\ExceptionContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -49,8 +50,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
             ];
         } catch (\Exception $e) {
             Log::error('Plaid connection failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return [
@@ -124,7 +124,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             Log::error('Failed to get Plaid transactions', [
                 'bank_feed_id' => $bankFeed->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             throw $e;
@@ -163,7 +163,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             Log::error('Failed to update Plaid balance', [
                 'bank_feed_id' => $bankFeed->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             throw $e;
@@ -182,7 +182,7 @@ class PlaidImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             Log::error('Failed to disconnect from Plaid', [
                 'bank_feed_id' => $bankFeed->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return false;

@@ -3,6 +3,7 @@
 namespace App\Services\BankFeed;
 
 use App\Models\BankFeed;
+use App\Support\ExceptionContext;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
@@ -61,8 +62,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
             ];
         } catch (\Exception $e) {
             Log::error('Airtable connection failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return [
@@ -137,7 +137,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             Log::error('Failed to get Airtable transactions', [
                 'bank_feed_id' => $bankFeed->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             throw $e;
@@ -360,7 +360,7 @@ class AirtableImportStrategy implements BankFeedImportInterface
         } catch (\Exception $e) {
             Log::warning('Failed to parse Airtable date', [
                 'date_value' => $dateValue,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return null;

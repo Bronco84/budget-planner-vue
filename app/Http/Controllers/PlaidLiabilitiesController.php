@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PlaidConnection;
 use App\Services\PlaidService;
+use App\Support\ExceptionContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -112,7 +113,7 @@ class PlaidLiabilitiesController extends Controller
             } catch (\Exception $e) {
                 Log::error('Failed to update liability data for credit card', [
                     'plaid_account_id' => $creditCard->id,
-                    'error' => $e->getMessage(),
+                    ...ExceptionContext::withoutArguments($e),
                 ]);
                 $failCount++;
             }
@@ -174,7 +175,7 @@ class PlaidLiabilitiesController extends Controller
                 Log::error('Failed to update liability data for connection', [
                     'connection_id' => $connection->id,
                     'institution' => $connection->institution_name,
-                    'error' => $e->getMessage(),
+                    ...ExceptionContext::withoutArguments($e),
                 ]);
                 $failCount++;
             }

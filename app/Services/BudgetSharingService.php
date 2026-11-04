@@ -7,6 +7,7 @@ use App\Mail\BudgetInvitationMail;
 use App\Models\Budget;
 use App\Models\BudgetInvitation;
 use App\Models\User;
+use App\Support\ExceptionContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -69,7 +70,7 @@ class BudgetSharingService
             Log::error('Failed to send budget invitation email', [
                 'budget_id' => $budget->id,
                 'invitation_id' => $invitation->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
         }
 

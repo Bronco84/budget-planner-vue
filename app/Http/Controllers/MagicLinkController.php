@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\DeviceFingerprintService;
 use App\Services\DeviceTokenService;
 use App\Services\MagicLinkService;
+use App\Support\ExceptionContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -62,7 +63,7 @@ class MagicLinkController extends Controller
                 // A mail outage must not change the (already sent) response.
                 Log::error('Magic link email could not be sent', [
                     'user_id' => $user->id,
-                    'exception' => $e,
+                    ...ExceptionContext::withoutArguments($e),
                 ]);
             }
         });

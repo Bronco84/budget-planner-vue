@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
 use App\Services\PlaidService;
+use App\Support\ExceptionContext;
 use GuzzleHttp\Exception\ConnectException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -106,7 +107,7 @@ class PlaidController extends Controller
             );
         } catch (\Exception $e) {
             Log::error('Failed to create link token', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
         }
 
@@ -173,7 +174,7 @@ class PlaidController extends Controller
             $linkToken = $this->plaidService->createLinkToken((string) Auth::id());
         } catch (\Exception $e) {
             Log::error('Failed to create link token for discovery', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
         }
 
@@ -293,9 +294,8 @@ class PlaidController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Plaid import failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'budget_id' => $budget->id,
-                'exception' => $e,
             ]);
 
             $this->discardExchangedItem($accessToken, $itemId ?? null, $budget);
@@ -408,9 +408,8 @@ class PlaidController extends Controller
                 ->with('error', $syncError);
         } catch (\Exception $e) {
             Log::error('Plaid linking failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'account_id' => $account->id,
-                'exception' => $e,
             ]);
 
             $this->discardExchangedItem($accessToken, $itemId, $budget);
@@ -500,9 +499,8 @@ class PlaidController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Account re-linking failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'account_id' => $account->id,
-                'exception' => $e,
             ]);
 
             $this->discardExchangedItem($accessToken, $itemId, $budget);
@@ -631,7 +629,7 @@ class PlaidController extends Controller
         } catch (\Throwable $e) {
             Log::warning('Failed to remove an unused Plaid item after linking failed', [
                 'budget_id' => $budget->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
         }
     }
@@ -674,7 +672,7 @@ class PlaidController extends Controller
         Log::error('Account sync error', [
             'account_id' => $account->id,
             'plaid_account_id' => $plaidAccount->id,
-            'error' => $e->getMessage(),
+            ...ExceptionContext::withoutArguments($e),
         ]);
 
         return redirect()->back()->with('error', $this->syncFailureMessage($e));
@@ -725,7 +723,7 @@ class PlaidController extends Controller
 
                 Log::warning('Initial sync after linking failed', [
                     'plaid_account_id' => $plaidAccount->id,
-                    'error' => $result->getMessage(),
+                    ...ExceptionContext::withoutArguments($result),
                 ]);
 
                 $error ??= $this->syncFailureMessage($result);
@@ -769,10 +767,9 @@ class PlaidController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to create upgrade link token', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'account_id' => $account->id,
                 'plaid_account_id' => $plaidAccount->id,
-                'exception' => $e,
             ]);
 
             return response()->json(['error' => $this->userSafeError($e, 'Failed to create re-authentication link. Please try again.')], 500);
@@ -819,9 +816,8 @@ class PlaidController extends Controller
             return redirect()->back()->with('message', 'Connection re-authenticated successfully. All accounts under this connection have been updated.');
         } catch (\Exception $e) {
             Log::error('Re-authentication failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'account_id' => $account->id,
-                'exception' => $e,
             ]);
 
             return redirect()->back()->with('error', $this->userSafeError($e, 'Failed to re-authenticate. Please try again.'));
@@ -939,7 +935,7 @@ class PlaidController extends Controller
                 Log::error('Sync error', [
                     'plaid_account_id' => $plaidAccount->id,
                     'account_id' => $plaidAccount->account_id,
-                    'error' => $result->getMessage(),
+                    ...ExceptionContext::withoutArguments($result),
                 ]);
             }
         }

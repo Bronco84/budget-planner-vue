@@ -78,7 +78,7 @@ class IdentifyAllRecurringTransactions extends Command
                 Log::error('Error in identify-all-recurring command', [
                     'budget_id' => $budget->id,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
+                    'exception' => $e,
                 ]);
             }
         }

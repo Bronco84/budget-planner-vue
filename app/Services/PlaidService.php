@@ -11,6 +11,7 @@ use App\Models\PlaidSecurity;
 use App\Models\PlaidStatementHistory;
 use App\Models\PlaidTransaction;
 use App\Models\Transaction;
+use App\Support\ExceptionContext;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
@@ -200,7 +201,7 @@ class PlaidService
 
         } catch (ConnectException $e) {
             Log::error('Plaid connection failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'host' => $this->baseUrl,
                 'environment' => $this->environment,
             ]);
@@ -217,7 +218,7 @@ class PlaidService
             }
 
             Log::error('Plaid link token creation failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'status_code' => $response ? $response->getStatusCode() : null,
                 'error_details' => $errorDetails,
                 'environment' => $this->environment,
@@ -297,14 +298,14 @@ class PlaidService
             return $result['access_token'] ?? null;
         } catch (ConnectException $e) {
             Log::error('Plaid token exchange could not connect', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'host' => $this->baseUrl,
                 'environment' => $this->environment,
             ]);
             throw new \Exception($this->getConnectionErrorMessage($e), 0, $e);
         } catch (RequestException $e) {
             Log::error('Plaid token exchange failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null,
             ]);
             throw new \Exception($this->getRequestErrorMessage($e));
@@ -377,7 +378,7 @@ class PlaidService
             Log::warning('Failed to remove Plaid item; its access token may still be valid at Plaid', [
                 'connection_id' => $connection->id,
                 'budget_id' => $connection->budget_id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return false;
@@ -429,7 +430,7 @@ class PlaidService
         } catch (RequestException $e) {
             Log::warning('Failed to search institutions from Plaid', [
                 'query' => $query,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return null;
@@ -477,7 +478,7 @@ class PlaidService
         } catch (RequestException $e) {
             Log::warning('Failed to fetch institution details from Plaid', [
                 'institution_id' => $institutionId,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'response' => $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null,
             ]);
 
@@ -548,7 +549,7 @@ class PlaidService
             }
 
             Log::error('Plaid transactions fetch failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'response' => $errorDetails,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
@@ -597,7 +598,7 @@ class PlaidService
             $errorDetails = $e->hasResponse() ? json_decode($e->getResponse()->getBody(), true) : null;
 
             Log::error('Plaid accounts fetch failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'response' => $errorDetails,
             ]);
 
@@ -668,7 +669,7 @@ class PlaidService
             }
 
             Log::error('Plaid liabilities fetch failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'response' => $errorResponse,
             ]);
 
@@ -762,7 +763,7 @@ class PlaidService
             }
 
             Log::error('Plaid investment holdings fetch failed', [
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'response' => $errorDetails,
             ]);
 
@@ -1101,7 +1102,7 @@ class PlaidService
                     Log::info('Transaction fetch failed for investment account (expected, continuing to balance update)', [
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $plaidAccount->account_name,
-                        'error' => $txError->getMessage(),
+                        ...ExceptionContext::withoutArguments($txError),
                     ]);
                 } else {
                     throw $txError;
@@ -1326,7 +1327,7 @@ class PlaidService
                     Log::warning('Failed to update liability data during transaction sync', [
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $plaidAccount->account_name,
-                        'error' => $liabilityError->getMessage(),
+                        ...ExceptionContext::withoutArguments($liabilityError),
                     ]);
                 }
             }
@@ -1343,7 +1344,7 @@ class PlaidService
                     Log::warning('Failed to update investment data during transaction sync', [
                         'plaid_account_id' => $plaidAccount->id,
                         'account_name' => $plaidAccount->account_name,
-                        'error' => $investmentError->getMessage(),
+                        ...ExceptionContext::withoutArguments($investmentError),
                     ]);
                 }
             }
@@ -1369,7 +1370,7 @@ class PlaidService
                     Log::warning('Failed to auto-link transactions to recurring templates', [
                         'account_id' => $plaidAccount->account_id,
                         'account_name' => $plaidAccount->account_name,
-                        'error' => $linkError->getMessage(),
+                        ...ExceptionContext::withoutArguments($linkError),
                     ]);
                 }
             }
@@ -1380,9 +1381,8 @@ class PlaidService
             ];
         } catch (\Exception $e) {
             Log::error('Error syncing transactions', [
-                'message' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString(),
             ]);
 
             $this->flagLoginRequired($plaidAccount, $e);
@@ -1676,9 +1676,8 @@ class PlaidService
             return false;
         } catch (\Exception $e) {
             Log::error('Error updating account balance', [
-                'message' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString(),
             ]);
 
             $this->flagLoginRequired($plaidAccount, $e);
@@ -1812,9 +1811,8 @@ class PlaidService
 
         } catch (\Exception $e) {
             Log::error('Error updating liability data', [
-                'message' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString(),
             ]);
 
             $this->flagLoginRequired($plaidAccount, $e);
@@ -2073,9 +2071,8 @@ class PlaidService
 
         } catch (\Exception $e) {
             Log::error('Error updating investment data', [
-                'message' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
                 'plaid_account_id' => $plaidAccount->id,
-                'trace' => $e->getTraceAsString(),
             ]);
 
             $this->flagLoginRequired($plaidAccount, $e);

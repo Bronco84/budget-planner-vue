@@ -47,7 +47,7 @@ business_rules:
   - auth.magic_link_queue (env MAGIC_LINK_QUEUE, default false) queues the email instead of sending it synchronously; enable only once a queue worker is running, since magic links are the fallback sign-in
   - magic-link sign-in does not create a TrustedDevice
   - raw token and URL are never logged
-  - a mail transport failure is caught and logged (Log::error) and the same neutral status is returned
+  - a mail transport failure is caught and logged (Log::error, argument-free trace via ExceptionContext::withoutArguments so mailer frames cannot leak the link) and the same neutral status is returned
 scenarios:
   - id: request_form_renders
     kind: happy_path

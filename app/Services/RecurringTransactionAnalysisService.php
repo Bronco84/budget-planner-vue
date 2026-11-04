@@ -155,6 +155,7 @@ class RecurringTransactionAnalysisService
 
                 Log::error('Failed to create recurring transaction template', [
                     'error' => $e->getMessage(),
+                    'exception' => $e,
                     'pattern_data' => $patternData,
                     'budget_id' => $budget->id,
                 ]);

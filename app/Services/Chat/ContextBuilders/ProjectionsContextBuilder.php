@@ -176,6 +176,7 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
             Log::warning('Chat projections: autopay projections failed', [
                 'budget_id' => $budget->id,
                 'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             return null;
@@ -209,6 +210,7 @@ class ProjectionsContextBuilder implements ContextBuilderInterface
                     'budget_id' => $budget->id,
                     'account_id' => $account->id,
                     'error' => $e->getMessage(),
+                    'exception' => $e,
                 ]);
             }
         }

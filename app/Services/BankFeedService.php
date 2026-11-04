@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Services\BankFeed\AirtableImportStrategy;
 use App\Services\BankFeed\BankFeedImportInterface;
 use App\Services\BankFeed\PlaidImportStrategy;
+use App\Support\ExceptionContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -121,7 +122,7 @@ class BankFeedService
                 // Balance update failure shouldn't prevent connection
                 Log::warning('Failed to update balance during connection', [
                     'bank_feed_id' => $bankFeed->id,
-                    'error' => $e->getMessage(),
+                    ...ExceptionContext::withoutArguments($e),
                 ]);
             }
 
@@ -138,7 +139,7 @@ class BankFeedService
             Log::error('Failed to connect bank feed source', [
                 'account_id' => $account->id,
                 'source_type' => $sourceType,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return [
@@ -204,7 +205,7 @@ class BankFeedService
                     } catch (\Exception $e) {
                         Log::warning('Failed to create transaction from bank feed transaction', [
                             'bank_feed_transaction_id' => $bankFeedTransaction->id,
-                            'error' => $e->getMessage(),
+                            ...ExceptionContext::withoutArguments($e),
                         ]);
                     }
                 }
@@ -220,7 +221,7 @@ class BankFeedService
             } catch (\Exception $e) {
                 Log::warning('Failed to update balance during sync', [
                     'bank_feed_id' => $bankFeed->id,
-                    'error' => $e->getMessage(),
+                    ...ExceptionContext::withoutArguments($e),
                 ]);
             }
 
@@ -244,7 +245,7 @@ class BankFeedService
 
             Log::error('Failed to sync bank feed transactions', [
                 'bank_feed_id' => $bankFeed->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return [
@@ -319,7 +320,7 @@ class BankFeedService
         } catch (\Exception $e) {
             Log::error('Failed to disconnect bank feed', [
                 'bank_feed_id' => $bankFeed->id,
-                'error' => $e->getMessage(),
+                ...ExceptionContext::withoutArguments($e),
             ]);
 
             return false;

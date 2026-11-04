@@ -45,6 +45,7 @@ business_rules:
   - the Nova User resource has no Password field (accounts are passwordless)
   - a one-off data migration set is_admin for the previously allowlisted owner email; its down() is a no-op so a rollback cannot lock the owner out
   - is_admin is not mass-assignable
+  - users cannot be deleted from Nova (single, bulk or force delete); a bare row delete would skip AccountDeletionService, so users delete their own accounts from Profile (PROFILE-002)
 scenarios:
   - id: admin_gate_allows
     kind: happy_path
@@ -114,6 +115,13 @@ scenarios:
     tests:
       - tests/Feature/SecurityNovaAccessTest.php::the owner admin migration grants is_admin to the previously allowlisted email
       - tests/Feature/SecurityNovaAccessTest.php::the owner admin migration is a no-op when the owner account does not exist
+  - id: nova_user_delete_denied
+    kind: authorization
+    description: An admin's single, bulk ("all") and force delete of a user through Nova's API deletes nothing, and the user resource reports it cannot be deleted.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a user through nova
+      - tests/Feature/Admin/NovaDeletionTest.php::nova does not offer deleting a user
 known_issues: []
 confidence: medium
 evidence:

@@ -45,6 +45,21 @@ class User extends Resource
     ];
 
     /**
+     * Users are never deleted from Nova: a bare row delete skips AccountDeletionService
+     * (S3 files, Plaid items, Google grants, shared-budget succession). Users delete
+     * their own accounts from Profile.
+     */
+    public function authorizedToDelete(Request $request): bool
+    {
+        return false;
+    }
+
+    public function authorizedToForceDelete(Request $request): bool
+    {
+        return false;
+    }
+
+    /**
      * Get the fields displayed by the resource.
      *
      * @return array<int, Field|Panel|ResourceTool|MergeValue>

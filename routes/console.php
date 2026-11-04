@@ -10,3 +10,7 @@ Artisan::command('inspire', function () {
 
 // Telescope records only failures outside local; keep two days of them.
 Schedule::command('telescope:prune --hours=48')->daily();
+
+// Retry removing files left unattached by a failed S3 delete (account, budget,
+// transaction or attachment deletion), so their S3 objects are not kept forever.
+Schedule::command('files:cleanup-orphans')->daily();

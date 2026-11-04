@@ -78,6 +78,11 @@ class AccountDeletionService
 
             $this->reassignOrRemoveFiles($user);
 
+            // Whatever the user still uploaded is a file whose S3 object could not be
+            // deleted. Detach it rather than let the foreign key cascade it away, so
+            // the scheduled files:cleanup-orphans can retry and reclaim the object.
+            File::where('uploaded_by', $user->id)->update(['uploaded_by' => null]);
+
             // Trusted devices, magic-link tokens, preferences and memberships cascade
             // via foreign keys; WebAuthn credentials are polymorphic so are removed here.
             $user->webAuthnCredentials()->delete();
@@ -212,7 +217,13 @@ class AccountDeletionService
             if ($file->deleteFromS3IfUnused()) {
                 $file->delete();
                 Activity::query()->whereMorphedTo('subject', $file)->delete();
+
+                return;
             }
+
+            Log::warning('Could not delete an unused file from S3 while deleting an account; left for files:cleanup-orphans', [
+                'file_id' => $file->id,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('Failed to remove an unused file while deleting an account', [
                 'file_id' => $file->id,

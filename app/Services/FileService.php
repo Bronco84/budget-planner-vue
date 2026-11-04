@@ -500,12 +500,19 @@ class FileService
      * Clean up orphaned files (files with no attachments).
      * This is useful for maintenance and can be run as a scheduled job.
      *
+     * Run daily by files:cleanup-orphans. It reclaims files left behind when an S3
+     * delete failed (including ones detached from a deleted account, with a null
+     * uploaded_by). $untouchedSince skips files changed recently, so a record an
+     * upload is about to re-attach is never removed under it.
+     *
      * @param  int|null  $userId  Optional user ID for activity logging
      * @return array Summary of cleanup results
      */
-    public function cleanupOrphanedFiles(?int $userId = null): array
+    public function cleanupOrphanedFiles(?int $userId = null, ?\DateTimeInterface $untouchedSince = null): array
     {
-        $orphanedFiles = File::whereDoesntHave('attachments')->get();
+        $orphanedFiles = File::whereDoesntHave('attachments')
+            ->when($untouchedSince, fn ($query) => $query->where('updated_at', '<', $untouchedSince))
+            ->get();
         $cleanupSummary = [
             'total_orphaned' => $orphanedFiles->count(),
             'successfully_deleted' => 0,

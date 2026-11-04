@@ -301,7 +301,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Auth/GuestAccessTest.php`, `tests/Feature/Profile/ProfileValidationTest.php`, `tests/Feature/ProfileTest.php`
 - **PROFILE-002** User deletes their account _(implemented, medium)_
   - Routes: `profile.edit`, `profile.destroy`
-  - Tests: `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/Calendar/CalendarGrantRevocationTest.php`, `tests/Feature/DeleteAccountTest.php`, `tests/Feature/ProfileTest.php`
+  - Tests: `tests/Feature/Auth/PasskeyLoginCeremonyTest.php`, `tests/Feature/Calendar/CalendarGrantRevocationTest.php`, `tests/Feature/DeleteAccountTest.php`, `tests/Feature/Files/OrphanedFileCleanupTest.php`, `tests/Feature/ProfileTest.php`
 
 ### projections
 

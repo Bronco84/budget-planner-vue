@@ -28,6 +28,8 @@ depends_on:
     reason: resolved from the container in destroy(); succession, unshared budget cleanup and authorship reassignment
   - path: app/Services/BudgetDeletionService.php
     reason: destroys unshared budgets with their attachments, S3 objects and Plaid items
+  - path: app/Console/Commands/CleanupOrphanedFiles.php
+    reason: scheduled daily in routes/console.php; retries S3 deletes of files the deletion could not remove
   - path: app/Services/GoogleCalendarService.php
     reason: revokeAccess() revokes each calendar connection's Google grant after the user is deleted
   - path: app/Services/BudgetSharingService.php
@@ -56,6 +58,7 @@ business_rules:
   - an unshared budget is destroyed like BUDGET-005 (attachments, unused S3 objects, Plaid items, activity-log history); activity on shared budgets that live on is kept, as is the user's causer reference in it
   - budgets that live on include any budget holding the user's scenarios or attachments, even one they were removed from or left, not only current memberships
   - on budgets that live on, the user's scenarios (scenarios.user_id), attachments (file_attachments.attached_by) and files (files.uploaded_by) pass to the budget's primary owner; a file whose content the owner already has a record for merges into that record (a duplicate attachment on the same item is dropped); a file attached nowhere is removed with its S3 object when unused
+  - a file whose S3 object cannot be deleted (the s3 disk returns false or throws) is kept with uploaded_by set to null instead of cascading with the user, and the daily files:cleanup-orphans command (FileService::cleanupOrphanedFiles, files unattached and unchanged for 24 hours) retries the S3 delete and removes the record
 scenarios:
   - id: account_deleted
     kind: happy_path
@@ -135,6 +138,14 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/DeleteAccountTest.php::a removed member deleting their account leaves their receipts and scenarios on the owners budget
+  - id: failed_s3_delete_left_for_cleanup
+    kind: recovery
+    description: When S3 deletes fail during account deletion, the user is still deleted, their undeletable files are detached from them and kept, and the scheduled orphan cleanup reclaims the objects once S3 works.
+    coverage: covered
+    tests:
+      - tests/Feature/Files/OrphanedFileCleanupTest.php::a file whose S3 delete fails during account deletion is detached from the user and kept for cleanup
+      - tests/Feature/Files/OrphanedFileCleanupTest.php::files:cleanup-orphans removes old unattached files and keeps attached, recent and still failing ones
+      - tests/Feature/Files/OrphanedFileCleanupTest.php::files:cleanup-orphans is scheduled daily
   - id: device_cookie_cleared
     kind: integration
     description: The device_token cookie is expired on the deletion response.

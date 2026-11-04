@@ -84,7 +84,7 @@
                     <div class="ml-3">
                       <h3 class="text-sm font-medium text-blue-800">What's next?</h3>
                       <p class="mt-1 text-sm text-blue-700">
-                        After creating your budget, you can connect your bank accounts for automatic transaction syncing, or add accounts manually for full control.
+                        After creating your budget, you can connect your bank accounts to import transactions and balances (they update when you sync), or add accounts manually for full control.
                       </p>
                     </div>
                   </div>

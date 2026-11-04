@@ -301,7 +301,7 @@
                   Select additional accounts to link to your existing {{ existingConnectionInstitution }} connection.
                 </template>
                 <template v-else>
-                  Connect this account to your bank to automatically import transactions and update balances.
+                  Connect this account to your bank to import transactions and balances. They update when you sync.
                 </template>
                 <br>
                 Your banking credentials are never stored on our servers.

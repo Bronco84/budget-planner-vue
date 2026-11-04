@@ -331,7 +331,7 @@
                       </svg>
                     </div>
                     <p class="text-sm text-gray-600 mb-4">
-                      Connect to automatically import transactions and update balances
+                      Connect to import transactions and balances; they update when you sync
                     </p>
                     <Link 
                       :href="route('plaid.link', [budget.id, account.id])"

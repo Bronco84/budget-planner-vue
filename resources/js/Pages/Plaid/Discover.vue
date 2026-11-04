@@ -34,7 +34,7 @@
                     <p class="text-sm text-blue-700 dark:text-blue-300">
                       Connect to your bank to discover <strong>all available accounts</strong> including checking, savings,
                       credit cards, mortgages, investments, and loans. Select which accounts you'd like to import
-                      into your budget for automatic transaction syncing.
+                      into your budget. Transactions and balances update when you sync.
                     </p>
                   </div>
                 </div>

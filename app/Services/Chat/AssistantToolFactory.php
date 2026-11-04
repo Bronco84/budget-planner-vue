@@ -216,7 +216,7 @@ class AssistantToolFactory
             try {
                 $data = $resolve($named);
             } catch (\Throwable $e) {
-                Log::error("Assistant tool {$name} failed", ['error' => $e->getMessage()]);
+                Log::error("Assistant tool {$name} failed", ['exception' => $e]);
 
                 return json_encode(['error' => 'Unable to load this data right now.']);
             }

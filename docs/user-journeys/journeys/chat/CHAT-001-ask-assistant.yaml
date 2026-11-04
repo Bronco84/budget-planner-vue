@@ -158,6 +158,12 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/AssistantToolFactoryTest.php::transaction query caps the requested limit'
+  - id: tool_failure_safe_and_logged
+    kind: recovery
+    description: A tool whose data builder throws returns a generic error to the model and logs the throwable itself (so the trace reaches logs and Telescope).
+    coverage: covered
+    tests:
+      - 'tests/Feature/AssistantToolFactoryTest.php::a failing tool returns a safe error and logs the throwable so its trace is kept'
   - id: message_validation
     kind: validation
     description: Empty, over-2000-char messages or unknown conversation/budget ids fail validation (422) on send and stream start.

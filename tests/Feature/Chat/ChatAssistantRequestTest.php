@@ -152,7 +152,7 @@ test('provider failures on send return the specific safe message and log the rea
 
     Log::shouldHaveReceived('error')
         ->withArgs(fn ($log, $context) => $log === 'Chat service error'
-            && $context['exception'] === $exception::class
+            && $context['exception'] === $exception
             && $context['user_id'] === $user->id)
         ->once();
 })->with([
@@ -176,7 +176,7 @@ test('provider failures while streaming send the specific safe message in band a
 
     Log::shouldHaveReceived('error')
         ->withArgs(fn ($log, $context) => $log === 'Chat streaming provider error'
-            && $context['exception'] === $exception::class)
+            && $context['exception'] === $exception)
         ->once();
 })->with([
     'overloaded' => [fn () => PrismProviderOverloadedException::make(Provider::OpenAI), 'The AI provider is overloaded right now. Please try again in a moment.'],

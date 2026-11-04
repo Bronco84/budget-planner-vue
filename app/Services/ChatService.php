@@ -95,8 +95,7 @@ class ChatService
         } catch (\Exception $e) {
             Log::error('Chat service streaming error', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             return response()->json([
@@ -227,8 +226,7 @@ class ChatService
                     Log::error('Chat streaming provider error', [
                         'user_id' => $userId,
                         'conversation_id' => $conversationId,
-                        'exception' => $e::class,
-                        'error' => $e->getMessage(),
+                        'exception' => $e,
                     ]);
 
                     $this->discardFailedTurn($conversation, $userMessage);
@@ -246,8 +244,7 @@ class ChatService
         } catch (\Exception $e) {
             Log::error('Chat service streaming error', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             return response()->json([
@@ -381,9 +378,7 @@ class ChatService
 
             Log::error('Chat service error', [
                 'user_id' => $user->id,
-                'exception' => $e::class,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             return [
@@ -995,7 +990,7 @@ class ChatService
         } catch (\Exception $e) {
             Log::error('Failed to generate conversation title', [
                 'conversation_id' => $conversation->id,
-                'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
         }
     }

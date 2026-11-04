@@ -98,8 +98,7 @@ class CalendarConnectionController extends Controller
         } catch (\Exception $e) {
             Log::error('Google Calendar OAuth callback failed', [
                 'user_id' => auth()->id(),
-                'exception' => $e::class,
-                'error' => $e->getMessage(),
+                ...GoogleCalendarService::exceptionContext($e),
             ]);
 
             return redirect()->route('calendar.connections.index')
@@ -122,8 +121,7 @@ class CalendarConnectionController extends Controller
         } catch (\Exception $e) {
             Log::error('Google Calendar sync failed', [
                 'calendar_connection_id' => $calendarConnection->id,
-                'exception' => $e::class,
-                'error' => $e->getMessage(),
+                ...GoogleCalendarService::exceptionContext($e),
             ]);
 
             return redirect()->back()

@@ -5,7 +5,9 @@ use App\Models\Budget;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Chat\AssistantToolFactory;
+use App\Services\Chat\ContextBuilders\AccountContextBuilder;
 use App\Services\Chat\ContextBuilders\TransactionQueryContextBuilder;
+use Illuminate\Support\Facades\Log;
 
 test('factory builds the full tool set for a budget-owning user', function () {
     $user = User::factory()->create();
@@ -69,4 +71,29 @@ test('transaction query caps the requested limit', function () {
 
     // More rows exist than the cap, so the 100-row maximum is what limits the result.
     expect($result['summary']['returned'])->toBe(100);
+});
+
+test('a failing tool returns a safe error and logs the throwable so its trace is kept', function () {
+    $user = User::factory()->create();
+    $budget = Budget::factory()->create(['user_id' => $user->id]);
+    $failure = new RuntimeException('builder blew up');
+    app()->bind(AccountContextBuilder::class, fn () => new class($failure)
+    {
+        public function __construct(private Throwable $failure) {}
+
+        public function build(): array
+        {
+            throw $this->failure;
+        }
+    });
+    Log::spy();
+
+    $tool = collect(app(AssistantToolFactory::class)->make($user, $budget))
+        ->first(fn ($t) => $t->name() === 'get_accounts');
+
+    expect(json_decode($tool->handle(), true))->toBe(['error' => 'Unable to load this data right now.']);
+    Log::shouldHaveReceived('error')
+        ->withArgs(fn ($message, $context = []) => $message === 'Assistant tool get_accounts failed'
+            && ($context['exception'] ?? null) === $failure)
+        ->once();
 });

@@ -91,7 +91,8 @@ test('a failed google revocation still removes the calendar connection and is lo
     Log::shouldHaveReceived('warning')
         ->withArgs(fn ($message, $context) => str_contains($message, 'Google Calendar grant revocation')
             && $context['connection_id'] === $connection->id
-            && ! str_contains(json_encode($context), 'refresh-primary'))
+            && ! str_contains(json_encode($context), 'refresh-primary')
+            && ($failure === 'refuse' || ($context['trace'] ?? []) !== []))
         ->once();
 })->with([
     'google refuses' => ['refuse'],

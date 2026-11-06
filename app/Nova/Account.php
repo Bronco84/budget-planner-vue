@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use App\Models\Property;
 use App\Models\User;
 use App\Services\PlaidService;
 use Illuminate\Database\Eloquent\Model;
@@ -116,6 +117,7 @@ class Account extends Resource
 
             BelongsTo::make('Autopay Source Account', 'autopaySourceAccount', Account::class)
                 ->nullable()
+                ->rules([static::inBudget(\App\Models\Account::class, $request->input('budget'))])
                 ->hideFromIndex(),
 
             Number::make('Autopay Amount Override', 'autopay_amount_override_cents')
@@ -125,6 +127,7 @@ class Account extends Resource
 
             BelongsTo::make('Property')
                 ->nullable()
+                ->rules([static::inBudget(Property::class, $request->input('budget'))])
                 ->hideFromIndex(),
 
             HasOne::make('Plaid Account', 'plaidAccount', PlaidAccount::class),

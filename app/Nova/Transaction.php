@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use App\Models\Account;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -110,7 +111,8 @@ class Transaction extends Resource
 
             BelongsTo::make('Account')
                 ->sortable()
-                ->required(),
+                ->required()
+                ->rules([static::inBudget(Account::class, $request->input('budget'))]),
 
             Text::make('Description')
                 ->sortable()
@@ -152,6 +154,7 @@ class Transaction extends Resource
 
             BelongsTo::make('Recurring Template', 'recurringTemplate', RecurringTransactionTemplate::class)
                 ->nullable()
+                ->rules([static::inBudget(\App\Models\RecurringTransactionTemplate::class, $request->input('budget'))])
                 ->hideFromIndex(),
 
             MorphMany::make('File Attachments', 'fileAttachments', FileAttachment::class),

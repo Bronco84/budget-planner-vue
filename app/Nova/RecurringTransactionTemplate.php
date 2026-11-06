@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use App\Models\Account;
 use App\Models\RecurringTransactionTemplate as RTTModel;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
@@ -60,7 +61,8 @@ class RecurringTransactionTemplate extends Resource
 
             BelongsTo::make('Account')
                 ->sortable()
-                ->required(),
+                ->required()
+                ->rules([static::inBudget(Account::class, $request->input('budget'))]),
 
             Text::make('Description')
                 ->sortable()

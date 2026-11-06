@@ -79,6 +79,8 @@ class Budget extends Resource
 
             BelongsTo::make('Starting Balance Account', 'startingBalanceAccount', Account::class)
                 ->nullable()
+                // The budget being edited; a budget being created owns no accounts yet.
+                ->rules([static::inBudget(\App\Models\Account::class, $request->resourceId)])
                 ->hideFromIndex(),
 
             HasMany::make('Accounts'),

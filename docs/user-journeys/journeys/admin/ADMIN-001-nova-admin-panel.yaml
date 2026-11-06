@@ -67,6 +67,7 @@ business_rules:
   - Plaid connections cannot be deleted from Nova (single, bulk or force delete); a bare delete would leave the Item live at Plaid, so owners unlink connections in the app
   - Plaid accounts cannot be deleted from Nova (single, bulk or force delete); deleting a connection's last one would leave the connection empty with its Item live at Plaid, so owners unlink accounts in the app
   - users cannot be deleted from Nova (single, bulk or force delete); a bare row delete would skip AccountDeletionService, so users delete their own accounts from Profile (PROFILE-002)
+  - Nova refuses (422) a relation to a record of a different budget, as the app only pairs records of one budget (a transaction's account and recurring template, a recurring template's account, an account's autopay source account and property must belong to the selected budget, and a budget's starting balance account must belong to that budget (none on create)). The relation dropdowns still list every budget's records; the rule, not the dropdown, is the guarantee
 scenarios:
   - id: admin_gate_allows
     kind: happy_path
@@ -213,6 +214,20 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a plaid account through nova
+  - id: nova_cross_budget_relation_refused
+    kind: validation
+    description: Nova refuses (422) creating or updating a transaction with an account from another budget, moving a transaction to another budget while keeping its account, and a recurring template, autopay source account, property or starting balance account from another budget, and changes nothing; the same pairings within one budget are saved.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses to create a transaction with an account from another budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova creates a transaction with an account from the same budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses to move a transaction to an account from another budget and changes nothing
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses to move a transaction to another budget while keeping its account
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova moves a transaction to another account in the same budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses a transaction recurring template from another budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses a recurring template account from another budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses an account autopay source or property from another budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses a budget starting balance account from another budget
 known_issues: []
 confidence: medium
 evidence:

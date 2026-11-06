@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PlaidConnection;
-use App\Models\Transfer;
 use App\Services\PlaidService;
 use App\Support\ExceptionContext;
 use App\Traits\InstitutionDomainMapping;
@@ -231,18 +230,8 @@ class AccountController extends Controller
     {
         $this->authorize('delete', $account);
 
-        // Transfers create a transaction on both accounts, so they must go first.
-        $hasTransfers = Transfer::where('from_account_id', $account->id)
-            ->orWhere('to_account_id', $account->id)
-            ->exists();
-
-        if ($hasTransfers) {
-            return back()->with('error', 'This account has transfers. Delete its transfers first, then delete the account.');
-        }
-
-        // Don't allow deletion if there are transactions
-        if ($account->transactions()->count() > 0) {
-            return back()->with('error', 'Cannot delete account with existing transactions.');
+        if ($reason = $account->deletionBlockedReason()) {
+            return back()->with('error', $reason);
         }
 
         // The plaid_accounts row cascades with the account; the connection and

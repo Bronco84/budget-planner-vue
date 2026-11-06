@@ -4,8 +4,10 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\File;
 use App\Models\FileAttachment;
+use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
 use App\Models\Transaction;
+use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
@@ -18,6 +20,8 @@ use Tests\Support\FakePlaidApi;
  * PR-081: a budget deleted from Nova goes through BudgetDeletionService, with
  * the same cleanup as deleting it in the app, and a file attachment deleted
  * from Nova is detached through FileService.
+ * PR-084: an account deleted from Nova gets the app's guards (no transfers, no
+ * transactions) and its empty Plaid connection is removed with its Item.
  */
 
 function novaDeletionAdmin(): User
@@ -140,4 +144,104 @@ test('deleting a file attachment from nova removes a file nothing else uses from
         ->and(File::pluck('hash')->all())->toBe(['hash-shared']);
     Storage::disk('s3')->assertMissing('hash-only');
     Storage::disk('s3')->assertExists('hash-shared');
+});
+
+function novaDeletionPlaidAccount(PlaidConnection $connection, Budget $budget, string $plaidId): Account
+{
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    PlaidAccount::create([
+        'plaid_connection_id' => $connection->id,
+        'account_id' => $account->id,
+        'plaid_account_id' => $plaidId,
+        'account_name' => 'Checking',
+        'account_type' => 'depository',
+        'account_subtype' => 'checking',
+    ]);
+
+    return $account;
+}
+
+test('deleting the last account of a plaid connection from nova removes the connection and its plaid item', function () {
+    $plaid = FakePlaidApi::install();
+    $plaid->on('/item/remove', ['request_id' => 'req-1']);
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $connection = PlaidConnection::create([
+        'budget_id' => $budget->id,
+        'plaid_item_id' => 'item-one',
+        'institution_name' => 'First Platypus Bank',
+        'access_token' => 'access-item-one',
+        'status' => PlaidConnection::STATUS_ACTIVE,
+    ]);
+    $account = novaDeletionPlaidAccount($connection, $budget, 'acc-1');
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/accounts?resources[]='.$account->id)
+        ->assertOk();
+
+    expect(Account::find($account->id))->toBeNull()
+        ->and(PlaidAccount::count())->toBe(0)
+        ->and(PlaidConnection::find($connection->id))->toBeNull()
+        ->and($plaid->bodyFor('/item/remove'))->toBe(['access_token' => 'access-item-one']);
+});
+
+test('deleting one of several accounts on a plaid connection from nova keeps the connection', function () {
+    $plaid = FakePlaidApi::install();
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $connection = PlaidConnection::create([
+        'budget_id' => $budget->id,
+        'plaid_item_id' => 'item-one',
+        'institution_name' => 'First Platypus Bank',
+        'access_token' => 'access-item-one',
+        'status' => PlaidConnection::STATUS_ACTIVE,
+    ]);
+    $account = novaDeletionPlaidAccount($connection, $budget, 'acc-1');
+    $kept = novaDeletionPlaidAccount($connection, $budget, 'acc-2');
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/accounts?resources[]='.$account->id)
+        ->assertOk();
+
+    expect(Account::find($account->id))->toBeNull()
+        ->and(Account::find($kept->id))->not->toBeNull()
+        ->and(PlaidConnection::find($connection->id))->not->toBeNull()
+        ->and(collect($plaid->requests)->where('path', '/item/remove')->all())->toBe([]);
+});
+
+test('nova refuses to delete an account with transactions', function () {
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id]);
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/accounts?resources[]='.$account->id)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['resources' => 'Cannot delete account with existing transactions.']);
+
+    expect(Account::find($account->id))->not->toBeNull()
+        ->and(Transaction::where('account_id', $account->id)->count())->toBe(1);
+});
+
+test('nova refuses to delete an account with transfers', function () {
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    $other = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    Transfer::create([
+        'budget_id' => $budget->id,
+        'from_account_id' => $other->id,
+        'to_account_id' => $account->id,
+        'amount_in_cents' => 1000,
+        'date' => now()->toDateString(),
+        'description' => 'Move money',
+    ]);
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/accounts?resources[]='.$account->id)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['resources' => 'This account has transfers.']);
+
+    expect(Account::find($account->id))->not->toBeNull();
 });

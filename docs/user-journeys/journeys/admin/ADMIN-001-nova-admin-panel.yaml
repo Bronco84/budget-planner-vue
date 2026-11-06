@@ -32,6 +32,10 @@ depends_on:
     reason: the Budget resource's beforeDelete deletes through it (attachments, unused S3 objects, activity, Plaid items)
   - path: app/Services/FileService.php
     reason: the FileAttachment resource's beforeDelete detaches through it (unused file and S3 object removed)
+  - path: app/Services/PlaidService.php
+    reason: the Account resource's beforeDelete calls deleteConnectionIfEmpty (empty connection and its Plaid item removed)
+  - path: app/Models/Account.php
+    reason: deletionBlockedReason() is the delete guard shared with AccountController::destroy (ACCOUNT-002)
   - path: app/Nova/Actions/LiftChatBan.php
     reason: User resource action to lift a chat ban (see ADMIN-002)
 integrations:
@@ -50,6 +54,7 @@ business_rules:
   - a one-off data migration set is_admin for the previously allowlisted owner email; its down() is a no-op so a rollback cannot lock the owner out
   - is_admin is not mass-assignable
   - deleting a budget from Nova runs BudgetDeletionService, the same cleanup as deleting it in the app (BUDGET-005); BudgetPolicy still limits it to the budget's owner
+  - deleting an account from Nova applies the app's guards (refused with a validation error while it has transfers or transactions) and removes its Plaid connection and the Item at Plaid when it was the connection's last account (ACCOUNT-002)
   - deleting a file attachment from Nova detaches it through FileService, removing a file and S3 object nothing else uses
   - users cannot be deleted from Nova (single, bulk or force delete); a bare row delete would skip AccountDeletionService, so users delete their own accounts from Profile (PROFILE-002)
 scenarios:
@@ -140,8 +145,22 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::deleting a file attachment from nova removes a file nothing else uses from S3
+  - id: nova_account_delete_cleans_up_plaid
+    kind: happy_path
+    description: Deleting a connection's last account through Nova's API removes the connection and its Item at Plaid; deleting one of several keeps them.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::deleting the last account of a plaid connection from nova removes the connection and its plaid item
+      - tests/Feature/Admin/NovaDeletionTest.php::deleting one of several accounts on a plaid connection from nova keeps the connection
+  - id: nova_account_delete_guarded
+    kind: validation
+    description: Nova refuses (422) to delete an account that has transactions or transfers, and the account stays.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete an account with transactions
+      - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete an account with transfers
 known_issues:
-  - Deleting an Account, File or Plaid Connection from Nova is still a bare row delete (Plaid items, S3 objects, the app's transfer/transaction guard are skipped); reported to the owner, not yet decided
+  - Deleting a File or Plaid Connection from Nova is still a bare row delete (S3 objects and Plaid items are left)
 confidence: medium
 evidence:
   - app/Providers/NovaServiceProvider.php gate(), routes()

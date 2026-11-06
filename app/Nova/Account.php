@@ -3,6 +3,9 @@
 namespace App\Nova;
 
 use App\Models\User;
+use App\Services\PlaidService;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
@@ -43,6 +46,30 @@ class Account extends Resource
     public static $search = [
         'id', 'name', 'type',
     ];
+
+    /**
+     * Apply the app's delete guards (no transfers, no transactions) and, as the app
+     * does, remove the Plaid connection and its Item when this was the connection's
+     * last account. Nova's own delete() that follows is a no-op on the deleted model.
+     *
+     * @param  \App\Models\Account  $model
+     *
+     * @throws ValidationException
+     */
+    public static function beforeDelete(NovaRequest $request, Model $model): void
+    {
+        if ($reason = $model->deletionBlockedReason()) {
+            throw ValidationException::withMessages(['resources' => $reason]);
+        }
+
+        $plaidConnection = $model->plaidAccount?->plaidConnection;
+
+        $model->delete();
+
+        if ($plaidConnection) {
+            app(PlaidService::class)->deleteConnectionIfEmpty($plaidConnection);
+        }
+    }
 
     /**
      * Get the fields displayed by the resource.

@@ -145,6 +145,28 @@ class Account extends Model
     }
 
     /**
+     * Why this account cannot be deleted yet, or null when it can. Shared by the
+     * app's delete and Nova's, so neither orphans transfers or transactions.
+     */
+    public function deletionBlockedReason(): ?string
+    {
+        // Transfers create a transaction on both accounts, so they must go first.
+        $hasTransfers = Transfer::where('from_account_id', $this->id)
+            ->orWhere('to_account_id', $this->id)
+            ->exists();
+
+        if ($hasTransfers) {
+            return 'This account has transfers. Delete its transfers first, then delete the account.';
+        }
+
+        if ($this->transactions()->exists()) {
+            return 'Cannot delete account with existing transactions.';
+        }
+
+        return null;
+    }
+
+    /**
      * Get all bank feeds for this account.
      */
     public function bankFeeds(): HasMany

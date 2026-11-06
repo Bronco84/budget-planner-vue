@@ -2,6 +2,8 @@
 
 namespace App\Nova;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
@@ -39,6 +41,21 @@ class Category extends Resource
     public static $search = [
         'id', 'name', 'description',
     ];
+
+    /**
+     * Apply the app's delete guard: a category that transactions are in (linked by
+     * id, or legacy rows by name) cannot be deleted.
+     *
+     * @param  \App\Models\Category  $model
+     *
+     * @throws ValidationException
+     */
+    public static function beforeDelete(NovaRequest $request, Model $model): void
+    {
+        if ($reason = $model->deletionBlockedReason()) {
+            throw ValidationException::withMessages(['resources' => $reason]);
+        }
+    }
 
     /**
      * Get the fields displayed by the resource.

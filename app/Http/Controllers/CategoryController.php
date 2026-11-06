@@ -120,14 +120,8 @@ class CategoryController extends Controller
      */
     public function destroy(Budget $budget, Category $category)
     {
-        // Check if category has transactions (linked by id, or legacy rows by name)
-        $transactionCount = $budget->transactions()
-            ->inCategory($category)
-            ->count();
-
-        if ($transactionCount > 0) {
-            return redirect()->back()->with('error',
-                "Cannot delete category '{$category->name}' because it has {$transactionCount} transaction(s) assigned to it.");
+        if ($reason = $category->deletionBlockedReason()) {
+            return redirect()->back()->with('error', $reason);
         }
 
         $category->delete();

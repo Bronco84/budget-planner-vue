@@ -2,6 +2,7 @@
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\Category;
 use App\Models\File;
 use App\Models\FileAttachment;
 use App\Models\PlaidAccount;
@@ -359,4 +360,30 @@ test('nova refuses to delete one leg of a transfer', function () {
 
     expect(Transfer::find($transfer->id))->not->toBeNull()
         ->and(Transaction::where('transfer_id', $transfer->id)->count())->toBe(2);
+});
+
+test('nova refuses to delete a category that transactions are in, as the app does', function () {
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $account = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    $linked = Category::create(['budget_id' => $budget->id, 'name' => 'Groceries', 'amount' => 100, 'order' => 0]);
+    $legacy = Category::create(['budget_id' => $budget->id, 'name' => 'Dining', 'amount' => 100, 'order' => 1]);
+    $unused = Category::create(['budget_id' => $budget->id, 'name' => 'Hobbies', 'amount' => 100, 'order' => 2]);
+    Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id, 'category_id' => $linked->id]);
+    Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id, 'category_id' => null, 'category' => ' dining ']);
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/categories?resources[]='.$linked->id)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['resources' => "Cannot delete category 'Groceries' because it has 1 transaction(s) assigned to it."]);
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/categories?resources[]='.$legacy->id)
+        ->assertUnprocessable();
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/categories?resources[]='.$unused->id)
+        ->assertOk();
+
+    expect(Category::find($linked->id))->not->toBeNull()
+        ->and(Category::find($legacy->id))->not->toBeNull()
+        ->and(Category::find($unused->id))->toBeNull();
 });

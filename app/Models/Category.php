@@ -121,6 +121,24 @@ class Category extends Model
     }
 
     /**
+     * Why this category cannot be deleted yet, or null when it can. Shared by the
+     * app's delete and Nova's: deleting a category that transactions are in
+     * (linked by id, or legacy rows by name) would drop them out of category totals.
+     */
+    public function deletionBlockedReason(): ?string
+    {
+        $transactionCount = Transaction::where('budget_id', $this->budget_id)
+            ->inCategory($this)
+            ->count();
+
+        if ($transactionCount > 0) {
+            return "Cannot delete category '{$this->name}' because it has {$transactionCount} transaction(s) assigned to it.";
+        }
+
+        return null;
+    }
+
+    /**
      * Expense totals of unlinked legacy rows per claiming category id, summed
      * in SQL by name key (rows differing only in case or surrounding spaces
      * merge) and mapped back to the category that claims each key.

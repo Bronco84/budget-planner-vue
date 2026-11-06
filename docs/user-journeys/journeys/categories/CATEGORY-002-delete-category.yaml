@@ -17,6 +17,8 @@ routes:
 depends_on:
   - path: resources/js/Pages/Categories/Partials/DeleteConfirmationModal.vue
     reason: confirmation modal issuing the delete
+  - path: app/Models/Category.php
+    reason: deletionBlockedReason() is the delete guard shared with the Nova Category resource (ADMIN-001)
 integrations: []
 steps:
   - action: confirm delete (DELETE /budgets/{budget}/categories/{category})
@@ -24,7 +26,7 @@ steps:
 postconditions:
   - category deleted only when no transaction references it
 business_rules:
-  - categories in use by transactions (linked by category_id, or unlinked legacy rows matching the name) cannot be deleted
+  - categories in use by transactions (linked by category_id, or unlinked legacy rows matching the name) cannot be deleted; the same Category::deletionBlockedReason guard refuses the delete from Nova
   - recurring templates linked to a deleted category have category_id nulled by the foreign key (their name string is kept)
 scenarios:
   - id: delete_unused_category

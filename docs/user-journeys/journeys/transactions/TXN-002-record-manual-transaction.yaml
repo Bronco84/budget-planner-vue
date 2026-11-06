@@ -35,7 +35,7 @@ business_rules:
   - account_id must exist in this budget; recurring_transaction_template_id, if given, must belong to this budget
   - description required (max 255); amount numeric (negative = expense); date required
   - category_id optional (null = Uncategorized) and must belong to this budget; the chosen category's name is copied to the legacy `category` column
-  - without category_id, a category string (QuickAddTransactionModal still sends free text) is linked to the budget category with the same trimmed, case-insensitive name, otherwise stored unlinked
+  - 'without category_id, a category string (QuickAddTransactionModal still sends free text) is linked to the budget category with the same name key (Category::findForBudgetByName via Category::nameKey/nameKeySql: spaces trimmed, case ignored, accents significant, compared as bytes on MySQL so "cafe" never links to "Café"; the lowest id wins when several share it), the rule unlinked legacy rows are counted by, otherwise stored unlinked'
 scenarios:
   - id: create_form_renders
     kind: happy_path
@@ -118,10 +118,12 @@ scenarios:
       - tests/Feature/Categories/CategoryLinkingTest.php::storing a transaction rejects a category from another budget
   - id: category_name_linked
     kind: alternate
-    description: A free-text category (quick add) matching a budget category by trimmed, case-insensitive name is linked to it.
+    description: A free-text category (quick add) matching a budget category by name key (spaces trimmed, case ignored, accents kept; tabs are not trimmed) is linked to it.
     coverage: covered
     tests:
       - tests/Feature/Categories/CategoryLinkingTest.php::a category name from quick add is linked to the matching budget category
+      - 'tests/Feature/Categories/LegacyCategoryMatchingTest.php::a new write links to a category by the legacy name rule: spaces trimmed, case ignored, accents kept'
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::a string links to a category exactly when it would count toward it unlinked
 known_issues:
 
 confidence: high

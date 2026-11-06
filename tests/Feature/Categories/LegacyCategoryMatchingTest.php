@@ -135,3 +135,35 @@ test('renaming a category adopts legacy rows matching its old name in any case',
     expect($row->category_id)->toBe($category->id)
         ->and($row->category)->toBe('Food');
 });
+
+test('a new write links to a category by the legacy name rule: spaces trimmed, case ignored, accents kept', function () {
+    $groceries = legacyMatchCategory($this->budget, 'Groceries');
+    $cafe = legacyMatchCategory($this->budget, 'Café', 1);
+
+    $link = fn (string $name) => Transaction::create([
+        'budget_id' => $this->budget->id,
+        'account_id' => $this->account->id,
+        'description' => 'New write',
+        'category' => $name,
+        'amount_in_cents' => -100,
+        'date' => '2026-06-10',
+    ])->category_id;
+
+    expect($link('  GROCERIES '))->toBe($groceries->id)
+        ->and($link('CAFÉ'))->toBe($cafe->id)
+        // Accents matter (MySQL's collation would otherwise equate these).
+        ->and($link('cafe'))->toBeNull()
+        // Only spaces are trimmed, as when legacy rows are counted.
+        ->and($link("Groceries\t"))->toBeNull();
+});
+
+test('a string links to a category exactly when it would count toward it unlinked', function () {
+    $cafe = legacyMatchCategory($this->budget, 'Café');
+
+    foreach (['café', ' CAFÉ ', 'cafe', "Café\t", 'Cafe '] as $name) {
+        $linked = Category::findForBudgetByName($this->budget->id, $name) !== null;
+        $id = legacyMatchRow($this->budget, $this->account, $name, -100);
+
+        expect($linked)->toBe(Transaction::findOrFail($id)->isInCategory($cafe), $name);
+    }
+});

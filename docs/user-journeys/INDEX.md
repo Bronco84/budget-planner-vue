@@ -379,7 +379,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
   - Tests: `tests/Feature/Budgets/ActiveBudgetNavigationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/TransactionFilterTest.php`, `tests/Feature/Transactions/TransactionListTest.php`
 - **TXN-002** Owner records a manual transaction _(implemented, critical)_
   - Routes: `budget.transaction.create`, `budget.transaction.store`, `budget.transaction.edit`
-  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Transactions/ManualTransactionTest.php`, `tests/Feature/Transactions/QuickAddCategoriesTest.php`, `tests/playwright/budget-basics.spec.js`
+  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/Categories/LegacyCategoryMatchingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Transactions/ManualTransactionTest.php`, `tests/Feature/Transactions/QuickAddCategoriesTest.php`, `tests/playwright/budget-basics.spec.js`
 - **TXN-003** Owner edits, reviews history of, or deletes a transaction _(implemented, high)_
   - Routes: `budget.transaction.edit`, `budget.transaction.update`, `budget.transaction.destroy`, `budget.transaction.activity-log`, `budget.transaction.keep`
   - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Plaid/PlaidRemovedByBankTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/Transactions/EditTransactionTest.php`, `tests/Feature/Transactions/TransactionDeletionAttachmentsTest.php`

@@ -189,12 +189,16 @@ class Category extends Model
     }
 
     /**
-     * Find a budget's category by name (trimmed, case-insensitive), e.g. to map
-     * a free-text or imported category string onto an existing category.
+     * Find a budget's category by name, e.g. to map a free-text or imported
+     * category string onto an existing category. It matches by nameKey()
+     * (spaces trimmed, case ignored, accents significant) on every engine,
+     * the rule unlinked legacy rows are counted by, so a string links to the
+     * category it would count toward unlinked. When several categories share
+     * the key, the lowest id wins (see claimsLegacyName()).
      */
     public static function findForBudgetByName(int $budgetId, ?string $name): ?self
     {
-        $key = mb_strtolower(trim((string) $name));
+        $key = static::nameKey($name);
 
         if ($key === '') {
             return null;
@@ -202,7 +206,7 @@ class Category extends Model
 
         return static::query()
             ->where('budget_id', $budgetId)
-            ->whereRaw('LOWER(TRIM(name)) = ?', [$key])
+            ->whereRaw(static::nameKeySql('name').' = ?', [$key])
             ->orderBy('id')
             ->first();
     }

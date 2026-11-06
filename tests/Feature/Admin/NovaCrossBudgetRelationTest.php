@@ -4,6 +4,8 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\PayoffPlan;
 use App\Models\PayoffPlanDebt;
+use App\Models\PlaidAccount;
+use App\Models\PlaidConnection;
 use App\Models\Property;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
@@ -275,4 +277,63 @@ test('nova moves a payoff plan debt to another account in the plan budget', func
         ->assertOk();
 
     expect($debt->fresh()->account_id)->toBe($card->id);
+});
+
+function novaCrossBudgetPlaidAccount(Budget $budget, ?Account $account, string $suffix = 'a'): PlaidAccount
+{
+    $connection = PlaidConnection::create([
+        'budget_id' => $budget->id,
+        'plaid_item_id' => "item-cross-{$suffix}",
+        'institution_name' => 'Cross Bank',
+        'access_token' => "access-sandbox-cross-{$suffix}",
+        'status' => PlaidConnection::STATUS_ACTIVE,
+    ]);
+
+    return PlaidAccount::create([
+        'plaid_connection_id' => $connection->id,
+        'account_id' => $account?->id,
+        'plaid_account_id' => "acc-cross-{$suffix}",
+        'account_name' => 'Checking',
+        'account_type' => 'depository',
+        'account_subtype' => 'checking',
+        'current_balance_cents' => 0,
+    ]);
+}
+
+test('nova refuses to link a plaid account to an account from another budget and changes nothing', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account, , $otherAccount] = novaCrossBudgetTwoBudgets($admin);
+    $plaidAccount = novaCrossBudgetPlaidAccount($budget, $account);
+
+    novaCrossBudgetPut($admin, 'plaid-accounts', $plaidAccount->id, ['account' => $otherAccount->id, 'account_name' => 'Renamed'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('account');
+
+    expect($plaidAccount->fresh()->only('account_id', 'account_name'))
+        ->toBe(['account_id' => $account->id, 'account_name' => 'Checking']);
+});
+
+test('nova refuses to move a plaid account to another budget connection while keeping its account', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account, $otherBudget] = novaCrossBudgetTwoBudgets($admin);
+    $plaidAccount = novaCrossBudgetPlaidAccount($budget, $account);
+    $otherConnectionId = novaCrossBudgetPlaidAccount($otherBudget, null, 'b')->plaid_connection_id;
+
+    novaCrossBudgetPut($admin, 'plaid-accounts', $plaidAccount->id, ['plaidConnection' => $otherConnectionId])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('account');
+
+    expect($plaidAccount->fresh()->plaid_connection_id)->toBe($plaidAccount->plaid_connection_id);
+});
+
+test('nova links a plaid account to an account in its connection budget', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account] = novaCrossBudgetTwoBudgets($admin);
+    $savings = Account::factory()->savings()->create(['budget_id' => $budget->id]);
+    $plaidAccount = novaCrossBudgetPlaidAccount($budget, $account);
+
+    novaCrossBudgetPut($admin, 'plaid-accounts', $plaidAccount->id, ['account' => $savings->id])
+        ->assertOk();
+
+    expect($plaidAccount->fresh()->account_id)->toBe($savings->id);
 });

@@ -2,6 +2,8 @@
 
 namespace App\Nova;
 
+use App\Models\Account;
+use App\Models\PlaidConnection as PlaidConnectionModel;
 use Illuminate\Http\Request;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
@@ -74,7 +76,12 @@ class PlaidAccount extends Resource
 
             BelongsTo::make('Account')
                 ->sortable()
-                ->nullable(),
+                ->nullable()
+                // Syncs write into this account, so it must be in the connection's budget:
+                // the connection chosen on the form, else the saved one.
+                ->rules([static::inBudget(Account::class, fn () => PlaidConnectionModel::query()
+                    ->whereKey($request->input('plaidConnection', $this->resource?->plaid_connection_id))
+                    ->value('budget_id'))]),
 
             Text::make('Plaid Account ID', 'plaid_account_id')
                 ->sortable()

@@ -22,7 +22,7 @@ depends_on:
 integrations: []
 steps:
   - action: visit /transactions or /budget/{budget}/transactions
-    expected: Transactions/Index rendered with transactions (paginated), accounts, distinct categories and filters
+    expected: Transactions/Index rendered with transactions (paginated), accounts, category filter options and filters
   - action: apply search/account_id/category/timeframe query parameters
     expected: list filtered accordingly; filters echoed in props
 postconditions:
@@ -31,6 +31,8 @@ business_rules:
   - search matches description or notes (LIKE)
   - timeframe is one of this_month, last_month, last_3_months, this_year; unknown values are ignored
   - 20 per page ordered by date desc
+  - 'the category filter (a category name from the options) matches the category itself: rows linked by category_id (even if their copied string is stale) plus the unlinked legacy rows it claims by name key (Category::nameKey: spaces trimmed, case ignored, accents kept, collation-independent on MySQL); the value resolves to the category with exactly that name, else the lowest-id one sharing its key; a legacy string no category has matches unlinked rows by name key'
+  - category filter options are the budget's categories in their order, then the unlinked legacy strings no category claims, one per name key
   - each row carries file_attachments_count; rows with attachments show a paperclip that opens a read-only receipts modal (see FILE-001 viewer_reads_receipts)
   - the per-row Edit link is shown only to members who can edit (budgetAccess.can.edit); viewers do not see it
 scenarios:
@@ -53,6 +55,14 @@ scenarios:
     tests:
       - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_account
       - tests/Feature/TransactionFilterTest.php::test_can_filter_transactions_by_category
+  - id: category_filter_matches_category
+    kind: alternate
+    description: The category filter returns rows linked by id (stale string or not) and legacy rows matching the name key, not rows linked to another category or near-miss names; a legacy-only string matches unlinked rows by name key with accents kept; the options list each category once plus unclaimed legacy strings once per key.
+    coverage: covered
+    tests:
+      - tests/Feature/Transactions/TransactionCategoryFilterTest.php::filtering by a category returns rows linked by id and legacy rows matching its name key
+      - tests/Feature/Transactions/TransactionCategoryFilterTest.php::filtering by a legacy string no category has matches unlinked rows by name key, accents kept
+      - tests/Feature/Transactions/TransactionCategoryFilterTest.php::the category filter options list each category once and legacy strings no category claims
   - id: filter_by_timeframe
     kind: alternate
     description: Each timeframe option restricts by date.

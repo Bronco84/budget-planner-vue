@@ -376,7 +376,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **TXN-001** Owner browses and filters a budget's transactions _(implemented, high)_
   - Routes: `budget.transaction.index`, `transactions.index`
-  - Tests: `tests/Feature/Budgets/ActiveBudgetNavigationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/TransactionFilterTest.php`, `tests/Feature/Transactions/TransactionListTest.php`
+  - Tests: `tests/Feature/Budgets/ActiveBudgetNavigationTest.php`, `tests/Feature/SecurityAuthorizationTest.php`, `tests/Feature/TransactionFilterTest.php`, `tests/Feature/Transactions/TransactionCategoryFilterTest.php`, `tests/Feature/Transactions/TransactionListTest.php`
 - **TXN-002** Owner records a manual transaction _(implemented, critical)_
   - Routes: `budget.transaction.create`, `budget.transaction.store`, `budget.transaction.edit`
   - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/Categories/LegacyCategoryMatchingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/Transactions/ManualTransactionTest.php`, `tests/Feature/Transactions/QuickAddCategoriesTest.php`, `tests/playwright/budget-basics.spec.js`

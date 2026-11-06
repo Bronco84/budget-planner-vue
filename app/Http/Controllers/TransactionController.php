@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -48,9 +49,21 @@ class TransactionController extends Controller
             $query->where('account_id', $request->input('account_id'));
         }
 
-        // Apply category filter
+        // Category filter: the category itself (rows linked by id, plus the
+        // unlinked legacy rows it claims by name key), or, for a legacy string
+        // no category has, the unlinked rows with that name key.
+        $categories = $budget->categories()->get(['id', 'budget_id', 'name']);
+
         if ($request->filled('category')) {
-            $query->where('category', $request->input('category'));
+            $name = (string) $request->input('category');
+            $category = $this->categoryForFilter($categories, $name);
+
+            if ($category) {
+                $query->inCategory($category);
+            } else {
+                $query->whereNull('transactions.category_id')
+                    ->whereRaw(Category::nameKeySql('transactions.category').' = ?', [Category::nameKey($name)]);
+            }
         }
 
         // Apply timeframe filter
@@ -82,17 +95,25 @@ class TransactionController extends Controller
         $transactions = $query->orderByDesc('date')->paginate(20);
 
         $accounts = $budget->accounts()->get();
-        $categories = $budget->transactions()
-            ->select('category')
-            ->distinct()
+
+        // Filter options: the budget's categories, then legacy strings that no
+        // category claims, one per name key (case and space variants merge).
+        $keys = $categories->mapWithKeys(fn (Category $category) => [Category::nameKey($category->name) => true]);
+        $legacyNames = $budget->transactions()
+            ->whereNull('category_id')
             ->whereNotNull('category')
-            ->pluck('category');
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category')
+            ->reject(fn (string $name) => Category::nameKey($name) === '' || $keys->has(Category::nameKey($name)))
+            ->unique(fn (string $name) => Category::nameKey($name));
+        $categoryOptions = $categories->pluck('name')->concat($legacyNames)->values();
 
         return Inertia::render('Transactions/Index', [
             'budget' => $budget,
             'transactions' => $transactions,
             'accounts' => $accounts,
-            'categories' => $categories,
+            'categories' => $categoryOptions,
             'filters' => [
                 'search' => $request->input('search', ''),
                 'account_id' => $request->filled('account_id') ? (int) $request->input('account_id') : '',
@@ -284,6 +305,21 @@ class TransactionController extends Controller
         ]);
 
         return redirect()->back()->with('message', 'Transaction kept. It counts in your totals again.');
+    }
+
+    /**
+     * The category a filter option names: the one with exactly that name (the
+     * options list category names verbatim), else the lowest-id category
+     * sharing its name key, the one new writes and legacy rows go to.
+     *
+     * @param  Collection<int, Category>  $categories
+     */
+    private function categoryForFilter(Collection $categories, string $name): ?Category
+    {
+        $key = Category::nameKey($name);
+
+        return $categories->first(fn (Category $category) => $category->name === $name)
+            ?? $categories->sortBy('id')->first(fn (Category $category) => $key !== '' && Category::nameKey($category->name) === $key);
     }
 
     /**

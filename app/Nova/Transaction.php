@@ -3,6 +3,8 @@
 namespace App\Nova;
 
 use App\Models\Account;
+use App\Models\PlaidTransaction as PlaidTransactionModel;
+use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -150,6 +152,7 @@ class Transaction extends Resource
 
             BelongsTo::make('Plaid Transaction', 'plaidTransaction', PlaidTransaction::class)
                 ->nullable()
+                ->rules([$this->plaidTransactionInBudget($request->input('budget'))])
                 ->hideFromIndex(),
 
             BelongsTo::make('Recurring Template', 'recurringTemplate', RecurringTransactionTemplate::class)
@@ -159,6 +162,38 @@ class Transaction extends Resource
 
             MorphMany::make('File Attachments', 'fileAttachments', FileAttachment::class),
         ];
+    }
+
+    /**
+     * The Plaid transaction must have been imported into an account of the
+     * transaction's budget. Not necessarily the transaction's own account: the
+     * app lets an imported transaction move between the budget's accounts. The
+     * link is stored as the Plaid id, which is unique per account only, so the
+     * check is whether that id names a Plaid transaction in the budget, not
+     * just the row the form picked (which may be another budget's twin).
+     */
+    protected function plaidTransactionInBudget(mixed $budgetId): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($budgetId): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            $plaidId = PlaidTransactionModel::query()->whereKey($value)->value('plaid_transaction_id');
+
+            if ($plaidId === null) {
+                return;
+            }
+
+            $inBudget = PlaidTransactionModel::query()
+                ->where('plaid_transaction_id', $plaidId)
+                ->whereHas('account', fn ($accounts) => $accounts->where('budget_id', $budgetId))
+                ->exists();
+
+            if (! $inBudget) {
+                $fail('The selected :attribute belongs to a different budget.');
+            }
+        };
     }
 
     /**

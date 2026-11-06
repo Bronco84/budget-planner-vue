@@ -67,7 +67,7 @@ business_rules:
   - Plaid connections cannot be deleted from Nova (single, bulk or force delete); a bare delete would leave the Item live at Plaid, so owners unlink connections in the app
   - Plaid accounts cannot be deleted from Nova (single, bulk or force delete); deleting a connection's last one would leave the connection empty with its Item live at Plaid, so owners unlink accounts in the app
   - users cannot be deleted from Nova (single, bulk or force delete); a bare row delete would skip AccountDeletionService, so users delete their own accounts from Profile (PROFILE-002)
-  - Nova refuses (422) a relation to a record of a different budget, as the app only pairs records of one budget (a transaction's account and recurring template, a recurring template's account, an account's autopay source account and property must belong to the selected budget, a payoff plan debt's account must belong to its payoff plan's budget, a Plaid account's linked account must belong to its Plaid connection's budget, and a budget's starting balance account must belong to that budget (none on create)). The relation dropdowns still list every budget's records; the rule, not the dropdown, is the guarantee
+  - Nova refuses (422) a relation to a record of a different budget, as the app only pairs records of one budget (a transaction's account and recurring template, a recurring template's account, an account's autopay source account and property must belong to the selected budget, a payoff plan debt's account must belong to its payoff plan's budget, a Plaid account's linked account must belong to its Plaid connection's budget, a transaction's Plaid transaction must have been imported into an account of the transaction's budget (any of the budget's accounts, as the app lets an imported transaction move between them; checked by the stored Plaid id, which is unique per account only), and a budget's starting balance account must belong to that budget (none on create)). The relation dropdowns still list every budget's records; the rule, not the dropdown, is the guarantee
 scenarios:
   - id: admin_gate_allows
     kind: happy_path
@@ -216,7 +216,7 @@ scenarios:
       - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a plaid account through nova
   - id: nova_cross_budget_relation_refused
     kind: validation
-    description: Nova refuses (422) creating or updating a transaction with an account from another budget, moving a transaction to another budget while keeping its account, and a recurring template, autopay source account, property or starting balance account from another budget, and a payoff plan debt account outside its plan's budget (including moving the debt to another budget's plan), and a Plaid account's linked account outside its connection's budget (including moving it to another budget's connection), and changes nothing; the same pairings within one budget are saved.
+    description: Nova refuses (422) creating or updating a transaction with an account from another budget, moving a transaction to another budget while keeping its account, and a recurring template, autopay source account, property or starting balance account from another budget, and a payoff plan debt account outside its plan's budget (including moving the debt to another budget's plan), and a Plaid account's linked account outside its connection's budget (including moving it to another budget's connection), and a transaction's Plaid transaction from another budget, and changes nothing; the same pairings within one budget are saved.
     coverage: covered
     tests:
       - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses to create a transaction with an account from another budget
@@ -234,6 +234,9 @@ scenarios:
       - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses to link a plaid account to an account from another budget and changes nothing
       - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses to move a plaid account to another budget connection while keeping its account
       - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova links a plaid account to an account in its connection budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova refuses to link a transaction to a plaid transaction from another budget and changes nothing
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova links a transaction to a plaid transaction of another account in the same budget
+      - tests/Feature/Admin/NovaCrossBudgetRelationTest.php::nova keeps a transaction plaid link whose id another budget shares when editing it
 known_issues: []
 confidence: medium
 evidence:

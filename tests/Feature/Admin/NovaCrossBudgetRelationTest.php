@@ -6,6 +6,7 @@ use App\Models\PayoffPlan;
 use App\Models\PayoffPlanDebt;
 use App\Models\PlaidAccount;
 use App\Models\PlaidConnection;
+use App\Models\PlaidTransaction;
 use App\Models\Property;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
@@ -336,4 +337,57 @@ test('nova links a plaid account to an account in its connection budget', functi
         ->assertOk();
 
     expect($plaidAccount->fresh()->account_id)->toBe($savings->id);
+});
+
+function novaCrossBudgetPlaidTransaction(Account $account, string $plaidId): PlaidTransaction
+{
+    return PlaidTransaction::create([
+        'plaid_transaction_id' => $plaidId, 'account_id' => $account->id, 'plaid_account_id' => "plaid-{$account->id}",
+        'pending' => false, 'amount' => 42.00, 'date' => now()->toDateString(), 'name' => 'CORNER STORE',
+    ]);
+}
+
+test('nova refuses to link a transaction to a plaid transaction from another budget and changes nothing', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account, , $otherAccount] = novaCrossBudgetTwoBudgets($admin);
+    $otherPlaid = novaCrossBudgetPlaidTransaction($otherAccount, 'tx-other');
+    $transaction = Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id, 'amount_in_cents' => -1200]);
+
+    novaCrossBudgetPut($admin, 'transactions', $transaction->id, ['plaidTransaction' => $otherPlaid->id, 'amount_in_cents' => -9900])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('plaidTransaction');
+
+    expect($transaction->fresh()->only('plaid_transaction_id', 'amount_in_cents'))
+        ->toBe(['plaid_transaction_id' => null, 'amount_in_cents' => -1200]);
+});
+
+test('nova links a transaction to a plaid transaction of another account in the same budget', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account] = novaCrossBudgetTwoBudgets($admin);
+    $savings = Account::factory()->savings()->create(['budget_id' => $budget->id]);
+    $plaid = novaCrossBudgetPlaidTransaction($savings, 'tx-savings');
+    $transaction = Transaction::factory()->create(['budget_id' => $budget->id, 'account_id' => $account->id]);
+
+    novaCrossBudgetPut($admin, 'transactions', $transaction->id, ['plaidTransaction' => $plaid->id])
+        ->assertOk();
+
+    expect($transaction->fresh()->plaid_transaction_id)->toBe('tx-savings');
+});
+
+test('nova keeps a transaction plaid link whose id another budget shares when editing it', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account, , $otherAccount] = novaCrossBudgetTwoBudgets($admin);
+    // Plaid ids are unique per account only; the edit form resolves the link to
+    // the first row with the id, here the other budget's.
+    novaCrossBudgetPlaidTransaction($otherAccount, 'tx-shared');
+    novaCrossBudgetPlaidTransaction($account, 'tx-shared');
+    $transaction = Transaction::factory()->create([
+        'budget_id' => $budget->id, 'account_id' => $account->id, 'plaid_transaction_id' => 'tx-shared', 'amount_in_cents' => -1200,
+    ]);
+
+    novaCrossBudgetPut($admin, 'transactions', $transaction->id, ['amount_in_cents' => -1300])
+        ->assertOk();
+
+    expect($transaction->fresh()->only('plaid_transaction_id', 'amount_in_cents'))
+        ->toBe(['plaid_transaction_id' => 'tx-shared', 'amount_in_cents' => -1300]);
 });

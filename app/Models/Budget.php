@@ -275,16 +275,18 @@ class Budget extends Model
         $totalIncome = $matchingTransactions->where('amount_in_cents', '>', 0)->sum('amount_in_cents');
         $totalExpenses = $matchingTransactions->where('amount_in_cents', '<', 0)->sum('amount_in_cents');
 
-        // Group by category
+        // Group by category: legacy rows join the category claiming their
+        // name key, so 'groceries ' counts under Groceries as everywhere else.
+        $categoryName = Category::groupingNameResolver($this->id);
         $byCategory = $matchingTransactions
-            ->groupBy(function (Transaction $transaction) {
-                return $transaction->category_name;
+            ->groupBy(function (Transaction $transaction) use ($categoryName) {
+                return $categoryName($transaction);
             })
-            ->map(function ($transactions) {
+            ->map(function ($transactions) use ($categoryName) {
                 $first = $transactions->first();
 
                 return (object) [
-                    'category' => $first instanceof Transaction ? $first->category_name : null,
+                    'category' => $first instanceof Transaction ? $categoryName($first) : null,
                     'total' => $transactions->sum('amount_in_cents'),
                 ];
             })
@@ -305,14 +307,14 @@ class Budget extends Model
 
         // Group previous month by category
         $prevMonthByCategory = $prevMonthTransactions
-            ->groupBy(function (Transaction $transaction) {
-                return $transaction->category_name;
+            ->groupBy(function (Transaction $transaction) use ($categoryName) {
+                return $categoryName($transaction);
             })
-            ->map(function ($transactions) {
+            ->map(function ($transactions) use ($categoryName) {
                 $first = $transactions->first();
 
                 return (object) [
-                    'category' => $first instanceof Transaction ? $first->category_name : null,
+                    'category' => $first instanceof Transaction ? $categoryName($first) : null,
                     'total' => $transactions->sum('amount_in_cents'),
                 ];
             })

@@ -98,7 +98,7 @@ scenarios:
       - tests/Feature/Categories/CategoryLinkingTest.php::renaming a category carries its transactions and templates
   - id: spending_grouped_by_id
     kind: edge
-    description: Spending counts transactions linked by id even when their copied name is stale, plus unlinked legacy rows with the same name; unmatched legacy strings are grouped separately in monthly statistics.
+    description: Spending counts transactions linked by id even when their copied name is stale, plus unlinked legacy rows with the same name key; unmatched legacy strings are grouped separately (one bucket per name key) in monthly statistics.
     coverage: covered
     tests:
       - tests/Feature/Categories/CategoryLinkingTest.php::spending is grouped by category id with the legacy string as fallback

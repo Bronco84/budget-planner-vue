@@ -34,7 +34,7 @@ business_rules:
   - net worth = assets minus abs(liability balances); sampling interval is 1, 3, 7, 15 or 30 days depending on range length
   - savings rate = avg net cash flow / avg income x 100, 0 when there is no income
   - budget performance allocation = category monthly amount x months in the range, where each partial calendar month counts as days covered / days in that month
-  - budget performance and spending-by-category match transactions to categories by category_id, falling back to the legacy category string for unlinked rows (spending patterns group by the linked category's current name)
+  - budget performance and spending-by-category match transactions to categories by category_id, falling back to the legacy category string for unlinked rows (spending patterns group linked rows by the category's current name and unlinked rows under the category claiming their name key, Category::groupingNameResolver, so 'groceries ' joins Groceries; other legacy strings get one bucket per name key)
   - budget performance spent = abs of the category's expenses (negative amounts) in the range and account filter, excluding rows the bank removed; summed in SQL by category_id plus a trimmed, case-insensitive legacy-name match (Category::legacySpentByCategory, the same rule as the categories page and Transaction::isInCategory, collation-independent on MySQL), so refunds, rows linked to another budget's category and other budgets' rows never count; categories are sorted by spent, highest first
   - income vs expenses values each template at its projected amount (RecurringTransactionService::projectedAmount, so dynamic templates use their calculated amount), uses only active templates (started, not ended) and normalises frequencies to monthly (weekly x4.33, biweekly x2.17, bimonthly x2, quarterly /3, yearly /12, daily x30.44)
   - date_range must be one of 30days, 3months, 6months, ytd, year, all, custom; custom start/end dates must fall between 2000-01-01 and 2100-12-31 (invalid input redirects back with validation errors)
@@ -89,6 +89,12 @@ scenarios:
       - tests/Feature/Reports/ReportsBudgetPerformanceTest.php::budget performance for all accounts matches the pinned values
       - tests/Feature/Reports/ReportsBudgetPerformanceTest.php::budget performance filtered to one account matches the pinned values
       - tests/Feature/Reports/ReportsBudgetPerformanceTest.php::budget performance sums spending in SQL instead of loading the range
+  - id: spending_patterns_merge_legacy_variants
+    kind: edge
+    description: Spending patterns' top categories count unlinked legacy rows differing only in case or surrounding spaces under the category claiming their name key (lowest id when shared), and merge unmatched legacy variants into one bucket.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::per-category breakdowns group legacy rows under the category claiming their name key
   - id: foreign_account_filter_ignored
     kind: edge
     description: An account_id from another budget is ignored and all accounts are shown.

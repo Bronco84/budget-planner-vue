@@ -4,6 +4,7 @@ namespace App\Services\Chat\ContextBuilders;
 
 use App\Contracts\ContextBuilderInterface;
 use App\Models\Budget;
+use App\Models\Category;
 use App\Models\User;
 use Carbon\Carbon;
 
@@ -109,14 +110,16 @@ class TransactionContextBuilder implements ContextBuilderInterface
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->get();
 
-        // Group by the linked category's name, falling back to the legacy string.
+        // Group by the linked category's name; legacy strings join the category
+        // claiming their name key (Category::groupingNameResolver).
+        $categoryName = Category::groupingNameResolver($budget->id);
         $byCategory = $transactions
-            ->groupBy('category_name')
-            ->map(function ($categoryTransactions) {
+            ->groupBy($categoryName)
+            ->map(function ($categoryTransactions) use ($categoryName) {
                 $total = $categoryTransactions->sum('amount_in_cents') / 100;
 
                 return [
-                    'category' => $categoryTransactions->first()->category_name ?: 'Uncategorized',
+                    'category' => $categoryName($categoryTransactions->first()) ?: 'Uncategorized',
                     'total' => $total,
                     'transaction_count' => $categoryTransactions->count(),
                     'is_expense' => $total < 0,

@@ -5,6 +5,7 @@ use App\Models\Budget;
 use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Chat\ContextBuilders\TransactionContextBuilder;
 use Illuminate\Support\Facades\DB;
 
 /*
@@ -55,14 +56,19 @@ function legacyMatchCategoriesPage($test): array
     return collect($categories)->mapWithKeys(fn ($row) => [$row['name'] => $row['spent_cents']])->all();
 }
 
-function legacyMatchReport($test): array
+function legacyMatchReportProps($test): array
 {
-    $performance = $test->actingAs($test->user)->get(route('reports.index', [
+    return $test->actingAs($test->user)->get(route('reports.index', [
         $test->budget,
         'date_range' => 'custom',
         'start_date' => '2026-06-01',
         'end_date' => '2026-06-30',
-    ]))->assertOk()->viewData('page')['props']['budgetPerformance'];
+    ]))->assertOk()->viewData('page')['props'];
+}
+
+function legacyMatchReport($test): array
+{
+    $performance = legacyMatchReportProps($test)['budgetPerformance'];
 
     return collect($performance['categories'])->mapWithKeys(fn ($row) => [$row['category'] => $row['spent']])->all();
 }
@@ -165,5 +171,39 @@ test('a string links to a category exactly when it would count toward it unlinke
         $id = legacyMatchRow($this->budget, $this->account, $name, -100);
 
         expect($linked)->toBe(Transaction::findOrFail($id)->isInCategory($cafe), $name);
+    }
+});
+
+test('per-category breakdowns group legacy rows under the category claiming their name key', function () {
+    $groceries = legacyMatchCategory($this->budget, 'Groceries');
+    // Shares the key 'food' with a lower-id category: legacy 'FOOD' goes to 'food '.
+    legacyMatchCategory($this->budget, 'food ', 1);
+    legacyMatchCategory($this->budget, 'Food', 2);
+
+    DB::table('transactions')->where('id', legacyMatchRow($this->budget, $this->account, 'Groceries', -100))
+        ->update(['category_id' => $groceries->id]);
+    legacyMatchRow($this->budget, $this->account, 'groceries ', -200);
+    legacyMatchRow($this->budget, $this->account, '  GROCERIES', -400);
+    legacyMatchRow($this->budget, $this->account, 'FOOD', -800);
+    // No category has these: one bucket per name key, first spelling trimmed.
+    legacyMatchRow($this->budget, $this->account, ' Venmo', -1600);
+    legacyMatchRow($this->budget, $this->account, 'venmo', -3200);
+    legacyMatchRow($this->budget, $this->account, null, -6400);
+
+    $expected = ['Groceries' => -700, 'food ' => -800, 'Venmo' => -4800, 'Uncategorized' => -6400];
+
+    $stats = collect($this->budget->getMonthlyStatistics(6, 2026)['by_category'])
+        ->mapWithKeys(fn ($row) => [$row->category ?? 'Uncategorized' => $row->total])->all();
+
+    $patterns = collect(legacyMatchReportProps($this)['spendingPatterns']['topCategories'])
+        ->mapWithKeys(fn ($row) => [$row['category'] => -$row['total']])->all();
+
+    $chat = collect(app(TransactionContextBuilder::class)
+        ->build($this->user, $this->budget, ['type' => 'by_category', 'month' => '2026-06'])['by_category'])
+        ->mapWithKeys(fn ($row) => [$row['category'] => (int) round($row['total'] * 100)])->all();
+
+    foreach ([$stats, $patterns, $chat] as $breakdown) {
+        ksort($breakdown);
+        expect($breakdown)->toBe(collect($expected)->sortKeys()->all());
     }
 });

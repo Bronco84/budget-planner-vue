@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Closure;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -186,6 +187,50 @@ class Category extends Model
         }
 
         return $spent;
+    }
+
+    /**
+     * A function giving the name a budget's transaction is grouped and shown
+     * under in per-category breakdowns: a linked row its category's name; an
+     * unlinked legacy row the name of the category claiming its name key (the
+     * lowest id, see claimsLegacyName()); any other legacy string one spelling
+     * per name key (the first seen, spaces trimmed), so case and space
+     * variants merge. Null for uncategorized rows. Callers eager-load
+     * budgetCategory.
+     *
+     * @return Closure(Transaction): ?string
+     */
+    public static function groupingNameResolver(int $budgetId): Closure
+    {
+        $names = [];
+
+        $categories = static::query()
+            ->withoutGlobalScope('ordered')
+            ->where('budget_id', $budgetId)
+            ->orderBy('id')
+            ->get(['id', 'name']);
+
+        foreach ($categories as $category) {
+            $key = static::nameKey($category->name);
+
+            if ($key !== '' && ! isset($names[$key])) {
+                $names[$key] = $category->name;
+            }
+        }
+
+        return function (Transaction $transaction) use (&$names): ?string {
+            if ($transaction->category_id && $transaction->budgetCategory) {
+                return $transaction->budgetCategory->name;
+            }
+
+            $key = static::nameKey($transaction->category);
+
+            if ($key === '') {
+                return null;
+            }
+
+            return $names[$key] ??= trim((string) $transaction->category, ' ');
+        };
     }
 
     /**

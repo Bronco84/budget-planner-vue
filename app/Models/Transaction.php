@@ -186,7 +186,9 @@ class Transaction extends Model
      * The category name to display/group by: the linked category's name, or the
      * legacy free-text category for rows that never matched a category. Grouping
      * by it merges linked rows (even with a stale copied name) with unlinked
-     * legacy rows that carry the same category name.
+     * legacy rows that carry the same category name. Per-category breakdowns
+     * use Category::groupingNameResolver instead, which also merges legacy
+     * strings by name key (case and surrounding spaces).
      */
     public function getCategoryNameAttribute(): ?string
     {

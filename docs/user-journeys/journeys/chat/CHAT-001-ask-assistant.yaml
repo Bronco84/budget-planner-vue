@@ -60,6 +60,7 @@ business_rules:
   - the assistant turn is always the server-generated text; a reply failing validateResponse is neither sent nor stored (in-band SSE error instead)
   - tools are scoped to the requested budget only if the user can view it (BudgetPolicy view), else to the user's active budget; with no budget no tools are offered
   - transaction queries are clamped to the last 12 months and the result count is capped
+  - the transactions-by-category context groups linked rows by their category's name and unlinked legacy rows under the category claiming their name key (Category::groupingNameResolver), other legacy strings one bucket per name key
   - a context builder that skips a failing piece logs a warning with ids and marks the result partial (projections monthly_cash_flow is_complete false with excluded_accounts, autopay_projections_unavailable, payoff projection_unavailable) instead of presenting it as complete
   - provider rate-limit/overload/too-large errors map to specific safe messages; anything else to a generic message; raw provider text is never returned
   - when the provider fails or the reply fails validation, the persisted user message is deleted (and a conversation created by that request, if nothing else references it), matching the panel, which drops the turn
@@ -146,6 +147,12 @@ scenarios:
     tests:
       - 'tests/Feature/AssistantToolFactoryTest.php::factory returns no tools when there is no budget'
       - 'tests/Feature/Chat/ChatAssistantRequestTest.php::a user without a budget gets no tools and a getting started prompt'
+  - id: by_category_context_merges_legacy_variants
+    kind: edge
+    description: The transactions-by-category context groups unlinked legacy rows under the category claiming their name key (case and surrounding spaces ignored, lowest id when shared), as the categories page and reports do.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::per-category breakdowns group legacy rows under the category claiming their name key
   - id: transaction_window_clamped
     kind: edge
     description: The transaction query tool clamps start dates to the last 12 months.

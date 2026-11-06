@@ -35,6 +35,7 @@ postconditions:
 business_rules:
   - income = sum of positive amounts, expenses = sum of negative amounts within the period
   - month and year default to the current date; requires budget view ability
+  - "the monthly category breakdown (and the previous month's) groups linked rows under their category's name and unlinked legacy rows under the category claiming their name key (Category::groupingNameResolver: spaces trimmed, case ignored, lowest-id owner), so 'groceries ' joins Groceries; other legacy strings get one bucket per name key, shown with the first spelling trimmed"
   - monthly route params must be digits with month 1-12 and year 1900-2100 (404 otherwise); the yearly year query param must be an integer 1900-2100 (validation redirect otherwise)
 scenarios:
   - id: monthly_page_renders
@@ -44,6 +45,12 @@ scenarios:
     tests:
       - tests/Feature/Budgets/BudgetStatisticsTest.php::owner sees the monthly statistics page with totals for the requested month
       - tests/playwright/smoke.spec.js::monthly statistics page loads
+  - id: monthly_breakdown_merges_legacy_variants
+    kind: edge
+    description: Unlinked legacy rows differing from a category name only in case or surrounding spaces are counted under that category in the monthly breakdown, a key shared by two categories goes to the lowest id, and unmatched legacy variants merge into one bucket.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::per-category breakdowns group legacy rows under the category claiming their name key
   - id: yearly_page_renders
     kind: happy_path
     description: Owner opens yearly statistics and the Yearly page renders twelve months with prior-year comparison.

@@ -225,7 +225,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **CHAT-001** User asks the AI assistant a question about their finances _(implemented, high)_
   - Routes: `chat.stream.start`, `chat.stream`, `chat.stream.complete`, `chat.send`
-  - Tests: `tests/Feature/AssistantToolFactoryTest.php`, `tests/Feature/Chat/ChatAssistantRequestTest.php`, `tests/Feature/Chat/ChatContextPartialResultsTest.php`, `tests/Feature/Chat/ChatStreamStartTest.php`, `tests/Feature/ChatAssistantTest.php`, `tests/playwright/chat.spec.js`
+  - Tests: `tests/Feature/AssistantToolFactoryTest.php`, `tests/Feature/Categories/LegacyCategoryMatchingTest.php`, `tests/Feature/Chat/ChatAssistantRequestTest.php`, `tests/Feature/Chat/ChatContextPartialResultsTest.php`, `tests/Feature/Chat/ChatStreamStartTest.php`, `tests/Feature/ChatAssistantTest.php`, `tests/playwright/chat.spec.js`
 - **CHAT-002** Chat message is blocked, throttled or refused by moderation _(implemented, high)_
   - Routes: `chat.send`, `chat.stream.start`
   - Tests: `tests/Feature/Chat/ChatModerationLimitsTest.php`, `tests/Feature/Chat/ChatModerationOutcomesTest.php`, `tests/Feature/Chat/ChatStreamStartTest.php`, `tests/Feature/ChatAssistantTest.php`, `tests/playwright/chat.spec.js`
@@ -346,10 +346,10 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **REPORT-001** User reviews the financial reports dashboard _(implemented, high)_
   - Routes: `reports.index`
-  - Tests: `tests/Feature/Reports/ReportsBudgetPerformanceTest.php`, `tests/Feature/Reports/ReportsCalculationsTest.php`, `tests/Feature/Reports/ReportsCashFlowTest.php`, `tests/Feature/Reports/ReportsDashboardTest.php`, `tests/Feature/Reports/ReportsDateRangeTest.php`, `tests/Feature/Reports/ReportsNetWorthQueryTest.php`
+  - Tests: `tests/Feature/Categories/LegacyCategoryMatchingTest.php`, `tests/Feature/Reports/ReportsBudgetPerformanceTest.php`, `tests/Feature/Reports/ReportsCalculationsTest.php`, `tests/Feature/Reports/ReportsCashFlowTest.php`, `tests/Feature/Reports/ReportsDashboardTest.php`, `tests/Feature/Reports/ReportsDateRangeTest.php`, `tests/Feature/Reports/ReportsNetWorthQueryTest.php`
 - **REPORT-002** User views monthly and yearly budget statistics _(implemented, medium)_
   - Routes: `budget.statistics.monthly`, `budget.statistics.yearly`
-  - Tests: `tests/Feature/Budgets/BudgetStatisticsTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/YearlyStatisticsQueryTest.php`, `tests/playwright/smoke.spec.js`
+  - Tests: `tests/Feature/Budgets/BudgetStatisticsTest.php`, `tests/Feature/Categories/LegacyCategoryMatchingTest.php`, `tests/Feature/NestedRouteAuthorizationTest.php`, `tests/Feature/YearlyStatisticsQueryTest.php`, `tests/playwright/smoke.spec.js`
 
 ### scenarios
 

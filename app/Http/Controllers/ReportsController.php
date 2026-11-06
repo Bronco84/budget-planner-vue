@@ -444,10 +444,11 @@ class ReportsController extends Controller
 
         $transactions = $transactionsQuery->get();
 
-        // Group by category
-        $byCategory = $transactions->groupBy('category_name')->map(function ($categoryTransactions) {
+        // Group by category; legacy rows join the category claiming their name key.
+        $categoryName = Category::groupingNameResolver($budget->id);
+        $byCategory = $transactions->groupBy($categoryName)->map(function ($categoryTransactions) use ($categoryName) {
             return [
-                'category' => $categoryTransactions->first()->category_name ?: 'Uncategorized',
+                'category' => $categoryName($categoryTransactions->first()) ?: 'Uncategorized',
                 'total' => abs($categoryTransactions->sum('amount_in_cents')),
                 'count' => $categoryTransactions->count(),
                 'average' => abs($categoryTransactions->avg('amount_in_cents')),

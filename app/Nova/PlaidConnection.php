@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use Illuminate\Http\Request;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
@@ -40,6 +41,21 @@ class PlaidConnection extends Resource
     public static $search = [
         'id', 'institution_name', 'plaid_item_id',
     ];
+
+    /**
+     * Connections are never deleted from Nova: a bare (soft or force) delete leaves
+     * the Item live at Plaid. Owners unlink connections in the app, which removes
+     * the Item through PlaidService.
+     */
+    public function authorizedToDelete(Request $request): bool
+    {
+        return false;
+    }
+
+    public function authorizedToForceDelete(Request $request): bool
+    {
+        return false;
+    }
 
     /**
      * Get the fields displayed by the resource.

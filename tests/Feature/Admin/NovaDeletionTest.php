@@ -23,6 +23,8 @@ use Tests\Support\FakePlaidApi;
  * PR-084: an account deleted from Nova gets the app's guards (no transfers, no
  * transactions) and its empty Plaid connection is removed with its Item.
  * PR-085: files cannot be deleted from Nova (delete their attachments instead).
+ * PR-086: Plaid connections cannot be deleted from Nova (owners unlink them in
+ * the app, which removes the Item at Plaid).
  */
 
 function novaDeletionAdmin(): User
@@ -267,4 +269,35 @@ test('an admin cannot delete a file through nova', function () {
     $resource = new App\Nova\File($file);
     expect($resource->authorizedToDelete(request()))->toBeFalse()
         ->and($resource->authorizedToForceDelete(request()))->toBeFalse();
+});
+
+test('an admin cannot delete a plaid connection through nova', function () {
+    $plaid = FakePlaidApi::install();
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $connection = PlaidConnection::create([
+        'budget_id' => $budget->id,
+        'plaid_item_id' => 'item-one',
+        'institution_name' => 'First Platypus Bank',
+        'access_token' => 'access-item-one',
+        'status' => PlaidConnection::STATUS_ACTIVE,
+    ]);
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/plaid-connections?resources[]='.$connection->id)
+        ->assertOk();
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/plaid-connections?resources=all')
+        ->assertOk();
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/plaid-connections/force?resources[]='.$connection->id);
+
+    expect(PlaidConnection::find($connection->id))->not->toBeNull()
+        ->and(collect($plaid->requests)->where('path', '/item/remove')->all())->toBe([]);
+
+    $this->actingAs($admin)
+        ->getJson('/nova-api/plaid-connections/'.$connection->id)
+        ->assertOk()
+        ->assertJsonPath('resource.authorizedToDelete', false)
+        ->assertJsonPath('resource.authorizedToForceDelete', false);
 });

@@ -57,6 +57,7 @@ business_rules:
   - deleting an account from Nova applies the app's guards (refused with a validation error while it has transfers or transactions) and removes its Plaid connection and the Item at Plaid when it was the connection's last account (ACCOUNT-002)
   - deleting a file attachment from Nova detaches it through FileService, removing a file and S3 object nothing else uses
   - files cannot be deleted from Nova (single, bulk or force delete); a bare row delete would leave the S3 object and activity rows, so an admin deletes the file's attachments instead
+  - Plaid connections cannot be deleted from Nova (single, bulk or force delete); a bare delete would leave the Item live at Plaid, so owners unlink connections in the app
   - users cannot be deleted from Nova (single, bulk or force delete); a bare row delete would skip AccountDeletionService, so users delete their own accounts from Profile (PROFILE-002)
 scenarios:
   - id: admin_gate_allows
@@ -166,8 +167,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a file through nova
+  - id: nova_plaid_connection_delete_denied
+    kind: authorization
+    description: An admin's single, bulk ("all") and force delete of a Plaid connection through Nova's API deletes nothing and calls Plaid for nothing, and the resource reports it cannot be deleted or force deleted.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a plaid connection through nova
 known_issues:
-  - Deleting a Plaid Connection from Nova is still a bare soft delete (the Item stays live at Plaid)
   - The Nova File resource's Uploaded By field names an `uploader` relation, but App\Models\File defines `uploadedBy`, so a File detail request returns 500
 confidence: medium
 evidence:

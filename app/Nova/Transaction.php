@@ -2,7 +2,9 @@
 
 namespace App\Nova;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
@@ -61,6 +63,35 @@ class Transaction extends Resource
                 'resources' => 'This transaction is part of a transfer. Delete the transfer instead.',
             ]);
         }
+    }
+
+    /**
+     * Transfer legs are not edited on their own either: TransferService keeps both
+     * legs and the transfer in step, and the app sends leg edits to the transfer.
+     * Edit the transfer in the app instead. This also stops replicating a leg.
+     */
+    public function authorizedToUpdate(Request $request): bool
+    {
+        return ! $this->isTransferLeg() && parent::authorizedToUpdate($request);
+    }
+
+    /**
+     * Nova's update endpoints call this rather than authorizedToUpdate.
+     *
+     * @throws AuthorizationException
+     */
+    public function authorizeToUpdate(Request $request): void
+    {
+        if ($this->isTransferLeg()) {
+            throw new AuthorizationException('This transaction is part of a transfer. Edit the transfer instead.');
+        }
+
+        parent::authorizeToUpdate($request);
+    }
+
+    private function isTransferLeg(): bool
+    {
+        return $this->resource instanceof \App\Models\Transaction && $this->resource->isTransfer();
     }
 
     /**

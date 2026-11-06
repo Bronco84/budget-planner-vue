@@ -35,7 +35,7 @@ depends_on:
   - path: app/Services/PlaidService.php
     reason: the Account resource's beforeDelete calls deleteConnectionIfEmpty (empty connection and its Plaid item removed)
   - path: app/Services/TransferService.php
-    reason: transfer legs are kept in sync by it, so the Transaction resource's beforeDelete refuses deleting a leg on its own
+    reason: transfer legs are kept in sync by it, so the Transaction resource refuses deleting (beforeDelete) or editing (authorizedToUpdate/authorizeToUpdate) a leg on its own
   - path: app/Models/Category.php
     reason: deletionBlockedReason() is the delete guard shared with CategoryController::destroy (CATEGORY-002)
   - path: app/Models/Account.php
@@ -61,6 +61,7 @@ business_rules:
   - deleting an account from Nova applies the app's guards (refused with a validation error while it has transfers or transactions) and removes its Plaid connection and the Item at Plaid when it was the connection's last account (ACCOUNT-002)
   - deleting a category from Nova applies the app's guard (refused with a validation error while transactions are in it, linked by id or legacy rows by name) (CATEGORY-002)
   - a transfer leg cannot be deleted from Nova (refused with a validation error, as the app redirects to the transfer); the transfer and both legs stay, and the transfer is deleted in the app (TRANSFER-002)
+  - a transfer leg cannot be edited or replicated from Nova (update refused with 403, as the app redirects leg edits to the transfer); both legs and the transfer stay unchanged, and the transfer is edited in the app (TRANSFER-002); other transactions stay editable
   - deleting a file attachment from Nova detaches it through FileService, removing a file and S3 object nothing else uses
   - files cannot be deleted from Nova (single, bulk or force delete); a bare row delete would leave the S3 object and activity rows, so an admin deletes the file's attachments instead
   - Plaid connections cannot be deleted from Nova (single, bulk or force delete); a bare delete would leave the Item live at Plaid, so owners unlink connections in the app
@@ -187,6 +188,13 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete one leg of a transfer
+  - id: nova_transfer_leg_edit_denied
+    kind: authorization
+    description: Nova refuses (403) to update one leg of a transfer, both legs and the transfer stay unchanged, and the leg's detail reports it cannot be updated or replicated; a transaction outside a transfer is still updated.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaTransferLegEditTest.php::nova refuses to edit one leg of a transfer and leaves the transfer in step
+      - tests/Feature/Admin/NovaTransferLegEditTest.php::nova still edits a transaction that is not part of a transfer
   - id: nova_file_delete_denied
     kind: authorization
     description: An admin's single and bulk ("all") delete of a file through Nova's API deletes nothing (row, attachments and S3 object stay), and the File resource reports it cannot be deleted or force deleted.

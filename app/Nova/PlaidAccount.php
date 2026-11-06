@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use Illuminate\Http\Request;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
@@ -40,6 +41,22 @@ class PlaidAccount extends Resource
     public static $search = [
         'id', 'account_name', 'plaid_account_id', 'account_mask',
     ];
+
+    /**
+     * Plaid accounts are never deleted from Nova: deleting the last one of a
+     * connection would leave the connection empty with its Item live at Plaid.
+     * Owners unlink accounts in the app, which removes an emptied connection and
+     * its Item through PlaidService.
+     */
+    public function authorizedToDelete(Request $request): bool
+    {
+        return false;
+    }
+
+    public function authorizedToForceDelete(Request $request): bool
+    {
+        return false;
+    }
 
     /**
      * Get the fields displayed by the resource.

@@ -301,3 +301,37 @@ test('an admin cannot delete a plaid connection through nova', function () {
         ->assertJsonPath('resource.authorizedToDelete', false)
         ->assertJsonPath('resource.authorizedToForceDelete', false);
 });
+
+test('an admin cannot delete a plaid account through nova', function () {
+    $plaid = FakePlaidApi::install();
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $connection = PlaidConnection::create([
+        'budget_id' => $budget->id,
+        'plaid_item_id' => 'item-one',
+        'institution_name' => 'First Platypus Bank',
+        'access_token' => 'access-item-one',
+        'status' => PlaidConnection::STATUS_ACTIVE,
+    ]);
+    $account = novaDeletionPlaidAccount($connection, $budget, 'acc-1');
+    $plaidAccount = PlaidAccount::where('account_id', $account->id)->sole();
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/plaid-accounts?resources[]='.$plaidAccount->id)
+        ->assertOk();
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/plaid-accounts?resources=all')
+        ->assertOk();
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/plaid-accounts/force?resources[]='.$plaidAccount->id);
+
+    expect(PlaidAccount::find($plaidAccount->id))->not->toBeNull()
+        ->and(PlaidConnection::find($connection->id))->not->toBeNull()
+        ->and(collect($plaid->requests)->where('path', '/item/remove')->all())->toBe([]);
+
+    $this->actingAs($admin)
+        ->getJson('/nova-api/plaid-accounts/'.$plaidAccount->id)
+        ->assertOk()
+        ->assertJsonPath('resource.authorizedToDelete', false)
+        ->assertJsonPath('resource.authorizedToForceDelete', false);
+});

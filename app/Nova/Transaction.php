@@ -2,6 +2,8 @@
 
 namespace App\Nova;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
@@ -41,6 +43,25 @@ class Transaction extends Resource
     public static $search = [
         'id', 'description', 'category', 'notes',
     ];
+
+    /**
+     * Transfer legs are kept in sync by TransferService, so, as in the app, a leg
+     * cannot be deleted on its own (that would leave the transfer and its other
+     * leg behind). Delete the transfer in the app instead. Other transactions are
+     * deleted by Nova; the model's deleting hook removes their attachments.
+     *
+     * @param  \App\Models\Transaction  $model
+     *
+     * @throws ValidationException
+     */
+    public static function beforeDelete(NovaRequest $request, Model $model): void
+    {
+        if ($model->isTransfer()) {
+            throw ValidationException::withMessages([
+                'resources' => 'This transaction is part of a transfer. Delete the transfer instead.',
+            ]);
+        }
+    }
 
     /**
      * Get the fields displayed by the resource.

@@ -34,6 +34,8 @@ depends_on:
     reason: the FileAttachment resource's beforeDelete detaches through it (unused file and S3 object removed)
   - path: app/Services/PlaidService.php
     reason: the Account resource's beforeDelete calls deleteConnectionIfEmpty (empty connection and its Plaid item removed)
+  - path: app/Services/TransferService.php
+    reason: transfer legs are kept in sync by it, so the Transaction resource's beforeDelete refuses deleting a leg on its own
   - path: app/Models/Account.php
     reason: deletionBlockedReason() is the delete guard shared with AccountController::destroy (ACCOUNT-002)
   - path: app/Nova/Actions/LiftChatBan.php
@@ -55,6 +57,7 @@ business_rules:
   - is_admin is not mass-assignable
   - deleting a budget from Nova runs BudgetDeletionService, the same cleanup as deleting it in the app (BUDGET-005); BudgetPolicy still limits it to the budget's owner
   - deleting an account from Nova applies the app's guards (refused with a validation error while it has transfers or transactions) and removes its Plaid connection and the Item at Plaid when it was the connection's last account (ACCOUNT-002)
+  - a transfer leg cannot be deleted from Nova (refused with a validation error, as the app redirects to the transfer); the transfer and both legs stay, and the transfer is deleted in the app (TRANSFER-002)
   - deleting a file attachment from Nova detaches it through FileService, removing a file and S3 object nothing else uses
   - files cannot be deleted from Nova (single, bulk or force delete); a bare row delete would leave the S3 object and activity rows, so an admin deletes the file's attachments instead
   - Plaid connections cannot be deleted from Nova (single, bulk or force delete); a bare delete would leave the Item live at Plaid, so owners unlink connections in the app
@@ -162,6 +165,12 @@ scenarios:
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete an account with transactions
       - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete an account with transfers
+  - id: nova_transfer_leg_delete_guarded
+    kind: validation
+    description: Nova refuses (422) to delete one leg of a transfer, and the transfer and both legs stay.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete one leg of a transfer
   - id: nova_file_delete_denied
     kind: authorization
     description: An admin's single and bulk ("all") delete of a file through Nova's API deletes nothing (row, attachments and S3 object stay), and the File resource reports it cannot be deleted or force deleted.

@@ -9,6 +9,7 @@ use App\Models\PlaidConnection;
 use App\Models\Transaction;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Services\TransferService;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Tests\Support\FakePlaidApi;
@@ -334,4 +335,28 @@ test('an admin cannot delete a plaid account through nova', function () {
         ->assertOk()
         ->assertJsonPath('resource.authorizedToDelete', false)
         ->assertJsonPath('resource.authorizedToForceDelete', false);
+});
+
+test('nova refuses to delete one leg of a transfer', function () {
+    $admin = novaDeletionAdmin();
+    $budget = Budget::factory()->create(['user_id' => $admin->id]);
+    $checking = Account::factory()->checking()->create(['budget_id' => $budget->id]);
+    $savings = Account::factory()->savings()->create(['budget_id' => $budget->id]);
+    $transfer = app(TransferService::class)->create([
+        'budget_id' => $budget->id,
+        'from_account_id' => $checking->id,
+        'to_account_id' => $savings->id,
+        'amount_in_cents' => 5000,
+        'date' => now()->toDateString(),
+        'description' => 'Move to savings',
+    ]);
+    $leg = Transaction::where('transfer_id', $transfer->id)->where('account_id', $checking->id)->sole();
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/transactions?resources[]='.$leg->id)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['resources' => 'This transaction is part of a transfer. Delete the transfer instead.']);
+
+    expect(Transfer::find($transfer->id))->not->toBeNull()
+        ->and(Transaction::where('transfer_id', $transfer->id)->count())->toBe(2);
 });

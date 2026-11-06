@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 
 class Category extends Model
@@ -67,6 +68,106 @@ class Category extends Model
     public function recurringTransactionTemplates(): HasMany
     {
         return $this->hasMany(RecurringTransactionTemplate::class);
+    }
+
+    /**
+     * The key an unlinked legacy `category` string matches a category name by:
+     * trimmed of spaces and lowercased, as SyncsCategoryAssignment links new
+     * writes. nameKeySql() is its SQL twin; the two must agree on every engine.
+     */
+    public static function nameKey(?string $name): string
+    {
+        return mb_strtolower(trim((string) $name, ' '));
+    }
+
+    /**
+     * SQL for nameKey() over a column: LOWER(TRIM(column)). On MySQL it is
+     * compared as bytes, so the column's collation (accent- and
+     * pad-insensitive by default) cannot widen the match beyond case and
+     * surrounding spaces; SQLite and MySQL then agree with nameKey().
+     */
+    public static function nameKeySql(string $column): string
+    {
+        $key = "LOWER(TRIM({$column}))";
+
+        return in_array((new self)->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)
+            ? "CAST({$key} AS BINARY)"
+            : $key;
+    }
+
+    /**
+     * Whether unlinked legacy rows whose category string matches this
+     * category's name key count toward it. When several categories share a
+     * key, only the one with the lowest id claims them (the one
+     * findForBudgetByName, and so SyncsCategoryAssignment, links new writes
+     * to), so a legacy row is never counted twice.
+     */
+    public function claimsLegacyName(): bool
+    {
+        $key = static::nameKey($this->name);
+
+        if ($key === '') {
+            return false;
+        }
+
+        $ownerId = static::query()
+            ->withoutGlobalScope('ordered')
+            ->where('budget_id', $this->budget_id)
+            ->whereRaw(static::nameKeySql('name').' = ?', [$key])
+            ->orderBy('id')
+            ->value('id');
+
+        return (int) $ownerId === (int) $this->id;
+    }
+
+    /**
+     * Expense totals of unlinked legacy rows per claiming category id, summed
+     * in SQL by name key (rows differing only in case or surrounding spaces
+     * merge) and mapped back to the category that claims each key.
+     *
+     * @param  Builder  $query  transactions already scoped to the budget and filters
+     * @param  iterable<int, self>  $categories  the budget's categories
+     * @return array<int, int>
+     */
+    public static function legacySpentByCategory(Builder $query, iterable $categories): array
+    {
+        $owners = [];
+
+        foreach (collect($categories)->sortBy('id') as $category) {
+            $key = static::nameKey($category->name);
+
+            if ($key !== '' && ! isset($owners[$key])) {
+                $owners[$key] = (int) $category->id;
+            }
+        }
+
+        if ($owners === []) {
+            return [];
+        }
+
+        // Keys are bound as strings: PHP turns numeric-looking array keys into
+        // ints, and MySQL would then compare numerically.
+        $keys = array_map('strval', array_keys($owners));
+        $keySql = static::nameKeySql('transactions.category');
+
+        $rows = $query
+            ->whereNull('transactions.category_id')
+            ->whereRaw($keySql.' IN ('.implode(', ', array_fill(0, count($keys), '?')).')', $keys)
+            ->groupByRaw($keySql)
+            ->selectRaw($keySql.' as name_key, SUM(amount_in_cents) as total')
+            ->get();
+
+        $spent = [];
+
+        foreach ($rows as $row) {
+            $categoryId = $owners[(string) $row->name_key] ?? null;
+
+            if ($categoryId !== null) {
+                $spent[$categoryId] = ($spent[$categoryId] ?? 0) + (int) $row->total;
+            }
+        }
+
+        return $spent;
     }
 
     /**
@@ -156,16 +257,29 @@ class Category extends Model
                 return;
             }
 
-            $oldName = $category->getOriginal('name');
+            // Legacy rows match the old name as everywhere else (trimmed,
+            // case-insensitive), and only if this category claimed them: a
+            // category with a lower id sharing the old name key keeps them
+            // (see claimsLegacyName()).
+            $oldKey = static::nameKey($category->getOriginal('name'));
+            $adoptsLegacy = $oldKey !== '' && ! static::query()
+                ->where('budget_id', $category->budget_id)
+                ->where('id', '<', $category->id)
+                ->whereRaw(static::nameKeySql('name').' = ?', [$oldKey])
+                ->exists();
 
             foreach ([Transaction::class, RecurringTransactionTemplate::class] as $model) {
                 $model::query()
                     ->where('budget_id', $category->budget_id)
-                    ->where(function ($query) use ($category, $oldName) {
-                        $query->where('category_id', $category->id)
-                            ->orWhere(function ($legacy) use ($oldName) {
-                                $legacy->whereNull('category_id')->where('category', $oldName);
+                    ->where(function ($query) use ($category, $oldKey, $adoptsLegacy) {
+                        $query->where('category_id', $category->id);
+
+                        if ($adoptsLegacy) {
+                            $query->orWhere(function ($legacy) use ($oldKey) {
+                                $legacy->whereNull('category_id')
+                                    ->whereRaw(static::nameKeySql('category').' = ?', [$oldKey]);
                             });
+                        }
                     })
                     ->update(['category_id' => $category->id, 'category' => $category->name]);
             }

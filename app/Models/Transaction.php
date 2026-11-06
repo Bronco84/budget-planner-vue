@@ -199,21 +199,30 @@ class Transaction extends Model
 
     /**
      * Scope to transactions assigned to the given category: linked by id, or
-     * unlinked legacy rows whose category string equals the category's name.
+     * unlinked legacy rows whose category string matches the category's name
+     * trimmed and case-insensitively (Category::nameKey), when the category
+     * claims that name (Category::claimsLegacyName).
      */
     public function scopeInCategory(Builder $query, Category $category): Builder
     {
-        return $query->where(function (Builder $q) use ($category) {
-            $q->where('category_id', $category->id)
-                ->orWhere(function (Builder $legacy) use ($category) {
-                    $legacy->whereNull('category_id')->where('category', $category->name);
+        $claimsLegacy = $category->claimsLegacyName();
+        $column = $query->getModel()->qualifyColumn('category');
+
+        return $query->where(function (Builder $q) use ($category, $claimsLegacy, $column) {
+            $q->where('category_id', $category->id);
+
+            if ($claimsLegacy) {
+                $q->orWhere(function (Builder $legacy) use ($category, $column) {
+                    $legacy->whereNull('category_id')
+                        ->whereRaw(Category::nameKeySql($column).' = ?', [Category::nameKey($category->name)]);
                 });
+            }
         });
     }
 
     /**
      * Whether this transaction belongs to the given category (in-memory
-     * counterpart of scopeInCategory).
+     * counterpart of scopeInCategory, with the same legacy name matching).
      */
     public function isInCategory(Category $category): bool
     {
@@ -221,7 +230,11 @@ class Transaction extends Model
             return (int) $this->category_id === (int) $category->id;
         }
 
-        return $this->category === $category->name;
+        $key = Category::nameKey($this->category);
+
+        return $key !== ''
+            && $key === Category::nameKey($category->name)
+            && $category->claimsLegacyName();
     }
 
     /**

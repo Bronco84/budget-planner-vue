@@ -45,7 +45,7 @@ beforeEach(function () {
         [$this->checking, '2026-01-05', -5000, $groceries->id, 'Groceries', []],
         [$this->card, '2026-02-10', -2500, $groceries->id, null, []],
         [$this->checking, '2026-01-20', -1000, null, 'Groceries', []],        // legacy, name only
-        [$this->checking, '2026-01-21', -700, null, 'groceries', []],          // legacy, name differs in case
+        [$this->checking, '2026-01-21', -700, null, 'groceries ', []],         // legacy, differs in case and spaces: still counts (PR-083)
         [$this->checking, '2026-01-22', -4000, $dining->id, 'Groceries', []],  // id wins over the string
         [$this->checking, '2026-02-01', 1500, $groceries->id, 'Groceries', []], // refund, not spending
         [$this->card, '2026-02-14', -3000, null, 'Dining', []],               // legacy on the card
@@ -109,13 +109,13 @@ test('budget performance for all accounts matches the pinned values', function (
     // Two full months: allocations are twice the monthly amount.
     expect($performance['categories'])->toBe([
         performanceRow('Rent', 0, 120000, 0),
-        performanceRow('Groceries', 60000, 8500, 8500 / 60000 * 100),
+        performanceRow('Groceries', 60000, 9200, 9200 / 60000 * 100),
         performanceRow('Dining', 20000, 7000, 7000 / 20000 * 100),
         performanceRow('Utilities', 10000, 0, 0),
     ])->and($performance['summary'])->toBe([
         'totalAllocated' => 90000,
-        'totalSpent' => 135500,
-        'totalRemaining' => -45500,
+        'totalSpent' => 136200,
+        'totalRemaining' => -46200,
         'categoriesOverBudget' => 1,
     ]);
 });

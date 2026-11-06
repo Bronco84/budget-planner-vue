@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\Category;
 use App\Models\PayoffPlanDebt;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
@@ -365,28 +366,16 @@ class ReportsController extends Controller
             ->selectRaw('category_id, SUM(amount_in_cents) as total')
             ->pluck('total', 'category_id');
 
-        // The legacy match is an exact string comparison, as in isInCategory.
-        // MySQL's default collation compares case- and trailing-space-
-        // insensitively, so group by the binary value there; the names are
-        // then looked up exactly (PHP array keys are case-sensitive).
-        $legacyKey = in_array($budget->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)
-            ? 'CAST(category AS BINARY)'
-            : 'category';
-
-        $spentByLegacyName = $expenses()
-            ->whereNull('category_id')
-            ->whereIn('category', $categories->pluck('name'))
-            ->groupByRaw($legacyKey)
-            ->selectRaw('MIN(category) as name, SUM(amount_in_cents) as total')
-            ->get()
-            ->mapWithKeys(fn ($row) => [$row->name => (int) $row->total]);
+        // The legacy match is trimmed and case-insensitive, as in
+        // isInCategory, and independent of the column's collation.
+        $spentByLegacyName = Category::legacySpentByCategory($expenses(), $categories);
 
         $categoryPerformance = [];
         $monthsInRange = $this->monthsInRange($startDate, $endDate);
 
         foreach ($categories as $category) {
             $spent = abs((int) ($spentById[$category->id] ?? 0))
-                + abs((int) ($spentByLegacyName[$category->name] ?? 0));
+                + abs((int) ($spentByLegacyName[$category->id] ?? 0));
             // Category amounts are monthly dollars; prorate them over the selected range.
             $allocated = (int) round($category->amount * 100 * $monthsInRange);
 

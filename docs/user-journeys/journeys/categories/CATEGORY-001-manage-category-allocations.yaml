@@ -35,8 +35,10 @@ postconditions:
   - category list reflects the change
 business_rules:
   - name required (max 255), amount required numeric >= 0 (stored in dollars), colour max 7 chars, description max 1000 (stored in a TEXT column so strict MySQL accepts the full length)
-  - spent = sum of |amount_in_cents| of the budget's negative transactions (all time, no date bound) linked to the category by category_id, plus unlinked (category_id null) legacy rows whose category string equals the category name; pending rows the bank dropped (removed_by_bank_at) are excluded, as in every other total; summed in SQL grouped by category_id / legacy name
-  - renaming a category keeps its transactions and recurring templates (they reference the id); the denormalized `category` string on them is updated to the new name, and unlinked rows carrying the old name are adopted
+  - spent = sum of |amount_in_cents| of the budget's negative transactions (all time, no date bound) linked to the category by category_id, plus unlinked (category_id null) legacy rows whose category string matches the category name trimmed of spaces and case-insensitively; pending rows the bank dropped (removed_by_bank_at) are excluded, as in every other total; summed in SQL grouped by category_id / legacy name key, so legacy rows differing only in case or spaces merge into one total
+  - legacy name matching is one rule everywhere (Category::nameKey in PHP, LOWER(TRIM(category)) in SQL, compared as bytes on MySQL so the column collation cannot widen it), the same normalisation SyncsCategoryAssignment links new writes by; Transaction::isInCategory, Transaction::scopeInCategory (delete blocking, budget/category accessors), the categories page and the budget performance report agree on SQLite and MySQL
+  - when several categories share a name key, only the lowest-id one (the one findForBudgetByName links new writes to) claims the matching legacy rows, so none is counted twice
+  - renaming a category keeps its transactions and recurring templates (they reference the id); the denormalized `category` string on them is updated to the new name, and unlinked rows matching the old name (trimmed, case-insensitive) are adopted unless a lower-id category shares that name
   - category_id was backfilled by migration from the category string (trimmed, case-insensitive, same budget); unmatched rows keep category_id null and their string
   - percent_used is 0 when the allocation is 0
 scenarios:
@@ -100,6 +102,16 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Categories/CategoryLinkingTest.php::spending is grouped by category id with the legacy string as fallback
+  - id: legacy_name_matching_normalised
+    kind: edge
+    description: An unlinked legacy row whose category differs only in case or surrounding spaces (e.g. 'groceries ') counts toward the category in isInCategory, scopeInCategory, the categories page and the report; such rows merge into one total, near-miss names do not count, a name shared by two categories counts once toward the lowest id, and a rename adopts case-variant legacy rows only when the category claimed them.
+    coverage: covered
+    tests:
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::a legacy row differing only in case or surrounding spaces counts toward the category everywhere
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::legacy rows that differ only in case or spaces merge into one category total
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::a legacy name shared by two categories counts once, toward the one new writes link to
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::renaming a category adopts legacy rows matching its old name in any case
+      - tests/Feature/Categories/LegacyCategoryMatchingTest.php::renaming a category does not take legacy rows claimed by an earlier category of the same name
   - id: backfill_links_existing_rows
     kind: integration
     description: The category_id migration links existing transactions and templates by trimmed, case-insensitive name within the same budget and leaves unmatched rows (and the string) untouched; down() drops the column.

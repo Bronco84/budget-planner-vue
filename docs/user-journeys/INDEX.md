@@ -215,7 +215,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 
 - **CATEGORY-001** Owner reviews spending by category and creates or edits categories _(implemented, high)_
   - Routes: `budgets.categories.index`, `budgets.categories.store`, `budgets.categories.update`
-  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/Categories/CategoryManagementTest.php`
+  - Tests: `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/Categories/CategoryManagementTest.php`, `tests/Feature/Categories/LegacyCategoryMatchingTest.php`
 - **CATEGORY-002** Owner deletes an unused category _(implemented, medium)_
   - Routes: `budgets.categories.destroy`
   - Tests: `tests/Feature/Categories/CategoryDeleteAndReorderTest.php`, `tests/Feature/Categories/CategoryLinkingTest.php`, `tests/Feature/Categories/CategoryValidationTest.php`

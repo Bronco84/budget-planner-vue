@@ -41,16 +41,12 @@ class CategoryController extends Controller
             ->selectRaw('category_id, SUM(amount_in_cents) as total')
             ->pluck('total', 'category_id');
 
-        $spentByLegacyName = $expenses()
-            ->whereNull('category_id')
-            ->whereIn('category', $categories->pluck('name'))
-            ->groupBy('category')
-            ->selectRaw('category, SUM(amount_in_cents) as total')
-            ->pluck('total', 'category');
+        // Legacy names match trimmed and case-insensitively on every engine.
+        $spentByLegacyName = Category::legacySpentByCategory($expenses(), $categories);
 
         $categoriesWithSpent = $categories->map(function ($category) use ($spentById, $spentByLegacyName) {
             $spent = abs((int) ($spentById[$category->id] ?? 0))
-                + abs((int) ($spentByLegacyName[$category->name] ?? 0));
+                + abs((int) ($spentByLegacyName[$category->id] ?? 0));
 
             return [
                 'id' => $category->id,

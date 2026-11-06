@@ -139,6 +139,8 @@ class Budget extends Model
 
     /**
      * Get the categories for the budget.
+     *
+     * @return HasMany<Category, $this>
      */
     public function categories(): HasMany
     {

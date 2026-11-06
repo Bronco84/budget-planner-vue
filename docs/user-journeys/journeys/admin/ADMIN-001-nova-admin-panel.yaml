@@ -135,6 +135,13 @@ scenarios:
     tests:
       - tests/Feature/SecurityNovaAccessTest.php::the owner admin migration grants is_admin to the previously allowlisted email
       - tests/Feature/SecurityNovaAccessTest.php::the owner admin migration is a no-op when the owner account does not exist
+  - id: nova_relation_fields_resolve
+    kind: edge
+    description: Every relationship field of every Nova resource names a relation its model defines, and an admin can open a File's detail page (its Uploaded By field once named a missing relation and returned 500).
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaRelationFieldsTest.php::every nova relationship field names a relation its model defines
+      - tests/Feature/Admin/NovaRelationFieldsTest.php::an admin can open a file detail page in nova
   - id: nova_user_delete_denied
     kind: authorization
     description: An admin's single, bulk ("all") and force delete of a user through Nova's API deletes nothing, and the user resource reports it cannot be deleted.
@@ -198,8 +205,7 @@ scenarios:
     coverage: covered
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a plaid account through nova
-known_issues:
-  - The Nova File resource's Uploaded By field names an `uploader` relation, but App\Models\File defines `uploadedBy`, so a File detail request returns 500
+known_issues: []
 confidence: medium
 evidence:
   - app/Providers/NovaServiceProvider.php gate(), routes()

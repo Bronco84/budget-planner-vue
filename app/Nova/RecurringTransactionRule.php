@@ -21,7 +21,7 @@ class RecurringTransactionRule extends Resource
     {
         return [
             ID::make()->sortable(),
-            BelongsTo::make('Recurring Transaction Template', 'recurringTransactionTemplate', RecurringTransactionTemplate::class)->sortable()->required(),
+            BelongsTo::make('Recurring Transaction Template', 'template', RecurringTransactionTemplate::class)->sortable()->required(),
             Text::make('Field')->sortable()->required(),
             Text::make('Operator')->sortable()->required(),
             Text::make('Value')->sortable(),

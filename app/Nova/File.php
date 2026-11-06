@@ -43,7 +43,7 @@ class File extends Resource
             Text::make('MIME Type', 'mime_type')->sortable(),
             Text::make('Extension')->sortable(),
             Number::make('Size (bytes)', 'size_bytes')->sortable(),
-            BelongsTo::make('Uploaded By', 'uploader', User::class)->nullable(),
+            BelongsTo::make('Uploaded By', 'uploadedBy', User::class)->nullable(),
             HasMany::make('Attachments', 'attachments', FileAttachment::class),
         ];
     }

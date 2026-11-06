@@ -138,7 +138,7 @@ Coverage is declared per scenario in each journey file and verified by `php bin/
 ### admin
 
 - **ADMIN-001** Administrator manages application data in the Nova panel _(implemented, medium)_
-  - Tests: `tests/Feature/Admin/NovaDeletionTest.php`, `tests/Feature/Admin/NovaHttpAccessTest.php`, `tests/Feature/SecurityNovaAccessTest.php`
+  - Tests: `tests/Feature/Admin/NovaDeletionTest.php`, `tests/Feature/Admin/NovaHttpAccessTest.php`, `tests/Feature/Admin/NovaRelationFieldsTest.php`, `tests/Feature/SecurityNovaAccessTest.php`
 - **ADMIN-002** Administrator reviews flagged chat messages in Nova _(implemented, low)_
   - Tests: `tests/Feature/Admin/LiftChatBanTest.php`, `tests/Feature/Admin/NovaHttpAccessTest.php`, `tests/Feature/SecurityNovaAccessTest.php`
 

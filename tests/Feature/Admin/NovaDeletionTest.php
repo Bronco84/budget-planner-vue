@@ -22,6 +22,7 @@ use Tests\Support\FakePlaidApi;
  * from Nova is detached through FileService.
  * PR-084: an account deleted from Nova gets the app's guards (no transfers, no
  * transactions) and its empty Plaid connection is removed with its Item.
+ * PR-085: files cannot be deleted from Nova (delete their attachments instead).
  */
 
 function novaDeletionAdmin(): User
@@ -244,4 +245,26 @@ test('nova refuses to delete an account with transfers', function () {
         ->assertJsonValidationErrors(['resources' => 'This account has transfers.']);
 
     expect(Account::find($account->id))->not->toBeNull();
+});
+
+test('an admin cannot delete a file through nova', function () {
+    Storage::fake('s3');
+    $admin = novaDeletionAdmin();
+    $file = novaDeletionStoredFile($admin, 'hash-kept');
+    novaDeletionAttach($file, Budget::factory()->create(['user_id' => $admin->id]), $admin);
+
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/files?resources[]='.$file->id)
+        ->assertOk();
+    $this->actingAs($admin)
+        ->deleteJson('/nova-api/files?resources=all')
+        ->assertOk();
+
+    expect(File::find($file->id))->not->toBeNull()
+        ->and(FileAttachment::where('file_id', $file->id)->count())->toBe(1);
+    Storage::disk('s3')->assertExists('hash-kept');
+
+    $resource = new App\Nova\File($file);
+    expect($resource->authorizedToDelete(request()))->toBeFalse()
+        ->and($resource->authorizedToForceDelete(request()))->toBeFalse();
 });

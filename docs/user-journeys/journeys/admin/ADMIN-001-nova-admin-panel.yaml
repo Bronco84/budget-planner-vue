@@ -56,6 +56,7 @@ business_rules:
   - deleting a budget from Nova runs BudgetDeletionService, the same cleanup as deleting it in the app (BUDGET-005); BudgetPolicy still limits it to the budget's owner
   - deleting an account from Nova applies the app's guards (refused with a validation error while it has transfers or transactions) and removes its Plaid connection and the Item at Plaid when it was the connection's last account (ACCOUNT-002)
   - deleting a file attachment from Nova detaches it through FileService, removing a file and S3 object nothing else uses
+  - files cannot be deleted from Nova (single, bulk or force delete); a bare row delete would leave the S3 object and activity rows, so an admin deletes the file's attachments instead
   - users cannot be deleted from Nova (single, bulk or force delete); a bare row delete would skip AccountDeletionService, so users delete their own accounts from Profile (PROFILE-002)
 scenarios:
   - id: admin_gate_allows
@@ -159,8 +160,15 @@ scenarios:
     tests:
       - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete an account with transactions
       - tests/Feature/Admin/NovaDeletionTest.php::nova refuses to delete an account with transfers
+  - id: nova_file_delete_denied
+    kind: authorization
+    description: An admin's single and bulk ("all") delete of a file through Nova's API deletes nothing (row, attachments and S3 object stay), and the File resource reports it cannot be deleted or force deleted.
+    coverage: covered
+    tests:
+      - tests/Feature/Admin/NovaDeletionTest.php::an admin cannot delete a file through nova
 known_issues:
-  - Deleting a File or Plaid Connection from Nova is still a bare row delete (S3 objects and Plaid items are left)
+  - Deleting a Plaid Connection from Nova is still a bare soft delete (the Item stays live at Plaid)
+  - The Nova File resource's Uploaded By field names an `uploader` relation, but App\Models\File defines `uploadedBy`, so a File detail request returns 500
 confidence: medium
 evidence:
   - app/Providers/NovaServiceProvider.php gate(), routes()

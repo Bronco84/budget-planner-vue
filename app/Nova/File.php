@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use Illuminate\Http\Request;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Fields\ID;
@@ -16,6 +17,22 @@ class File extends Resource
     public static $title = 'original_name';
 
     public static $search = ['id', 'original_name', 'hash'];
+
+    /**
+     * Files are never deleted from Nova: a bare row delete leaves the S3 object and
+     * activity rows. Delete the file's attachments instead; FileAttachment's
+     * beforeDelete detaches through FileService, which removes a file nothing
+     * else uses from S3 and the database.
+     */
+    public function authorizedToDelete(Request $request): bool
+    {
+        return false;
+    }
+
+    public function authorizedToForceDelete(Request $request): bool
+    {
+        return false;
+    }
 
     public function fields(NovaRequest $request): array
     {

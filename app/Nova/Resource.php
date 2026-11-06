@@ -49,15 +49,22 @@ abstract class Resource extends NovaResource
      * A rule for a relation field whose record must belong to the given budget,
      * such as a transaction's account. Nova offers every budget's records in a
      * relation dropdown, while the app only ever pairs records of one budget.
-     * A missing record is left to Nova's own Relatable rule.
+     * A missing record is left to Nova's own Relatable rule. The budget may be
+     * given as a closure when finding it costs a query, so it is looked up only
+     * when the field is validated rather than each time the fields are built.
      *
      * @param  class-string<Model>  $model
+     * @param  mixed|Closure(): mixed  $budgetId
      */
     protected static function inBudget(string $model, mixed $budgetId): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) use ($model, $budgetId): void {
             if ($value === null || $value === '') {
                 return;
+            }
+
+            if ($budgetId instanceof Closure) {
+                $budgetId = $budgetId();
             }
 
             $ownerBudgetId = $model::query()->whereKey($value)->value('budget_id');

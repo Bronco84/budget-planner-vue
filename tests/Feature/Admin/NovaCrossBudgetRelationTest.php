@@ -2,6 +2,8 @@
 
 use App\Models\Account;
 use App\Models\Budget;
+use App\Models\PayoffPlan;
+use App\Models\PayoffPlanDebt;
 use App\Models\Property;
 use App\Models\RecurringTransactionTemplate;
 use App\Models\Transaction;
@@ -211,4 +213,66 @@ test('nova refuses a budget starting balance account from another budget', funct
         ->assertOk();
 
     expect($budget->fresh()->starting_balance_account_id)->toBe($account->id);
+});
+
+function novaCrossBudgetPayoffPlan(Budget $budget): PayoffPlan
+{
+    return PayoffPlan::create([
+        'budget_id' => $budget->id,
+        'name' => 'Debt free',
+        'strategy' => 'snowball',
+        'monthly_extra_payment_cents' => 0,
+        'is_active' => true,
+        'start_date' => now()->toDateString(),
+    ]);
+}
+
+function novaCrossBudgetPayoffDebt(PayoffPlan $plan, Account $account): PayoffPlanDebt
+{
+    return PayoffPlanDebt::create([
+        'payoff_plan_id' => $plan->id,
+        'account_id' => $account->id,
+        'starting_balance_cents' => 500000,
+        'interest_rate' => 19.99,
+        'minimum_payment_cents' => 15000,
+        'priority' => 1,
+    ]);
+}
+
+test('nova refuses a payoff plan debt account from another budget and changes nothing', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account, , $otherAccount] = novaCrossBudgetTwoBudgets($admin);
+    $debt = novaCrossBudgetPayoffDebt(novaCrossBudgetPayoffPlan($budget), $account);
+
+    novaCrossBudgetPut($admin, 'payoff-plan-debts', $debt->id, ['account' => $otherAccount->id, 'priority' => 7])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('account');
+
+    expect($debt->fresh()->only('account_id', 'priority'))
+        ->toBe(['account_id' => $account->id, 'priority' => 1]);
+});
+
+test('nova refuses to move a payoff plan debt to another budget plan while keeping its account', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account, $otherBudget] = novaCrossBudgetTwoBudgets($admin);
+    $plan = novaCrossBudgetPayoffPlan($budget);
+    $debt = novaCrossBudgetPayoffDebt($plan, $account);
+
+    novaCrossBudgetPut($admin, 'payoff-plan-debts', $debt->id, ['payoffPlan' => novaCrossBudgetPayoffPlan($otherBudget)->id])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('account');
+
+    expect($debt->fresh()->payoff_plan_id)->toBe($plan->id);
+});
+
+test('nova moves a payoff plan debt to another account in the plan budget', function () {
+    $admin = novaCrossBudgetAdmin();
+    [$budget, $account] = novaCrossBudgetTwoBudgets($admin);
+    $card = Account::factory()->create(['budget_id' => $budget->id]);
+    $debt = novaCrossBudgetPayoffDebt(novaCrossBudgetPayoffPlan($budget), $account);
+
+    novaCrossBudgetPut($admin, 'payoff-plan-debts', $debt->id, ['account' => $card->id])
+        ->assertOk();
+
+    expect($debt->fresh()->account_id)->toBe($card->id);
 });

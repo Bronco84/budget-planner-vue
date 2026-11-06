@@ -2,6 +2,8 @@
 
 namespace App\Nova;
 
+use App\Models\Account;
+use App\Models\PayoffPlan as PayoffPlanModel;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Card;
 use Laravel\Nova\Fields\BelongsTo;
@@ -53,7 +55,11 @@ class PayoffPlanDebt extends Resource
 
             BelongsTo::make('Account')
                 ->sortable()
-                ->required(),
+                ->required()
+                // The debt's budget is its payoff plan's: the plan chosen on the form, else the saved one.
+                ->rules([static::inBudget(Account::class, fn () => PayoffPlanModel::query()
+                    ->whereKey($request->input('payoffPlan', $this->resource?->payoff_plan_id))
+                    ->value('budget_id'))]),
 
             Number::make('Starting Balance', 'starting_balance_cents')
                 ->sortable()

@@ -92,6 +92,11 @@ scenarios:
     coverage: covered
     tests:
       - 'tests/Feature/Auth/PasskeyLoginCeremonyTest.php::a cloned authenticator whose counter does not advance is rejected'
+  - id: cloned_authenticator_disabled
+    kind: edge
+    description: Under laragear/webauthn a cloned authenticator's passkey was marked disabled.
+    coverage: not_applicable
+    note: laravel/passkeys has no disabled state; a cloned authenticator is rejected instead (see cloned_authenticator_rejected). Kept so the id is not reused.
   - id: counterless_authenticator_signs_in
     kind: alternate
     description: An authenticator that always reports a zero signature counter (e.g. synced passkeys) can sign in repeatedly.
